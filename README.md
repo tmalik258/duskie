@@ -31,16 +31,14 @@ Sidekick lives in a small island at the top of your screen, with a friendly orb 
 - **Works without AI.** Rules handle the everyday moments. Add Claude Code, the Anthropic API, Codex or a local model through Ollama for answers, drafts and multi-step tasks.
 - **Yours to shape.** Switch skills on, off or to automatic, record your own shortcuts, and write your own skills in YAML.
 
-## What's new in v0.2.0
+## What's new in v0.2.1
 
-Released October 10, 2026. See the [full changelog](CHANGELOG.md#020---2026-10-10) for features, improvements and fixes since v0.1.0.
+Released October 12, 2026. See the [full changelog](CHANGELOG.md#021---2026-10-12) for everything since v0.2.0.
 
-- **Coding agents in the island:** run up to four sessions with Claude Code, Codex, GitHub Copilot, Cursor's agent CLI or a local Ollama model. Review changes, keep or undo them, rewind and resume after restarting.
-- **Repos and GitHub:** see branches, incoming commits, pull requests and CI; update a branch with conflict review in the island, or copy a repository link to clone it.
-- **New instant results in Ask:** find installed apps and files as you type, or calculate an expression, without waiting for AI.
-- **Faster Ask and voice:** warmer AI sessions, faster spoken replies and clearer recovery when a model is unavailable.
-- **More control:** new appearance options, automatic editor detection, Morning setup and a Local only default for new chats under Settings > AI > Privacy.
-- **Windows fixes:** more reliable Ollama connections, answers that fit the panel, steadier This PC only behavior, voice test fixes and shortcuts that avoid GPU overlays.
+- **Live activity:** downloads, setup, agents and updates show progress in the island, with Check again and Dismiss.
+- **Clearer updates:** percentage, size, verify and install errors in the island and Settings; release builds check that installers match the tagged version.
+- **Projects and GitHub:** folder picker when no repos are found, fresher project lists, and steadier `gh` connection checks.
+- **Faster Agents:** last agent and model restore immediately, long sessions open on the recent timeline, and the open animation settles without a height jump.
 
 ## Install
 

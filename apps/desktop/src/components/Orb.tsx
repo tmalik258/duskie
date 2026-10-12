@@ -176,11 +176,24 @@ export function Orb({
   // Cursor: gaze anywhere on screen, magnetic pull only nearby.
   useEffect(() => {
     let release: ReturnType<typeof setTimeout> | undefined;
+    let cachedRect: DOMRect | null = null;
+    let lastRectTime = 0;
+
+    const onResize = () => {
+      cachedRect = null;
+    };
+    window.addEventListener("resize", onResize, { passive: true });
+
     const unsubscribe = subscribeCursor((x, y) => {
       const el = root.current;
       const e = engine.current;
       if (!el || !e) return;
-      const r = el.getBoundingClientRect();
+      const now = performance.now();
+      if (!cachedRect || now - lastRectTime > 250) {
+        cachedRect = el.getBoundingClientRect();
+        lastRectTime = now;
+      }
+      const r = cachedRect;
       const dx = x - (r.left + r.width / 2);
       const dy = y - (r.top + r.height / 2);
       const dist = Math.hypot(dx, dy) || 1;
@@ -198,6 +211,7 @@ export function Orb({
       release = setTimeout(() => engine.current?.gaze(0, 0), GAZE_RELEASE_MS);
     });
     return () => {
+      window.removeEventListener("resize", onResize);
       clearTimeout(release);
       unsubscribe();
     };

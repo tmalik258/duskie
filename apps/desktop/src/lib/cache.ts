@@ -11,15 +11,30 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 const memory = new Map<string, string>();
 const PREFIX = "sidekick:cache:";
+const subscribers = new Map<string, Set<(json: string) => void>>();
+const pending = new Map<string, Promise<unknown>>();
+
+function loadOnce<T>(key: string, load: () => Promise<T>): Promise<T> {
+  const active = pending.get(key);
+  if (active) return active as Promise<T>;
+  const request = Promise.resolve().then(load);
+  pending.set(key, request);
+  const clear = () => {
+    pending.delete(key);
+  };
+  void request.then(clear, clear);
+  return request;
+}
 
 /** Bump when setup-status shape or copy changes so stale localStorage is ignored. */
 export const SETUP_STATUS_CACHE_KEY = "setup-status:v2";
 
 /** Loads fresh data even when a cache entry exists (e.g. entering Connect). */
 export function revalidate<T>(key: string, load: () => Promise<T>): void {
-  void load()
-    .then((next) => writeJson(key, JSON.stringify(next)))
-    .catch(() => undefined);
+  // Settings may have changed while an older probe was still running.
+  const active = pending.get(key);
+  const next = active ? active.catch(() => undefined).then(() => loadOnce(key, load)) : loadOnce(key, load);
+  void next.then((next) => writeJson(key, JSON.stringify(next))).catch(() => undefined);
 }
 
 function readJson(key: string): string | null {
@@ -41,12 +56,13 @@ function writeJson(key: string, json: string) {
   } catch {
     // Storage can be full or blocked; memory still has it.
   }
+  for (const notify of subscribers.get(key) ?? []) notify(json);
 }
 
 /** Load into the cache if empty — e.g. while welcome speech plays on the prior step. */
 export function prefetch<T>(key: string, load: () => Promise<T>): void {
   if (readJson(key) !== null) return;
-  void load()
+  void loadOnce(key, load)
     .then((next) => writeJson(key, JSON.stringify(next)))
     .catch(() => undefined);
 }
@@ -80,9 +96,15 @@ export interface Cached<T> {
 
 /**
  * Loads `key` with `load`, showing the cached value meanwhile. Remount with
- * a cache hit does not refetch. `every` refreshes on an interval while mounted.
+ * a cache hit does not refetch unless `revalidateOnMount` is set. `every`
+ * refreshes on an interval while mounted. Writes update all mounted consumers.
  */
-export function useCached<T>(key: string, load: () => Promise<T>, every?: number): Cached<T> {
+export function useCached<T>(
+  key: string,
+  load: () => Promise<T>,
+  every?: number,
+  revalidateOnMount = false,
+): Cached<T> {
   const [data, setData] = useState<T | null>(() => cached<T>(key));
   const [refreshing, setRefreshing] = useState(false);
   const shown = useRef<string | null>(readJson(key));
@@ -106,29 +128,40 @@ export function useCached<T>(key: string, load: () => Promise<T>, every?: number
       const showBusy = opts?.busy === true || shown.current === null;
       if (showBusy) setRefreshing(true);
       try {
-        set(await loadRef.current());
+        set(await loadOnce(key, loadRef.current));
       } finally {
         if (showBusy) setRefreshing(false);
       }
     },
-    [set],
+    [key, set],
   );
 
   useEffect(() => {
+    const notify = (json: string) => {
+      if (json === shown.current) return;
+      shown.current = json;
+      setData(JSON.parse(json) as T);
+    };
+    const listeners = subscribers.get(key) ?? new Set<(json: string) => void>();
+    listeners.add(notify);
+    subscribers.set(key, listeners);
     // Another panel may have refreshed this key since we mounted.
     const json = readJson(key);
     if (json !== null && json !== shown.current) {
       shown.current = json;
       setData(JSON.parse(json) as T);
     }
-    // First time only: a remount with cache must not look like Check again.
-    if (shown.current === null) {
+    // Revalidation keeps cached rows visible while the fresh answer loads.
+    if (shown.current === null || revalidateOnMount) {
       void refresh().catch(() => undefined);
     }
-    if (!every) return;
-    const id = setInterval(() => void refresh().catch(() => undefined), every);
-    return () => clearInterval(id);
-  }, [key, every, refresh]);
+    const id = every ? setInterval(() => void refresh().catch(() => undefined), every) : undefined;
+    return () => {
+      if (id !== undefined) clearInterval(id);
+      listeners.delete(notify);
+      if (listeners.size === 0) subscribers.delete(key);
+    };
+  }, [key, every, refresh, revalidateOnMount]);
 
   return { data, refreshing, refresh, set };
 }

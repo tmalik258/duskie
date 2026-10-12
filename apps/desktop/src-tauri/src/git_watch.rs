@@ -24,12 +24,12 @@ pub const BASE_MOVED: &str = "dev.base_moved";
 const SWITCH_MIN: Duration = Duration::from_secs(30);
 const ACTIVE_EVERY: Duration = Duration::from_secs(60);
 const REST_EVERY: Duration = Duration::from_secs(5 * 60);
-const TICK: Duration = Duration::from_secs(15);
+const TICK: Duration = Duration::from_secs(30);
 /// A tick this late means the PC slept.
 const SLEPT: Duration = Duration::from_secs(90);
 const FETCH_TIMEOUT: Duration = Duration::from_secs(20);
 /// Background repos fetched per tick, so a big folder never stalls.
-const PER_TICK: usize = 3;
+const PER_TICK: usize = 2;
 
 const TERMINALS: &[&str] = &[
     "windowsterminal.exe",

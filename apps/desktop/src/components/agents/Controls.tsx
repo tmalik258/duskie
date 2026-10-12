@@ -65,13 +65,18 @@ function Pop({
   chip,
   className = "",
   children,
+  requested,
 }: {
   label: string;
   chip: ReactNode;
   className?: string;
   children: (close: () => void) => ReactNode;
+  requested?: number;
 }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (requested) setOpen(true);
+  }, [requested]);
   const btn = useRef<HTMLButtonElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const [at, setAt] = useState<{ left: number; bottom: number } | null>(null);
@@ -146,7 +151,7 @@ function Pop({
 function windowName(w: string): string {
   if (w === "five_hour") return "5-hour";
   if (w.startsWith("seven_day")) return "Weekly";
-  return "Plan";
+  return w;
 }
 
 function resetText(at: number | null): string {
@@ -165,6 +170,112 @@ function ago(t: number): string {
   return mins < 1 ? "just now" : mins < 60 ? `${mins} min ago` : `${Math.round(mins / 60)} h ago`;
 }
 
+/** Ticks only while the usage popover is open (this component mounts with the pop). */
+function UsageBody({
+  usage,
+  ctxPct,
+  plans,
+  now,
+  agent,
+  onCompact,
+  onRefresh,
+}: {
+  usage?: Session["usage"];
+  ctxPct: number | null;
+  plans: { used: number; window: string; resetsAt: number | null; at: number }[];
+  now: number;
+  agent: string;
+  onCompact?: () => void;
+  onRefresh?: () => void;
+}) {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return (
+    <>
+      {!usage && <p className="ak-note">Context capacity: Not reported</p>}
+      {usage && ctxPct !== null && (
+        <>
+          <div className="ak-pop-h">
+            <span>Context window</span>
+            <span className="ak-pop-m">
+              {Math.round(usage.used / 1000)}k / {Math.round(usage.window / 1000)}k ({ctxPct}%)
+            </span>
+          </div>
+          <div className="ak-pbar">
+            <i className="ak-pfill" style={{ width: `${ctxPct}%` }} />
+          </div>
+          <p className="ak-note">
+            {Math.max(0, usage.window - usage.used).toLocaleString()} tokens remaining {"\u00b7"} {100 - ctxPct}%
+            remaining
+          </p>
+          <p className="ak-note">
+            Latest usage: {usage.used.toLocaleString()} tokens. Session total:{" "}
+            {usage.total?.toLocaleString() ?? "Not reported"}. {usage.at ? `Reported ${ago(usage.at)}` : "Cached"}
+          </p>
+        </>
+      )}
+      {usage && plans.length > 0 && <div className="ak-pop-sep" />}
+      {plans.length > 0 && (
+        <>
+          <div className="ak-pop-h">
+            <span>Account allowance</span>
+          </div>
+          {plans.map((p) => {
+            const pPct = Math.round(p.used <= 1 ? p.used * 100 : p.used);
+            return (
+              <div key={p.window} className="ak-lim">
+                <div className="ak-pop-h">
+                  <span className="font-normal">{windowName(p.window)}</span>
+                  <span className="ak-pop-m">
+                    {`${100 - pPct}% remaining \u00b7 ${resetText(p.resetsAt) || "Reset not reported"}`}
+                  </span>
+                </div>
+                <p className="ak-note">
+                  {p.resetsAt ? new Date(p.resetsAt * 1000).toLocaleString() : "Reset timestamp: Not reported"}{" "}
+                  {"\u00b7"}{" "}
+                  {p.resetsAt && p.resetsAt * 1000 <= now ? "Expired; refresh required" : `Cached report ${ago(p.at)}`}
+                </p>
+                <div className="ak-pbar">
+                  <i
+                    className="ak-pfill"
+                    style={{ width: `${pPct}%`, background: pPct > 65 ? "#ff9f0a" : undefined }}
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </>
+      )}
+      <div className="ak-pop-h">
+        <span className="ak-pop-m">
+          {idOf(agent) === "codex" && plans.length === 0
+            ? "Account allowance: Not reported (API-key accounts may not report this)"
+            : plans.length > 0
+              ? `Sent with ${agent}'s usage warnings; last seen ${ago(Math.max(...plans.map((p) => p.at)))}`
+              : "Plan limits show once the agent reports them"}
+        </span>
+        {onCompact && (
+          <button type="button" className="chip ak-pop-btn" onClick={onCompact}>
+            Compact
+          </button>
+        )}
+        {onRefresh && (
+          <button type="button" className="chip ak-pop-btn" onClick={onRefresh}>
+            Refresh allowance
+          </button>
+        )}
+      </div>
+      <p className="ak-note">
+        Context capacity is what one turn can hold. Account allowance limits service usage over a time window.
+        Compaction summarizes earlier messages to free context; it does not reset allowance.
+      </p>
+    </>
+  );
+}
+
 export function ChatControls({
   agent,
   model,
@@ -176,6 +287,8 @@ export function ChatControls({
   onCompact,
   keys,
   localModel,
+  panel,
+  onRefresh,
 }: {
   agent: string;
   model: string | null | undefined;
@@ -189,6 +302,8 @@ export function ChatControls({
   keys?: string;
   /** For Local: the Ollama model it runs. */
   localModel?: string;
+  panel?: { name: string; at: number };
+  onRefresh?: () => void;
 }) {
   const models = modelsFor(agent);
   const [mark, color] = markOf(agent);
@@ -199,7 +314,6 @@ export function ChatControls({
   const now = Date.now();
   const byWindow = new Map<string, { used: number; window: string; resetsAt: number | null; at: number }>();
   for (const u of seenWindows(agent)) {
-    if (u.resetsAt !== null && u.resetsAt * 1000 <= now) continue;
     byWindow.set(u.window, u);
   }
   if (limit && limit.used !== null) {
@@ -216,14 +330,14 @@ export function ChatControls({
   });
   const top = seenUsage(agent);
   const planPct = top ? Math.round(top.used <= 1 ? top.used * 100 : top.used) : null;
-  const ctxPct = usage ? Math.round(Math.min(1, usage.used / usage.window) * 100) : null;
+  const ctxPct = usage && usage.window > 0 ? Math.round(Math.min(1, usage.used / usage.window) * 100) : null;
   const ringPct = ctxPct ?? planPct ?? 0;
   const usageText = [
     ctxPct !== null ? `${ctxPct}% context` : null,
     top && planPct !== null ? `${planPct}% ${windowName(top.window).toLowerCase()}` : null,
   ]
     .filter(Boolean)
-    .join(" · ");
+    .join(" \u00b7 ");
 
   const image = AGENT_IMAGES[idOf(agent)];
   const modelOptions: SelectOption[] = [
@@ -238,7 +352,7 @@ export function ChatControls({
     ...models.map(([v, l]) => ({
       value: v,
       label: l,
-      sub: ABOUT[v] ? `${ABOUT[v][0]} · ${ABOUT[v][1]}` : undefined,
+      sub: ABOUT[v] ? `${ABOUT[v][0]} \u00b7 ${ABOUT[v][1]}` : undefined,
       icon: image ? undefined : mark,
       image,
       color,
@@ -248,6 +362,27 @@ export function ChatControls({
 
   return (
     <div className="ak-ctl">
+      {panel?.name === "model" && (
+        <Pop label="Choose model" requested={panel.at} chip="Choose model">
+          {(close) => (
+            <>
+              {[["", "Default"], ...models].map(([value, label]) => (
+                <button
+                  type="button"
+                  className="chip ak-pop-btn"
+                  key={value}
+                  onClick={() => {
+                    onModel(value || null);
+                    close();
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </>
+          )}
+        </Pop>
+      )}
       {local ? (
         <span className="ak-cchip">
           <i className="ak-cdot" style={{ background: "#30d158" }} />
@@ -274,6 +409,7 @@ export function ChatControls({
       {(models.length > 0 || local) && (
         <Pop
           label="Thinking"
+          requested={panel?.name === "effort" ? panel.at : undefined}
           chip={
             <>
               <Brain />
@@ -341,82 +477,34 @@ export function ChatControls({
             <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
             <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" strokeWidth="1.3" />
           </svg>
-          On this PC · no limits
+          On this PC {"\u00b7"} no limits
         </span>
       ) : (
-        usageText && (
-          <Pop
-            label="Usage"
-            className="ak-cusage"
-            chip={
-              <>
-                <span className="ak-ring" aria-hidden="true">
-                  <i className="ak-cring" style={{ "--p": ringPct } as CSSProperties} />
-                </span>
-                {usageText}
-              </>
-            }
-          >
-            {() => (
-              <>
-                {usage && ctxPct !== null && (
-                  <>
-                    <div className="ak-pop-h">
-                      <span>Context window</span>
-                      <span className="ak-pop-m">
-                        {Math.round(usage.used / 1000)}k / {Math.round(usage.window / 1000)}k ({ctxPct}%)
-                      </span>
-                    </div>
-                    <div className="ak-pbar">
-                      <i className="ak-pfill" style={{ width: `${ctxPct}%` }} />
-                    </div>
-                  </>
-                )}
-                {usage && plans.length > 0 && <div className="ak-pop-sep" />}
-                {plans.length > 0 && (
-                  <>
-                    <div className="ak-pop-h">
-                      <span>Plan usage limits</span>
-                    </div>
-                    {plans.map((p) => {
-                      const pPct = Math.round(p.used <= 1 ? p.used * 100 : p.used);
-                      return (
-                        <div key={p.window} className="ak-lim">
-                          <div className="ak-pop-h">
-                            <span className="font-normal">{windowName(p.window)}</span>
-                            <span className="ak-pop-m">
-                              {[resetText(p.resetsAt), `${pPct}%`].filter(Boolean).join(" · ")}
-                            </span>
-                          </div>
-                          <div className="ak-pbar">
-                            <i
-                              className="ak-pfill"
-                              style={{ width: `${pPct}%`, background: pPct > 65 ? "#ff9f0a" : undefined }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </>
-                )}
-                <div className="ak-pop-h">
-                  <span className="ak-pop-m">
-                    {idOf(agent) === "codex" && plans.length === 0
-                      ? "Live from Codex"
-                      : plans.length > 0
-                        ? `Sent with ${agent}'s usage warnings; last seen ${ago(Math.max(...plans.map((p) => p.at)))}`
-                        : "Plan limits show once the agent reports them"}
-                  </span>
-                  {onCompact && (
-                    <button type="button" className="chip ak-pop-btn" onClick={onCompact}>
-                      Compact
-                    </button>
-                  )}
-                </div>
-              </>
-            )}
-          </Pop>
-        )
+        <Pop
+          label="Usage"
+          requested={panel?.name === "usage" ? panel.at : undefined}
+          className="ak-cusage"
+          chip={
+            <>
+              <span className="ak-ring" aria-hidden="true">
+                <i className="ak-cring" style={{ "--p": ringPct } as CSSProperties} />
+              </span>
+              {usageText || "Usage \u00b7 Not reported"}
+            </>
+          }
+        >
+          {() => (
+            <UsageBody
+              usage={usage}
+              ctxPct={ctxPct}
+              plans={plans}
+              now={now}
+              agent={agent}
+              onCompact={onCompact}
+              onRefresh={onRefresh}
+            />
+          )}
+        </Pop>
       )}
       {keys && <span className="ckeys mono">{keys}</span>}
     </div>

@@ -4,7 +4,7 @@
   "version": "0.3.0",
   "description": "Connects your browser to the Sidekick desktop companion: it reads and acts on pages when you ask, and tidies tabs.",
   "icons": { "32": "icons/32.png", "128": "icons/128.png" },
-  "permissions": ["tabs", "storage", "bookmarks", "alarms", "scripting"],
+  "permissions": ["tabs", "storage", "bookmarks", "alarms", "scripting", "downloads"],
   "host_permissions": ["http://127.0.0.1/*"],
   "background": { "service_worker": "background.js", "scripts": ["background.js"] },
   "content_scripts": [{ "matches": ["http://*/*", "https://*/*"], "js": ["content.js"], "run_at": "document_idle" }],

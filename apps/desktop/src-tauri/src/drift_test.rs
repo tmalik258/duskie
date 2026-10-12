@@ -36,17 +36,29 @@ fn invoked() -> BTreeSet<String> {
     names
 }
 
+/// Final path segment of each entry in `generate_handler![...]`.
+fn registered() -> BTreeSet<String> {
+    let start = LIB.find("generate_handler![").unwrap_or(0);
+    let end = LIB[start..]
+        .find("]))")
+        .map(|i| start + i)
+        .unwrap_or(LIB.len());
+    LIB[start..end]
+        .split(',')
+        .filter_map(|part| {
+            let name = part.trim().rsplit("::").next()?.trim();
+            if !name.is_empty() && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+                Some(name.to_owned())
+            } else {
+                None
+            }
+        })
+        .collect()
+}
+
 #[test]
 fn every_ui_command_is_registered() {
-    let registered: BTreeSet<String> = LIB
-        .match_indices("commands::")
-        .map(|(at, _)| {
-            LIB[at + "commands::".len()..]
-                .chars()
-                .take_while(|c| c.is_ascii_alphanumeric() || *c == '_')
-                .collect()
-        })
-        .collect();
+    let registered = registered();
     let missing: Vec<_> = invoked()
         .into_iter()
         .filter(|n| !registered.contains(n))

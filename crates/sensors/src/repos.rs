@@ -49,6 +49,9 @@ const MAX_REPOS: usize = 200;
 
 /// Git repos directly in `root` or one level down.
 pub fn find_repos(root: &Path) -> Vec<PathBuf> {
+    if root.is_dir() && root.join(".git").exists() {
+        return vec![root.to_path_buf()];
+    }
     let mut out = Vec::new();
     let Ok(entries) = std::fs::read_dir(root) else {
         return out;
@@ -336,6 +339,11 @@ mod tests {
         let mut repos = find_repos(&root);
         repos.sort();
         assert_eq!(repos.len(), 2);
+        assert_eq!(find_repos(&clean), vec![clean.clone()]);
+        let worktree = root.join("worktree");
+        std::fs::create_dir_all(&worktree).unwrap();
+        std::fs::write(worktree.join(".git"), "gitdir: ../clean/.git").unwrap();
+        assert_eq!(find_repos(&worktree), vec![worktree]);
         assert_eq!(unsaved(&clean), None);
         assert_eq!(unsaved(&dirty), Some((1, 0)));
 

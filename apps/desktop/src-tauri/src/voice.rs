@@ -1177,6 +1177,17 @@ pub fn download(app: &AppHandle) -> Result<(), String> {
     if v.downloading.swap(true, Ordering::SeqCst) {
         return Ok(());
     }
+    let activity_id = format!("voice:{}", ulid::Ulid::new());
+    crate::activity::report(
+        app,
+        &activity_id,
+        "voice",
+        "Downloading voice models",
+        crate::activity::Phase::Downloading,
+        None,
+        None,
+        None,
+    );
     v.cancel_download.store(false, Ordering::SeqCst);
     emit_state(app);
     let app = app.clone();
@@ -1190,6 +1201,16 @@ pub fn download(app: &AppHandle) -> Result<(), String> {
                 continue;
             }
             let result = models::install(model, &v.models, &v.cancel_download, |done, total| {
+                crate::activity::report(
+                    &app,
+                    &activity_id,
+                    "voice",
+                    &format!("Downloading {}", model.label),
+                    crate::activity::Phase::Downloading,
+                    Some(done),
+                    Some(total).filter(|n| *n > 0),
+                    None,
+                );
                 let _ = app.emit(
                     DOWNLOAD_EVENT,
                     DownloadPayload {
@@ -1217,6 +1238,20 @@ pub fn download(app: &AppHandle) -> Result<(), String> {
             }
         }
         v.downloading.store(false, Ordering::SeqCst);
+        crate::activity::report(
+            &app,
+            &activity_id,
+            "voice",
+            "Voice models",
+            if failure.is_some() {
+                crate::activity::Phase::Failed
+            } else {
+                crate::activity::Phase::Completed
+            },
+            None,
+            None,
+            failure.clone(),
+        );
         let _ = app.emit(
             DOWNLOAD_EVENT,
             DownloadPayload {

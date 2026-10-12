@@ -246,7 +246,7 @@ pub fn defer_welcome(app: &AppHandle) {
 /// Clears a Hide and shows welcome again (island hover or Ask shortcut).
 /// Re-emits when already open, so a missed cold-start ask://open is repaired.
 pub fn resume_welcome(app: &AppHandle) {
-    if !needs_welcome(app) {
+    if !needs_welcome(app) || suggestions::current(app).is_some() {
         return;
     }
     log::info!("welcome resumed (was parked: {})", is_deferred());
@@ -267,7 +267,7 @@ pub fn ensure_welcome(app: &AppHandle) {
 }
 
 fn ensure_welcome_impl(app: &AppHandle) {
-    if !needs_welcome(app) || is_deferred() {
+    if !needs_welcome(app) || is_deferred() || suggestions::current(app).is_some() {
         return;
     }
     // Voice gate: do not show welcome until the voice can speak.

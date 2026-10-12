@@ -4,6 +4,37 @@ All notable changes to Sidekick are listed here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-12
+
+### Live activity
+
+- Downloads, setup steps, agent work, model pulls and updates show live progress in the island, with Check again and Dismiss. Waiting never cancels work; inactivity is detected after two quiet minutes.
+- Browser downloads report through the paired extension (needs the new `downloads` permission and one browser approval). Without telemetry, recognized partial files in Downloads still show received bytes.
+
+### Projects and GitHub
+
+- Agent project dropdowns always offer a native folder picker, including when no repositories are discovered. Chosen folders are saved across restarts, become repository scan roots, and can be removed in Settings > Code folders. Board dropdown keys no longer change the project behind the menu.
+- Projects and Repos refresh cached lists when opened, code-folder changes immediately refresh mounted lists and invalidate discovery, and selecting a repository itself as a code folder works. Empty repository lists include Check again.
+- GitHub CLI connection checks use locally stored credentials instead of network validation, share their status across Settings and Repos, and retain a known connection if the credential store times out.
+
+### Updates
+
+- Updates show download percentage and file size, verification, installer launch, and errors in the island and Settings. Duplicate clicks reuse the update already in progress. Startup snapshots preserve newer live progress and available-update events.
+- Updates select the installer matching the release version, and manual update checks announce newly detected releases. Release builds validate version consistency before uploading installers.
+
+### Agents
+
+- Opening Agents is faster and steadier: the last agent and model restore on first paint, long sessions paint the recent timeline first (Show earlier loads the rest), and saved scroll position is restored instead of jumping to the top.
+- Agents open with a short Dynamic Island spring and a staged content settle. Plan / Ask / Edit / Full stay grouped with Shift+Tab on the right.
+- Session mode changes apply cleanly for Codex (including plan vs default collaboration), and review entries stay distinct across turns.
+- New-session agent, model and effort preferences are remembered per project.
+
+### Island and Ask
+
+- Pending alerts and approvals stay accessible when Welcome is hidden or a connection guide is open; hovering no longer covers them with onboarding.
+- Later items can be cleared one by one from the glance list.
+- Instant file matches: folders open with Enter only. Ctrl Enter still reveals the parent folder for files.
+
 ## [0.2.0] - 2026-10-10
 
 ### Parallel agents, repositories and everyday Ask
@@ -216,6 +247,7 @@ The first public release.
 - Update checks once a day. A small sign on the island shows a waiting update; installs are checked against SHA256SUMS.txt and only run after your click.
 - History with Undo for files Sidekick creates (24 hours).
 
-[Unreleased]: https://github.com/tmalik258/sidekick/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/tmalik258/sidekick/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/tmalik258/sidekick/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/tmalik258/sidekick/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tmalik258/sidekick/releases/tag/v0.1.0

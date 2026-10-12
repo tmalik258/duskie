@@ -68,7 +68,8 @@ async fn handle(app: &AppHandle, mut event: Event) {
     if from_ask(app, &event) {
         return;
     }
-    if crate::privacy::check(app, &event) {
+    if crate::privacy::check(app, &event) || crate::activity::download_excluded(&event) {
+        crate::activity::exclude_download(app, &event);
         // Still remember which app is in front, so its copies are ignored
         // too, and keep the island out of fullscreen apps.
         if event.kind == WindowSensor::EVENT_KIND {
@@ -76,6 +77,10 @@ async fn handle(app: &AppHandle, mut event: Event) {
             *lock(&app.state::<AppState>().last_window) = Some(event.payload.clone());
             timetrack::on_away(app);
         }
+        return;
+    }
+    crate::activity::observe(app, &event);
+    if event.kind == "browser.download" || event.kind == "file.download_progress" {
         return;
     }
     // Pairing finished: tell the UI at once (welcome waiting guide, Connections).

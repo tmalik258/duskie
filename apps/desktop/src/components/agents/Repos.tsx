@@ -83,16 +83,46 @@ function ReposLoading() {
 }
 
 export function Repos({ maxHeight }: { maxHeight?: number }) {
-  const { data, refresh } = useCached<ReposOverview>("repos", () => api.reposOverview(false));
+  const { data, refreshing, refresh, set } = useCached<ReposOverview>(
+    "repos",
+    () => api.reposOverview(false),
+    60_000,
+    true,
+  );
   const [checked, setChecked] = useState(() => Date.now());
   const now = useNow(10_000);
   const [open, setOpen] = useState<string | null>(null);
   const [note, setNote] = useState<Record<string, string>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [checking, setChecking] = useState(false);
+  const check = async () => {
+    setChecking(true);
+    setError(null);
+    try {
+      set(await api.reposOverview(true));
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setChecking(false);
+    }
+  };
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new answer means a fresh check
   useEffect(() => setChecked(Date.now()), [data]);
   if (!data) return <ReposLoading />;
   if (data.repos.length === 0) {
-    return <p className="ak-rempty">No repos yet. Clone one or open a folder with git, and it shows here.</p>;
+    return (
+      <section className="ak-repos">
+        <p className="ak-rempty">No repos found in your code folders. Check your code folders in Settings.</p>
+        <button type="button" className="ak-rcheck" disabled={checking || refreshing} onClick={() => void check()}>
+          {checking || refreshing ? "Checking..." : "Check again"}
+        </button>
+        {error && (
+          <p className="ak-rnote" role="alert">
+            {error}
+          </p>
+        )}
+      </section>
+    );
   }
   const say = (path: string, text: string) => setNote((n) => ({ ...n, [path]: text }));
   const pull = (r: RepoRow, stash: boolean) =>
@@ -119,11 +149,17 @@ export function Repos({ maxHeight }: { maxHeight?: number }) {
           type="button"
           className="ak-rcheck"
           title="Check now: fetch every repo and look for new commits and PRs"
-          onClick={() => void api.reposOverview(true).then(() => refresh?.())}
+          disabled={checking}
+          onClick={() => void check()}
         >
-          checked {since(checked, now)}
+          {checking ? "Checking..." : `checked ${since(checked, now)}`}
         </button>
       </div>
+      {error && (
+        <p className="ak-rnote" role="alert">
+          {error}
+        </p>
+      )}
       {data.via === "none" && <p className="ak-rnote">Sign in with gh auth login to see PRs and checks.</p>}
       <div className="ak-scroll ak-rlist" style={{ maxHeight: maxHeight ? maxHeight - 48 : undefined }}>
         {data.repos.map((r) => {

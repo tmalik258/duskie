@@ -1228,6 +1228,7 @@ pub async fn run_proposal(app: &AppHandle, id: &str) -> Result<Ran, String> {
         found
     }
     .ok_or("That button has expired; ask again")?;
+    let mut activity = crate::activity::Guard::start(app, &proposed.label);
     let result = match crate::act::run(app, &proposed.action, &proposed.args).await {
         Some(r) => r,
         None => {
@@ -1241,6 +1242,7 @@ pub async fn run_proposal(app: &AppHandle, id: &str) -> Result<Ran, String> {
         Ok(o) => (true, o.message.clone(), o.path.clone()),
         Err(e) => (false, e.to_string(), None),
     };
+    activity.finish(ok, message.clone());
     let undo_path = match (&result, proposed.action.as_str()) {
         (Ok(o), "move_file") => o
             .path

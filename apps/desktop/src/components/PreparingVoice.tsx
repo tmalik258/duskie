@@ -4,6 +4,7 @@
 // arriving. Shown until onboarding can speak; never a blank idle orb.
 
 import type { VoiceStatus } from "@/lib/types";
+import { ActivityProgress } from "./ActivityProgress";
 
 export function PreparingVoice({ voiceStatus }: { voiceStatus: VoiceStatus | null }) {
   const models = voiceStatus?.models ?? [
@@ -17,6 +18,7 @@ export function PreparingVoice({ voiceStatus }: { voiceStatus: VoiceStatus | nul
   return (
     <div className="flex flex-col gap-2 pb-1">
       <p className="font-display text-[15px] leading-5 font-semibold tracking-[-0.015em] text-white">Preparing voice</p>
+      <ActivityProgress sources={["voice"]} />
       <ul className="flex flex-col gap-1.5">
         {rows.map((m) => (
           <li key={m.id} className="flex items-center gap-2.5 text-[12.5px] text-white/70">

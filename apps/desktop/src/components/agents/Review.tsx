@@ -133,9 +133,9 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
       <div className="ak-rv-head">
         <b>Review changes</b>
         <span className="sub2">
-          {list.length} {list.length === 1 ? "file" : "files"} · {changes} {changes === 1 ? "change" : "changes"}
+          {list.length} {list.length === 1 ? "file" : "files"} ┬╖ {changes} {changes === 1 ? "change" : "changes"}
         </span>
-        <span className="keys mono">↑↓ move · K keep · U undo</span>
+        <span className="keys mono">ΓåæΓåô move ┬╖ K keep ┬╖ U undo</span>
       </div>
       {error && <p className="ak-err">{error}</p>}
       <div className="ak-tl ak-scroll" style={{ maxHeight: maxHeight - 50 }}>
@@ -145,7 +145,7 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
               <span className="mono">{f.path}</span>
               {f.status !== "modified" && <span>{f.status}</span>}
               {f.added > 0 && <span className="add-n mono">+{f.added}</span>}
-              {f.removed > 0 && <span className="del-n mono">−{f.removed}</span>}
+              {f.removed > 0 && <span className="del-n mono">ΓêÆ{f.removed}</span>}
               <span className="acts">
                 <button
                   type="button"
@@ -165,7 +165,7 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
                 return (
                   <div key={key} className="ak-rv-hunk">
                     <p className="ak-rv-res">
-                      <span className="k">✓ Kept</span>
+                      <span className="k">Γ£ô Kept</span>
                       <span className="mono truncate">
                         {h.lines
                           .find((l) => l.startsWith("+"))

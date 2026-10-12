@@ -9,9 +9,10 @@ import { useAgents } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
-import { updateSettings, useAssistantName, useSidekick } from "@/lib/store";
+import { installUpdate, updateSettings, useAssistantName, useSidekick } from "@/lib/store";
 import { pickTip } from "@/lib/tips";
 import { type AppTime, type CalendarToday, formatDuration, type LaterItem } from "@/lib/types";
+import { updateBusy, updateLabel } from "@/lib/updates";
 import { Icon } from "./Icon";
 import { AgentsGlance, AwayCard, useAway } from "./IslandAgents";
 import { CardChips, CardHead, CardNote } from "./IslandCard";
@@ -213,19 +214,31 @@ function LaterList() {
         className={`flex flex-col gap-1.5 ${all ? "island-scroll max-h-[260px] overflow-y-auto overscroll-contain" : ""}`}
       >
         {shown.map((l, n) => (
-          <button
+          <div
             key={l.id}
-            type="button"
             style={{ animationDelay: `${Math.min(n, 6) * 40}ms` }}
-            onClick={() => void api.laterOpen(l.id)}
-            className="chip rise-in flex w-full shrink-0 items-center gap-3 rounded-xl bg-white/[0.07] px-3 py-1.5 text-left hover:bg-white/12"
+            className="rise-in flex w-full shrink-0 items-center gap-2 rounded-xl bg-white/[0.07] pr-1.5 hover:bg-white/12"
           >
-            <span className="min-w-0 flex-1 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => void api.laterOpen(l.id)}
+              className="chip min-w-0 flex-1 px-3 py-1.5 text-left"
+            >
               <span className="block truncate text-[13px] font-medium text-white">{l.title}</span>
               <span className="block truncate text-[12px] text-[rgb(235_235_245/0.62)]">{l.detail}</span>
-            </span>
+            </button>
             <span className="shrink-0 text-[11px] text-white/40 tabular-nums">{ago(l.minutesAgo)}</span>
-          </button>
+            <Tip label="Clear">
+              <button
+                type="button"
+                aria-label={`Clear ${l.title}`}
+                onClick={() => void api.laterDismiss(l.id)}
+                className="chip grid size-7 shrink-0 place-items-center rounded-full text-white/45 hover:bg-white/10 hover:text-white"
+              >
+                <Icon name="close" size={12} />
+              </button>
+            </Tip>
+          </div>
         ))}
       </div>
       {!all && items.length > LATER_SHOWN && (
@@ -288,16 +301,27 @@ function FocusButton() {
 /** Only while a newer release is waiting: a small button with a dot. */
 function UpdateButton() {
   const update = useSidekick((s) => s.update);
-  const [busy, setBusy] = useState(false);
+  const progress = useSidekick((s) => s.updateProgress);
+  const busy = updateBusy(progress);
   if (!update) return null;
   const install = () => {
-    setBusy(true);
-    void api.updateInstall().catch(() => setBusy(false));
+    void installUpdate().catch(() => undefined);
   };
   return (
     <span className="relative">
-      <RoundButton label={busy ? "Opening the installer..." : `Update to ${update.version}`} onClick={install}>
-        <Icon name="update" size={15} />
+      <RoundButton
+        label={progress ? updateLabel(progress) : `Update to ${update.version}`}
+        onClick={install}
+        disabled={busy}
+      >
+        {busy ? (
+          <span
+            aria-hidden="true"
+            className="size-4 animate-spin rounded-full border-2 border-white/25 border-t-white motion-reduce:animate-none"
+          />
+        ) : (
+          <Icon name="update" size={15} />
+        )}
       </RoundButton>
       <span
         aria-hidden="true"
@@ -307,14 +331,25 @@ function UpdateButton() {
   );
 }
 
-export function RoundButton({ label, onClick, children }: { label: string; onClick: () => void; children: ReactNode }) {
+export function RoundButton({
+  label,
+  onClick,
+  children,
+  disabled = false,
+}: {
+  label: string;
+  onClick: () => void;
+  children: ReactNode;
+  disabled?: boolean;
+}) {
   return (
     <Tip label={label}>
       <button
         type="button"
         aria-label={label}
+        disabled={disabled}
         onClick={onClick}
-        className="chip grid size-8 place-items-center rounded-full bg-white/12 text-white/90 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff]"
+        className="chip grid size-8 place-items-center rounded-full bg-white/12 text-white/90 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff] disabled:cursor-wait disabled:opacity-60"
       >
         {children}
       </button>

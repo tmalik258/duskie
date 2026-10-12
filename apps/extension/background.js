@@ -5,6 +5,85 @@
 const BRIDGE = "http://127.0.0.1:47822";
 const MANY_TABS = 25;
 
+// Bytes do not trigger onChanged. Poll while paired, including downloads
+// recovered after a service-worker or desktop restart.
+let downloadSequence = 0;
+let downloadScan = false;
+let downloadInstancePromise;
+const trackedDownloads = new Set();
+function nextDownloadSequence() {
+  downloadSequence = Math.max(downloadSequence + 1, Date.now() * 1000);
+  return downloadSequence;
+}
+function downloadInstance() {
+  downloadInstancePromise ??= chrome.storage.local.get("downloadInstance").then(async (saved) => {
+    if (saved.downloadInstance) return saved.downloadInstance;
+    const id = crypto.randomUUID();
+    await chrome.storage.local.set({ downloadInstance: id });
+    return id;
+  });
+  return downloadInstancePromise;
+}
+async function sendDownload(item, sequence = nextDownloadSequence()) {
+  if (item.incognito !== false || !(await token())) return;
+  const res = await call("/browser/download", {
+    method: "POST",
+    body: JSON.stringify({
+      instance: await downloadInstance(),
+      sequence,
+      id: item.id,
+      incognito: false,
+      startedAt: Number.isFinite(Date.parse(item.startTime)) ? Date.parse(item.startTime) : null,
+      filename: item.filename,
+      url: item.url,
+      finalUrl: item.finalUrl || item.url,
+      referrer: item.referrer || "",
+      bytes: item.bytesReceived,
+      total: item.totalBytes > 0 ? item.totalBytes : null,
+      paused: item.paused,
+      state: item.state,
+      error: item.error || null,
+    }),
+  });
+  if (res?.ok) {
+    if (item.state === "in_progress") trackedDownloads.add(item.id);
+    else trackedDownloads.delete(item.id);
+  }
+}
+async function scanDownloads() {
+  if (downloadScan || !chrome.downloads || !(await token())) return;
+  downloadScan = true;
+  try {
+    const sequence = nextDownloadSequence();
+    const items = (await chrome.downloads.search({ state: "in_progress" })).map((item) => ({ item, sequence }));
+    const live = new Set(items.map(({ item }) => item.id));
+    for (const id of trackedDownloads) {
+      if (!live.has(id)) {
+        const sequence = nextDownloadSequence();
+        items.push(...(await chrome.downloads.search({ id })).map((item) => ({ item, sequence })));
+      }
+    }
+    for (const { item, sequence } of items) await sendDownload(item, sequence);
+  } catch {
+    /* Reconnection polling recovers live records. */
+  } finally {
+    downloadScan = false;
+  }
+}
+chrome.downloads?.onCreated.addListener((item) => {
+  void sendDownload(item).catch(() => {});
+});
+chrome.downloads?.onChanged.addListener((delta) => {
+  const sequence = nextDownloadSequence();
+  void chrome.downloads
+    .search({ id: delta.id })
+    .then(async (items) => {
+      for (const item of items) await sendDownload(item, sequence);
+    })
+    .catch(() => {});
+});
+setInterval(() => void scanDownloads(), 2000);
+
 async function token() {
   const { token } = await chrome.storage.local.get("token");
   return token || "";
@@ -74,7 +153,6 @@ chrome.runtime.onStartup.addListener(async () => {
   if (!(await token())) pair();
   poll();
 });
-poll();
 
 async function report(event) {
   try {
@@ -89,6 +167,7 @@ async function report(event) {
 // answers, so a request (read this page, click Send) runs at once. The
 // alarm restarts it if the browser put the worker to sleep.
 let polling = false;
+poll();
 async function poll() {
   if (polling) return;
   polling = true;
@@ -111,6 +190,7 @@ async function poll() {
 }
 
 async function run(cmd) {
+  if (cmd.type === "check_downloads") return scanDownloads();
   if (cmd.type === "close_duplicates") return closeDuplicates();
   if (cmd.type === "save_session") return saveSession();
 }

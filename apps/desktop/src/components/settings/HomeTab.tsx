@@ -8,7 +8,7 @@ import { api, EVENTS, listen } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useDnd } from "@/lib/hooks";
 import { checkKit, cueVolume, playCue, SYNTH_KIT } from "@/lib/sound";
-import { updateSettings, useSidekick } from "@/lib/store";
+import { installUpdate, updateSettings, useSidekick } from "@/lib/store";
 import {
   type ActionRecord,
   type AppInfo,
@@ -24,8 +24,10 @@ import {
   type SkillInfo,
   type StoredEvent,
 } from "@/lib/types";
+import { updateBusy } from "@/lib/updates";
 import { SetupChecklist, usePendingByTab } from "../SetupChecklist";
 import { Tip } from "../Tip";
+import { UpdateProgress } from "../UpdateProgress";
 import { Button, ChipList, Field, FolderPicker, Section, Select, Slider, Toggle } from "./ui";
 
 const DAY_SUMMARY_SKILL = "system.day-summary";
@@ -616,7 +618,9 @@ function NotificationInbox({ onError }: { onError: (e: string) => void }) {
 /** This version, and a newer one when it is out: Install, or Check now. */
 function UpdateRow({ version, onError }: { version: string; onError: (e: string) => void }) {
   const update = useSidekick((s) => s.update);
-  const [state, setState] = useState<"idle" | "checking" | "latest" | "installing">("idle");
+  const progress = useSidekick((s) => s.updateProgress);
+  const busy = updateBusy(progress);
+  const [state, setState] = useState<"idle" | "checking" | "latest">("idle");
   const check = () => {
     setState("checking");
     api.updateCheck().then(
@@ -628,29 +632,31 @@ function UpdateRow({ version, onError }: { version: string; onError: (e: string)
     );
   };
   const install = () => {
-    setState("installing");
-    api.updateInstall().catch((e) => {
-      setState("idle");
-      onError(String(e));
-    });
+    void installUpdate().catch((e) => onError(String(e)));
   };
   return (
     <div className="flex items-center justify-between gap-3 text-[13px]">
-      <span className="min-w-0">
+      <div className="min-w-0 flex-1">
         <span className="block text-white">
           {update ? `Sidekick ${update.version} is available` : `Sidekick ${version}`}
         </span>
-        <span className="block text-(--muted)">
-          {update
-            ? `You have ${update.current}. It downloads, checks and opens the installer.`
-            : state === "latest"
-              ? "You have the newest version."
-              : "Checks once a day while the switch above is on."}
-        </span>
-      </span>
-      {update ? (
-        <Button small onClick={install} disabled={state === "installing"}>
-          {state === "installing" ? "Opening..." : "Install"}
+        {progress ? (
+          <div className="mt-2">
+            <UpdateProgress progress={progress} />
+          </div>
+        ) : (
+          <span className="block text-(--muted)">
+            {update
+              ? `You have ${update.current}. It downloads, checks and opens the installer.`
+              : state === "latest"
+                ? "You have the newest version."
+                : "Checks once a day while the switch above is on."}
+          </span>
+        )}
+      </div>
+      {update || progress ? (
+        <Button small onClick={install} disabled={busy}>
+          {busy ? "Updating..." : progress?.phase === "failed" ? "Retry" : "Install"}
         </Button>
       ) : (
         <Button small onClick={check} disabled={state === "checking"}>

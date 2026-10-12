@@ -393,6 +393,11 @@ export function AskPanel() {
     return all;
   }, [paused, settings.muted, turns.length, resetChat]);
 
+  // Keep Agents mounted while Ask stays open (tab switches), not across Ask close.
+  const agentsKept = useRef(tab === "agents");
+  if (tab === "agents") agentsKept.current = true;
+  const keepAgents = coder && (agentsKept.current || tab === "agents");
+
   if (!ask) return null;
 
   const streaming = chatId !== null;
@@ -599,10 +604,15 @@ export function AskPanel() {
             icon: <Icon name={f.folder ? "folder" : "file"} size={12} />,
             label: f.name,
             hint: f.place,
-            // Enter opens the file; Ctrl Enter shows its folder.
+            // Enter opens; for files, Ctrl Enter shows the parent folder.
+            // Folders are already folders — Enter alone is enough.
             run: () => openFile(f.path),
-            ctrlRun: () => openFile(f.path, "reveal"),
-            ctrlHint: "folder",
+            ...(f.folder
+              ? {}
+              : {
+                  ctrlRun: () => openFile(f.path, "reveal"),
+                  ctrlHint: "folder",
+                }),
             stay: true,
             keepText: true,
           });
@@ -947,22 +957,34 @@ export function AskPanel() {
     />
   );
 
+  // Stable host so AgentsTab is not remounted when Ask closes/reopens or tabs change.
+  // ak-enter: staged reveal on Agents open (tabs → chrome → timeline → composer).
+  const agentsHost = keepAgents ? (
+    <div
+      data-agents-host=""
+      className={tab === "agents" ? "ak ak-enter" : undefined}
+      hidden={tab !== "agents"}
+      aria-hidden={tab !== "agents"}
+    >
+      <div data-agents-tabs="">{tab === "agents" ? tabs : null}</div>
+      <AgentsTab keys={alt} maxHeight={scrollMax} active={tab === "agents"} />
+    </div>
+  ) : null;
+
   if (tab === "repos" && coder) {
     return (
-      <div className="ak">
-        {tabs}
-        <Repos maxHeight={scrollMax} />
-      </div>
+      <>
+        {agentsHost}
+        <div className="ak">
+          {tabs}
+          <Repos maxHeight={scrollMax} />
+        </div>
+      </>
     );
   }
 
   if (tab === "agents" && coder) {
-    return (
-      <div className="ak">
-        {tabs}
-        <AgentsTab keys={alt} maxHeight={scrollMax} />
-      </div>
-    );
+    return <>{agentsHost}</>;
   }
 
   // First-run card only when nothing is set up yet. If a provider is
@@ -1107,110 +1129,113 @@ export function AskPanel() {
   );
 
   return (
-    <div className="ak" data-chat={showChat || undefined}>
-      {tabs}
-      {showChat && (
-        <div className="ak-head">
-          <input
-            aria-label="Chat name"
-            value={chatName ?? turns.find((t) => t.role === "user")?.content ?? ""}
-            onChange={(e) => setChatName(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === "Escape") {
-                e.preventDefault();
-                inputRef.current?.focus();
-              }
-            }}
-            spellCheck={false}
-            className="ak-title ak-cname"
-          />
-          <IconButton label="New chat (Esc)" keys={alt} hint="Esc" onClick={resetChat}>
-            <Icon name="plus" size={15} />
-          </IconButton>
-        </div>
-      )}
-      {/* In a chat the field is a box at the bottom: what goes with the
+    <>
+      {agentsHost}
+      <div className="ak" data-chat={showChat || undefined}>
+        {tabs}
+        {showChat && (
+          <div className="ak-head">
+            <input
+              aria-label="Chat name"
+              value={chatName ?? turns.find((t) => t.role === "user")?.content ?? ""}
+              onChange={(e) => setChatName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === "Escape") {
+                  e.preventDefault();
+                  inputRef.current?.focus();
+                }
+              }}
+              spellCheck={false}
+              className="ak-title ak-cname"
+            />
+            <IconButton label="New chat (Esc)" keys={alt} hint="Esc" onClick={resetChat}>
+              <Icon name="plus" size={15} />
+            </IconButton>
+          </div>
+        )}
+        {/* In a chat the field is a box at the bottom: what goes with the
           question on top, then the field, then the model and voice. The
           same wrapper either way, so the input keeps focus on send. */}
-      <div className={showChat ? "ak-askc" : "contents"}>
-        {field}
-        {!inHistory && <ContextLine keys={alt} />}
-      </div>
+        <div className={showChat ? "ak-askc" : "contents"}>
+          {field}
+          {!inHistory && <ContextLine keys={alt} />}
+        </div>
 
-      {showClips && clips ? (
-        <div key="clips" className="ak-scroll ak-in" style={{ maxHeight: scrollMax }}>
-          <Clips
-            items={shownClips}
-            filtered={clipFilter.length > 0}
-            active={Math.min(pick, shownClips.length - 1)}
-            onHover={setPick}
-          />
-        </div>
-      ) : inHistory ? (
-        <div key="history" className="ak-scroll ak-in" style={{ maxHeight: scrollMax }}>
-          <HistoryList rows={history} active={Math.min(pick, Math.max(history.length - 1, 0))} onHover={setPick} />
-        </div>
-      ) : showHits && hits ? (
-        <div key="hits" className="ak-scroll ak-in" style={{ maxHeight: scrollMax }}>
-          <Results
-            query={hits.query}
-            items={hits.items}
-            active={Math.min(pick, hits.items.length - 1)}
-            onHover={setPick}
-            onOpen={(h) => openHit(h.source, h.reference, h.title)}
-          />
-        </div>
-      ) : showChat && !(asking && rows > 0 && !inChat) ? (
-        <div key="chat" ref={chatRef} onScroll={onScroll} className="ak-scroll" style={{ maxHeight: scrollMax }}>
-          <Chat turns={turns} />
-        </div>
-      ) : firstRun ? (
-        <FirstRun />
-      ) : (
-        rows > 0 && (
-          <ul
-            key={slash ? "slash" : asking ? "typing" : "start"}
-            className="ak-list ak-scroll"
-            style={{ maxHeight: scrollMax }}
-          >
-            {items.map((it, i) => (
-              <li key={it.id} ref={scrollIfActive(active === i)}>
-                {it.group && <p className="ak-group">{it.group}</p>}
-                <button
-                  type="button"
-                  data-sel={active === i}
-                  onMouseMove={() => setSelected(i)}
-                  onClick={() => runRow(i)}
-                  className="ak-row"
-                >
-                  <span className="ak-ico">{it.icon}</span>
-                  <span className="min-w-0 flex-1 truncate">{it.label}</span>
-                  {it.hint && <span className="ak-hint">{it.hint}</span>}
-                  {it.key ? (
-                    <kbd className="ak-key">{it.key}</kbd>
-                  ) : (
-                    asking &&
-                    active === i &&
-                    (it.ctrlRun ? (
-                      <span className="ak-keys">
-                        <kbd className="ak-key">Enter</kbd>
-                        <kbd className="ak-key">Ctrl Enter</kbd>
-                      </span>
+        {showClips && clips ? (
+          <div key="clips" className="ak-scroll ak-in" style={{ maxHeight: scrollMax }}>
+            <Clips
+              items={shownClips}
+              filtered={clipFilter.length > 0}
+              active={Math.min(pick, shownClips.length - 1)}
+              onHover={setPick}
+            />
+          </div>
+        ) : inHistory ? (
+          <div key="history" className="ak-scroll ak-in" style={{ maxHeight: scrollMax }}>
+            <HistoryList rows={history} active={Math.min(pick, Math.max(history.length - 1, 0))} onHover={setPick} />
+          </div>
+        ) : showHits && hits ? (
+          <div key="hits" className="ak-scroll ak-in" style={{ maxHeight: scrollMax }}>
+            <Results
+              query={hits.query}
+              items={hits.items}
+              active={Math.min(pick, hits.items.length - 1)}
+              onHover={setPick}
+              onOpen={(h) => openHit(h.source, h.reference, h.title)}
+            />
+          </div>
+        ) : showChat && !(asking && rows > 0 && !inChat) ? (
+          <div key="chat" ref={chatRef} onScroll={onScroll} className="ak-scroll" style={{ maxHeight: scrollMax }}>
+            <Chat turns={turns} />
+          </div>
+        ) : firstRun ? (
+          <FirstRun />
+        ) : (
+          rows > 0 && (
+            <ul
+              key={slash ? "slash" : asking ? "typing" : "start"}
+              className="ak-list ak-scroll"
+              style={{ maxHeight: scrollMax }}
+            >
+              {items.map((it, i) => (
+                <li key={it.id} ref={scrollIfActive(active === i)}>
+                  {it.group && <p className="ak-group">{it.group}</p>}
+                  <button
+                    type="button"
+                    data-sel={active === i}
+                    onMouseMove={() => setSelected(i)}
+                    onClick={() => runRow(i)}
+                    className="ak-row"
+                  >
+                    <span className="ak-ico">{it.icon}</span>
+                    <span className="min-w-0 flex-1 truncate">{it.label}</span>
+                    {it.hint && <span className="ak-hint">{it.hint}</span>}
+                    {it.key ? (
+                      <kbd className="ak-key">{it.key}</kbd>
                     ) : (
-                      <kbd className="ak-key">Enter</kbd>
-                    ))
-                  )}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )
-      )}
+                      asking &&
+                      active === i &&
+                      (it.ctrlRun ? (
+                        <span className="ak-keys">
+                          <kbd className="ak-key">Enter</kbd>
+                          <kbd className="ak-key">Ctrl Enter</kbd>
+                        </span>
+                      ) : (
+                        <kbd className="ak-key">Enter</kbd>
+                      ))
+                    )}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )
+        )}
 
-      {handoffError && <p className="ak-err">{handoffError}</p>}
-      {footer}
-      <Timings />
-    </div>
+        {handoffError && <p className="ak-err">{handoffError}</p>}
+        {footer}
+        <Timings />
+      </div>
+    </>
   );
 }
 
@@ -1225,9 +1250,9 @@ interface Item {
   /** A key shown at the end ("/"). */
   key?: string;
   run: () => void;
-  /** Ctrl Enter: e.g. show a file's folder, or browser incognito. */
+  /** Ctrl Enter: e.g. show a file's parent folder. Not used for folders. */
   ctrlRun?: () => void;
-  /** Footer label for Ctrl Enter ("folder", "incognito"). */
+  /** Footer label for Ctrl Enter ("folder"). */
   ctrlHint?: string;
   /** Keep Ask open after running. */
   stay?: boolean;

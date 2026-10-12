@@ -1,8 +1,9 @@
 import { create } from "zustand";
 import type { Expression } from "@/components/orb/expressions";
+import { acceptActivities, beginActivity, finishActivity, ownsWorking, useActivities } from "./activities";
 import { setTab, startHere } from "./agents";
 import { api, EVENTS, listen } from "./bridge";
-import { putCached, SETUP_STATUS_CACHE_KEY } from "./cache";
+import { putCached, revalidate, SETUP_STATUS_CACHE_KEY } from "./cache";
 import { firstToday, isThanks, type Mood, moodForSkill, SUGGESTION_MOOD_MS } from "./mood";
 import { type NetNotice, watchNet } from "./net";
 import { cueVolume, playCue, playMood, playSound, preloadSounds } from "./sound";
@@ -23,8 +24,10 @@ import {
   type Suggestion,
   type Turn,
   type UpdateInfo,
+  type UpdateProgress,
   type VoiceStatus,
 } from "./types";
+import { updateBusy } from "./updates";
 
 interface SidekickState {
   mascot: MascotState;
@@ -32,6 +35,7 @@ interface SidekickState {
   suggestion: Suggestion | null;
   /** A newer release, until it is installed. */
   update: UpdateInfo | null;
+  updateProgress: UpdateProgress | null;
   /** A short-lived face on top of the mascot's state (see mood.ts). */
   mood: Mood | null;
   /** The internet is reachable. */
@@ -176,6 +180,7 @@ export const useSidekick = create<SidekickState>(() => ({
   suggestion: null,
   mood: null,
   update: null,
+  updateProgress: null,
   online: true,
   askWhenOnline: null,
   offlineSince: null,
@@ -307,6 +312,21 @@ export function backgroundWaiting() {
 
 /** How long a done pill stays before the island settles. */
 const DONE_PILL_MS = 2600;
+/** Immediately acknowledges a click; Rust broadcasts progress to every window. */
+export async function installUpdate(): Promise<void> {
+  if (updateBusy(useSidekick.getState().updateProgress)) return;
+  useSidekick.setState({ updateProgress: { phase: "preparing", done: 0, total: null, error: null } });
+  try {
+    await api.updateInstall();
+  } catch (error) {
+    const progress = await api.updateProgress().catch(() => null);
+    useSidekick.setState({
+      updateProgress: progress ?? { phase: "failed", done: 0, total: null, error: String(error) },
+    });
+    throw error;
+  }
+}
+
 let doneTimer: ReturnType<typeof setTimeout> | undefined;
 /** Shows a compact done pill for a moment: nothing needs you. */
 export function showDone(text: string) {
@@ -319,21 +339,44 @@ export function showDone(text: string) {
  * Close Ask, show Opening…, run an open, then Opened… (or an error card).
  * `open` returns false when nothing was opened (caller may show a picker).
  */
+let openGeneration = 0;
+function mayFinishOpen(generation: number, id: string): boolean {
+  const activities = useActivities.getState();
+  return (
+    generation === openGeneration &&
+    ![...activities.activities, ...activities.local].some((a) => a.id !== id && ownsWorking(a))
+  );
+}
 export async function runOpen(open: () => Promise<boolean>, doneMessage: string): Promise<boolean> {
+  const generation = ++openGeneration;
+  const label = doneMessage.replace(/^Opened\b/i, "Opening");
+  const id = beginActivity(label);
   void api.askClose();
-  useSidekick.setState({ mascot: "working", running: "Opening" });
+  useSidekick.setState({ mascot: "working", running: label });
   try {
+    await api.activityOpenStart(id, label).catch(() => {});
     const opened = await open();
-    useSidekick.setState({ running: null });
-    if (!opened) return false;
-    showDone(doneMessage);
-    return true;
+    const outcome = opened ? doneMessage.replace(/^Opened\b/i, "Launch requested for") : "Nothing opened";
+    finishActivity(id, true, outcome);
+    void api.activityOpenFinish(id, true, outcome).catch(() => {});
+    if (mayFinishOpen(generation, id)) {
+      useSidekick.setState({ running: null, mascot: "idle" });
+      if (opened) showDone(outcome);
+    }
+    return opened;
   } catch (e) {
-    useSidekick.setState({
-      running: null,
-      lastResult: { ok: false, message: String(e), path: null, auto: false, undoId: null },
-    });
+    finishActivity(id, false, String(e));
+    void api.activityOpenFinish(id, false, String(e)).catch(() => {});
+    if (mayFinishOpen(generation, id))
+      useSidekick.setState({
+        running: null,
+        mascot: "error",
+        lastResult: { ok: false, message: String(e), path: null, auto: false, undoId: null },
+      });
     return false;
+  } finally {
+    if (mayFinishOpen(generation, id) && useSidekick.getState().mascot === "working")
+      useSidekick.setState({ running: null, mascot: "idle" });
   }
 }
 
@@ -898,10 +941,30 @@ export const setOverlayHit = (overlayHit: HitRect | null) => {
   useSidekick.setState({ overlayHit });
 };
 
+let confirmedCodeFolders: string[] | null = null;
+let confirmedSavedProjects: string[] | null = null;
+function confirmSettings(settings: Settings) {
+  const changed =
+    confirmedCodeFolders !== null && JSON.stringify(confirmedCodeFolders) !== JSON.stringify(settings.codeFolders);
+  const savedChanged =
+    confirmedSavedProjects !== null &&
+    JSON.stringify(confirmedSavedProjects) !== JSON.stringify(settings.savedProjects);
+  confirmedCodeFolders = [...settings.codeFolders];
+  confirmedSavedProjects = [...settings.savedProjects];
+  useSidekick.setState({ settings });
+  if (changed || savedChanged) {
+    revalidate("projects", api.projectsList);
+    revalidate("repos", () => api.reposOverview(false));
+  }
+}
+
 export function updateSettings(patch: Partial<Settings>): Promise<Settings> {
   const next = { ...useSidekick.getState().settings, ...patch };
   useSidekick.setState({ settings: next });
-  return api.settingsSet(next);
+  return api.settingsSet(next).then((settings) => {
+    confirmSettings(settings);
+    return settings;
+  });
 }
 
 function voiceReady(voice: VoiceStatus | null): boolean {
@@ -918,6 +981,34 @@ function voiceReady(voice: VoiceStatus | null): boolean {
 export function connect({ sounds }: { sounds: boolean }): () => void {
   let disposed = false;
   const unlisteners: Array<() => void> = [];
+  void listen(EVENTS.activityChanged, acceptActivities).then((off) => {
+    if (disposed) off();
+    else {
+      unlisteners.push(off);
+      void api
+        .activitySnapshot()
+        .then((snapshot) => {
+          if (!disposed && snapshot) acceptActivities(snapshot);
+        })
+        .catch(() => {});
+    }
+  });
+  let progressRevision = 0;
+  let updateRevision = 0;
+  let settingsRevision = 0;
+  unlisteners.push(
+    useSidekick.subscribe((state, previous) => {
+      if (state.updateProgress !== previous.updateProgress) progressRevision++;
+      if (state.update !== previous.update) updateRevision++;
+    }),
+  );
+  const loadUpdate = () => {
+    const revision = updateRevision;
+    void api.updateStatus().then(
+      (update) => !disposed && revision === updateRevision && useSidekick.setState({ update }),
+      () => {},
+    );
+  };
 
   void api.focusStatus().then(
     (f) => !disposed && useSidekick.setState({ focusUntil: f.until }),
@@ -934,15 +1025,20 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
         if (sounds && t.previous === "sleeping" && t.state === "idle") helloOncePerDay();
       }),
       listen(EVENTS.settingsChanged, (settings) => {
-        useSidekick.setState({ settings });
+        settingsRevision++;
+        confirmSettings(settings);
         if (sounds) preloadSounds(settings.soundKit);
-        void api.updateStatus().then(
-          (update) => !disposed && useSidekick.setState({ update }),
-          () => {},
-        );
+        loadUpdate();
         if (!settings.onboarded && !useSidekick.getState().ask) void api.askEnsureWelcome();
       }),
-      listen(EVENTS.updateAvailable, (update) => useSidekick.setState({ update })),
+      listen(EVENTS.updateAvailable, (update) => {
+        updateRevision++;
+        useSidekick.setState({ update });
+      }),
+      listen(EVENTS.updateProgress, (updateProgress) => {
+        progressRevision++;
+        useSidekick.setState({ updateProgress });
+      }),
       listen(EVENTS.suggestionNew, (suggestion) => {
         useSidekick.setState({ suggestion, lastResult: null });
         // The cue already plays for a new suggestion, so the mood is silent.
@@ -1154,6 +1250,16 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
     }
     unlisteners.push(...offs);
 
+    // Recover a download started in another window before this one connected.
+    const progressSnapshotRevision = progressRevision;
+    void api.updateProgress().then(
+      (updateProgress) =>
+        !disposed && progressSnapshotRevision === progressRevision && useSidekick.setState({ updateProgress }),
+      () => {},
+    );
+    loadUpdate();
+
+    const settingsSnapshotRevision = settingsRevision;
     const [settings, mascot, suggestion, voiceStatus, later] = await Promise.all([
       api.settingsGet(),
       api.mascotGet(),
@@ -1162,7 +1268,8 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
       api.laterList().catch(() => []),
     ]);
     if (disposed) return;
-    useSidekick.setState({ settings, mascot, suggestion, voiceStatus, later: later.length, ready: true });
+    if (settingsSnapshotRevision === settingsRevision) confirmSettings(settings);
+    useSidekick.setState({ mascot, suggestion, voiceStatus, later: later.length, ready: true });
     if (sounds) preloadSounds(settings.soundKit);
     if (sounds && settings.onboarded) helloOncePerDay();
     // Listeners are live; re-emit welcome if still locked (repairs missed emit).

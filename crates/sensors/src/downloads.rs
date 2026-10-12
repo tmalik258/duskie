@@ -137,17 +137,42 @@ impl Sensor for DownloadsSensor {
             // path -> modified time it was reported with, so a sync touch on
             // the same contents is skipped but a same-name overwrite is not.
             let mut reported: HashMap<PathBuf, SystemTime> = HashMap::new();
+            let mut partials: HashMap<PathBuf, u64> = HashMap::new();
+            if id == Self::ID
+                && let Ok(files) = std::fs::read_dir(&dir)
+            {
+                for file in files.flatten() {
+                    if partial_destination(&file.path()).is_some() {
+                        partials.insert(file.path(), u64::MAX);
+                    }
+                }
+            }
             let mut tick = tokio::time::interval(CHECK_EVERY);
 
             loop {
                 tokio::select! {
                     Some((path, renamed)) = rx.recv() => {
+                        if id == Self::ID && partial_destination(&path).is_some() {
+                            partials.entry(path.clone()).or_insert(u64::MAX);
+                        }
                         if !is_partial_or_hidden(&path) {
                             let renamed = renamed || pending.get(&path).is_some_and(|p| p.2);
                             pending.insert(path, (u64::MAX, Instant::now(), renamed));
                         }
                     }
                     _ = tick.tick() => {
+                        partials.retain(|path, previous| {
+                            let Some(destination) = partial_destination(path) else { return false; };
+                            let size = std::fs::metadata(path).ok().filter(|m| m.is_file()).map(|m| m.len());
+                            if (size.is_some() || *previous != u64::MAX) && (size.is_none() || size != Some(*previous)) && gate.allows(id) {
+                                let mut event = file_event(id, "file.download_progress", &destination, size.unwrap_or(*previous));
+                                event.payload["path"] = path.display().to_string().into();
+                                event.payload["destination"] = destination.display().to_string().into();
+                                event.payload["missing"] = size.is_none().into();
+                                bus.publish(event);
+                            }
+                            if let Some(size) = size { *previous = size; true } else { false }
+                        });
                         if pending.is_empty() {
                             continue;
                         }
@@ -198,6 +223,22 @@ impl Sensor for DownloadsSensor {
             }
         })
     }
+}
+
+/// Only recognized download suffixes, never generic temporary/hidden files.
+fn partial_destination(path: &Path) -> Option<PathBuf> {
+    let raw = path.to_str()?;
+    let lower = raw.to_ascii_lowercase();
+    [
+        ".crdownload",
+        ".part",
+        ".partial",
+        ".opdownload",
+        ".download",
+    ]
+    .iter()
+    .find(|suffix| lower.ends_with(**suffix))
+    .map(|suffix| PathBuf::from(&raw[..raw.len() - suffix.len()]))
 }
 
 /// The modified time to report a settled file under, or None when it was not
@@ -285,6 +326,54 @@ mod tests {
     use super::*;
     use crate::GateState;
 
+    async fn completed(
+        rx: &mut tokio::sync::broadcast::Receiver<Event>,
+    ) -> Result<Event, tokio::sync::broadcast::error::RecvError> {
+        loop {
+            let event = rx.recv().await?;
+            if event.kind != "file.download_progress" {
+                return Ok(event);
+            }
+        }
+    }
+
+    #[test]
+    fn partials_have_known_destinations_without_treating_generic_temp_files_as_downloads() {
+        assert_eq!(
+            partial_destination(Path::new("report.zip.crdownload")),
+            Some(PathBuf::from("report.zip"))
+        );
+        assert_eq!(
+            partial_destination(Path::new("invoice.pdf.part")),
+            Some(PathBuf::from("invoice.pdf"))
+        );
+        assert_eq!(partial_destination(Path::new("work.tmp")), None);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn partial_growth_reports_bytes_but_never_invents_a_total() {
+        let dir = std::env::temp_dir().join(format!("sidekick-growth-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let bus = EventBus::default();
+        let mut rx = bus.subscribe();
+        let (_, gate) = SensorGate::new(GateState::default());
+        let task = Box::new(DownloadsSensor::with_dir(dir.clone())).spawn(bus, gate);
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let path = dir.join("report.zip.part");
+        for size in [10, 20] {
+            std::fs::write(&path, vec![b'x'; size]).unwrap();
+            let event = tokio::time::timeout(Duration::from_secs(5), rx.recv())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(event.kind, "file.download_progress");
+            assert_eq!(event.payload["size"], size as u64);
+            assert!(event.payload.get("total").is_none());
+        }
+        task.abort();
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
     #[tokio::test(flavor = "multi_thread")]
     async fn reports_a_finished_download_once_and_skips_partials() {
         let dir = std::env::temp_dir().join(format!("sidekick-dl-{}", std::process::id()));
@@ -298,7 +387,7 @@ mod tests {
         std::fs::write(dir.join("movie.mp4.crdownload"), b"partial").unwrap();
         std::fs::write(dir.join("invoice.pdf"), b"%PDF-1.7 hello").unwrap();
 
-        let event = tokio::time::timeout(Duration::from_secs(5), rx.recv())
+        let event = tokio::time::timeout(Duration::from_secs(5), completed(&mut rx))
             .await
             .expect("download event in time")
             .unwrap();
@@ -306,7 +395,7 @@ mod tests {
         assert_eq!(event.payload["name"], "invoice.pdf");
         assert_eq!(event.payload["kind"], "document");
         assert!(
-            tokio::time::timeout(Duration::from_millis(1500), rx.recv())
+            tokio::time::timeout(Duration::from_millis(1500), completed(&mut rx))
                 .await
                 .is_err(),
             "no second event for the same file or the partial"
@@ -360,14 +449,14 @@ mod tests {
             .unwrap();
         drop(file);
         assert!(
-            tokio::time::timeout(Duration::from_millis(1500), rx.recv())
+            tokio::time::timeout(Duration::from_millis(1500), completed(&mut rx))
                 .await
                 .is_err(),
             "an old file touched by sync is not announced"
         );
 
         std::fs::write(&path, b"png bytes").unwrap();
-        let event = tokio::time::timeout(Duration::from_secs(5), rx.recv())
+        let event = tokio::time::timeout(Duration::from_secs(5), completed(&mut rx))
             .await
             .expect("overwrite event in time")
             .unwrap();
@@ -398,7 +487,7 @@ mod tests {
         for round in ["new file", "same-name replace"] {
             old_partial(&part);
             std::fs::rename(&part, &done).unwrap();
-            let event = tokio::time::timeout(Duration::from_secs(5), rx.recv())
+            let event = tokio::time::timeout(Duration::from_secs(5), completed(&mut rx))
                 .await
                 .unwrap_or_else(|_| panic!("{round}: event in time"))
                 .unwrap();

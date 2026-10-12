@@ -23,15 +23,22 @@ export interface PlanItem {
 }
 
 /** One entry in a session's timeline: something said, or a step taken. */
-export type Entry = { kind: "you"; text: string } | { kind: "text"; text: string } | { kind: "step"; step: Step };
+export type Entry =
+  | { kind: "you"; text: string }
+  | { kind: "text"; text: string }
+  | { kind: "step"; step: Step }
+  | { kind: "review"; id: string; files: number; error: string | null };
 
 export interface Session extends AgentStarted {
   mode: AgentMode;
+  activeMode?: AgentMode;
+  compaction?: "running" | "done" | "failed";
+  view?: { draft: string; scroll: number; follow: boolean; reviewing: boolean; active: number; reviewTurn?: string };
   title: string;
   status: "working" | "waiting" | "idle" | "ended" | "failed";
   entries: Entry[];
   plan: PlanItem[];
-  usage: { used: number; window: number } | null;
+  usage: { used: number; window: number; total?: number; at?: number } | null;
   /** The plan's usage limit, when the agent says it is close or reached. */
   limit?: { status: string; window: string; resetsAt: number | null; used: number | null } | null;
   /** "Not now" on the compact offer, until the context is compacted. */
@@ -99,7 +106,8 @@ const STORE_KEY = "sidekick.agents";
 function loadSessions(): Session[] {
   try {
     const raw = typeof localStorage === "undefined" ? null : localStorage.getItem(STORE_KEY);
-    const list = raw ? (JSON.parse(raw) as Session[]) : [];
+    const saved = raw ? JSON.parse(raw) : [];
+    const list: Session[] = Array.isArray(saved) ? saved : (saved.sessions ?? []);
     // Whatever was running stopped with Sidekick; each can be resumed.
     return list.map((s) => ({
       ...s,
@@ -113,6 +121,37 @@ function loadSessions(): Session[] {
 }
 
 const LAYOUT_KEY = "sidekick.agentsLayout";
+
+function loadView(): Partial<AgentsState> {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORE_KEY) ?? "{}");
+    const ids = new Set(loadSessions().map((s) => s.id));
+    return {
+      current: ids.has(saved.current) ? saved.current : null,
+      focus: ids.has(saved.focus) ? saved.focus : null,
+      tab: ["ask", "agents", "repos", "history"].includes(saved.tab) ? saved.tab : "ask",
+      layout: saved.layout === "board" ? "board" : saved.layout === "one" ? "one" : loadLayout(),
+    };
+  } catch {
+    return {};
+  }
+}
+
+export function sessionView(id: string, patch: Partial<NonNullable<Session["view"]>>) {
+  update(id, (s) => ({
+    ...s,
+    view: { draft: "", scroll: 0, follow: true, reviewing: false, active: 0, ...s.view, ...patch },
+  }));
+}
+
+export async function setSessionMode(id: string, mode: AgentMode) {
+  try {
+    await api.agentSetMode(id, mode);
+    update(id, (s) => ({ ...s, mode }));
+  } catch (e) {
+    update(id, (s) => ({ ...s, error: String(e) }));
+  }
+}
 
 function loadLayout(): AgentsLayout {
   try {
@@ -128,6 +167,7 @@ export const useAgents = create<AgentsState>(() => ({
   current: null,
   layout: typeof window === "undefined" ? "one" : loadLayout(),
   focus: null,
+  ...loadView(),
 }));
 
 export function setLayout(layout: AgentsLayout) {
@@ -147,8 +187,12 @@ export function renameSession(id: string, title: string) {
 
 /** Model and thinking for one session, from its chat box. */
 export function tuneSession(id: string, model: string | null, effort: string | null) {
-  update(id, (s) => ({ ...s, model, effort }));
-  void api.agentTune(id, model, effort);
+  update(id, (s) => {
+    const agent = s.agent.toLowerCase().replace(/\s+/g, "_");
+    writeNewPrefs({ agent, model, effort });
+    return { ...s, model, effort };
+  });
+  void api.agentTune(id, model, effort).catch((e) => update(id, (s) => ({ ...s, error: String(e) })));
 }
 
 /** Merges a session's own worktree back into its repo. */
@@ -159,19 +203,107 @@ export async function finishSession(id: string): Promise<string> {
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
-useAgents.subscribe((st) => {
+/** Cap persisted sessions so streaming does not stringify unbounded timelines. */
+const SAVE_CAP = 20;
+function saveView(st = useAgents.getState()) {
+  try {
+    localStorage.setItem(
+      STORE_KEY,
+      JSON.stringify(
+        {
+          version: 2,
+          sessions: st.sessions.slice(0, SAVE_CAP),
+          current: st.current,
+          focus: st.focus,
+          tab: st.tab,
+          layout: st.layout,
+        },
+        (_k, v: unknown) => (typeof v === "string" ? mask(v) : v),
+      ),
+    );
+  } catch {
+    // Storage full or blocked: the timeline just does not survive a restart.
+  }
+}
+useAgents.subscribe(() => {
   if (saveTimer) clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    try {
-      localStorage.setItem(
-        STORE_KEY,
-        JSON.stringify(st.sessions.slice(0, 20), (_k, v: unknown) => (typeof v === "string" ? mask(v) : v)),
-      );
-    } catch {
-      // Storage full or blocked: the timeline just does not survive a restart.
-    }
-  }, 400);
+  // Idle longer than a stream token so typing/draft flushes do not fight agent events.
+  saveTimer = setTimeout(() => saveView(), 800);
 });
+if (typeof window !== "undefined") {
+  window.addEventListener("pagehide", () => saveView());
+  window.addEventListener("beforeunload", () => saveView());
+}
+/** Flush session view (draft/scroll) + localStorage immediately — island hide / unmount. */
+export function flushAgentsView() {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveView();
+}
+
+/** Last usual agent per project path (+ `__last` for first paint before path is known). */
+const USUAL_KEY = "sidekick.agentUsualByPath";
+/** New-session agent/model/effort/mode, so reopening Agents does not flash defaults. */
+const NEW_PREFS_KEY = "sidekick.agentNewPrefs";
+
+export type AgentNewPrefs = {
+  agent?: string | null;
+  model?: string | null;
+  effort?: string | null;
+  mode?: AgentMode;
+  byAgent?: Record<string, { model?: string | null; effort?: string | null }>;
+};
+
+function readJson<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    return JSON.parse(raw) as T;
+  } catch {
+    return fallback;
+  }
+}
+
+/** Cached usual agent for a project; `__last` when path is not ready yet. */
+export function readUsualAgent(path?: string | null): string | null {
+  const map = readJson<Record<string, string | null>>(USUAL_KEY, {});
+  if (path && map[path]) return map[path];
+  return map.__last ?? null;
+}
+
+export function writeUsualAgent(path: string, id: string | null) {
+  try {
+    const map = readJson<Record<string, string | null>>(USUAL_KEY, {});
+    map[path] = id;
+    map.__last = id;
+    localStorage.setItem(USUAL_KEY, JSON.stringify(map));
+  } catch {
+    // Storage blocked: next open may flash until agentUsual returns again.
+  }
+}
+
+export function readNewPrefs(): AgentNewPrefs {
+  return readJson<AgentNewPrefs>(NEW_PREFS_KEY, {});
+}
+
+export function writeNewPrefs(patch: AgentNewPrefs) {
+  try {
+    const prev = readNewPrefs();
+    const agent = patch.agent !== undefined ? patch.agent : prev.agent;
+    const byAgent = { ...prev.byAgent, ...patch.byAgent };
+    if (agent && (patch.model !== undefined || patch.effort !== undefined || patch.byAgent?.[agent])) {
+      byAgent[agent] = {
+        ...prev.byAgent?.[agent],
+        ...patch.byAgent?.[agent],
+        ...(patch.model !== undefined ? { model: patch.model } : {}),
+        ...(patch.effort !== undefined ? { effort: patch.effort } : {}),
+      };
+    }
+    const next: AgentNewPrefs = { ...prev, ...patch, byAgent };
+    localStorage.setItem(NEW_PREFS_KEY, JSON.stringify(next));
+  } catch {
+    // Not kept across restarts.
+  }
+}
 
 /** Opens a tab. Agents defaults to New unless a session is still working or waiting. */
 export function setTab(tab: AskTab) {
@@ -181,8 +313,7 @@ export function setTab(tab: AskTab) {
   }
   const st = useAgents.getState();
   const cur = st.sessions.find((s) => s.id === st.current);
-  const live = cur !== undefined && (cur.status === "working" || cur.status === "waiting");
-  useAgents.setState({ tab, current: live ? st.current : null });
+  useAgents.setState({ tab, current: cur ? st.current : null });
 }
 
 /** Opens New in Agents for one project ("Start an agent here"). */
@@ -213,6 +344,7 @@ function addSession(started: AgentStarted, title: string, mode: AgentMode, first
     mode,
     title: title.length > 60 ? `${title.slice(0, 57)}...` : title,
     status: "working",
+    activeMode: mode,
     entries: [{ kind: "you", text: first }],
     plan: [],
     usage: null,
@@ -255,6 +387,7 @@ export function sendToSession(id: string, text: string) {
     entries: [...s.entries, { kind: "you", text }],
     status: "working",
     stuck: false,
+    activeMode: s.status === "working" || s.status === "waiting" ? s.activeMode : s.mode,
     turnAt: Date.now(),
     tookMs: null,
     note: null,
@@ -306,6 +439,7 @@ export function closeSession(id: string) {
   useAgents.setState((st) => ({
     sessions: st.sessions.filter((s) => s.id !== id),
     current: st.current === id ? null : st.current,
+    focus: st.focus === id ? null : st.focus,
   }));
 }
 
@@ -324,7 +458,15 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
   const id = e.session;
   switch (e.kind) {
     case "working":
-      return update(id, (s) => ({ ...s, status: s.question ? "waiting" : "working" }));
+      return update(id, (s) => ({
+        ...s,
+        status: s.question ? "waiting" : "working",
+        activeMode: (e.mode as AgentMode) ?? s.activeMode ?? s.mode,
+      }));
+    case "control_error":
+      return update(id, (s) => ({ ...s, error: String(e.error) }));
+    case "compaction":
+      return update(id, (s) => ({ ...s, compaction: e.state as Session["compaction"] }));
     case "text":
       return update(id, (s) => {
         const last = s.entries.at(-1);
@@ -372,7 +514,12 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
       return update(id, (s) => ({ ...s, plan: (e.items as PlanItem[]) ?? [] }));
     case "usage":
       return update(id, (s) => {
-        const usage = { used: Number(e.used), window: Number(e.window) };
+        const usage = {
+          used: Number(e.used),
+          window: Number(e.window),
+          total: typeof e.total === "number" ? e.total : undefined,
+          at: Date.now(),
+        };
         // After a compact the offer may come back the next time it fills up.
         const compactDismissed = s.compactDismissed && usage.used / usage.window >= COMPACT_AT;
         return { ...s, usage, compactDismissed };
@@ -408,12 +555,19 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
       }));
     case "answered":
       return update(id, (s) => (s.question?.id === e.question ? { ...s, question: null } : s));
+    case "turn_diff": {
+      const diff = String(e.diff ?? "");
+      if (!diff.trim()) return;
+      return update(id, (s) => ({ ...s, changes: Math.max(s.changes, 1) }));
+    }
     case "turn":
       return update(id, (s) => ({
         ...s,
         status: e.error ? "failed" : "idle",
         error: e.error ? String(e.error) : null,
         tookMs: Date.now() - s.turnAt,
+        changes: Number(e.changes ?? s.changes),
+        entries: appendReview(s.entries, e.review),
       }));
     case "ended":
       return update(id, (s) => ({
@@ -423,8 +577,18 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
         error: e.error ? String(e.error) : s.error,
         changes: Number(e.changes ?? 0),
         question: null,
+        entries: appendReview(s.entries, e.review),
       }));
   }
+}
+
+/** Timeline Review rows only when there are real files (or a capture error). */
+function appendReview(entries: Entry[], review: unknown): Entry[] {
+  const r = review as { id: string; files: number; error: string | null } | null | undefined;
+  if (!r?.id) return entries;
+  if (r.files === 0 && !r.error) return entries;
+  if (entries.some((entry) => entry.kind === "review" && entry.id === r.id)) return entries;
+  return [...entries, { kind: "review", id: r.id, files: r.files, error: r.error }];
 }
 
 let started = false;

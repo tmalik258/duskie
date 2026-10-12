@@ -68,8 +68,13 @@ fn build(app: &AppHandle) {
     };
     let started = std::time::Instant::now();
     // Stops (keeping the old index) if the PC goes on battery or Sidekick is paused.
+    // Yields 2 ms every ~2 048 files so foreground disk I/O (SQLite, git) is not starved.
     let result = writer.rebuild(&drive_roots(), || {
-        sidekick_sensors::on_mains() && !crate::state::is_paused(app)
+        if !sidekick_sensors::on_mains() || crate::state::is_paused(app) {
+            return false;
+        }
+        std::thread::sleep(Duration::from_millis(2));
+        true
     });
     match result {
         Ok(Some(n)) => log::info!("name index: {n} entries in {:?}", started.elapsed()),

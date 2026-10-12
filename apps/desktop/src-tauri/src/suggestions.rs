@@ -53,9 +53,9 @@ const DIGITS: [Code; 10] = [
     Code::Digit9,
 ];
 
-/// Alt+1..9 pick an option and Alt+0 is "Not now". They are global, because
-/// the island never takes focus, and exist only while a suggestion is showing
-/// so they never steal keys otherwise.
+/// Alt+1..9 pick an option and Alt+0 is "Not now". Shift+Alt+1..9 opens a
+/// link option in a private/incognito window (same as Shift+click). Global
+/// because the island never takes focus; only while a suggestion is showing.
 fn bind_keys(app: &AppHandle, options: usize) {
     // The guide card's keys step aside while a suggestion shows.
     release_digits(app);
@@ -67,11 +67,25 @@ fn bind_keys(app: &AppHandle, options: usize) {
                 // Off the handler's thread: picking unregisters these very
                 // shortcuts, which must not happen from inside their callback.
                 let app = app.clone();
-                tauri::async_runtime::spawn(async move { pick(&app, n) });
+                tauri::async_runtime::spawn(async move { pick(&app, n, false) });
             }
         });
         if let Err(err) = result {
             log::warn!("could not register Alt+{n} (another app may use it): {err}");
+        }
+        // Shift+Alt+1..9: private open. Not for 0 (Ignore).
+        if n == 0 {
+            continue;
+        }
+        let private = Shortcut::new(Some(Modifiers::ALT | Modifiers::SHIFT), *code);
+        let result = gs.on_shortcut(private, move |app, _shortcut, event| {
+            if event.state == ShortcutState::Pressed {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move { pick(&app, n, true) });
+            }
+        });
+        if let Err(err) = result {
+            log::warn!("could not register Shift+Alt+{n} (another app may use it): {err}");
         }
     }
 }
@@ -80,6 +94,10 @@ fn release_digits(app: &AppHandle) {
     let gs = app.global_shortcut();
     for digit in DIGITS {
         let _ = gs.unregister(Shortcut::new(Some(Modifiers::ALT), digit));
+        let _ = gs.unregister(Shortcut::new(
+            Some(Modifiers::ALT | Modifiers::SHIFT),
+            digit,
+        ));
     }
 }
 
@@ -132,13 +150,17 @@ pub fn rebind_keys(app: &AppHandle) {
     }
 }
 
-/// Alt+N: option N, or "Not now" for 0.
-fn pick(app: &AppHandle, n: usize) {
-    log::info!("shortcut Alt+{n}");
+/// Alt+N: option N, or "Not now" for 0. With `private`, open_url runs in a
+/// private/incognito window (Shift+Alt+N).
+fn pick(app: &AppHandle, n: usize, private: bool) {
+    log::info!("shortcut {}Alt+{n}", if private { "Shift+" } else { "" });
     let Some(s) = current(app) else { return };
     let result = if n == 0 {
         dismiss(app, &s.id, "shortcut")
     } else if n <= s.options.len() {
+        if private {
+            make_private(app, &s.id, n - 1);
+        }
         choose(app, &s.id, n - 1)
     } else {
         return;
@@ -294,6 +316,17 @@ pub fn later_open(app: &AppHandle, id: &str) -> Result<(), String> {
 pub fn later_clear(app: &AppHandle) {
     lock(&app.state::<AppState>().later).clear();
     let _ = app.emit(LATER_EVENT, 0);
+}
+
+/// Drops one waiting suggestion without opening it.
+pub fn later_dismiss(app: &AppHandle, id: &str) {
+    let state = app.state::<AppState>();
+    let count = {
+        let mut later = lock(&state.later);
+        later.retain(|l| l.id != id);
+        later.len()
+    };
+    let _ = app.emit(LATER_EVENT, count);
 }
 
 /// Shows a proposal now, keeps a minor one (or one during a meeting) in the
@@ -526,7 +559,7 @@ fn expire_when_ignored(app: &AppHandle, id: String) {
     });
 }
 
-/// Shift+click: open a link option in a private window, in any browser.
+/// Shift+click or Shift+Alt+N: open a link option in a private window, in any browser.
 pub fn make_private(app: &AppHandle, id: &str, index: usize) {
     let state = app.state::<AppState>();
     let mut current = lock(&state.active);
@@ -551,6 +584,8 @@ fn run_choice(app: &AppHandle, id: &str, index: usize, auto: bool) -> Result<(),
         .get(index)
         .cloned()
         .ok_or("option out of range")?;
+    let mut activity =
+        crate::activity::Guard::start(app, &format!("{}: {}", active.proposal.title, option.label));
     if !auto
         && crate::learned::on(app)
         && let Some(key) = &active.proposal.remember
@@ -613,6 +648,7 @@ fn run_choice(app: &AppHandle, id: &str, index: usize, auto: bool) -> Result<(),
                 MascotEvent::ActionFailed
             },
         );
+        activity.finish(payload.ok, payload.message.clone());
         if let Some(offer) = follow_up {
             offer_later(&app, offer);
         }

@@ -10,9 +10,10 @@ import {
   resumeSession,
   type Session,
   sendToSession,
+  sessionView,
   setLayout,
+  startHere,
   startSession,
-  tuneSession,
   usageLine,
   useAgents,
   wideScreen,
@@ -21,9 +22,8 @@ import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useSidekick } from "@/lib/store";
 import type { Agents } from "@/lib/types";
-import { Select } from "../settings/ui";
-import { AgentMark, agentMarkId, NameField, projectPlace, STEP_TAG } from "./AgentsTab";
-import { ChatControls } from "./Controls";
+import { AgentMark, agentMarkId, Composer, NameField, STEP_TAG } from "./AgentsTab";
+import { folderName, ProjectPicker } from "./ProjectPicker";
 
 function state(s: Session): [string, string] {
   if (s.question) return ["ask", "Needs you"];
@@ -217,7 +217,7 @@ function EmptySlot({
   onDismiss?: () => void;
 }) {
   const { data: agents } = useCached<Agents>("agents", api.agentsStatus);
-  const { data: projects } = useCached<{ name: string; path: string }[]>("projects", api.projectsList);
+  const { data: projects } = useCached<{ name: string; path: string }[]>("projects", api.projectsList, 30_000);
   const draftPath = useAgents((s) => s.draftPath);
   const [picking, setPicking] = useState(false);
   const [agent, setAgent] = useState<string | null>(null);
@@ -226,7 +226,7 @@ function EmptySlot({
   const [highlight, setHighlight] = useState(0);
   const pickRoot = useRef<HTMLDivElement>(null);
   const list = projects ?? [];
-  const pickedPath = (path && list.some((p) => p.path === path) ? path : null) || list[0]?.path || "";
+  const pickedPath = path || list[0]?.path || "";
   const project = list.find((p) => p.path === pickedPath);
   const choosePath = (next: string) => {
     setPath(next);
@@ -243,7 +243,7 @@ function EmptySlot({
   const closePickRef = useRef(closePick);
   closePickRef.current = closePick;
 
-  // Keep the picker on a real project when the list loads or draft goes stale.
+  // Use a discovered project only when a folder has not been selected.
   useEffect(() => {
     if (!list.length) return;
     if (pickedPath && pickedPath !== path) setPath(pickedPath);
@@ -266,6 +266,12 @@ function EmptySlot({
   useEffect(() => {
     if (!picking) return;
     const onKey = (e: KeyboardEvent) => {
+      if (
+        e.defaultPrevented ||
+        useSidekick.getState().overlayHit ||
+        (e.target instanceof Element && e.target.closest("[data-project-picker]"))
+      )
+        return;
       if (e.key !== "Escape" || e.repeat) return;
       // Project menu is open: let Select take Esc first.
       if (useSidekick.getState().overlayHit) return;
@@ -300,6 +306,12 @@ function EmptySlot({
       useAgents.setState({ draftPath: next.path });
     };
     const onKey = (e: KeyboardEvent) => {
+      if (
+        e.defaultPrevented ||
+        useSidekick.getState().overlayHit ||
+        (e.target instanceof Element && e.target.closest("[data-project-picker]"))
+      )
+        return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
@@ -339,30 +351,12 @@ function EmptySlot({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [picking, agent, ready, pickedPath, highlight, list]);
-  const projectPicker =
-    list.length > 0 ? (
-      <span className="ak-pickproj">
-        <span className="ak-pickproj-l">In</span>
-        <Select
-          variant="plain"
-          overlay
-          searchable
-          menuWidth={300}
-          label="Project"
-          value={pickedPath}
-          onChange={choosePath}
-          group="Project"
-          options={list.map((p) => ({
-            value: p.path,
-            label: p.name,
-            sub: projectPlace(p.path),
-            title: p.path,
-          }))}
-        />
-      </span>
-    ) : (
-      <span className="ak-tm">Add a project in Settings</span>
-    );
+  const projectPicker = (
+    <span className="ak-pickproj">
+      <span className="ak-pickproj-l">In</span>
+      <ProjectPicker menuWidth={300} path={pickedPath} onChange={choosePath} projects={list} />
+    </span>
+  );
 
   if (!picking && !agent) {
     return (
@@ -414,8 +408,8 @@ function EmptySlot({
           />
           <p className="ak-pickhint">
             {pickedPath
-              ? `Enter to start in ${project?.name ?? "project"} · Esc back`
-              : "Add a project in Settings first"}
+              ? `Enter to start in ${project?.name ?? folderName(pickedPath)} · Esc back`
+              : "Select a folder above first"}
           </p>
         </>
       ) : (
@@ -452,7 +446,7 @@ function EmptySlot({
             ))}
           </div>
           <p className="ak-pickhint">
-            {pickedPath ? "1–3 agent · [ ] project · Enter · Esc" : "Add a project in Settings first"}
+            {pickedPath ? "1–3 agent · [ ] project · Enter · Esc" : "Select a folder above first"}
           </p>
           {recent.length > 0 && (
             <div className="ak-trec">
@@ -487,17 +481,38 @@ function plain(md: string): string {
 
 export function Board({ sessions, maxHeight }: { sessions: Session[]; keys?: boolean; maxHeight: number }) {
   const focus = useAgents((s) => s.focus);
-  const live = sessions.filter((s) => !s.restored || s.status !== "ended");
+  const live = sessions;
   const paused = sessions.filter((s) => s.restored && s.status === "ended");
   const target = live.find((s) => s.id === focus) ?? live.find((s) => s.question) ?? live[0] ?? null;
-  const [text, setText] = useState("");
+  const targetId = target?.id;
+  const [text, setLocalText] = useState("");
+  const textRef = useRef("");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: restore draft only when the focused target switches
+  useEffect(() => {
+    const draft = target?.view?.draft ?? "";
+    textRef.current = draft;
+    setLocalText(draft);
+  }, [targetId]);
+  const setText = (draft: string) => {
+    textRef.current = draft;
+    setLocalText(draft);
+  };
+  const flushDraft = () => {
+    if (targetId) sessionView(targetId, { draft: textRef.current });
+  };
+  useEffect(
+    () => () => {
+      if (targetId) sessionView(targetId, { draft: textRef.current });
+    },
+    [targetId],
+  );
   const grid = useRef<HTMLDivElement>(null);
   const [below, setBelow] = useState(0);
   const [openNew, setOpenNew] = useState(0);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const targetId = target?.id;
   const focusComposer = () => {
-    requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
+    requestAnimationFrame(() =>
+      document.querySelector<HTMLInputElement>(".ak-board .ak-composer input")?.focus({ preventScroll: true }),
+    );
   };
   // Ready to type on open, and again when Ctrl 1-9 picks another tile.
   // biome-ignore lint/correctness/useExhaustiveDependencies: focus again when the target changes
@@ -508,6 +523,12 @@ export function Board({ sessions, maxHeight }: { sessions: Session[]; keys?: boo
   // Ctrl N: new session. Ctrl 1–9: focus a live session tile.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (
+        e.defaultPrevented ||
+        useSidekick.getState().overlayHit ||
+        (e.target instanceof Element && e.target.closest("[data-project-picker]"))
+      )
+        return;
       if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
       if (e.key.toLowerCase() === "n") {
         e.preventDefault();
@@ -539,7 +560,9 @@ export function Board({ sessions, maxHeight }: { sessions: Session[]; keys?: boo
     const t = text.trim();
     if (!t || !target) return;
     sendToSession(target.id, t);
-    setText("");
+    setLocalText("");
+    textRef.current = "";
+    sessionView(target.id, { draft: "" });
   };
 
   if (live.length === 0 && paused.length === 0) {
@@ -604,41 +627,30 @@ export function Board({ sessions, maxHeight }: { sessions: Session[]; keys?: boo
         {below > 0 && <p className="ak-below">{below} more below</p>}
       </div>
       {target && (
-        <div className="ak-composer ak-two">
-          <div className="ak-to">
-            To
-            <AgentMark agent={target.agent} sm />
-            <b className="truncate">
-              {target.agent}
-              {target.title ? ` · ${target.title}` : ""}
-            </b>
-          </div>
-          <div className="ak-row">
-            <input
-              ref={inputRef}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  send();
-                }
-              }}
-              placeholder="Message this session"
-            />
-          </div>
-          <ChatControls
-            agent={target.agent}
-            model={target.model}
-            effort={target.effort}
-            onModel={(m) => tuneSession(target.id, m, target.effort ?? null)}
-            onEffort={(e) => tuneSession(target.id, target.model ?? null, e)}
-            usage={target.usage}
-            localModel={target.localModel}
-            limit={target.limit}
-            keys="Enter send"
-          />
-        </div>
+        <Composer
+          session={target}
+          working={target.status === "working" || target.status === "waiting"}
+          text={text}
+          setText={setText}
+          onSend={send}
+          onBlur={flushDraft}
+          keys={true}
+          onClear={() =>
+            void api.agentProject(target.id).then((path) => {
+              setLayout("one");
+              startHere(path);
+            })
+          }
+          onReview={() => {
+            sessionView(target.id, { reviewing: true });
+            setLayout("one");
+            useAgents.setState({ current: target.id });
+          }}
+          onRewind={() => {
+            setLayout("one");
+            useAgents.setState({ current: target.id });
+          }}
+        />
       )}
     </div>
   );

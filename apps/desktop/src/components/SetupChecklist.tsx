@@ -14,6 +14,7 @@ import { api, EVENTS, listen } from "@/lib/bridge";
 import { SETUP_STATUS_CACHE_KEY, useCached } from "@/lib/cache";
 import { stopWaiting, useSidekick } from "@/lib/store";
 import type { SetupGroup, SetupItem } from "@/lib/types";
+import { ActivityProgress } from "./ActivityProgress";
 import { BrowserInstallPanel } from "./SetupBrowser";
 import { SETUP_CATALOG, skeletonItem } from "./SetupCatalog";
 import { SetupRow, SetupSpinner, SetupStatusMark, SmallButton } from "./SetupChecklistRow";
@@ -29,7 +30,12 @@ const WATCH_EVERY_MS = 6000;
 const WATCH_TIMES = 20;
 
 export function useSetupStatus() {
-  const { data: status, refreshing: statusBusy, refresh, set } = useCached(SETUP_STATUS_CACHE_KEY, api.setupStatus);
+  const {
+    data: status,
+    refreshing: statusBusy,
+    refresh,
+    set,
+  } = useCached(SETUP_STATUS_CACHE_KEY, api.setupStatus, undefined, true);
   const { refresh: refreshDetect } = useCached("setup-detect", api.setupDetect);
   // Covers the full Check-again round-trip (status + detect), not only one cache.
   const [recheck, setRecheck] = useState(false);
@@ -179,6 +185,7 @@ export function SetupChecklist({
 
   return (
     <div className="flex flex-col gap-2 text-[13px]">
+      <ActivityProgress sources={["setup", "voice"]} />
       <div className="flex items-center gap-2">
         <p className="flex-1 text-[12px] text-[rgb(235_235_245/0.6)]">
           {status === null

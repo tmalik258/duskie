@@ -15,25 +15,35 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { activityLabel, useActivities } from "@/lib/activities";
+import { type AgentCommand, commandCatalog } from "@/lib/agent-commands";
 import {
   answerQuestion,
   COMPACT_AT,
   closeSession,
   dismissCompact,
   type Entry,
+  flushAgentsView,
   handOffSession,
   interruptSession,
   messageIndex,
+  readNewPrefs,
+  readUsualAgent,
   renameSession,
   resumeSession,
   rewindSession,
   type Session,
   type Step,
   sendToSession,
+  sessionView,
+  setSessionMode,
+  startHere,
   startSession,
   tuneSession,
   usageLine,
   useAgents,
+  writeNewPrefs,
+  writeUsualAgent,
 } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
@@ -47,6 +57,7 @@ import { Select } from "../settings/ui";
 import { Tip } from "../Tip";
 import { Board } from "./Board";
 import { ChatControls } from "./Controls";
+import { ProjectPicker } from "./ProjectPicker";
 import { Review } from "./Review";
 
 const MODES: { id: AgentMode; label: string; note: string }[] = [
@@ -110,10 +121,11 @@ export function AgentMark({ agent, sm, className = "" }: { agent: string; sm?: b
   );
 }
 
-/** Chats started in Cursor, refreshed while Agents is open. */
-function useCursorChats(): CursorChat[] {
+/** Chats started in Cursor, refreshed while Agents is visible. */
+function useCursorChats(active: boolean): CursorChat[] {
   const [chats, setChats] = useState<CursorChat[]>([]);
   useEffect(() => {
+    if (!active) return;
     let live = true;
     let busy = false;
     const load = () => {
@@ -135,23 +147,39 @@ function useCursorChats(): CursorChat[] {
       live = false;
       clearInterval(t);
     };
-  }, []);
+  }, [active]);
   return chats;
 }
 
 const CURSOR = "cursor:";
 
-export function AgentsTab({ keys, maxHeight }: { keys: boolean; maxHeight: number }) {
+export function AgentsTab({
+  keys,
+  maxHeight,
+  active = true,
+}: {
+  keys: boolean;
+  maxHeight: number;
+  /** False while Ask is closed but Agents is kept warm — skip background work. */
+  active?: boolean;
+}) {
   const sessions = useAgents((s) => s.sessions);
   const current = useAgents((s) => s.current);
   const layout = useAgents((s) => s.layout);
-  const cursor = useCursorChats();
+  const cursor = useCursorChats(active);
   const session = sessions.find((s) => s.id === current) ?? null;
   if (layout === "board") return <Board sessions={sessions} keys={keys} maxHeight={maxHeight} />;
   const watched = current?.startsWith(CURSOR) ? cursor.find((c) => CURSOR + c.id === current) : undefined;
   if (watched) return <CursorView chat={watched} sessions={sessions} cursor={cursor} />;
   return session ? (
-    <SessionView key={session.id} session={session} sessions={sessions} keys={keys} maxHeight={maxHeight} />
+    <SessionView
+      key={session.id}
+      session={session}
+      sessions={sessions}
+      keys={keys}
+      maxHeight={maxHeight}
+      active={active}
+    />
   ) : (
     <NewSession sessions={sessions} cursor={cursor} />
   );
@@ -259,35 +287,48 @@ function SessionChips({
 
 function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorChat[] }) {
   const { data: agents, refreshing, refresh } = useCached<Agents>("agents", api.agentsStatus);
-  const { data: projects } = useCached<{ name: string; path: string }[]>("projects", api.projectsList);
-  const [agent, setAgent] = useState<string>("");
+  const { data: projects } = useCached<{ name: string; path: string }[]>("projects", api.projectsList, 30_000);
+  const prefs = useRef(readNewPrefs()).current;
+  // Last session's agent fills the gap before usual-cache / prefs exist.
+  const lastAgentId = sessions[0] ? agentMarkId(sessions[0].agent) : null;
+  const lastModel = sessions[0]?.model ?? null;
+  const lastEffort = sessions[0]?.effort ?? null;
+  const [agent, setAgent] = useState<string>(prefs.agent ?? "");
   const draftPath = useAgents((s) => s.draftPath);
   const [path, setPath] = useState(draftPath ?? "");
-  const [mode, setMode] = useState<AgentMode>("edit");
+  const [mode, setMode] = useState<AgentMode>(prefs.mode ?? "edit");
   const draftPrompt = useAgents((s) => s.draftPrompt);
   const [prompt, setPrompt] = useState(draftPrompt ?? "");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [model, setModel] = useState<string | null>(null);
-  const [effort, setEffort] = useState<string | null>(null);
+  const seedAgent = prefs.agent || readUsualAgent() || lastAgentId || "";
+  const seedTune = (seedAgent && prefs.byAgent?.[seedAgent]) || prefs;
+  const [model, setModel] = useState<string | null>(
+    seedTune.model ?? (seedAgent === lastAgentId ? lastModel : null) ?? null,
+  );
+  const [effort, setEffort] = useState<string | null>(
+    seedTune.effort ?? (seedAgent === lastAgentId ? lastEffort : null) ?? null,
+  );
   const inputRef = useRef<HTMLInputElement>(null);
-  // Cache can be stale after install/login; always recheck when starting a session.
-  useEffect(() => {
-    void refresh().catch(() => undefined);
-  }, [refresh]);
   // Ready agents first; the rest stay listed with what they need.
   const all = agents?.list ?? [];
   const choices = [...all.filter(ready), ...all.filter((a) => !ready(a) && a.installed)];
   const missing = all.filter((a) => !a.installed);
   const pickedPath = path || projects?.[0]?.path || "";
-  // The agent you used last in this project comes first.
-  const [usual, setUsual] = useState<string | null>(null);
+  // Seed from cache / last session so the first paint matches usual (no Claude→Codex flash).
+  const [usual, setUsual] = useState<string | null>(() => readUsualAgent(pickedPath || undefined) || lastAgentId);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: path drives refresh; usual seed is sync
   useEffect(() => {
     if (!pickedPath) return;
     let live = true;
+    const cached = readUsualAgent(pickedPath);
+    if (cached && cached !== usual) setUsual(cached);
     void api
       .agentUsual(pickedPath)
-      .then((id) => live && setUsual(id))
+      .then((id) => {
+        writeUsualAgent(pickedPath, id);
+        if (live) setUsual(id);
+      })
       .catch(() => live && setUsual(null));
     return () => {
       live = false;
@@ -296,6 +337,27 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
   const usualChoice = choices.find((c) => c.id === usual && ready(c))?.id;
   const pickedAgent = agent || usualChoice || choices[0]?.id || "";
   const picked = all.find((a) => a.id === pickedAgent);
+  const pickAgent = (id: string) => {
+    setAgent(id);
+    const tune = readNewPrefs().byAgent?.[id];
+    if (tune) {
+      if (tune.model !== undefined) setModel(tune.model ?? null);
+      if (tune.effort !== undefined) setEffort(tune.effort ?? null);
+    }
+    writeNewPrefs({ agent: id, model: tune?.model ?? model, effort: tune?.effort ?? effort, mode });
+  };
+  const pickModel = (m: string | null) => {
+    setModel(m);
+    writeNewPrefs({ agent: pickedAgent || agent || null, model: m, effort, mode });
+  };
+  const pickEffort = (e: string | null) => {
+    setEffort(e);
+    writeNewPrefs({ agent: pickedAgent || agent || null, model, effort: e, mode });
+  };
+  const pickMode = (m: AgentMode) => {
+    setMode(m);
+    writeNewPrefs({ agent: pickedAgent || agent || null, model, effort, mode: m });
+  };
   useEffect(() => {
     requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
   }, []);
@@ -303,6 +365,10 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
     if (!prompt.trim() || !pickedPath || busy || (picked && !ready(picked))) return;
     setBusy(true);
     setError(null);
+    // Confirm readiness right before start; avoid refresh on every open.
+    void refresh().catch(() => undefined);
+    writeNewPrefs({ agent: pickedAgent, model, effort, mode });
+    writeUsualAgent(pickedPath, pickedAgent);
     startSession(pickedAgent, pickedPath, prompt.trim(), mode, model, effort)
       .then(() => setPrompt(""))
       .catch((e: unknown) => setError(String(e)))
@@ -328,7 +394,7 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
                   overlay
                   label="Agent"
                   value={pickedAgent}
-                  onChange={setAgent}
+                  onChange={pickAgent}
                   options={[...choices, ...missing].map((c) => ({
                     value: c.id,
                     label: c.name,
@@ -348,24 +414,16 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
               </span>
             )}
             <span className="ak-mi max-w-44">
-              <Select
-                variant="plain"
-                overlay
-                searchable
-                menuWidth={340}
-                label="Project"
-                value={pickedPath}
-                onChange={setPath}
-                group="Project"
-                options={(projects ?? []).map((p) => ({
-                  value: p.path,
-                  label: p.name,
-                  sub: projectPlace(p.path),
-                  title: p.path,
-                }))}
+              <ProjectPicker
+                projects={projects ?? []}
+                path={pickedPath}
+                onChange={(next) => {
+                  setPath(next);
+                  useAgents.setState({ draftPath: next });
+                }}
               />
             </span>
-            <ModeSwitch mode={mode} onChange={setMode} />
+            <ModeSwitch mode={mode} onChange={pickMode} />
           </div>
           {picked && !ready(picked) && <FixLine agent={picked} />}
           {picked?.local && ready(picked) && (
@@ -393,8 +451,8 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
               agent={pickedAgent}
               model={model}
               effort={effort}
-              onModel={setModel}
-              onEffort={setEffort}
+              onModel={pickModel}
+              onEffort={pickEffort}
               keys={busy ? "Starting..." : "Enter start"}
             />
           </div>
@@ -457,17 +515,6 @@ function NewSessionLoading() {
   );
 }
 
-/** Repo folder plus its two parents, so same-named projects stay distinct. */
-export function projectPlace(path: string): string {
-  const home = path
-    .replace(/^[A-Za-z]:[\\/]Users[\\/][^\\/]+/, "~")
-    .replace(/^\/Users\/[^/]+/, "~")
-    .replace(/^\/home\/[^/]+/, "~");
-  const parts = home.split(/[\\/]+/).filter(Boolean);
-  const tail = parts.length <= 3 ? parts : parts.slice(-3);
-  return tail.join("\\");
-}
-
 /** Ready to start: installed, not known signed out, not out of usage. */
 function ready(a: AgentInfo): boolean {
   return a.installed && a.signedIn !== false && !a.limited;
@@ -524,11 +571,27 @@ function FixLine({ agent }: { agent: AgentInfo }) {
   );
 }
 
-function ModeSwitch({ mode, onChange }: { mode: AgentMode; onChange?: (m: AgentMode) => void }) {
+function ModeSwitch({ mode, onChange, agent }: { mode: AgentMode; onChange?: (m: AgentMode) => void; agent?: string }) {
   return (
     <fieldset aria-label="Mode" className="ak-seg border-0">
       {MODES.map((m) => (
-        <Tip key={m.id} label={m.note}>
+        <Tip
+          key={m.id}
+          label={
+            agent === "Codex"
+              ? {
+                  plan: "Codex Plan collaboration mode in a read-only sandbox",
+                  ask: "Workspace access; untrusted commands require approval",
+                  edit: "Workspace files and commands allowed; asks for escalation",
+                  full: "Full access without sandbox or approval prompts",
+                }[m.id]
+              : agent === "Local"
+                ? m.id === "plan"
+                  ? "Read-only tools"
+                  : "Every edit requires approval; commands are unavailable"
+                : m.note
+          }
+        >
           <button
             type="button"
             aria-pressed={mode === m.id}
@@ -609,38 +672,105 @@ function clock(ms: number): string {
   return s < 60 ? `${s} s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
+/** follow:false + scroll:0 is a bad flush (open before layout); treat as stick-to-bottom. */
+function stickBottom(st: { scroll: number; follow: boolean }): boolean {
+  return st.follow !== false || st.scroll <= 0;
+}
+
 function SessionView({
   session: s,
   sessions,
   keys,
   maxHeight,
+  active = true,
 }: {
   session: Session;
   sessions: Session[];
   keys: boolean;
   maxHeight: number;
+  active?: boolean;
 }) {
-  const [text, setText] = useState("");
-  const [reviewing, setReviewing] = useState(false);
+  const [text, setLocalText] = useState(s.view?.draft ?? "");
+  const textRef = useRef(text);
+  const savedScroll = s.view?.scroll ?? 0;
+  const savedFollow = s.view?.follow ?? true;
+  const scrollState = useRef({
+    scroll: savedScroll,
+    // Coerce corrupted prefs so reopen does not land at the top of a 200kpx timeline.
+    follow: savedFollow === false && savedScroll <= 0 ? true : savedFollow,
+  });
+  // biome-ignore lint/correctness/useExhaustiveDependencies: restore draft/scroll only when the session switches
+  useEffect(() => {
+    const draft = s.view?.draft ?? "";
+    textRef.current = draft;
+    setLocalText(draft);
+    const scroll = s.view?.scroll ?? 0;
+    const follow = s.view?.follow ?? true;
+    scrollState.current = { scroll, follow: follow === false && scroll <= 0 ? true : follow };
+  }, [s.id]);
+  const setText = (draft: string) => {
+    textRef.current = draft;
+    setLocalText(draft);
+  };
+  const flushView = () => {
+    const st = scrollState.current;
+    const follow = stickBottom(st);
+    sessionView(s.id, { draft: textRef.current, scroll: follow ? st.scroll : st.scroll, follow });
+    flushAgentsView();
+  };
+  const reviewing = s.view?.reviewing ?? false;
+  const setReviewing = (next: boolean) =>
+    sessionView(s.id, { draft: textRef.current, ...scrollState.current, reviewing: next });
   const [rewindAt, setRewindAt] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const { data: editors } = useCached<EditorList>("editors", api.editorsList);
   const editor = editors?.editors.find((e) => e.id === editors.current)?.name ?? null;
   const scroll = useRef<HTMLDivElement>(null);
-  const now = useNow(250);
+  const activity = useActivities((state) => state.activities.find((a) => a.parentId === s.id && !a.dismissed));
   const working = s.status === "working" || s.status === "waiting";
+  const now = useNow(active && working ? 250 : 60_000);
   const done = s.status === "idle" || s.status === "ended" || s.status === "failed";
   const current = useMemo(() => {
     const step = [...s.entries].reverse().find((e) => e.kind === "step" && e.step.state === "running");
     return step && step.kind === "step" ? step.step.label : null;
   }, [s.entries]);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: follow new entries
-  useEffect(() => {
+  // Restore scroll before paint; ResizeObserver keeps follow pinned while Markdown grows.
+  // Skip while warm/hidden — hidden nodes report scrollHeight 0 and would wipe the saved offset.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: follow new entry count, not every streamed token array identity
+  useLayoutEffect(() => {
+    if (!active) return;
     const el = scroll.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [s.entries.length, s.plan.length, s.question, s.status]);
+    if (!el) return;
+    const apply = () => {
+      el.scrollTop = stickBottom(scrollState.current) ? el.scrollHeight : scrollState.current.scroll;
+    };
+    apply();
+    const ro = new ResizeObserver(() => {
+      if (stickBottom(scrollState.current)) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(el);
+    const id = requestAnimationFrame(apply);
+    return () => {
+      ro.disconnect();
+      cancelAnimationFrame(id);
+    };
+  }, [s.id, reviewing, s.entries.length, s.plan.length, s.question, s.status, active]);
+  // The cleanup intentionally captures the current session identity.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: saves on session switch/unmount
+  useEffect(() => {
+    if (!active) return;
+    const onHide = () => flushView();
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", onHide);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", onHide);
+      flushView();
+    };
+  }, [s.id, active]);
 
   // Alt 1 reviews, Alt 2 (or Alt T) carries on in a terminal.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: setReviewing is recreated each render; s.id covers the session
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (!e.altKey || e.ctrlKey || e.metaKey) return;
@@ -697,7 +827,9 @@ function SessionView({
     const t = text.trim();
     if (!t) return;
     sendToSession(s.id, t);
-    setText("");
+    textRef.current = "";
+    setLocalText("");
+    sessionView(s.id, { draft: "", ...scrollState.current });
   };
   const planDone = s.plan.filter((p) => p.status === "completed").length;
   const planAt = Math.min(planDone + 1, s.plan.length);
@@ -705,6 +837,13 @@ function SessionView({
   const firstSaid = s.entries.findIndex((e) => e.kind === "text");
   const planAfter = firstSaid >= 0 ? firstSaid : 0;
   const usedPct = s.usage ? Math.round(Math.min(1, s.usage.used / s.usage.window) * 100) : null;
+  // Long sessions: paint the recent tail first (open lag was parsing every Markdown block).
+  const TAIL = 28;
+  const [showEarlier, setShowEarlier] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset the tail fold when the session switches
+  useEffect(() => setShowEarlier(false), [s.id]);
+  const entryStart = showEarlier || s.entries.length <= TAIL ? 0 : s.entries.length - TAIL;
+  const visibleEntries = s.entries.slice(entryStart);
 
   return (
     <>
@@ -732,55 +871,82 @@ function SessionView({
         <span className="ak-mi b">{s.agent}</span>
         <span className="ak-mi">{s.project}</span>
         {s.branch && <span className="ak-mi">⎇ {s.branch}</span>}
-        <SessionMemory id={s.id} live={s.status !== "ended" && s.status !== "failed" && !s.restored} />
-        <ModeSwitch mode={s.mode} />
+        <SessionMemory id={s.id} live={active && s.status !== "ended" && s.status !== "failed" && !s.restored} />
+        <div className="ak-modes">
+          <ModeSwitch agent={s.agent} mode={s.mode} onChange={(mode) => void setSessionMode(s.id, mode)} />
+          <span className="keys mono">Shift+Tab</span>
+        </div>
+        {working && s.activeMode !== s.mode && <span className="ak-note">Applies to next message</span>}
       </div>
 
       {reviewing ? (
         <Review session={s} maxHeight={maxHeight} onDone={() => setReviewing(false)} />
       ) : (
         <>
-          <div ref={scroll} className="ak-tl ak-scroll" style={{ maxHeight: maxHeight - 40 }}>
-            {s.entries.map((e, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: entries only ever append
-              <Fragment key={i}>
-                <EntryRow
-                  entry={e}
-                  onRewind={e.kind === "you" && done && s.reviewable ? () => setRewindAt(i) : undefined}
-                />
-                {rewindAt === i && (
-                  <RewindConfirm
-                    session={s}
-                    entry={i}
-                    onDone={(msg) => {
-                      setRewindAt(null);
-                      setNotice(msg);
-                    }}
+          <div
+            ref={scroll}
+            onScroll={(e) => {
+              const el = e.currentTarget;
+              scrollState.current = {
+                scroll: el.scrollTop,
+                follow: el.scrollHeight - el.scrollTop - el.clientHeight < 48,
+              };
+            }}
+            className="ak-tl ak-scroll"
+            style={{ maxHeight: maxHeight - 40 }}
+          >
+            {entryStart > 0 && (
+              <button type="button" className="ak-chip chip self-start" onClick={() => setShowEarlier(true)}>
+                Show earlier ({entryStart} more)
+              </button>
+            )}
+            {visibleEntries.map((e, j) => {
+              const i = entryStart + j;
+              return (
+                <Fragment key={i}>
+                  <EntryRow
+                    entry={e}
+                    onReview={() => setReviewing(true)}
+                    onRewind={e.kind === "you" && done && s.reviewable ? () => setRewindAt(i) : undefined}
                   />
-                )}
-                {i === planAfter && s.plan.length > 0 && (
-                  <div className="ak-todo ak-in">
-                    <div className="h">
-                      <span>Plan</span>
-                      <span>
-                        {planAt} of {s.plan.length}
-                      </span>
-                    </div>
-                    {s.plan.map((p) => (
-                      <div key={p.text} className="ak-td" data-s={p.status}>
-                        <span className="ak-cb" aria-hidden="true" />
-                        {p.text}
+                  {rewindAt === i && (
+                    <RewindConfirm
+                      session={s}
+                      entry={i}
+                      onDone={(msg) => {
+                        setRewindAt(null);
+                        setNotice(msg);
+                      }}
+                    />
+                  )}
+                  {i === planAfter && s.plan.length > 0 && (
+                    <div className="ak-todo ak-in">
+                      <div className="h">
+                        <span>Plan</span>
+                        <span>
+                          {planAt} of {s.plan.length}
+                        </span>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </Fragment>
-            ))}
+                      {s.plan.map((p) => (
+                        <div key={p.text} className="ak-td" data-s={p.status}>
+                          <span className="ak-cb" aria-hidden="true" />
+                          {p.text}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Fragment>
+              );
+            })}
 
             {working && !s.question && (
               <p className="ak-status" role="status" aria-live="polite">
                 <span className="shimmer-text text-[rgb(235_235_245/0.6)]">
-                  {current ? `${current}...` : "Working..."}
+                  {activity
+                    ? activityLabel(activity, now)
+                    : current
+                      ? `${current}...`
+                      : "Waiting for the next agent step"}
                 </span>
                 <span className="ak-timer mono">{clock(now - s.turnAt)}</span>
               </p>
@@ -890,21 +1056,41 @@ function SessionView({
               </p>
             )}
             {notice && <p className="ak-note ak-in">{notice}</p>}
+            {s.compaction && (
+              <p role="status" className="ak-note">
+                {s.compaction === "running"
+                  ? "Compacting context…"
+                  : s.compaction === "done"
+                    ? "Context compacted"
+                    : "Compaction failed; see the session error."}
+              </p>
+            )}
           </div>
 
           {s.restored || s.status === "ended" || (s.status === "failed" && !working) ? (
-            <div className="ak-chips">
-              <button
-                type="button"
-                onClick={() => void resumeSession(s.id).catch((e: unknown) => setNotice(String(e)))}
-                className="ak-chip primary chip"
-              >
-                Resume
-              </button>
-              <span className="ak-note">
-                {s.restored ? "Sidekick restarted since this ran." : "This session ended."} Resume carries on where it
-                stopped.
-              </span>
+            <div>
+              <ChatControls
+                agent={s.agent}
+                model={s.model}
+                effort={s.effort}
+                usage={s.usage}
+                limit={s.limit}
+                onModel={(m) => tuneSession(s.id, m, s.effort ?? null)}
+                onEffort={(e) => tuneSession(s.id, s.model ?? null, e)}
+              />
+              <div className="ak-chips">
+                <button
+                  type="button"
+                  onClick={() => void resumeSession(s.id).catch((e: unknown) => setNotice(String(e)))}
+                  className="ak-chip primary chip"
+                >
+                  Resume
+                </button>
+                <span className="ak-note">
+                  {s.restored ? "Sidekick restarted since this ran." : "This session ended."} Resume carries on where it
+                  stopped.
+                </span>
+              </div>
             </div>
           ) : (
             <Composer
@@ -913,8 +1099,13 @@ function SessionView({
               text={text}
               setText={setText}
               onSend={send}
+              onBlur={flushView}
+              onReview={() => setReviewing(true)}
               onClear={() => {
-                closeSession(s.id);
+                void api
+                  .agentProject(s.id)
+                  .then((path) => startHere(path))
+                  .catch((e) => setNotice(String(e)));
               }}
               onRewind={() => {
                 const last = s.entries
@@ -952,7 +1143,17 @@ export const STEP_TAG: Record<string, string> = {
   webSearch: "Web",
 };
 
-function EntryRow({ entry: e, onRewind }: { entry: Entry; onRewind?: () => void }) {
+function EntryRow({ entry: e, onRewind, onReview }: { entry: Entry; onRewind?: () => void; onReview?: () => void }) {
+  if (e.kind === "review") {
+    return (
+      <div className="ak-chips">
+        <span className="ak-note">{e.error ?? `${e.files} files changed`}</span>
+        <button type="button" className="ak-chip chip" onClick={() => onReview?.()}>
+          Review
+        </button>
+      </div>
+    );
+  }
   if (e.kind === "you") {
     if (!onRewind) return <div className="ak-um ak-in">{e.text}</div>;
     return (
@@ -1073,17 +1274,19 @@ function RewindConfirm({
   );
 }
 
-type Slash = { name: string; description: string; group: string };
+type Slash = AgentCommand;
 
 /** Where you type to the agent: / lists commands, @ finds files in the project. */
-function Composer({
+export function Composer({
   session: s,
   working,
   text,
   setText,
   onSend,
   onClear,
+  onReview,
   onRewind,
+  onBlur,
   keys,
 }: {
   session: Session;
@@ -1092,10 +1295,15 @@ function Composer({
   setText: (t: string) => void;
   onSend: () => void;
   onClear: () => void;
+  onReview: () => void;
   onRewind: () => void;
+  onBlur?: () => void;
   keys: boolean;
 }) {
-  const [commands, setCommands] = useState<Slash[]>([]);
+  const [commands, setCommands] = useState<Slash[]>(commandCatalog(s.agent, []));
+  const [panel, setPanel] = useState<{ name: string; at: number }>();
+  const [notice, setNotice] = useState<string | null>(null);
+  const [terminal, setTerminal] = useState<string | null>(null);
   const [files, setFiles] = useState<string[]>([]);
   const [sel, setSel] = useState(0);
   const [float, setFloat] = useState<{ left: number; bottom: number; maxWidth: number } | null>(null);
@@ -1109,9 +1317,9 @@ function Composer({
   useEffect(() => {
     void api
       .agentCommands(s.id)
-      .then(setCommands)
-      .catch(() => setCommands([]));
-  }, [s.id]);
+      .then((cmds) => setCommands(commandCatalog(s.agent, cmds)))
+      .catch(() => setCommands(commandCatalog(s.agent, [])));
+  }, [s.id, s.agent]);
   const slash = text.startsWith("/") && !text.includes(" ");
   const mention = /(^|\s)@([^\s@]*)$/.exec(text);
   const query = mention?.[2] ?? null;
@@ -1181,11 +1389,99 @@ function Composer({
     const hit = { x: r.left, y: r.top, width: r.width, height: r.height };
     setOverlayHit(hit);
   }, [float, count]);
-  const runCommand = (c: Slash) => {
+  const runCommand = (c: Slash, args = "") => {
     setText("");
-    if (c.name === "/clear") onClear();
-    else if (c.name === "/rewind") onRewind();
-    else sendToSession(s.id, c.name);
+    setNotice(null);
+    if (c.execution === "terminal") {
+      setTerminal(`${c.name}${args ? ` ${args}` : ""}`);
+      return;
+    }
+    if (c.execution === "provider") {
+      sendToSession(s.id, `${c.name}${args ? ` ${args}` : ""}`);
+      return;
+    }
+    const mode = c.name.slice(1) as AgentMode;
+    if (["plan", "ask", "edit", "full"].includes(mode)) {
+      void setSessionMode(s.id, mode);
+      return;
+    }
+    const fail = (e: unknown) => setNotice(String(e));
+    switch (c.name) {
+      case "/clear":
+        onClear();
+        break;
+      case "/new":
+        useAgents.setState({ current: null });
+        break;
+      case "/rewind":
+        onRewind();
+        break;
+      case "/diff":
+        onReview();
+        break;
+      case "/permissions":
+        if (["plan", "ask", "edit", "full"].includes(args)) void setSessionMode(s.id, args as AgentMode);
+        else
+          setNotice(
+            `Selected: ${s.mode}. Use the mode buttons above or Shift+Tab. Codex Edit allows workspace commands and asks for escalation; Full disables the sandbox.`,
+          );
+        break;
+      case "/model":
+        if (args) tuneSession(s.id, args === "default" ? null : args, s.effort ?? null);
+        else setPanel({ name: "model", at: Date.now() });
+        break;
+      case "/effort":
+        if (args && ["off", "low", "medium", "high", "max", "xhigh", "default"].includes(args))
+          tuneSession(s.id, s.model ?? null, args === "default" ? null : args);
+        else if (args) setNotice("Unsupported effort. Choose off, low, medium, high, max, or default.");
+        else setPanel({ name: "effort", at: Date.now() });
+        break;
+      case "/usage":
+        setPanel({ name: "usage", at: Date.now() });
+        break;
+      case "/status":
+        setNotice(
+          `${s.agent} · ${s.status} · selected mode ${s.mode} · model ${s.model ?? "default"} · effort ${s.effort ?? "default"} · session ${s.id}`,
+        );
+        break;
+      case "/rename":
+        if (args) renameSession(s.id, args);
+        else setNotice("Use /rename followed by a title, or edit the session title above.");
+        break;
+      case "/copy": {
+        const e = [...s.entries].reverse().find((e) => e.kind === "text");
+        if (e?.kind === "text")
+          void navigator.clipboard
+            .writeText(e.text)
+            .then(() => setNotice("Response copied"))
+            .catch(fail);
+        break;
+      }
+      case "/resume":
+        void resumeSession(s.id).catch(fail);
+        break;
+      case "/compact":
+        if (working) {
+          setNotice("Wait for the current turn to finish before compacting.");
+          break;
+        }
+        if (s.agent === "Codex") void api.agentControl(s.id, "thread/compact/start").catch(fail);
+        else if (s.agent === "Claude Code") sendToSession(s.id, "/compact");
+        else setNotice("Compaction is not supported by this provider.");
+        break;
+      default:
+        setNotice(`Unsupported control: ${c.name}`);
+    }
+  };
+  const submit = () => {
+    const match = /^\/(\S+)(?:\s+(.*))?$/.exec(text.trim());
+    if (!match) {
+      onSend();
+      return;
+    }
+    const command = commands.find((c) => c.name === `/${match[1].toLowerCase()}`);
+    if (command) runCommand(command, match[2] ?? "");
+    else setNotice(`Unsupported command /${match[1]}. Use / to see supported controls.`);
   };
   const pickFile = (f: string) => {
     if (!mention) return;
@@ -1193,6 +1489,13 @@ function Composer({
     inputRef.current?.focus({ preventScroll: true });
   };
   const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Tab" && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      e.preventDefault();
+      e.stopPropagation();
+      const modes: AgentMode[] = ["plan", "ask", "edit", "full"];
+      void setSessionMode(s.id, modes[(modes.indexOf(s.mode) + 1) % modes.length]);
+      return;
+    }
     if (count && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
       e.preventDefault();
       setSel((at + (e.key === "ArrowDown" ? 1 : -1) + count) % count);
@@ -1205,7 +1508,7 @@ function Composer({
       setSel(0);
     } else if (e.key === "Enter") {
       e.preventDefault();
-      onSend();
+      submit();
     } else if (e.key === "Escape" && count) {
       e.preventDefault();
       setText(slash ? "" : text.replace(/(^|\s)@[^\s@]*$/, "$1"));
@@ -1281,6 +1584,32 @@ function Composer({
   return (
     <>
       {pop}
+      {notice && (
+        <p role="status" className="ak-note">
+          {notice}
+        </p>
+      )}
+      {terminal && (
+        <div className="ak-chips">
+          <span className="ak-note">
+            Terminal only: <code className="mono">{terminal}</code>
+          </span>
+          <button
+            type="button"
+            className="ak-chip chip"
+            onClick={() => void api.agentTerminal(s.id).catch((e) => setNotice(String(e)))}
+          >
+            Open in terminal
+          </button>
+          <button
+            type="button"
+            className="ak-chip chip"
+            onClick={() => void navigator.clipboard.writeText(terminal).catch((e) => setNotice(String(e)))}
+          >
+            Copy command
+          </button>
+        </div>
+      )}
       <div ref={wrapRef} className="ak-composer ak-two relative">
         <div className="ak-row">
           <input
@@ -1290,6 +1619,7 @@ function Composer({
               setText(e.target.value);
               setSel(0);
             }}
+            onBlur={() => onBlur?.()}
             onKeyDown={onKey}
             placeholder={working ? "Steer it, it reads this next" : "Ask for more, / for commands, @ for files"}
           />
@@ -1302,11 +1632,17 @@ function Composer({
           onModel={(m) => tuneSession(s.id, m, s.effort ?? null)}
           onEffort={(e) => tuneSession(s.id, s.model ?? null, e)}
           usage={s.usage}
+          panel={panel}
+          onRefresh={
+            s.agent === "Codex"
+              ? () => void api.agentControl(s.id, "account/rateLimits/read").catch((e) => setNotice(String(e)))
+              : undefined
+          }
           localModel={s.localModel}
           limit={s.limit}
           onCompact={
-            s.agent === "Claude Code" && s.status !== "working" && s.status !== "ended"
-              ? () => sendToSession(s.id, "/compact")
+            (s.agent === "Claude Code" || s.agent === "Codex") && !working
+              ? () => runCommand({ name: "/compact", description: "", group: "Sidekick", execution: "control" })
               : undefined
           }
           keys={working ? "Esc interrupt" : "Enter send"}
