@@ -333,14 +333,9 @@ pub fn apply_settings(app: &AppHandle, next: Settings) -> CmdResult<Settings> {
     let now = Utc::now();
     let previous = lock(&state.settings).clone();
     next.saved_projects.retain(|saved| {
-        !previous
-            .code_folders
+        next.code_folders
             .iter()
             .any(|p| crate::projects::same_path(p, saved))
-            || next
-                .code_folders
-                .iter()
-                .any(|p| crate::projects::same_path(p, saved))
     });
     if next.ai != previous.ai {
         // Warm sessions were started with the old models and paths.

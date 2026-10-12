@@ -687,8 +687,8 @@ fn spawn_run(
     let (app2, id2, path2) = (app.clone(), id.to_owned(), path.to_owned());
     let tune = tuned(id);
     let model = match agent {
-        Agent::Codex => Some(settings.ai.codex.model.clone()),
         _ if tune.model.is_some() => tune.model.clone(),
+        Agent::Codex => Some(settings.ai.codex.model.clone()),
         Agent::ClaudeCode => Some(settings.ai.claude_code.model.clone()),
         Agent::Copilot | Agent::Cursor => None,
         Agent::Local => Some(settings.ai.local.model.clone()),

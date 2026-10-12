@@ -662,6 +662,8 @@ pub fn chat(
             crate::recipes::note_question(app, &last.content);
         }
     }
+    let cancel = CancellationToken::new();
+    lock(&app.state::<AppState>().chats).insert(id.clone(), cancel.clone());
     crate::activity::report(
         app,
         &format!("chat:{id}"),
@@ -672,8 +674,6 @@ pub fn chat(
         None,
         None,
     );
-    let cancel = CancellationToken::new();
-    lock(&app.state::<AppState>().chats).insert(id.clone(), cancel.clone());
     let held = attach.hold.then(|| {
         let (tx, rx) = tokio::sync::watch::channel(false);
         lock(&HELD).insert(id.clone(), tx);
