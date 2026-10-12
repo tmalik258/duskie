@@ -308,6 +308,8 @@ export type SelectOption =
       image?: string;
       color?: string;
       sepBefore?: boolean;
+      /** Keep actions such as Browse available while filtering choices. */
+      alwaysVisible?: boolean;
     };
 
 interface Row {
@@ -319,6 +321,7 @@ interface Row {
   image?: string;
   color?: string;
   sepBefore?: boolean;
+  alwaysVisible?: boolean;
 }
 
 const toRow = (o: SelectOption): Row => (Array.isArray(o) ? { value: o[0], label: o[1] } : o);
@@ -371,7 +374,9 @@ export function Select({
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
-  const shown = q ? list.filter((r) => `${r.label} ${r.sub ?? ""} ${r.value}`.toLowerCase().includes(q)) : list;
+  const shown = q
+    ? list.filter((r) => r.alwaysVisible || `${r.label} ${r.sub ?? ""} ${r.value}`.toLowerCase().includes(q))
+    : list;
   const [active, setActive] = useState(() =>
     Math.max(
       0,

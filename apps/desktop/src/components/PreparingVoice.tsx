@@ -3,6 +3,7 @@
 // Compact island state while the voice (and other speech models) are still
 // arriving. Shown until onboarding can speak; never a blank idle orb.
 
+import { ActivityProgress } from "./ActivityProgress";
 import type { VoiceStatus } from "@/lib/types";
 
 export function PreparingVoice({ voiceStatus }: { voiceStatus: VoiceStatus | null }) {
@@ -17,6 +18,7 @@ export function PreparingVoice({ voiceStatus }: { voiceStatus: VoiceStatus | nul
   return (
     <div className="flex flex-col gap-2 pb-1">
       <p className="font-display text-[15px] leading-5 font-semibold tracking-[-0.015em] text-white">Preparing voice</p>
+      <ActivityProgress sources={["voice"]} />
       <ul className="flex flex-col gap-1.5">
         {rows.map((m) => (
           <li key={m.id} className="flex items-center gap-2.5 text-[12.5px] text-white/70">

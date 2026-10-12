@@ -85,20 +85,31 @@ fn gh(args: &[&str]) -> Option<Value> {
     serde_json::from_slice(&out.stdout).ok()
 }
 
-fn gh_signed_in() -> bool {
-    static AT: Mutex<Option<(Instant, bool)>> = Mutex::new(None);
-    let mut g = AT.lock().unwrap_or_else(|e| e.into_inner());
+/// Read local credentials without an API request. A network outage is not a logout.
+pub async fn gh_signed_in() -> bool {
+    static AT: tokio::sync::Mutex<Option<(Instant, bool)>> = tokio::sync::Mutex::const_new(None);
+    let mut g = AT.lock().await;
     if let Some((at, ok)) = *g
-        && at.elapsed() < Duration::from_secs(5 * 60)
+        && at.elapsed() < Duration::from_secs(if ok { 60 } else { 5 })
     {
         return ok;
     }
-    let ok = which::which("gh").is_ok_and(|exe| {
-        let mut cmd = Command::new(exe);
-        cmd.args(["auth", "status"]);
-        hide(&mut cmd);
-        cmd.output().is_ok_and(|o| o.status.success())
-    });
+    crate::setup::refresh_path();
+    let mut cmd = tokio::process::Command::new("gh");
+    cmd.args(["auth", "token", "--hostname", "github.com"])
+        .env("GH_PROMPT_DISABLED", "1")
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .kill_on_drop(true);
+    #[cfg(windows)]
+    cmd.creation_flags(0x0800_0000);
+    let ok = match tokio::time::timeout(Duration::from_secs(5), cmd.status()).await {
+        Ok(Ok(status)) => status.success(),
+        // Preserve the last known connection when a credential store is slow.
+        Err(_) => return g.as_ref().is_some_and(|(_, ok)| *ok),
+        Ok(Err(_)) => false,
+    };
     *g = Some((Instant::now(), ok));
     ok
 }
@@ -255,21 +266,38 @@ fn row(path: &Path, slug: Option<String>, prs: Vec<Pr>) -> RepoRow {
     }
 }
 
-static CACHE: Mutex<Option<(Instant, Overview)>> = Mutex::new(None);
+static CACHE: Mutex<Option<(Instant, Vec<PathBuf>, Overview)>> = Mutex::new(None);
+
+pub fn invalidate() {
+    *CACHE.lock().unwrap_or_else(|e| e.into_inner()) = None;
+}
 
 /// The Repos list: repos you worked in lately first.
 pub async fn overview(app: &AppHandle, fresh: bool) -> Overview {
+    let roots = crate::projects::roots(app);
+    if fresh {
+        crate::projects::invalidate();
+        invalidate();
+    }
     let cached = CACHE
         .lock()
         .unwrap_or_else(|e| e.into_inner())
         .as_ref()
-        .filter(|(at, _)| at.elapsed() < LIST_TTL)
-        .map(|(_, o)| o.clone());
+        .filter(|(at, cached_roots, o)| {
+            cached_roots == &roots
+                && at.elapsed()
+                    < if o.repos.is_empty() {
+                        Duration::from_secs(5)
+                    } else {
+                        LIST_TTL
+                    }
+        })
+        .map(|(_, _, o)| o.clone());
     if !fresh && let Some(o) = cached {
         return o;
     }
     let app2 = app.clone();
-    let (repos, via) = tauri::async_runtime::spawn_blocking(move || {
+    let repos = tauri::async_runtime::spawn_blocking(move || {
         let mut repos = crate::projects::list(&app2);
         // Most recently touched first.
         repos.sort_by_key(|p| {
@@ -280,11 +308,15 @@ pub async fn overview(app: &AppHandle, fresh: bool) -> Overview {
             )
         });
         repos.truncate(MAX_REPOS);
-        let via = if gh_signed_in() { "gh" } else { "composio" };
-        (repos, via)
+        repos
     })
     .await
     .unwrap_or_default();
+    let via = if gh_signed_in().await {
+        "gh"
+    } else {
+        "composio"
+    };
     let composio = lock(&app.state::<AppState>().settings).composio.clone();
     let composio_ok = via == "composio" && crate::composio::server(&composio).await.is_some();
     let via = if via == "gh" {
@@ -339,7 +371,7 @@ pub async fn overview(app: &AppHandle, fresh: bool) -> Overview {
         }
     }
     let o = Overview { via, repos: rows };
-    *CACHE.lock().unwrap_or_else(|e| e.into_inner()) = Some((Instant::now(), o.clone()));
+    *CACHE.lock().unwrap_or_else(|e| e.into_inner()) = Some((Instant::now(), roots, o.clone()));
     o
 }
 
@@ -440,11 +472,9 @@ pub fn start(app: &AppHandle) {
                 let s = lock(&state.settings);
                 !s.pause.is_active(chrono::Utc::now()) && s.sensor_enabled(ReposSensor::ID)
             };
-            if enabled && crate::net::online() {
+            if enabled && crate::net::online() && gh_signed_in().await {
                 let v = tauri::async_runtime::spawn_blocking(|| {
-                    gh_signed_in()
-                        .then(|| gh(&["api", "graphql", "-f", &format!("query={QUERY}")]))
-                        .flatten()
+                    gh(&["api", "graphql", "-f", &format!("query={QUERY}")])
                 })
                 .await
                 .ok()

@@ -296,6 +296,17 @@ pub fn later_clear(app: &AppHandle) {
     let _ = app.emit(LATER_EVENT, 0);
 }
 
+/// Drops one waiting suggestion without opening it.
+pub fn later_dismiss(app: &AppHandle, id: &str) {
+    let state = app.state::<AppState>();
+    let count = {
+        let mut later = lock(&state.later);
+        later.retain(|l| l.id != id);
+        later.len()
+    };
+    let _ = app.emit(LATER_EVENT, count);
+}
+
 /// Shows a proposal now, keeps a minor one (or one during a meeting) in the
 /// quiet list, or queues it while the island is busy.
 pub fn offer(app: &AppHandle, mut proposal: Proposal) {
@@ -551,6 +562,8 @@ fn run_choice(app: &AppHandle, id: &str, index: usize, auto: bool) -> Result<(),
         .get(index)
         .cloned()
         .ok_or("option out of range")?;
+    let mut activity =
+        crate::activity::Guard::start(app, &format!("{}: {}", active.proposal.title, option.label));
     if !auto
         && crate::learned::on(app)
         && let Some(key) = &active.proposal.remember
@@ -613,6 +626,7 @@ fn run_choice(app: &AppHandle, id: &str, index: usize, auto: bool) -> Result<(),
                 MascotEvent::ActionFailed
             },
         );
+        activity.finish(payload.ok, payload.message.clone());
         if let Some(offer) = follow_up {
             offer_later(&app, offer);
         }

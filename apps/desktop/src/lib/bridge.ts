@@ -3,10 +3,13 @@
 // previewed without the desktop shell.
 
 import { mock } from "./mock";
+import type { AgentCommand } from "./agent-commands";
 import type {
+  ActivitySnapshot,
   ActionRecord,
   ActionResult,
   AgentMode,
+  AgentReviewTurn,
   AgentStarted,
   Agents,
   AppInfo,
@@ -50,6 +53,7 @@ import type {
   Transition,
   Turn,
   UpdateInfo,
+  UpdateProgress,
   VoiceDownload,
   VoiceHeard,
   VoiceStatus,
@@ -57,6 +61,7 @@ import type {
 } from "./types";
 
 export const EVENTS = {
+  activityChanged: "activity://changed",
   mascotState: "mascot://state",
   suggestionNew: "suggestion://new",
   suggestionClear: "suggestion://clear",
@@ -85,12 +90,14 @@ export const EVENTS = {
   voiceWelcome: "voice://welcome",
   netStatus: "net://status",
   updateAvailable: "update://available",
+  updateProgress: "update://progress",
   timing: "timing://recorded",
   islandDone: "island://done",
   islandFocus: "island://focus",
 } as const;
 
 export interface EventPayloads {
+  [EVENTS.activityChanged]: ActivitySnapshot;
   [EVENTS.mascotState]: Transition;
   [EVENTS.islandDone]: { id: string; text: string };
   [EVENTS.islandFocus]: { until: number | null; held: number | unknown[]; ended?: boolean };
@@ -102,6 +109,7 @@ export interface EventPayloads {
   [EVENTS.islandFullscreen]: boolean;
   [EVENTS.netStatus]: boolean;
   [EVENTS.updateAvailable]: UpdateInfo;
+  [EVENTS.updateProgress]: UpdateProgress;
   [EVENTS.inboxChanged]: null;
   [EVENTS.aiDelta]: { id: string; text: string };
   [EVENTS.aiDone]: {
@@ -135,9 +143,19 @@ export function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
+let tauriCorePromise: Promise<typeof import("@tauri-apps/api/core")> | null = null;
+function getTauriCore() {
+  return (tauriCorePromise ??= import("@tauri-apps/api/core"));
+}
+
+let tauriEventPromise: Promise<typeof import("@tauri-apps/api/event")> | null = null;
+function getTauriEvent() {
+  return (tauriEventPromise ??= import("@tauri-apps/api/event"));
+}
+
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
   if (!isTauri()) return mock.invoke<T>(cmd, args);
-  const { invoke } = await import("@tauri-apps/api/core");
+  const { invoke } = await getTauriCore();
   return invoke<T>(cmd, args);
 }
 
@@ -146,7 +164,7 @@ export async function listen<K extends keyof EventPayloads>(
   handler: (payload: EventPayloads[K]) => void,
 ): Promise<() => void> {
   if (!isTauri()) return mock.listen(event, handler as (payload: unknown) => void);
-  const { listen } = await import("@tauri-apps/api/event");
+  const { listen } = await getTauriEvent();
   return listen<EventPayloads[K]>(event, (e) => handler(e.payload));
 }
 
@@ -162,6 +180,13 @@ export interface RouterModel {
 }
 
 export const api = {
+  activityOpenStart: (id: string, label: string) => invoke<void>("activity_open_start", { id, label }),
+  activityOpenFinish: (id: string, ok: boolean, outcome: string) =>
+    invoke<void>("activity_open_finish", { id, ok, outcome }),
+  activitySnapshot: () => invoke<ActivitySnapshot>("activity_snapshot"),
+  activityReconcile: () => invoke<boolean>("activity_reconcile"),
+  activityCheck: (id: string) => invoke<ActivitySnapshot>("activity_check", { id }),
+  activityDismiss: (id: string) => invoke<void>("activity_dismiss", { id }),
   appInfo: () => invoke<AppInfo>("app_info"),
   systemLook: () => invoke<{ transparency: boolean; batterySaver: boolean }>("system_look"),
   diagnostics: () => invoke<string>("diagnostics"),
@@ -181,6 +206,7 @@ export const api = {
   islandReady: () => invoke<void>("island_ready"),
   netStatus: () => invoke<boolean>("net_status"),
   updateStatus: () => invoke<UpdateInfo | null>("update_status"),
+  updateProgress: () => invoke<UpdateProgress | null>("update_progress"),
   updateCheck: () => invoke<UpdateInfo | null>("update_check"),
   updateInstall: () => invoke<string>("update_install"),
   netCheck: (lost: boolean) => invoke<boolean>("net_check", { lost }),
@@ -249,6 +275,7 @@ export const api = {
   clipboardHistory: (limit = 60) => invoke<{ text: string; ts: string }[]>("clipboard_history", { limit }),
   clipboardCopy: (text: string) => invoke<void>("clipboard_copy", { text }),
   projectsList: () => invoke<{ name: string; path: string }[]>("projects_list"),
+  projectPickFolder: () => invoke<string | null>("project_pick_folder"),
   projectLaunch: (path: string) => invoke<string>("project_launch", { path }),
   editorsList: () => invoke<EditorList>("editors_list"),
   instantFind: (query: string) => invoke<InstantResults>("instant_find", { query }),
@@ -282,6 +309,12 @@ export const api = {
   agentHandoff: (messages: ChatMessage[], reason: string | null) =>
     invoke<AgentStarted>("agent_handoff", { messages, reason }),
   agentSend: (id: string, text: string) => invoke<void>("agent_send", { id, text }),
+  agentSetMode: (id: string, mode: AgentMode) => invoke<void>("agent_set_mode", { id, mode }),
+  agentControl: (id: string, method: string) => invoke<void>("agent_control", { id, method }),
+  agentProject: (id: string) => invoke<string>("agent_project", { id }),
+  agentReviews: (id: string) => invoke<AgentReviewTurn[]>("agent_reviews", { id }),
+  agentReviewDecide: (id: string, turn: string, path: string | null, hunk: number | null, accept: boolean) =>
+    invoke<void>("agent_review_decide", { id, turn, path, hunk, accept }),
   agentTune: (id: string, model: string | null, effort: string | null) =>
     invoke<void>("agent_tune", { id, model, effort }),
   agentFinish: (id: string) => invoke<string>("agent_finish", { id }),
@@ -303,7 +336,7 @@ export const api = {
   agentRewind: (id: string, index: number) => invoke<number>("agent_rewind", { id, index }),
   agentFiles: (id: string, query: string) => invoke<string[]>("agent_files", { id, query }),
   agentCommands: (id: string) =>
-    invoke<{ name: string; description: string; group: string }[]>("agent_commands", { id }),
+    invoke<AgentCommand[]>("agent_commands", { id }),
   aiOpenLink: (target: string) => invoke<string>("ai_open_link", { target }),
   reposOverview: (fresh: boolean) => invoke<ReposOverview>("repos_overview", { fresh }),
   repoPull: (path: string, stash: boolean) => invoke<string>("repo_pull", { path, stash }),
@@ -338,6 +371,7 @@ export const api = {
   laterList: () => invoke<LaterItem[]>("later_list"),
   laterOpen: (id: string) => invoke<void>("later_open", { id }),
   laterClear: () => invoke<void>("later_clear"),
+  laterDismiss: (id: string) => invoke<void>("later_dismiss", { id }),
   skillUnmute: (id: string) => invoke<void>("skill_unmute", { id }),
   chatsList: () => invoke<ChatSummary[]>("chats_list"),
   chatGet: (id: string) => invoke<Turn[]>("chat_get", { id }),

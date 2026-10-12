@@ -31,7 +31,7 @@ pub fn dispatch(app: &AppHandle, event: MascotEvent) -> Option<Transition> {
     transition
 }
 
-/// Jumps to a state regardless of the machine's rules (debug panel only).
+/// Jumps to a state for debug controls or verified orphan recovery.
 pub fn force(app: &AppHandle, state: MascotState) -> Transition {
     let t = lock(&app.state::<AppState>().mascot).force(state);
     entered(app, t);

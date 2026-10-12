@@ -82,6 +82,8 @@ pub struct Settings {
     /// Folders with git repos to check at the end of the day.
     /// Empty means the usual places (code, projects, source/repos, ...).
     pub code_folders: Vec<String>,
+    /// Folders explicitly chosen for agent sessions, including non-Git folders.
+    pub saved_projects: Vec<String>,
     /// Local hour after which unsaved work is reported.
     pub end_of_day_hour: u32,
     /// Where clones go, by owner ("abdullahalhoothy" to "D:\\Abdullah"),
@@ -652,6 +654,7 @@ impl Default for Settings {
             shortcuts: default_shortcuts(),
             code_editor: "auto".into(),
             code_folders: Vec::new(),
+            saved_projects: Vec::new(),
             clone_rules: BTreeMap::new(),
             end_of_day_hour: 18,
             index_folders: Vec::new(),
@@ -793,6 +796,7 @@ impl Settings {
         }
         self.end_of_day_hour = self.end_of_day_hour.min(23);
         self.code_folders.retain(|f| !f.trim().is_empty());
+        self.saved_projects.retain(|f| !f.trim().is_empty());
         for (action, default) in SHORTCUTS {
             self.shortcuts
                 .entry((*action).to_owned())
@@ -938,6 +942,8 @@ mod tests {
         let path = dir.join("settings.json");
         let s = Settings {
             muted: true,
+            saved_projects: vec!["C:/projects/plain-folder".into()],
+            code_folders: vec!["C:/projects/plain-folder".into()],
             sensors: BTreeMap::from([("clipboard".to_string(), false)]),
             ..Settings::default()
         };
@@ -952,6 +958,7 @@ mod tests {
         let partial = Settings::load(&path);
         assert!(partial.muted);
         assert_eq!(partial.collapse_after_secs, 6);
+        assert!(partial.saved_projects.is_empty());
         fs::remove_dir_all(dir).unwrap();
     }
 

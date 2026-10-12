@@ -23,10 +23,14 @@ const RANK_DAYS: i64 = 30;
 pub const REPO_OPENED: &str = "dev.repo_opened";
 /// The same project is checked again after this long.
 const RECHECK: Duration = Duration::from_secs(3 * 60 * 60);
-const LIST_TTL: Duration = Duration::from_secs(10 * 60);
+const LIST_TTL: Duration = Duration::from_secs(30);
 
 static CHECKED: Mutex<Option<HashMap<String, Instant>>> = Mutex::new(None);
-static LIST: Mutex<Option<(Instant, Vec<PathBuf>)>> = Mutex::new(None);
+static LIST: Mutex<Option<(Instant, Vec<PathBuf>, Vec<PathBuf>)>> = Mutex::new(None);
+
+pub fn invalidate() {
+    *LIST.lock().unwrap_or_else(|e| e.into_inner()) = None;
+}
 
 pub fn roots(app: &AppHandle) -> Vec<PathBuf> {
     let folders = lock(&app.state::<AppState>().settings).code_folders.clone();
@@ -37,19 +41,27 @@ pub fn roots(app: &AppHandle) -> Vec<PathBuf> {
     }
 }
 
-/// Repos under the code folders, cached for a few minutes.
+/// Repos under the code folders, cached briefly and scoped to the current roots.
 pub fn list(app: &AppHandle) -> Vec<PathBuf> {
+    let roots = roots(app);
     if let Ok(cache) = LIST.lock()
-        && let Some((at, repos)) = cache.as_ref()
-        && at.elapsed() < LIST_TTL
+        && let Some((at, cached_roots, repos)) = cache.as_ref()
+        && cached_roots == &roots
+        && at.elapsed()
+            < if repos.is_empty() {
+                Duration::from_secs(5)
+            } else {
+                LIST_TTL
+            }
     {
         return repos.clone();
     }
-    let mut repos: Vec<PathBuf> = roots(app).iter().flat_map(|r| find_repos(r)).collect();
-    repos.sort_by_key(|p| p.file_name().map(|n| n.to_ascii_lowercase()));
+    let mut repos: Vec<PathBuf> = roots.iter().flat_map(|r| find_repos(r)).collect();
+    repos.sort();
     repos.dedup();
+    repos.sort_by_key(|p| p.file_name().map(|n| n.to_ascii_lowercase()));
     if let Ok(mut cache) = LIST.lock() {
-        *cache = Some((Instant::now(), repos.clone()));
+        *cache = Some((Instant::now(), roots, repos.clone()));
     }
     repos
 }
@@ -129,6 +141,14 @@ pub struct ProjectInfo {
     pub path: String,
 }
 
+pub fn same_path(a: &str, b: &str) -> bool {
+    let normalize = |p: &str| {
+        let p = p.replace('\\', "/").trim_end_matches('/').to_owned();
+        if cfg!(windows) { p.to_lowercase() } else { p }
+    };
+    normalize(a) == normalize(b)
+}
+
 pub fn infos(app: &AppHandle) -> Vec<ProjectInfo> {
     let since = (Local::now() - chrono::Duration::days(RANK_DAYS))
         .format("%Y-%m-%d")
@@ -140,7 +160,14 @@ pub fn infos(app: &AppHandle) -> Vec<ProjectInfo> {
         .into_iter()
         .map(|(name, secs, last)| (name.to_ascii_lowercase(), (last, secs)))
         .collect();
-    let mut out: Vec<ProjectInfo> = list(app)
+    let mut paths = list(app);
+    for saved in &lock(&app.state::<AppState>().settings).saved_projects {
+        let path = PathBuf::from(saved);
+        if path.is_dir() && !paths.iter().any(|p| same_path(&p.to_string_lossy(), saved)) {
+            paths.push(path);
+        }
+    }
+    let mut out: Vec<ProjectInfo> = paths
         .into_iter()
         .map(|p| ProjectInfo {
             name: p
@@ -173,6 +200,15 @@ pub fn infos(app: &AppHandle) -> Vec<ProjectInfo> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn folder_identity_ignores_separator_and_trailing_slash() {
+        assert!(same_path("C:\\projects\\plain", "C:/projects/plain/"));
+        assert!(!same_path("C:/projects/plain", "C:/projects/other"));
+        if cfg!(windows) {
+            assert!(same_path("C:/Projects/Plain", "c:/projects/plain"));
+        }
+    }
 
     #[test]
     fn speaks_only_when_there_is_something_to_do() {

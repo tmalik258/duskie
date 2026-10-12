@@ -45,6 +45,7 @@ export interface Settings {
   /** Global shortcuts by action; empty turns one off. */
   shortcuts: Record<string, string>;
   codeFolders: string[];
+  savedProjects: string[];
   indexFolders: string[];
   endOfDayHour: number;
   /** Where clones go, by owner. */
@@ -345,6 +346,13 @@ export interface UpdateInfo {
   url: string;
 }
 
+export interface UpdateProgress {
+  phase: "preparing" | "downloading" | "verifying" | "opening" | "failed";
+  done: number;
+  total: number | null;
+  error: string | null;
+}
+
 export interface StoredEvent {
   id: string;
   ts: string;
@@ -392,6 +400,7 @@ export const DEFAULT_SETTINGS: Settings = {
     settings: "Ctrl+Alt+Comma",
   },
   codeFolders: [],
+  savedProjects: [],
   indexFolders: [],
   endOfDayHour: 18,
   cloneRules: {},
@@ -864,4 +873,27 @@ export interface Learned {
   label: string;
   text: string;
   why: string;
+}
+export interface Activity {
+  id: string;
+  source: string;
+  parentId: string | null;
+  label: string;
+  phase: "running" | "downloading" | "verifying" | "installing" | "awaitingUser" | "completed" | "failed" | "unconfirmed";
+  startedAt: number;
+  lastProgressAt: number;
+  transferred: number | null;
+  total: number | null;
+  outcome: string | null;
+  dismissed: boolean;
+  revision: number;
+  destination: string | null;
+}
+export interface ActivitySnapshot { revision: number; activities: Activity[]; }
+export interface AgentReviewTurn {
+  id: string;
+  entry: number;
+  files: FileChange[];
+  decisions: Record<string, "accepted" | "rejected">;
+  error: string | null;
 }

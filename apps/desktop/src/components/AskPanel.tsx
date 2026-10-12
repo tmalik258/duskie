@@ -393,6 +393,11 @@ export function AskPanel() {
     return all;
   }, [paused, settings.muted, turns.length, resetChat]);
 
+  // Keep Agents mounted while Ask stays open (tab switches), not across Ask close.
+  const agentsKept = useRef(tab === "agents");
+  if (tab === "agents") agentsKept.current = true;
+  const keepAgents = coder && (agentsKept.current || tab === "agents");
+
   if (!ask) return null;
 
   const streaming = chatId !== null;
@@ -599,10 +604,15 @@ export function AskPanel() {
             icon: <Icon name={f.folder ? "folder" : "file"} size={12} />,
             label: f.name,
             hint: f.place,
-            // Enter opens the file; Ctrl Enter shows its folder.
+            // Enter opens; for files, Ctrl Enter shows the parent folder.
+            // Folders are already folders — Enter alone is enough.
             run: () => openFile(f.path),
-            ctrlRun: () => openFile(f.path, "reveal"),
-            ctrlHint: "folder",
+            ...(f.folder
+              ? {}
+              : {
+                  ctrlRun: () => openFile(f.path, "reveal"),
+                  ctrlHint: "folder",
+                }),
             stay: true,
             keepText: true,
           });
@@ -947,22 +957,34 @@ export function AskPanel() {
     />
   );
 
+  // Stable host so AgentsTab is not remounted when Ask closes/reopens or tabs change.
+  // ak-enter: staged reveal on Agents open (tabs → chrome → timeline → composer).
+  const agentsHost = keepAgents ? (
+    <div
+      data-agents-host=""
+      className={tab === "agents" ? "ak ak-enter" : undefined}
+      hidden={tab !== "agents"}
+      aria-hidden={tab !== "agents"}
+    >
+      <div data-agents-tabs="">{tab === "agents" ? tabs : null}</div>
+      <AgentsTab keys={alt} maxHeight={scrollMax} active={tab === "agents"} />
+    </div>
+  ) : null;
+
   if (tab === "repos" && coder) {
     return (
-      <div className="ak">
-        {tabs}
-        <Repos maxHeight={scrollMax} />
-      </div>
+      <>
+        {agentsHost}
+        <div className="ak">
+          {tabs}
+          <Repos maxHeight={scrollMax} />
+        </div>
+      </>
     );
   }
 
   if (tab === "agents" && coder) {
-    return (
-      <div className="ak">
-        {tabs}
-        <AgentsTab keys={alt} maxHeight={scrollMax} />
-      </div>
-    );
+    return <>{agentsHost}</>;
   }
 
   // First-run card only when nothing is set up yet. If a provider is
@@ -1107,6 +1129,8 @@ export function AskPanel() {
   );
 
   return (
+    <>
+      {agentsHost}
     <div className="ak" data-chat={showChat || undefined}>
       {tabs}
       {showChat && (
@@ -1211,6 +1235,7 @@ export function AskPanel() {
       {footer}
       <Timings />
     </div>
+    </>
   );
 }
 
@@ -1225,9 +1250,9 @@ interface Item {
   /** A key shown at the end ("/"). */
   key?: string;
   run: () => void;
-  /** Ctrl Enter: e.g. show a file's folder, or browser incognito. */
+  /** Ctrl Enter: e.g. show a file's parent folder. Not used for folders. */
   ctrlRun?: () => void;
-  /** Footer label for Ctrl Enter ("folder", "incognito"). */
+  /** Footer label for Ctrl Enter ("folder"). */
   ctrlHint?: string;
   /** Keep Ask open after running. */
   stay?: boolean;

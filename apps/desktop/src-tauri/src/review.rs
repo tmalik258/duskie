@@ -27,18 +27,18 @@ pub struct Baseline {
     pub git_dir: Option<PathBuf>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileChange {
     pub path: String,
     /// "added", "deleted" or "modified".
-    pub status: &'static str,
+    pub status: String,
     pub added: usize,
     pub removed: usize,
     pub hunks: Vec<Hunk>,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Hunk {
     /// The `@@ ... @@` line.
@@ -91,6 +91,49 @@ fn run_bytes(b: &Baseline, args: &[&str]) -> Result<Vec<u8>, String> {
         return Err(String::from_utf8_lossy(&out.stderr).trim().to_owned());
     }
     Ok(out.stdout)
+}
+
+/// Capture tracked and untracked contents through a private index. The real
+/// index and working tree are never changed.
+pub fn capture(dir: &Path, shadow_root: Option<&Path>) -> Option<Baseline> {
+    let mut b = snapshot(dir, shadow_root)?;
+    let index = std::env::temp_dir().join(format!("sidekick-index-{}", ulid::Ulid::new()));
+    let run_index = |args: &[&str]| -> Option<String> {
+        let mut cmd = Command::new("git");
+        if let Some(d) = &b.git_dir { cmd.arg("--git-dir").arg(d).arg("--work-tree").arg(&b.root); }
+        cmd.env("GIT_INDEX_FILE", &index).args(args).current_dir(&b.root);
+        hide_console(&mut cmd);
+        let o = cmd.output().ok()?;
+        o.status.success().then(|| String::from_utf8_lossy(&o.stdout).trim().to_owned())
+    };
+    let result = (|| {
+        run_index(&["read-tree", &b.commit])?;
+        run_index(&["add", "-A", "--", "."])?;
+        let tree = run_index(&["write-tree"])?;
+        run_index(&["-c", "user.name=Sidekick", "-c", "user.email=sidekick@localhost", "commit-tree", &tree, "-m", "Sidekick review snapshot"])
+    })();
+    let _ = std::fs::remove_file(&index);
+    b.commit = result?;
+    run(&b, &["update-ref", &format!("refs/sidekick/snapshots/{}", ulid::Ulid::new()), &b.commit]).ok()?;
+    b.untracked.clear();
+    Some(b)
+}
+
+pub fn between(before: &Baseline, after: &Baseline) -> Result<Vec<FileChange>, String> {
+    Ok(parse(&run(before, &["-c", "core.quotepath=false", "diff", "--no-color", "--no-ext-diff", "--no-renames", "-U3", &before.commit, &after.commit, "--"])?))
+}
+
+/// Reverse an immutable set of hunks in memory before writing anything.
+pub fn reverse_selected(b: &Baseline, file: &FileChange, hunks: &[usize]) -> Result<(), String> {
+    if file.hunks.is_empty() || (file.status != "modified" && hunks.len() == file.hunks.len()) {
+        return undo_file(b, &file.path);
+    }
+    let full = b.root.join(&file.path);
+    let mut text = std::fs::read_to_string(&full).map_err(|e| e.to_string())?;
+    for &n in hunks.iter().rev() {
+        text = reverse_hunk(&text, file.hunks.get(n).ok_or("Missing review hunk")?).ok_or("This change conflicts with later edits.")?;
+    }
+    std::fs::write(full, text).map_err(|e| e.to_string())
 }
 
 #[cfg(windows)]
@@ -237,14 +280,14 @@ pub fn changes(b: &Baseline) -> Result<Vec<FileChange>, String> {
     )?;
     let mut files = parse(&diff);
     for path in untracked_in(&b.root, b.git_dir.as_deref()) {
-        if b.untracked.contains(&path) {
+        if b.untracked.contains(&path) || run(b, &["cat-file", "-e", &format!("{}:{path}", b.commit)]).is_ok() {
             continue;
         }
         let text = std::fs::read_to_string(b.root.join(&path)).unwrap_or_default();
         let lines: Vec<String> = text.lines().map(|l| format!("+{l}")).collect();
         files.push(FileChange {
             path,
-            status: "added",
+            status: "added".into(),
             added: lines.len(),
             removed: 0,
             hunks: vec![Hunk {
@@ -265,7 +308,7 @@ pub fn parse(diff: &str) -> Vec<FileChange> {
             let path = rest.rsplit_once(" b/").map_or(rest, |(_, p)| p).to_owned();
             files.push(FileChange {
                 path,
-                status: "modified",
+                status: "modified".into(),
                 added: 0,
                 removed: 0,
                 hunks: Vec::new(),
@@ -276,9 +319,9 @@ pub fn parse(diff: &str) -> Vec<FileChange> {
             continue;
         };
         if line.starts_with("new file mode") {
-            file.status = "added";
+            file.status = "added".into();
         } else if line.starts_with("deleted file mode") {
-            file.status = "deleted";
+            file.status = "deleted".into();
         } else if line.starts_with("@@") {
             file.hunks.push(Hunk {
                 header: line.to_owned(),
@@ -286,8 +329,6 @@ pub fn parse(diff: &str) -> Vec<FileChange> {
             });
         } else if let Some(hunk) = file.hunks.last_mut()
             && (line.starts_with(['+', '-', ' ']) || line.starts_with('\\'))
-            && !line.starts_with("+++")
-            && !line.starts_with("---")
         {
             if line.starts_with('+') {
                 file.added += 1;
@@ -376,10 +417,6 @@ pub fn undo_file(b: &Baseline, path: &str) -> Result<(), String> {
     let full = b.root.join(path);
     let existed = run(b, &["cat-file", "-e", &format!("{}:{path}", b.commit)]).is_ok();
     if existed {
-        if !full.exists() {
-            run(b, &["checkout", &b.commit, "--", path])?;
-            return Ok(());
-        }
         // The stored copy has LF endings; a CRLF file gets its CRLF back.
         let mut old = run_bytes(b, &["show", &format!("{}:{path}", b.commit)])?;
         let crlf = std::fs::read(&full).is_ok_and(|now| now.windows(2).any(|w| w == b"\r\n"));

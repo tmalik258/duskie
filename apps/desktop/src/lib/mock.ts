@@ -2,6 +2,7 @@
 // Tauri. It mimics the app loosely; the real rules live in Rust.
 
 import {
+  type ActivitySnapshot,
   type CloudId,
   CUES,
   type Cue,
@@ -9,6 +10,7 @@ import {
   type MascotState,
   type Settings,
   type Suggestion,
+  type UpdateProgress,
   type WelcomeSpeech,
 } from "./types";
 
@@ -16,6 +18,11 @@ type Handler = (payload: unknown) => void;
 
 const handlers = new Map<string, Set<Handler>>();
 let settings: Settings = structuredClone(DEFAULT_SETTINGS);
+if (typeof localStorage !== "undefined") {
+  try {
+    Object.assign(settings, JSON.parse(localStorage.getItem("sidekick.mock.savedFolders") ?? "{}"));
+  } catch {}
+}
 /** Preview switches: `?nomodel` has no AI set up, `?offline` no internet. */
 const previewFlag = (name: string) => typeof location !== "undefined" && new URLSearchParams(location.search).has(name);
 
@@ -28,10 +35,71 @@ if (typeof location !== "undefined") {
   settings.theme = (q.get("theme") as Settings["theme"] | null) ?? settings.theme;
   if (q.get("voice") === "full") settings.voice.listeningStyle = "full";
 }
-let mascot: MascotState = "idle";
+let mascot: MascotState = previewFlag("orphan") ? "working" : "idle";
 let suggestion: Suggestion | null = null;
 let epoch = 0;
 let mockDnd = false;
+let mockUpdateProgress: UpdateProgress | null = null;
+let mockActivitySnapshot: ActivitySnapshot | null = null;
+function activitySnapshot(): ActivitySnapshot {
+  if (mockActivitySnapshot) return mockActivitySnapshot;
+  const query = new URLSearchParams(typeof window === "undefined" ? "" : window.location.search);
+  const mode = query.get("activity");
+  const now = Date.now();
+  const activities: ActivitySnapshot["activities"] = mode
+    ? [
+        {
+          id: "preview-download",
+          source: mode === "action" ? "action" : "browser",
+          parentId: null,
+          label: mode === "action" ? "Opening sidekick in Cursor" : "Downloading report.zip in Chrome",
+          phase:
+            mode === "paused"
+              ? "awaitingUser"
+              : mode === "failed"
+                ? "failed"
+                : mode === "action"
+                  ? "running"
+                  : "downloading",
+          startedAt: now - 12_000,
+          lastProgressAt: now - (mode === "stale" ? 120_000 : 0),
+          transferred: mode === "action" ? null : 18_000_000,
+          total: query.has("knownTotal") ? 36_000_000 : null,
+          outcome: mode === "failed" ? "NETWORK_FAILED" : null,
+          dismissed: false,
+          revision: 1,
+          destination: null,
+        },
+      ]
+    : [];
+  if (mode === "group")
+    activities.push({ ...activities[0], id: "second-download", label: "Downloading photo.zip in Chrome" });
+  mockActivitySnapshot = { revision: 1, activities };
+  return mockActivitySnapshot;
+}
+
+async function mockInstallUpdate(): Promise<string> {
+  if (mockUpdateProgress && mockUpdateProgress.phase !== "failed") return "An update is already in progress";
+  const report = (phase: UpdateProgress["phase"], done = 0, error: string | null = null) => {
+    mockUpdateProgress = { phase, done, total: phase === "preparing" ? null : 100 * 1_048_576, error };
+    emit("update://progress", mockUpdateProgress);
+  };
+  const delay = () => new Promise((resolve) => setTimeout(resolve, 600));
+  report("preparing");
+  await delay();
+  for (let i = 0; i <= 4; i++) {
+    report("downloading", i * 25 * 1_048_576);
+    await delay();
+  }
+  if (previewFlag("updateerror")) {
+    report("failed", 100 * 1_048_576, "The download did not match its checksum; nothing was installed");
+    throw new Error(mockUpdateProgress?.error ?? "Update failed");
+  }
+  report("verifying", 100 * 1_048_576);
+  await delay();
+  report("opening", 100 * 1_048_576);
+  return "Installing Sidekick_0.2.0_x64-setup.exe";
+}
 
 const CUE_BY_STATE: Partial<Record<MascotState, Cue>> = {
   idle: "settle",
@@ -66,6 +134,13 @@ function later(ms: number, fn: () => void) {
 const cloudKeys: Record<CloudId, boolean> = { gemini: previewFlag("gemini"), groq: false, openrouter: false };
 
 function saveSettings(next: Settings): Settings {
+  if (settings.codeFolders.some((p) => !next.codeFolders.includes(p))) {
+    next = { ...next, savedProjects: next.savedProjects.filter((p) => next.codeFolders.includes(p)) };
+  }
+  localStorage.setItem(
+    "sidekick.mock.savedFolders",
+    JSON.stringify({ codeFolders: next.codeFolders, savedProjects: next.savedProjects }),
+  );
   settings = next;
   emit("settings://changed", settings);
   emit("voice://state", commands.voice_status?.({}));
@@ -168,20 +243,57 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
   island_set_hit_rect: () => undefined,
   island_ready: () => undefined,
   net_status: () => !previewFlag("offline"),
-  update_status: () => null,
+  update_status: () =>
+    previewFlag("update")
+      ? { version: "0.2.0", current: "0.1.0", url: "https://github.com/tmalik258/sidekick/releases" }
+      : null,
+  activity_open_start: () => undefined,
+  activity_open_finish: () => undefined,
+  activity_snapshot: activitySnapshot,
+  activity_reconcile: () => {
+    go("idle");
+    return true;
+  },
+  activity_check: ({ id }) => {
+    const snapshot = activitySnapshot();
+    if (previewFlag("activityrecover")) {
+      const activity = snapshot.activities.find((a) => a.id === id);
+      if (activity) {
+        activity.transferred = (activity.transferred ?? 0) + 1_000_000;
+        activity.lastProgressAt = Date.now();
+        activity.phase = "downloading";
+        activity.dismissed = false;
+        snapshot.revision++;
+        emit("activity://changed", structuredClone(snapshot));
+      }
+    }
+    return structuredClone(snapshot);
+  },
+  activity_dismiss: ({ id }) => {
+    const snapshot = activitySnapshot();
+    const activity = snapshot.activities.find((a) => a.id === id);
+    if (activity) {
+      activity.dismissed = true;
+      snapshot.revision++;
+      emit("activity://changed", structuredClone(snapshot));
+    }
+  },
+  update_progress: () => mockUpdateProgress,
   // The preview pretends a release is out, so the update UI can be seen.
   update_check: () => {
     const update = { version: "0.2.0", current: "0.1.0", url: "https://github.com/tmalik258/sidekick/releases" };
     emit("update://available", update);
     return update;
   },
-  update_install: () => "Installing Sidekick_0.2.0_x64-setup.exe",
+  update_install: mockInstallUpdate,
   net_check: () => !previewFlag("offline") && (typeof navigator === "undefined" || navigator.onLine),
   suggestion_current: () => suggestion,
   suggestion_choose: (a) => {
     const index = a.index as number;
+    const updating = suggestion?.actions[index] === "install_update";
     suggestion = null;
     emit("suggestion://clear", a.id);
+    if (updating) return mockInstallUpdate();
     go("working");
     later(1400, () => {
       emit("action://result", {
@@ -243,6 +355,11 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
   routines_remove: () => 1,
   ai_open_link: (a) => `Opened ${String(a.target)}`,
   agent_tune: () => null,
+  agent_set_mode: () => null,
+  agent_control: () => null,
+  agent_project: () => "C:/code/sidekick",
+  agent_reviews: () => [],
+  agent_review_decide: () => null,
   agent_finish: () => "Merged wt/store-tests back",
   cursor_chats: () => [
     {
@@ -648,6 +765,11 @@ commands.agent_answer = () => {
   pendingAgentAnswer = null;
 };
 commands.agent_send = () => undefined;
+commands.agent_set_mode = () => undefined;
+commands.agent_control = () => undefined;
+commands.agent_project = () => "C:/code/sidekick";
+commands.agent_reviews = () => [];
+commands.agent_review_decide = () => undefined;
 commands.agent_stop = () => undefined;
 commands.agent_close = () => undefined;
 commands.agent_terminal = () => undefined;
@@ -715,6 +837,21 @@ commands.ask_defer_welcome = () => {
   }
   welcomeDeferred = true;
   emit("ask://close", { reason: "defer" });
+  // Preview a permission arriving while onboarding is hidden.
+  if (previewFlag("approval")) {
+    setTimeout(() => {
+      suggestion = {
+        id: "preview-approval",
+        skillId: "notify.permission",
+        title: "Allow this connection?",
+        detail: "The connection needs your approval.",
+        options: ["Accept", "Decline"],
+        actions: ["approve", "reject"],
+      };
+      emit("suggestion://new", suggestion);
+      go("suggesting");
+    }, 500);
+  }
 };
 commands.ask_resume_welcome = () => {
   if (settings.onboarded) return;
@@ -989,6 +1126,10 @@ commands.later_clear = () => {
   laterItems = [];
   emit("suggestion://later", 0);
 };
+commands.later_dismiss = (a) => {
+  laterItems = laterItems.filter((l) => l.id !== a.id);
+  emit("suggestion://later", laterItems.length);
+};
 commands.skill_unmute = () => undefined;
 const chats = new Map<string, { title: string; updated: string; turns: unknown[] }>([
   [
@@ -1021,9 +1162,25 @@ commands.chat_delete = (a) => {
 commands.ai_handoff = () => "C:/Users/you/AppData/Local/Sidekick/ai/handoff";
 commands.backup_export = () => "C:/Users/you/Documents/Sidekick backup.json";
 commands.backup_import = () => "Restored settings and 2 skills";
+commands.project_pick_folder = () => {
+  if (previewFlag("foldercancel")) return null;
+  if (previewFlag("folderfail")) throw new Error("Could not save chosen folder");
+  const path = "C:\\Users\\you\\Documents\\Other project";
+  saveSettings({
+    ...settings,
+    codeFolders: [...new Set([...settings.codeFolders, path])],
+    savedProjects: [...new Set([...settings.savedProjects, path])],
+  });
+  return path;
+};
 commands.projects_list = () => [
-  { name: "sidekick", path: "C:/Users/you/code/sidekick" },
-  { name: "falconxoft-api", path: "C:/Users/you/code/falconxoft-api" },
+  ...settings.savedProjects.map((path) => ({ name: path.split(/[\\/]/).at(-1) ?? path, path })),
+  ...(previewFlag("noprojects")
+    ? []
+    : [
+        { name: "sidekick", path: "C:/Users/you/code/sidekick" },
+        { name: "falconxoft-api", path: "C:/Users/you/code/falconxoft-api" },
+      ]),
 ];
 commands.editors_list = () => ({
   editors: [

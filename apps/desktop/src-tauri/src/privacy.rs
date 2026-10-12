@@ -6,7 +6,7 @@ use serde_json::Value;
 use sidekick_core::Event;
 use tauri::{AppHandle, Manager};
 
-use crate::state::{AppState, lock};
+use crate::state::{lock, AppState};
 
 fn host(url: &str) -> Option<String> {
     let rest = url.split_once("://").map_or(url, |(_, r)| r);
@@ -41,6 +41,21 @@ pub fn denied(event: &Event, last_exe: &str, apps: &[String], sites: &[String]) 
         "window.focused" => app_denied(p["exe"].as_str().unwrap_or_default(), apps),
         // A copy belongs to the app it was made in.
         "clipboard.changed" => app_denied(last_exe, apps) || site_denied(url("text").trim(), sites),
+        "browser.download" => {
+            let exe = match p["browser"].as_str().unwrap_or_default() {
+                "Chrome" => "chrome.exe",
+                "Edge" => "msedge.exe",
+                "Firefox" => "firefox.exe",
+                "Brave" => "brave.exe",
+                "Opera" => "opera.exe",
+                "Zen" => "zen.exe",
+                _ => "",
+            };
+            app_denied(exe, apps)
+                || site_denied(url("url"), sites)
+                || site_denied(url("finalUrl"), sites)
+                || site_denied(url("referrer"), sites)
+        }
         k if k.starts_with("browser.") => site_denied(url("url"), sites),
         _ => false,
     }
@@ -62,6 +77,22 @@ mod tests {
 
     fn ev(kind: &str, payload: Value) -> Event {
         Event::new(kind, "test", payload)
+    }
+    #[test]
+    fn downloads_respect_origin_redirect_referrer_and_browser_exclusions() {
+        let sites = vec!["private.example".into()];
+        for field in ["url", "finalUrl", "referrer"] {
+            let mut payload =
+                serde_json::json!({"url":"https://cdn.example/file.zip", "browser":"Chrome"});
+            payload[field] = "https://private.example/file".into();
+            assert!(denied(&ev("browser.download", payload), "", &[], &sites));
+        }
+        let event = ev(
+            "browser.download",
+            serde_json::json!({"url":"https://cdn.example/file.zip", "browser":"Chrome"}),
+        );
+        assert!(denied(&event, "", &["chrome.exe".into()], &[]));
+        assert!(!denied(&event, "", &[], &sites));
     }
 
     #[test]

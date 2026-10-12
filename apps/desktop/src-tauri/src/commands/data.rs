@@ -223,6 +223,44 @@ pub async fn clipboard_copy(app: AppHandle, text: String) -> CmdResult<()> {
         .map_err(|e| e.to_string())
 }
 
+/// Pick any local folder for an agent session; cancellation keeps its current folder.
+#[tauri::command]
+pub async fn project_pick_folder(app: AppHandle) -> CmdResult<Option<String>> {
+    let folder = tauri::async_runtime::spawn_blocking(|| {
+        rfd::FileDialog::new()
+            .set_title("Choose a folder for your agent")
+            .pick_folder()
+            .map(|path| path.to_string_lossy().into_owned())
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    if let Some(path) = &folder {
+        let mut settings = lock(&app.state::<AppState>().settings).clone();
+        if settings.code_folders.is_empty() {
+            settings.code_folders = crate::projects::roots(&app)
+                .into_iter()
+                .map(|p| p.to_string_lossy().into_owned())
+                .collect();
+        }
+        if !settings
+            .code_folders
+            .iter()
+            .any(|p| crate::projects::same_path(p, path))
+        {
+            settings.code_folders.push(path.clone());
+        }
+        if !settings
+            .saved_projects
+            .iter()
+            .any(|p| crate::projects::same_path(p, path))
+        {
+            settings.saved_projects.push(path.clone());
+        }
+        super::apply_settings(&app, settings)?;
+    }
+    Ok(folder)
+}
+
 /// Repos in the code folders, for the project launcher.
 #[tauri::command]
 pub async fn projects_list(app: AppHandle) -> Vec<crate::projects::ProjectInfo> {

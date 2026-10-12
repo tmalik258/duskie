@@ -22,7 +22,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 
-use crate::{Approvals, Sensor, SensorGate, http};
+use crate::{http, Approvals, Sensor, SensorGate};
 
 /// How long the extension's poll for commands is held open.
 const POLL_HOLD: Duration = Duration::from_secs(20);
@@ -189,7 +189,9 @@ impl Sensor for BrowserSensor {
                 let (bus, gate) = (bus.clone(), gate.clone());
                 tokio::spawn(async move {
                     serve(sock, &ctx, |event| {
-                        if gate.allows(Self::ID) {
+                        if gate.allows(Self::ID)
+                            && (event.kind != "browser.download" || gate.allows("downloads"))
+                        {
                             bus.publish(event);
                         }
                     })
@@ -349,6 +351,27 @@ async fn serve(mut sock: TcpStream, ctx: &Ctx, publish: impl Fn(Event)) {
             publish(event);
             http::respond(&mut sock, "204 No Content", &cors, None).await;
         }
+        ("POST", "/browser/download") => {
+            let input = req
+                .is_json()
+                .then(|| serde_json::from_slice::<serde_json::Value>(&req.body).ok())
+                .flatten();
+            let Some(mut event) = input.as_ref().and_then(download_event) else {
+                http::respond(&mut sock, "400 Bad Request", &cors, None).await;
+                return;
+            };
+            event.payload["browser"] =
+                browser_name(req.header("x-sidekick-browser").unwrap_or("Browser")).into();
+            // The authenticated extension origin is part of the identity.
+            event.payload["instance"] = format!(
+                "{}:{}",
+                origin,
+                event.payload["instance"].as_str().unwrap_or_default()
+            )
+            .into();
+            publish(event);
+            http::respond(&mut sock, "204 No Content", &cors, None).await;
+        }
         ("POST", "/browser/result") => {
             let parsed = req
                 .is_json()
@@ -384,6 +407,81 @@ fn host_of(url: &str) -> String {
         .next()
         .unwrap_or_default()
         .to_ascii_lowercase()
+}
+
+fn download_event(v: &serde_json::Value) -> Option<Event> {
+    if v["incognito"] != false {
+        return None;
+    }
+    let instance = v["instance"]
+        .as_str()
+        .filter(|s| !s.is_empty() && s.len() <= 128)?;
+    let id = v["id"].as_u64()?;
+    let sequence = v["sequence"].as_u64()?;
+    let bytes = v["bytes"].as_u64()?;
+    let total = if v["total"].is_null() {
+        None
+    } else {
+        Some(v["total"].as_u64()?)
+    };
+    let state = v["state"]
+        .as_str()
+        .filter(|s| matches!(*s, "in_progress" | "complete" | "interrupted"))?;
+    let filename = v["filename"]
+        .as_str()
+        .filter(|s| !s.is_empty() && s.len() <= 4096)?;
+    let url = v["url"].as_str().filter(|s| s.len() <= 8192)?;
+    let final_url = v["finalUrl"].as_str().unwrap_or(url);
+    let referrer = v["referrer"].as_str().unwrap_or_default();
+    if final_url.len() > 8192 || referrer.len() > 8192 {
+        return None;
+    }
+    let paused = v["paused"].as_bool()?;
+    Some(Event::new("browser.download", "downloads", serde_json::json!({
+            "instance": instance, "id": id, "sequence": sequence, "bytes": bytes, "startedAt": v["startedAt"].as_i64().filter(|t| *t >= 0),
+            "state": state, "filename": filename, "url": url, "finalUrl": final_url, "referrer": referrer, "paused": paused,
+            "total": total, "error": v["error"].as_str().map(|s| s.chars().take(256).collect::<String>())
+    })).with_sensitivity(sidekick_core::Sensitivity::Personal))
+}
+
+#[cfg(test)]
+mod download_tests {
+    use super::*;
+    fn record() -> serde_json::Value {
+        serde_json::json!({"instance":"extension-one", "id":7, "sequence":1, "incognito":false, "bytes":100, "total":null, "filename":"C:/Downloads/report.zip", "url":"https://example.com/report.zip", "paused":false, "state":"in_progress"})
+    }
+    #[test]
+    fn validates_downloads_and_rejects_private_or_malformed_records() {
+        let mut v = record();
+        let event = download_event(&v).unwrap();
+        assert_eq!(event.source, "downloads");
+        assert_eq!(event.payload["total"], serde_json::Value::Null);
+        v["incognito"] = true.into();
+        assert!(download_event(&v).is_none());
+        v = record();
+        v["bytes"] = (-1).into();
+        assert!(download_event(&v).is_none());
+        v = record();
+        v["total"] = "invalid".into();
+        assert!(download_event(&v).is_none());
+        v = record();
+        v["state"] = "invented".into();
+        assert!(download_event(&v).is_none());
+        v = record();
+        v["instance"] = "".into();
+        assert!(download_event(&v).is_none());
+    }
+    #[test]
+    fn retains_pause_completion_and_interruption_without_a_percentage() {
+        for state in ["in_progress", "complete", "interrupted"] {
+            let mut v = record();
+            v["state"] = state.into();
+            v["paused"] = true.into();
+            let event = download_event(&v).unwrap();
+            assert_eq!(event.payload["state"], state);
+            assert_eq!(event.payload["paused"], true);
+        }
+    }
 }
 
 /// Turns an extension report into an event, keeping only known fields.
@@ -474,17 +572,15 @@ mod tests {
             page_event(&serde_json::json!({ "kind": "run_this", "url": "https://x.com" }))
                 .is_none()
         );
-        assert!(
-            page_event(&serde_json::json!({ "kind": "long_read", "url": "file:///etc/passwd" }))
-                .is_none()
-        );
-        assert!(
-            page_event(&serde_json::json!({
-                "kind": "login_form",
-                "url": "https://github.com/login",
-            }))
-            .is_none()
-        );
+        assert!(page_event(
+            &serde_json::json!({ "kind": "long_read", "url": "file:///etc/passwd" })
+        )
+        .is_none());
+        assert!(page_event(&serde_json::json!({
+            "kind": "login_form",
+            "url": "https://github.com/login",
+        }))
+        .is_none());
     }
 
     #[test]
@@ -531,27 +627,21 @@ mod tests {
                 body.len()
             )
         };
-        assert!(
-            call(port, post("https://evil.example", "t0ken"))
-                .await
-                .starts_with("HTTP/1.1 403")
-        );
-        assert!(
-            call(port, post("chrome-extension://abc", "wrong"))
-                .await
-                .starts_with("HTTP/1.1 401")
-        );
+        assert!(call(port, post("https://evil.example", "t0ken"))
+            .await
+            .starts_with("HTTP/1.1 403"));
+        assert!(call(port, post("chrome-extension://abc", "wrong"))
+            .await
+            .starts_with("HTTP/1.1 401"));
         assert!(
             tokio::time::timeout(Duration::from_millis(200), rx.recv())
                 .await
                 .is_err(),
             "refused requests publish nothing"
         );
-        assert!(
-            call(port, post("chrome-extension://abc", "t0ken"))
-                .await
-                .starts_with("HTTP/1.1 204")
-        );
+        assert!(call(port, post("chrome-extension://abc", "t0ken"))
+            .await
+            .starts_with("HTTP/1.1 204"));
         let e = tokio::time::timeout(Duration::from_secs(2), rx.recv())
             .await
             .unwrap()
@@ -594,19 +684,15 @@ mod tests {
             )
         };
         // A web page, or a request with no origin, cannot ask.
-        assert!(
-            call(port, pair("https://evil.example"))
-                .await
-                .starts_with("HTTP/1.1 403")
-        );
-        assert!(
-            call(
-                port,
-                "POST /browser/pair HTTP/1.1\r\ncontent-length: 0\r\n\r\n".into()
-            )
+        assert!(call(port, pair("https://evil.example"))
             .await
-            .starts_with("HTTP/1.1 403")
-        );
+            .starts_with("HTTP/1.1 403"));
+        assert!(call(
+            port,
+            "POST /browser/pair HTTP/1.1\r\ncontent-length: 0\r\n\r\n".into()
+        )
+        .await
+        .starts_with("HTTP/1.1 403"));
         // The extension asks; the island shows the request; Allow sends the token.
         let asking = tokio::spawn(call(port, pair("chrome-extension://abcdefghij")));
         let e = tokio::time::timeout(Duration::from_secs(2), rx.recv())

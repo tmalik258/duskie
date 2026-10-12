@@ -68,6 +68,8 @@ mod timings;
 mod tray;
 mod undo;
 mod updates;
+mod activity;
+mod setup_progress;
 mod voice;
 mod web;
 mod windows;
@@ -142,7 +144,14 @@ pub fn run() {
             commands::island_set_hit_rect,
             commands::island_ready,
             commands::net_status,
+            activity::activity_open_start,
+            activity::activity_open_finish,
+            activity::activity_snapshot,
+            activity::activity_reconcile,
+            activity::activity_check,
+            activity::activity_dismiss,
             commands::update_status,
+            commands::update_progress,
             commands::update_check,
             commands::update_install,
             commands::net_check,
@@ -165,6 +174,7 @@ pub fn run() {
             commands::later_list,
             commands::later_open,
             commands::later_clear,
+            commands::later_dismiss,
             commands::skill_unmute,
             commands::browsers_status,
             commands::extension_install,
@@ -196,6 +206,7 @@ pub fn run() {
             commands::backup_export,
             commands::backup_import,
             commands::projects_list,
+            commands::project_pick_folder,
             commands::project_launch,
             commands::clipboard_history,
             commands::clipboard_copy,
@@ -260,6 +271,11 @@ pub fn run() {
             commands::agent_commands,
             commands::agent_open_editor,
             commands::agent_tune,
+            commands::agent_set_mode,
+            commands::agent_control,
+            commands::agent_project,
+            commands::agent_reviews,
+            commands::agent_review_decide,
             commands::agent_finish,
             commands::cursor_chats,
             commands::cursor_open,
@@ -371,6 +387,7 @@ fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         features_started: Default::default(),
     });
 
+    activity::start(app);
     pipeline::start(app);
     // Prefer bundled models; only then network. Welcome opens from the island
     // once it listens (ask_ensure_welcome), or after models become ready.

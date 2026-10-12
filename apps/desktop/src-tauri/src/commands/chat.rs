@@ -593,6 +593,31 @@ pub fn agent_tune(id: String, model: Option<String>, effort: Option<String>) {
     crate::sessions::tune(&id, model, effort);
 }
 
+#[tauri::command]
+pub fn agent_set_mode(id: String, mode: crate::sessions::Mode) -> CmdResult<()> {
+    crate::sessions::set_mode(&id, mode)
+}
+
+#[tauri::command]
+pub fn agent_control(id: String, method: String) -> CmdResult<()> {
+    crate::sessions::control(&id, &method)
+}
+
+#[tauri::command]
+pub fn agent_project(id: String) -> CmdResult<String> {
+    crate::sessions::project(&id).map(|p| p.to_string_lossy().into_owned()).ok_or("That session is gone.".into())
+}
+
+#[tauri::command]
+pub fn agent_reviews(id: String) -> Vec<crate::sessions::reviews::ReviewTurn> {
+    crate::sessions::reviews::list(&id)
+}
+
+#[tauri::command]
+pub async fn agent_review_decide(id: String, turn: String, path: Option<String>, hunk: Option<usize>, accept: bool) -> CmdResult<()> {
+    tauri::async_runtime::spawn_blocking(move || crate::sessions::reviews::decide(&id, &turn, path.as_deref(), hunk, accept)).await.map_err(|e| e.to_string())?
+}
+
 /// Finish a session that ran in its own worktree: merge it back.
 #[tauri::command]
 pub async fn agent_finish(id: String) -> CmdResult<String> {

@@ -13,7 +13,7 @@ use std::time::Duration;
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
-use crate::state::{AppState, executor, lock};
+use crate::state::{executor, lock, AppState};
 
 /// Where the AI, connections and tools sections start in the checklist.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -325,20 +325,9 @@ fn found(name: &str) -> bool {
     which::which(name).is_ok()
 }
 
-/// `gh auth status` exits 0 when signed in.
+/// Share the local credential check with the Repos tab.
 async fn gh_signed_in() -> bool {
-    let mut cmd = tokio::process::Command::new("gh");
-    cmd.args(["auth", "status"])
-        .stdin(std::process::Stdio::null())
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .kill_on_drop(true);
-    #[cfg(windows)]
-    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
-    matches!(
-        tokio::time::timeout(Duration::from_secs(5), cmd.status()).await,
-        Ok(Ok(s)) if s.success()
-    )
+    crate::github::gh_signed_in().await
 }
 
 /// How recently the extension must have checked in to count as connected.
@@ -925,7 +914,30 @@ pub async fn run(app: &AppHandle, id: &str) -> Result<(), String> {
         }
         item.command.clone().ok_or("Nothing to run")?
     };
-    open_terminal(&command)
+    if id == "all" {
+        let commands = tracked_commands(
+            app,
+            items.iter().filter(|i| {
+                i.group == Group::Tools
+                    && i.recommended
+                    && !i.done
+                    && i.runnable
+                    && i.command
+                        .as_deref()
+                        .is_some_and(|c| c.starts_with("winget "))
+            }),
+        )?;
+        open_tracked_terminal(&chain(&commands))
+    } else {
+        let label = items
+            .iter()
+            .find(|i| i.id == id)
+            .map(|i| format!("Setting up {}", i.title))
+            .unwrap_or_else(|| "Setting up tools".into());
+        open_tracked_terminal(&crate::setup_progress::prepare(
+            app, &label, &command, false,
+        )?)
+    }
 }
 
 /// Opens an installed app the way its Start menu shortcut does.
@@ -991,7 +1003,7 @@ pub async fn run_many(app: &AppHandle, ids: &[String]) -> Result<Vec<String>, St
     let mut done = Vec::new();
     for item in apps {
         open_app(item.id)?;
-        done.push(format!("Opened {}", item.title));
+        done.push(format!("Launch requested for {}", item.title));
     }
     for item in pastes {
         let command = item.command.as_deref().ok_or("Nothing to paste")?;
@@ -1004,12 +1016,37 @@ pub async fn run_many(app: &AppHandle, ids: &[String]) -> Result<Vec<String>, St
             .as_deref()
             .is_some_and(|c| c.starts_with("winget "))
     });
-    let commands: Vec<String> = steps.iter().filter_map(|i| i.command.clone()).collect();
+    let commands = tracked_commands(app, steps.into_iter())?;
     if !commands.is_empty() {
-        open_terminal(&chain(&commands))?;
+        open_tracked_terminal(&chain(&commands))?;
         done.push("Installing in PowerShell".to_owned());
     }
     Ok(done)
+}
+
+fn tracked_commands<'a>(
+    app: &AppHandle,
+    items: impl Iterator<Item = &'a SetupItem>,
+) -> Result<Vec<String>, String> {
+    let mut commands = Vec::new();
+    for item in items {
+        let Some(command) = item.command.as_deref() else {
+            continue;
+        };
+        match crate::setup_progress::prepare(
+            app,
+            &format!("Setting up {}", item.title),
+            command,
+            !commands.is_empty(),
+        ) {
+            Ok(script) => commands.push(script),
+            Err(error) => {
+                crate::setup_progress::launch_failed(&chain(&commands), &error);
+                return Err(error);
+            }
+        }
+    }
+    Ok(commands)
 }
 
 /// Copies `command` and opens PowerShell with paste instructions. Does not
@@ -1024,11 +1061,18 @@ fn open_terminal_paste(command: &str) -> Result<(), String> {
     ))
 }
 
+fn open_tracked_terminal(command: &str) -> Result<(), String> {
+    let result = open_terminal(command);
+    if let Err(error) = &result {
+        crate::setup_progress::launch_failed(command, error);
+    }
+    result
+}
+
 #[cfg(windows)]
 fn open_terminal(command: &str) -> Result<(), String> {
     open_terminal_window(&format!(
-        "Write-Host 'Sidekick setup: {}' -ForegroundColor Cyan; {command}; Write-Host ''; Write-Host 'Done. Close this window and press Check again in Sidekick.' -ForegroundColor Green",
-        command.replace('\'', "''")
+        "Write-Host 'Sidekick setup' -ForegroundColor Cyan; {command}; Write-Host ''; Write-Host 'Setup commands finished. Check status in Sidekick.' -ForegroundColor Cyan"
     ))
 }
 
@@ -1044,6 +1088,15 @@ fn open_terminal_window(script: &str) -> Result<(), String> {
     // Don't inherit the app's cwd (e.g. src-tauri in dev); open in the
     // user profile so the prompt looks like a normal terminal.
     let home = dirs::home_dir().unwrap_or_else(|| Path::new("C:\\").to_path_buf());
+    // Captured multi-step scripts exceed cmd.exe's inline argument limit.
+    let script_path =
+        std::env::temp_dir().join(format!("sidekick-setup-{}.ps1", ulid::Ulid::new()));
+    std::fs::write(
+        &script_path,
+        format!("\u{feff}{script}\n[IO.File]::Delete($PSCommandPath)\n"),
+    )
+    .map_err(|e| format!("could not write setup script: {e}"))?;
+    let script_file = script_path.to_string_lossy();
     // `start "title" prog` — the quoted title is required so `start` does not
     // treat the first quoted arg as the window title and drop the program.
     std::process::Command::new("cmd.exe")
@@ -1056,8 +1109,10 @@ fn open_terminal_window(script: &str) -> Result<(), String> {
             "-NoExit",
             "-NoLogo",
             "-NoProfile",
-            "-Command",
-            script,
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            &script_file,
         ])
         .creation_flags(CREATE_NO_WINDOW)
         .stdin(Stdio::null())

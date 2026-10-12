@@ -66,9 +66,11 @@ pub fn reveal(window: &WebviewWindow) {
     let _ = window.set_ignore_cursor_events(true);
     // Brief, search, updates, … after first paint so logon feels instant.
     let app = window.app_handle().clone();
-    if crate::state::lock(&app.state::<AppState>().settings).onboarded {
-        crate::start_features(&app);
-    }
+    tauri::async_runtime::spawn(async move {
+        if crate::state::lock(&app.state::<AppState>().settings).onboarded {
+            crate::start_features(&app);
+        }
+    });
 }
 
 /// Makes sure the window really lets clicks through. tao remembers the last

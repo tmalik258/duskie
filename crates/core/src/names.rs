@@ -40,6 +40,14 @@ const SKIP: &[&str] = &[
     "$windows.~ws",
     "$windows.~bt",
     "programdata",
+    "appdata",
+    "program files",
+    "program files (x86)",
+    ".cargo",
+    ".rustup",
+    ".local",
+    ".gradle",
+    ".m2",
 ];
 
 pub struct NameIndex {
@@ -79,14 +87,13 @@ impl NameIndex {
         let tx = self.conn.transaction()?;
         tx.execute("DELETE FROM names", [])?;
         let mut count = 0u64;
-        let mut stopped = false;
+        let mut stopped = !go_on();
         {
             let mut insert =
                 tx.prepare("INSERT INTO names (key, path, folder) VALUES (?1, ?2, ?3)")?;
             let mut stack: Vec<PathBuf> = roots.to_vec();
-            while let Some(dir) = stack.pop() {
-                if count.is_multiple_of(2048) && !go_on() {
-                    stopped = true;
+            'walk: while let Some(dir) = stack.pop() {
+                if stopped {
                     break;
                 }
                 let Ok(entries) = std::fs::read_dir(&dir) else {
@@ -106,6 +113,10 @@ impl NameIndex {
                         ft.is_dir() as i32
                     ])?;
                     count += 1;
+                    if count.is_multiple_of(2048) && !go_on() {
+                        stopped = true;
+                        break 'walk;
+                    }
                     if ft.is_dir()
                         && !name.starts_with('.')
                         && !SKIP.contains(&name.to_lowercase().as_str())
@@ -211,6 +222,32 @@ mod tests {
         assert_eq!(idx.search("deep", 10).first().map(|h| h.folder), Some(true));
         assert!(idx.search("\"; DROP", 10).is_empty());
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn checks_progress_inside_a_large_directory_and_rolls_back_on_stop() {
+        let dir =
+            std::env::temp_dir().join(format!("sidekick-names-progress-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("report.docx"), "").unwrap();
+        let mut idx = NameIndex::open_in_memory().unwrap();
+        idx.rebuild(std::slice::from_ref(&dir), || true).unwrap();
+        for n in 0..2050 {
+            std::fs::write(dir.join(format!("file-{n}.txt")), "").unwrap();
+        }
+
+        let mut checks = 0;
+        let result = idx
+            .rebuild(std::slice::from_ref(&dir), || {
+                checks += 1;
+                checks < 2
+            })
+            .unwrap();
+        assert_eq!(checks, 2);
+        assert_eq!(result, None);
+        assert_eq!(idx.count(), 1);
+        assert_eq!(idx.search("report", 5).len(), 1);
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

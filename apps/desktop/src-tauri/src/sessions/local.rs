@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 use tauri::AppHandle;
 use tokio::sync::mpsc;
 
-use super::{Answer, Cmd, Mode, ask, cancel_running_steps, emit, turn_ended};
+use super::{Answer, Cmd, Mode, ask, cancel_running_steps, emit};
 
 /// Tool rounds in one turn before it counts as stuck.
 const MAX_ROUNDS: usize = 16;
@@ -262,6 +262,7 @@ pub async fn run(
     while let Some(cmd) = rx.recv().await {
         let text = match cmd {
             Cmd::Send(t) => t,
+            Cmd::Control(_) => continue,
             // Already idle: Esc is a no-op.
             Cmd::Stop => continue,
             Cmd::Restart => return Ok(()),
@@ -281,6 +282,7 @@ pub async fn run(
                 }
             },
         };
+        let mode = super::selected_mode(id, mode);
         messages.push(json!({"role":"user","content":text}));
         let mut error = None;
         let mut done = false;
@@ -306,6 +308,7 @@ pub async fn run(
                     Some(Cmd::Restart) | None => return Ok(()),
                     // A message mid-turn waits for the next turn.
                     Some(Cmd::Send(_)) => continue,
+                    Some(Cmd::Control(_)) => continue,
                 },
             };
             let msg = reply["message"].clone();
@@ -385,9 +388,7 @@ pub async fn run(
         if stopped {
             cancel_running_steps(app, id);
         }
-        emit(app, id, json!({"kind":"turn","error":error}));
-        let sid = id.to_owned();
-        tokio::task::spawn_blocking(move || turn_ended(&sid));
+        super::complete_turn(app, id, json!({"kind":"turn","error":error})).await;
     }
     Ok(())
 }

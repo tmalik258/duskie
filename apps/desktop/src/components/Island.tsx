@@ -10,12 +10,23 @@ import { type CSSProperties, useCallback, useEffect, useRef, useState } from "re
 import { useShallow } from "zustand/react/shallow";
 import { listenToAgents, useAgents, wideScreen } from "@/lib/agents";
 import { api } from "@/lib/bridge";
+import {
+  useActivities,
+  visibleActivities,
+  activityLabel,
+  terminal,
+  ownsWorking,
+  INACTIVITY_MS,
+  latestActivity,
+} from "@/lib/activities";
+import { ActivityProgress } from "./ActivityProgress";
 import { useNow, useSystemLook } from "@/lib/hooks";
 import { ISLAND_TOP, PANEL_PAD } from "@/lib/islandSize";
 import type { NetNotice } from "@/lib/net";
 import { playSound } from "@/lib/sound";
-import { connect, notePick, setHovered, uiVolume, useSidekick, watchWaiting } from "@/lib/store";
+import { connect, installUpdate, notePick, setHovered, uiVolume, useSidekick, watchWaiting } from "@/lib/store";
 import { isPaused, type MascotState, type Suggestion } from "@/lib/types";
+import { updateBusy, updateLabel } from "@/lib/updates";
 import { Announcer } from "./Announcer";
 import { ASK_MASCOT, ASK_ORB, ASK_PAD, AskPanel, VoiceBars } from "./AskPanel";
 import { Icon } from "./Icon";
@@ -27,6 +38,7 @@ import { MergeCard } from "./MergeCard";
 import { Orb } from "./Orb";
 import { PreparingVoice } from "./PreparingVoice";
 import { Tip } from "./Tip";
+import { UpdateProgress } from "./UpdateProgress";
 
 const TITLE: Record<MascotState, string> = {
   idle: "Sidekick",
@@ -34,7 +46,7 @@ const TITLE: Record<MascotState, string> = {
   noticing: "Something changed",
   suggesting: "Suggestion",
   listening: "Listening",
-  working: "Working on it",
+  working: "Checking activity status",
   success: "Done",
   error: "That did not work",
 };
@@ -45,7 +57,7 @@ const DETAIL: Record<MascotState, string> = {
   noticing: "Taking a look.",
   suggesting: "Here is an idea.",
   listening: "Go ahead.",
-  working: "This takes a moment.",
+  working: "Waiting for an activity report.",
   success: "All set.",
   error: "Details are in the log.",
 };
@@ -98,6 +110,8 @@ const resize = { type: "spring", bounce: 0, duration: 0.34 } as const;
 /** Ctrl+Space is a keyboard action used many times a day: Ask opens in one
  * quick, calm move, with no bounce and no blur. */
 const askOpen = { duration: 0.2, ease: [0.23, 1, 0.32, 1] } as const;
+/** Agents is a richer surface: a short Dynamic Island spring, still snappy. */
+const agentsOpen = { type: "spring", bounce: 0.14, duration: 0.42 } as const;
 
 export function Island() {
   const { mascot, settings, suggestion, hovered: rawHover, visible, ready } = useSidekick();
@@ -114,6 +128,16 @@ export function Island() {
   const online = useSidekick((s) => s.online);
   const netNotice = useSidekick((s) => s.netNotice);
   const merging = useSidekick((s) => s.merge !== null);
+  const updateProgress = useSidekick((s) => s.updateProgress);
+  const updateActivity = useActivities((s) => latestActivity(s.activities, "update"));
+  const updateSuppressed = updateActivity?.dismissed;
+  const updateNow = useNow(1000);
+  const updateWorking =
+    updateProgress && !updateSuppressed && updateBusy(updateProgress)
+      ? updateActivity
+        ? activityLabel(updateActivity, updateNow)
+        : updateLabel(updateProgress)
+      : null;
   const waiting = useSidekick((s) => (s.ask ? null : s.waiting));
   const justDone = useSidekick((s) => s.justDone);
   // A task still running after Ask closed: its current step, small.
@@ -158,15 +182,69 @@ export function Island() {
   }, [questionId]);
   // Skill / action in flight with Ask closed: same slim pill as chat/agents.
   // Combine outside a store selector so closed-over chat/agent labels stay fresh.
-  const skillWorking = useSidekick((s) => {
-    if (s.ask || s.mascot !== "working") return null;
-    return s.running ? `${s.running}...` : "Working on it";
-  });
-  const working = asking ? null : (chatWorking ?? agentWorking ?? skillWorking);
+  const activityState = useActivities();
+  const activityNow = useNow(1000);
+  const liveActivities = visibleActivities([...activityState.activities, ...activityState.local], activityNow);
+  const foreground = liveActivities.filter((a) => !["browser", "file"].includes(a.source));
+  const backgroundAll = liveActivities.filter((a) => ["browser", "file"].includes(a.source));
+  const background = backgroundAll.filter((a) => !terminal(a));
+  const pausedDownloads = background.filter((a) => a.phase === "awaitingUser").length;
+  const waitingDownloads = background.filter(
+    (a) => a.phase === "unconfirmed" || activityNow - a.lastProgressAt >= INACTIVITY_MS,
+  ).length;
+  const skillWorking = foreground[0] ? activityLabel(foreground[0], activityNow) : null;
+  const downloadWorking =
+    background.length > 1
+      ? pausedDownloads > 0
+        ? `${background.length} downloads · ${pausedDownloads} paused`
+        : waitingDownloads > 0
+          ? `${background.length} downloads · ${waitingDownloads} awaiting progress`
+          : `${background.length} downloads in progress`
+      : backgroundAll[0]
+        ? activityLabel(background[0] ?? backgroundAll[0], activityNow)
+        : null;
+  useEffect(() => {
+    if (
+      mascot !== "working" ||
+      chatWorking ||
+      agentWorking ||
+      activityState.revision < 0 ||
+      [...activityState.activities, ...activityState.local].some(ownsWorking)
+    )
+      return;
+    const timer = setTimeout(() => {
+      const current = useActivities.getState();
+      if (
+        [...current.activities, ...current.local].some(ownsWorking) ||
+        useSidekick.getState().chatId ||
+        useAgents.getState().sessions.some((s) => s.status === "working" || s.status === "waiting")
+      )
+        return;
+      useSidekick.setState((s) => (s.mascot === "working" ? { mascot: "idle", running: null } : {}));
+      void api.activityReconcile().catch(() => {});
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [mascot, chatWorking, agentWorking, activityState]);
+  const agentAsks = useAgents((s) => s.sessions.some((x) => x.status === "waiting"));
+  const working = asking
+    ? null
+    : ((agentAsks ? agentWorking : null) ??
+      updateWorking ??
+      skillWorking ??
+      chatWorking ??
+      agentWorking ??
+      downloadWorking);
+  const displayedActivity = liveActivities.find((a) => activityLabel(a, activityNow) === working);
+  const activityWaiting =
+    (working === downloadWorking && background.length > 1 && (pausedDownloads > 0 || waitingDownloads > 0)) ||
+    (displayedActivity &&
+      !terminal(displayedActivity) &&
+      (displayedActivity.phase === "awaitingUser" ||
+        displayedActivity.phase === "unconfirmed" ||
+        activityNow - displayedActivity.lastProgressAt >= INACTIVITY_MS));
   // An agent waiting on an answer: the mascot looks up curious and the pill
   // shows an amber dot instead of the busy bars.
-  const agentAsks = useAgents((s) => s.sessions.some((x) => x.status === "waiting"));
-  const asksYou = working !== null && chatWorking === null && skillWorking === null && agentAsks;
+  const asksYou = agentAsks && working === agentWorking;
   const guide = useGuide(waiting);
   // Voice with Ask closed: a compact pill while listening and thinking; the
   // island opens only when the answer starts.
@@ -176,7 +254,7 @@ export function Island() {
   // Also covers mascot success without Undo / Open (e.g. "Switched to Claude"
   // after Settings closed — showDone was skipped while Ask was open).
   const donePill = useSidekick((s) => {
-    if (s.ask) return null;
+    if (s.ask || updateBusy(s.updateProgress)) return null;
     if (s.donePill) return s.donePill;
     if (s.mascot !== "success") return null;
     const r = s.lastResult;
@@ -200,11 +278,15 @@ export function Island() {
   // hover card stays off until the cursor leaves and comes back; otherwise
   // shrinking the hit rect clears quiet while useIntent still thinks we are
   // hovering, and "Watching for moments" flashes.
+  const [contentHeight, setContentHeight] = useState(0);
   const [prevAsking, setPrevAsking] = useState(asking);
   const [quiet, setQuiet] = useState(false);
   if (prevAsking !== asking) {
     setPrevAsking(asking);
     if (!asking) setQuiet(true);
+    // Drop stale panel height on Ask open so the shell grows from compact
+    // instead of opening tall and shrinking to the new measure.
+    if (asking) setContentHeight(0);
   }
   // Cleared only once the cursor has been away as long as hover intent takes
   // to fall; clearing at once let a stale intent reopen a just-hidden welcome.
@@ -218,14 +300,33 @@ export function Island() {
   // brings the welcome back; the idle card ("watching for moments") would
   // just flash on the way.
   const guideOnHover = !!waiting && !waiting.background;
-  const hovered = intent && !quiet && (settings.onboarded || guideOnHover);
+  // Pending actions take priority over resuming onboarding on hover.
+  const needsAttention =
+    !!suggestion ||
+    questionId !== null ||
+    merging ||
+    updateProgress !== null ||
+    mascot === "error" ||
+    skillWorking !== null;
+  const hovered = intent && !quiet && (settings.onboarded || guideOnHover || needsAttention);
   const resumeWelcome =
-    intent && !quiet && !settings.onboarded && !asking && !guideOnHover && !justDone && mascot !== "success";
+    intent &&
+    !quiet &&
+    !settings.onboarded &&
+    !asking &&
+    !guideOnHover &&
+    !needsAttention &&
+    !justDone &&
+    mascot !== "success";
   useEffect(() => {
     if (resumeWelcome) void api.askResumeWelcome();
   }, [resumeWelcome]);
   const preparingVoice =
-    !settings.onboarded && !asking && !(voiceStatus?.models.some((m) => m.id === "voice" && m.installed) ?? false);
+    !settings.onboarded &&
+    !asking &&
+    !needsAttention &&
+    !waiting &&
+    !(voiceStatus?.models.some((m) => m.id === "voice" && m.installed) ?? false);
   // A guide stays open while Sidekick waits on something you finish elsewhere.
   const guiding = !!waiting && !waiting.minimized && (waiting.steps?.length ?? 0) > 0;
   // Voice / in-flight Ask with Ask closed: Listening / Thinking / Working pill.
@@ -245,6 +346,8 @@ export function Island() {
     done?: boolean;
     focus?: boolean;
     asks?: boolean;
+    waiting?: boolean;
+    failed?: boolean;
     dots?: string[];
   } | null = asking
     ? null
@@ -255,7 +358,16 @@ export function Island() {
         : hearing !== null || mascot === "listening"
           ? { text: hearing ?? "", thinking: false }
           : working !== null
-            ? { text: working, thinking: !asksYou, working: true, asks: asksYou, dots: agentDots }
+            ? {
+                text: working,
+                thinking: !asksYou && !activityWaiting && (!displayedActivity || !terminal(displayedActivity)),
+                working: true,
+                asks: asksYou,
+                waiting: !!activityWaiting,
+                done: displayedActivity?.phase === "completed",
+                failed: displayedActivity?.phase === "failed",
+                dots: agentDots,
+              }
             : focusLeft !== null
               ? { text: `Focus · ${focusLeft}`, thinking: false, focus: true }
               : null;
@@ -278,12 +390,13 @@ export function Island() {
     askOpens ||
     fullVoice ||
     preparingVoice ||
-    (hovered && (!voicePill || agentsOnly)) ||
+    (hovered && (!voicePill || agentsOnly || updateWorking !== null || liveActivities.length > 0)) ||
     guiding ||
     (OPEN_STATES.has(mascot) && !voicePill) ||
     successCard ||
     !!suggestion ||
     (!!netNotice && !voicePill) ||
+    updateProgress?.phase === "failed" ||
     merging;
   // At rest only the sphere shows. The shell keeps its size (so hover and the
   // orb position do not move) but loses its background.
@@ -293,13 +406,24 @@ export function Island() {
 
   // Hover while Thinking or Working: open Ask so the island is usable, not a dead pill.
   useEffect(() => {
-    if (!intent || quiet || asking || !settings.onboarded) return;
+    if (!intent || quiet || asking || !settings.onboarded || updateWorking !== null || suggestion) return;
+    if (voiceQuestion === null && liveActivities.length > 0) return;
     if (voiceQuestion === null && working === null) return;
     if (agentsOnly) return;
     void api.askOpen();
-  }, [intent, quiet, asking, settings.onboarded, voiceQuestion, working, agentsOnly]);
+  }, [
+    intent,
+    quiet,
+    asking,
+    settings.onboarded,
+    voiceQuestion,
+    working,
+    agentsOnly,
+    updateWorking,
+    suggestion,
+    liveActivities.length,
+  ]);
 
-  const [contentHeight, setContentHeight] = useState(0);
   const bump = useMotionValue(1);
   // A mood (thanks, Claude finished) shows for a moment; offline and at
   // rest, the mascot looks a little lost.
@@ -348,7 +472,7 @@ export function Island() {
   // so a stale tall height does not stick after the chat clears.
   const turnsLen = useSidekick((s) => s.turns.length);
   const chatId = useSidekick((s) => s.chatId);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: view, turnsLen and chatId are triggers, not inputs
+  // biome-ignore lint/correctness/useExhaustiveDependencies: triggers only — remeasure when Agents body changes size
   useEffect(() => {
     if (!asking) return;
     let id2 = 0;
@@ -362,9 +486,15 @@ export function Island() {
       cancelAnimationFrame(id1);
       cancelAnimationFrame(id2);
     };
-  }, [asking, view, turnsLen, chatId]);
+  }, [asking, view, turnsLen, chatId, askTab, agentCurrent, agentsLayout]);
 
-  const showGuide = !!waiting && !waiting.background && !suggestion && (mascot === "idle" || mascot === "sleeping");
+  const showGuide =
+    !!waiting &&
+    !waiting.background &&
+    !suggestion &&
+    questionId === null &&
+    !updateProgress &&
+    (mascot === "idle" || mascot === "sleeping");
   const width = asking
     ? view === "welcome"
       ? WELCOME_WIDTH
@@ -415,24 +545,33 @@ export function Island() {
       ? settled
         ? resize
         : asking
-          ? askOpen
+          ? askPanel && askTab === "agents"
+            ? agentsOpen
+            : askOpen
           : morphOpen
       : morphClose;
 
   const overlayHit = useSidekick((s) => s.overlayHit);
   // Report the target shape as the interactive area; outside it the window
   // stays click-through. A floating menu expands the rect so it stays usable.
+  // Debounced: during spring animations width/height change every frame, so
+  // we wait one frame before sending across the IPC boundary.
+  const hitRectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
-    const base = { x: (window.innerWidth - width) / 2, y: TOP, width, height };
-    const rect = overlayHit
-      ? {
-          x: Math.min(base.x, overlayHit.x),
-          y: Math.min(base.y, overlayHit.y),
-          width: Math.max(base.x + base.width, overlayHit.x + overlayHit.width) - Math.min(base.x, overlayHit.x),
-          height: Math.max(base.y + base.height, overlayHit.y + overlayHit.height) - Math.min(base.y, overlayHit.y),
-        }
-      : base;
-    void api.islandSetHitRect(rect);
+    clearTimeout(hitRectTimer.current);
+    hitRectTimer.current = setTimeout(() => {
+      const base = { x: (window.innerWidth - width) / 2, y: TOP, width, height };
+      const rect = overlayHit
+        ? {
+            x: Math.min(base.x, overlayHit.x),
+            y: Math.min(base.y, overlayHit.y),
+            width: Math.max(base.x + base.width, overlayHit.x + overlayHit.width) - Math.min(base.x, overlayHit.x),
+            height: Math.max(base.y + base.height, overlayHit.y + overlayHit.height) - Math.min(base.y, overlayHit.y),
+          }
+        : base;
+      void api.islandSetHitRect(rect);
+    }, 16);
+    return () => clearTimeout(hitRectTimer.current);
   }, [width, height, overlayHit]);
 
   // A small squish when something gets the mascot's attention while compact.
@@ -516,6 +655,8 @@ export function Island() {
         </AnimatePresence>
 
         <AnimatePresence initial={false} mode="popLayout">
+          {/* Exclusive branches only (as on main): keeping Ask mounted while closed
+              stacked with Expanded and stuck the island after rapid open/close. */}
           {asking ? (
             <motion.div
               key="ask"
@@ -526,12 +667,35 @@ export function Island() {
                   ? { left: ASK_PAD.x, paddingTop: ASK_PAD.top, paddingRight: ASK_PAD.x }
                   : { left: EXPANDED.pad, paddingTop: EXPANDED.pad, paddingRight: EXPANDED.pad }
               }
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0, transition: { duration: 0.08 } }}
-              transition={{ duration: reduced ? 0 : 0.14, ease: "easeOut" }}
+              initial={
+                reduced
+                  ? { opacity: 0 }
+                  : askPanel && askTab === "agents"
+                    ? { opacity: 0, filter: "blur(8px)", y: 10, scale: 0.985 }
+                    : { opacity: 0, y: 4 }
+              }
+              animate={{ opacity: 1, filter: "blur(0px)", y: 0, scale: 1 }}
+              exit={{
+                opacity: 0,
+                filter: reduced ? undefined : "blur(4px)",
+                y: reduced ? 0 : -3,
+                transition: { duration: 0.1 },
+              }}
+              transition={
+                reduced
+                  ? { duration: 0 }
+                  : askPanel && askTab === "agents"
+                    ? { duration: 0.34, delay: 0.05, ease: [0.23, 1, 0.32, 1] }
+                    : { duration: 0.18, ease: [0.23, 1, 0.32, 1] }
+              }
             >
-              {view === "settings" ? <IslandSettings /> : view === "welcome" ? <IslandWelcome /> : <AskPanel />}
+              {view === "settings" ? (
+                <IslandSettings />
+              ) : view === "welcome" ? (
+                <IslandWelcome />
+              ) : (
+                <AskPanel />
+              )}
             </motion.div>
           ) : preparingVoice ? (
             <motion.div
@@ -657,8 +821,8 @@ function FullVoice({ text, thinking }: { text: string; thinking: boolean }) {
 /** Compact listening shell: tight when empty, grows with speech up to voiceWidth. */
 function voiceShellWidth(text: string, thinking: boolean, working?: boolean): number {
   const label = voiceLabel(text, thinking, working);
-  // Orb column, gaps, green bars, right pad.
-  const chrome = COMPACT.height + 4 + 10 + 20 + 14;
+  // Orb column, gaps, green bars, stop button, right pad.
+  const chrome = COMPACT.height + 4 + 10 + 20 + 28 + 14;
   const textPx = Math.ceil([...label].length * 7.4);
   return Math.min(COMPACT.voiceWidth, Math.max(COMPACT.voiceMinWidth, chrome + textPx));
 }
@@ -712,6 +876,8 @@ function VoicePill({
   done,
   focus,
   asks,
+  waiting,
+  failed,
   dots,
   onOpen,
 }: {
@@ -721,6 +887,8 @@ function VoicePill({
   done?: boolean;
   focus?: boolean;
   asks?: boolean;
+  waiting?: boolean;
+  failed?: boolean;
   dots?: string[];
   onOpen?: () => void;
 }) {
@@ -751,7 +919,11 @@ function VoicePill({
           {label}
         </span>
       )}
-      {done ? (
+      {failed ? (
+        <span role="img" aria-label="Failed" className="size-2 rounded-full bg-red-400" />
+      ) : waiting ? (
+        <span role="img" aria-label="Waiting for confirmed progress" className="size-2 rounded-full bg-[#ff9f0a]" />
+      ) : done ? (
         <span className="text-[#30d158]">
           <Icon name="check" size={14} />
         </span>
@@ -771,10 +943,25 @@ function VoicePill({
         </span>
       ) : dots && dots.length > 1 ? (
         <AgentRing states={dots} />
-      ) : thinking ? (
+      ) : thinking || working ? (
         <Activity />
       ) : (
-        <VoiceBars />
+        <>
+          <VoiceBars />
+          <Tip label="Stop (Esc)">
+            <button
+              type="button"
+              aria-label="Stop listening"
+              onClick={(e) => {
+                e.stopPropagation();
+                void api.voiceStop();
+              }}
+              className="chip grid size-6 shrink-0 place-items-center rounded-full bg-white/[0.09] hover:bg-white/[0.15]"
+            >
+              <span className="size-2 rounded-[2px] bg-white" />
+            </button>
+          </Tip>
+        </>
       )}
     </motion.div>
   );
@@ -863,13 +1050,47 @@ function ExpandedContent({
   paused: boolean;
   suggestion: Suggestion | null;
 }) {
+  const activityState = useActivities();
+  const activityNow = useNow(1000);
+  const hasActivities =
+    visibleActivities([...activityState.activities, ...activityState.local], activityNow).length > 0;
+  const agentQuestion = useAgents((s) => s.sessions.some((agent) => agent.question));
   const result = useSidekick((s) => s.lastResult);
   const running = useSidekick((s) => s.running);
   const netNotice = useSidekick((s) => s.netNotice);
   const merge = useSidekick((s) => s.merge);
+  const progress = useSidekick((s) => s.updateProgress);
   const reporting = (mascot === "success" || mascot === "error" || mascot === "working") && !suggestion;
+  if (agentQuestion && !suggestion) return <Glance paused={paused} />;
   if (merge && !suggestion) return <MergeCard path={merge.path} />;
   if (netNotice && !suggestion) return <NetNoticeCard notice={netNotice} />;
+  if (progress && !suggestion && !latestActivity(activityState.activities, "update")?.dismissed) {
+    return (
+      <div className="flex flex-col gap-3">
+        <UpdateProgress progress={progress} />
+        <ActivityProgress sources={["update"]} />
+        {progress.phase === "failed" && (
+          <div className="flex gap-3 text-[13px]">
+            <button
+              type="button"
+              className="chip text-white"
+              onClick={() => void installUpdate().catch(() => undefined)}
+            >
+              Retry update
+            </button>
+            <button
+              type="button"
+              className="chip text-white/60"
+              onClick={() => useSidekick.setState({ updateProgress: null })}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+  if (hasActivities && !suggestion) return <ActivityProgress />;
   // A suggestion that expired or was taken leaves nothing to show: fall back to the glance.
   if (!suggestion && (mascot === "idle" || mascot === "sleeping" || mascot === "suggesting")) {
     return <Glance paused={paused} />;

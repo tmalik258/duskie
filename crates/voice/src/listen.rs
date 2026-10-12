@@ -230,10 +230,10 @@ impl Engine {
             ),
             decoding_method: Some("greedy_search".into()),
             enable_endpoint: true,
-            // Give up after 4 s of silence, end 0.6 s after speech, cap at 30 s.
+            // Give up after 2 s of silence, end 1 s after speech, cap at 30 s.
             // An answer may already start at the pause before that (Heard::Pause).
-            rule1_min_trailing_silence: 4.0,
-            rule2_min_trailing_silence: 0.6,
+            rule1_min_trailing_silence: 2.0,
+            rule2_min_trailing_silence: 1.0,
             rule3_min_utterance_length: 30.0,
             ..Default::default()
         };

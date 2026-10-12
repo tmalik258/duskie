@@ -122,6 +122,11 @@ pub fn update_status() -> Option<crate::updates::Available> {
     crate::updates::found()
 }
 
+#[tauri::command]
+pub fn update_progress() -> Option<crate::updates::Progress> {
+    crate::updates::progress()
+}
+
 /// Checks for a newer release now (Settings > Check now).
 #[tauri::command]
 pub async fn update_check(app: AppHandle) -> Result<Option<crate::updates::Available>, String> {
@@ -324,9 +329,19 @@ pub fn set_pause(app: &AppHandle, pause: Pause) -> CmdResult<Settings> {
 /// persist, update the sensor gate, and notify every window.
 pub fn apply_settings(app: &AppHandle, next: Settings) -> CmdResult<Settings> {
     let state = app.state::<AppState>();
-    let next = next.sanitized();
+    let mut next = next.sanitized();
     let now = Utc::now();
     let previous = lock(&state.settings).clone();
+    next.saved_projects.retain(|saved| {
+        !previous
+            .code_folders
+            .iter()
+            .any(|p| crate::projects::same_path(p, saved))
+            || next
+                .code_folders
+                .iter()
+                .any(|p| crate::projects::same_path(p, saved))
+    });
     if next.ai != previous.ai {
         // Warm sessions were started with the old models and paths.
         crate::ai::close_sessions();
@@ -399,6 +414,10 @@ pub fn apply_settings(app: &AppHandle, next: Settings) -> CmdResult<Settings> {
         crate::voice::refresh(app);
     }
 
+    if next.code_folders != previous.code_folders || next.composio != previous.composio {
+        crate::projects::invalidate();
+        crate::github::invalidate();
+    }
     if let Err(err) = app.emit(SETTINGS_CHANGED, &next) {
         log::warn!("could not emit settings change: {err}");
     }
@@ -442,6 +461,11 @@ pub fn later_open(app: AppHandle, id: String) -> CmdResult<()> {
 #[tauri::command]
 pub fn later_clear(app: AppHandle) {
     suggestions::later_clear(&app);
+}
+
+#[tauri::command]
+pub fn later_dismiss(app: AppHandle, id: String) {
+    suggestions::later_dismiss(&app, &id);
 }
 
 /// Lets a skill quieted by "Not now" speak again.
