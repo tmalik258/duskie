@@ -6,7 +6,7 @@ use serde_json::Value;
 use sidekick_core::Event;
 use tauri::{AppHandle, Manager};
 
-use crate::state::{lock, AppState};
+use crate::state::{AppState, lock};
 
 fn host(url: &str) -> Option<String> {
     let rest = url.split_once("://").map_or(url, |(_, r)| r);

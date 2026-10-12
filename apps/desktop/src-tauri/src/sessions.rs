@@ -102,34 +102,62 @@ enum Cmd {
 }
 
 pub fn control(id: &str, method: &str) -> Result<(), String> {
-    if !matches!(method, "thread/compact/start" | "account/rateLimits/read") { return Err("Unsupported control".into()); }
+    if !matches!(method, "thread/compact/start" | "account/rateLimits/read") {
+        return Err("Unsupported control".into());
+    }
     with(&SESSIONS, |s| {
         let h = s.get(id).ok_or("That session is gone.")?;
-        if h.agent != Agent::Codex { return Err("This control requires Codex.".into()); }
-        h.tx.send(Cmd::Control(method.into())).map_err(|_| "Resume this session first.".into())
+        if h.agent != Agent::Codex {
+            return Err("This control requires Codex.".into());
+        }
+        h.tx.send(Cmd::Control(method.into()))
+            .map_err(|_| "Resume this session first.".into())
     })
 }
 
-fn codex_turn_params(id: &str, thread: &str, input: Value, path: &Path, fallback: Mode, default_model: Option<&str>) -> Result<Value, String> {
+fn codex_turn_params(
+    id: &str,
+    thread: &str,
+    input: Value,
+    path: &Path,
+    fallback: Mode,
+    default_model: Option<&str>,
+) -> Result<Value, String> {
     let mode = selected_mode(id, fallback);
     let tune = tuned(id);
-    let model = tune.model.as_deref().or(default_model).ok_or("Codex collaboration mode requires a configured model")?;
-    let effort = tune.effort.as_deref().map(|e| if e == "max" { "xhigh" } else if e == "off" { "none" } else { e });
+    let model = tune
+        .model
+        .as_deref()
+        .or(default_model)
+        .ok_or("Codex collaboration mode requires a configured model")?;
+    let effort = tune.effort.as_deref().map(|e| {
+        if e == "max" {
+            "xhigh"
+        } else if e == "off" {
+            "none"
+        } else {
+            e
+        }
+    });
     let sandbox = match mode {
         Mode::Plan => json!({"type":"readOnly"}),
         Mode::Full => json!({"type":"dangerFullAccess"}),
-        _ => json!({"type":"workspaceWrite","writableRoots":[path.to_string_lossy()],"networkAccess":false}),
+        _ => {
+            json!({"type":"workspaceWrite","writableRoots":[path.to_string_lossy()],"networkAccess":false})
+        }
     };
-    Ok(json!({"threadId":thread,"input":input,"model":model,"effort":effort,
+    Ok(
+        json!({"threadId":thread,"input":input,"model":model,"effort":effort,
         "approvalPolicy":mode.codex().1,"sandboxPolicy":sandbox,
         "collaborationMode":{"mode":if mode == Mode::Plan {"plan"} else {"default"},
-            "settings":{"model":model,"reasoning_effort":effort,"developer_instructions":null}}}))
+            "settings":{"model":model,"reasoning_effort":effort,"developer_instructions":null}}}),
+    )
 }
 
 fn codex_limits(p: &Value) -> Vec<Value> {
     let mut out = Vec::new();
     let limits: Vec<(&str, &Value)> = match p["rateLimitsByLimitId"].as_object() {
-        Some(map) if !map.is_empty() => map.iter().map(|(k,v)| (k.as_str(),v)).collect(),
+        Some(map) if !map.is_empty() => map.iter().map(|(k, v)| (k.as_str(), v)).collect(),
         _ => vec![("codex", &p["rateLimits"])],
     };
     for (id, limit) in limits {
@@ -137,8 +165,17 @@ fn codex_limits(p: &Value) -> Vec<Value> {
             let w = &limit[key];
             if let Some(used) = w["usedPercent"].as_f64() {
                 let mins = w["windowDurationMins"].as_u64();
-                let window: String = match mins { Some(300) => "five_hour".into(), Some(10080) => "seven_day".into(), Some(n) => format!("{n} minutes"), None => key.into() };
-                let window = if id == "codex" { window } else { format!("{id}: {window}") };
+                let window: String = match mins {
+                    Some(300) => "five_hour".into(),
+                    Some(10080) => "seven_day".into(),
+                    Some(n) => format!("{n} minutes"),
+                    None => key.into(),
+                };
+                let window = if id == "codex" {
+                    window
+                } else {
+                    format!("{id}: {window}")
+                };
                 out.push(json!({"kind":"limit","status":if used >= 100.0 {"rejected"} else {"allowed"},"window":window,"used":used / 100.0,"resetsAt":w["resetsAt"]}));
             }
         }
@@ -202,7 +239,11 @@ pub fn set_mode(id: &str, mode: Mode) -> Result<(), String> {
         h.mode = mode;
         Ok::<_, String>(h.agent == Agent::ClaudeCode)
     })?;
-    if claude { with(&TUNES, |t| t.entry(id.to_owned()).or_default().restart = true); }
+    if claude {
+        with(&TUNES, |t| {
+            t.entry(id.to_owned()).or_default().restart = true
+        });
+    }
     save();
     Ok(())
 }
@@ -236,7 +277,9 @@ async fn complete_turn(app: &AppHandle, id: &str, mut data: Value) {
     emit(app, id, data);
     if let Some(messages) = with(&DEFERRED, |q| q.remove(id)) {
         for text in messages {
-            if let Err(error) = send(app, id, &text) { emit(app,id,json!({"kind":"control_error","error":error})); }
+            if let Err(error) = send(app, id, &text) {
+                emit(app, id, json!({"kind":"control_error","error":error}));
+            }
         }
     }
 }
@@ -331,7 +374,16 @@ pub fn restore(dir: &Path) {
     with(&SESSIONS, |s| {
         for v in saved {
             with(&reviews::REVIEWS, |r| r.insert(v.id.clone(), v.reviews));
-            with(&TUNES, |t| t.insert(v.id.clone(), Tune { model: v.model, effort: v.effort, restart: false }));
+            with(&TUNES, |t| {
+                t.insert(
+                    v.id.clone(),
+                    Tune {
+                        model: v.model,
+                        effort: v.effort,
+                        restart: false,
+                    },
+                )
+            });
             let agent = Agent::from_id(&v.agent).unwrap_or(Agent::ClaudeCode);
             // Nothing is running: sends fail with "That session has ended".
             let (tx, _) = mpsc::unbounded_channel();
@@ -600,7 +652,20 @@ pub async fn start_tuned(
     save();
     with(&reviews::WRITING, |w| w.insert(id.clone(), true));
     let _ = tx.send(Cmd::Send(prompt.to_owned()));
-    crate::activity::report(app, &format!("agent:{id}"), "agent", &format!("{} · {}", agent.name(), path.file_name().unwrap_or_default().to_string_lossy()), crate::activity::Phase::Running, None, None, None);
+    crate::activity::report(
+        app,
+        &format!("agent:{id}"),
+        "agent",
+        &format!(
+            "{} · {}",
+            agent.name(),
+            path.file_name().unwrap_or_default().to_string_lossy()
+        ),
+        crate::activity::Phase::Running,
+        None,
+        None,
+        None,
+    );
     spawn_run(app, &id, agent, exe, path, mode, None, rx);
     Ok(started)
 }
@@ -679,7 +744,9 @@ fn spawn_run(
         let sid = id2.clone();
         let _ = tokio::task::spawn_blocking(move || turn_ended(&sid)).await;
         let changes = review_count(&id2);
-        let review = reviews::list(&id2).last().map(|t| json!({"id":t.id,"files":t.files.len(),"error":t.error}));
+        let review = reviews::list(&id2)
+            .last()
+            .map(|t| json!({"id":t.id,"files":t.files.len(),"error":t.error}));
         emit(
             &app2,
             &id2,
@@ -799,7 +866,9 @@ fn review_count(id: &str) -> usize {
 /// of the project so Rewind can come back to this point.
 pub fn send(app: &AppHandle, id: &str, text: &str) -> Result<(), String> {
     if tuned(id).restart && with(&reviews::WRITING, |w| w.get(id).copied().unwrap_or(false)) {
-        with(&DEFERRED, |q| q.entry(id.into()).or_default().push(text.into()));
+        with(&DEFERRED, |q| {
+            q.entry(id.into()).or_default().push(text.into())
+        });
         return Ok(());
     }
     if tuned(id).restart {
@@ -816,9 +885,10 @@ pub fn send(app: &AppHandle, id: &str, text: &str) -> Result<(), String> {
 fn send_text(id: &str, text: &str) -> Result<(), String> {
     let writing = with(&reviews::WRITING, |w| w.insert(id.into(), true)).unwrap_or(false);
     let path = with(&SESSIONS, |s| s.get(id).map(|h| h.path.clone()));
-    if !writing && let Some(snap) = path
-        .as_deref()
-        .and_then(|p| review::capture(p, shadow_root().as_deref()))
+    if !writing
+        && let Some(snap) = path
+            .as_deref()
+            .and_then(|p| review::capture(p, shadow_root().as_deref()))
     {
         with(&SESSIONS, |s| {
             if let Some(h) = s.get_mut(id) {
@@ -1030,7 +1100,12 @@ pub fn commands(id: &str) -> Vec<SlashCommand> {
         name: name.into(),
         description: description.into(),
         group: group.into(),
-        execution: if group == "Session" { "control" } else { "provider" }.into(),
+        execution: if group == "Session" {
+            "control"
+        } else {
+            "provider"
+        }
+        .into(),
     };
     let mut out = Vec::new();
     if agent == Agent::ClaudeCode {
@@ -1546,7 +1621,10 @@ pub fn tail(text: &str) -> String {
 
 // ---------- Codex ----------
 
-async fn write_line<W: tokio::io::AsyncWrite + Unpin>(stdin: &mut W, v: Value) -> Result<(), String> {
+async fn write_line<W: tokio::io::AsyncWrite + Unpin>(
+    stdin: &mut W,
+    v: Value,
+) -> Result<(), String> {
     let mut line = v.to_string();
     line.push('\n');
     stdin
@@ -1556,29 +1634,55 @@ async fn write_line<W: tokio::io::AsyncWrite + Unpin>(stdin: &mut W, v: Value) -
     stdin.flush().await.map_err(|e| e.to_string())
 }
 
-async fn codex_initialize<W: tokio::io::AsyncWrite + Unpin, R: tokio::io::AsyncBufRead + Unpin>(stdin: &mut W, lines: &mut tokio::io::Lines<R>) -> Result<(), String> {
+async fn codex_initialize<W: tokio::io::AsyncWrite + Unpin, R: tokio::io::AsyncBufRead + Unpin>(
+    stdin: &mut W,
+    lines: &mut tokio::io::Lines<R>,
+) -> Result<(), String> {
     write_line(stdin, json!({"id":1,"method":"initialize","params":{
         "clientInfo":{"name":"sidekick","version":env!("CARGO_PKG_VERSION")},"capabilities":{"experimentalApi":true}}})).await?;
     tokio::time::timeout(Duration::from_secs(30), async {
         loop {
-            let line = lines.next_line().await.map_err(|e| e.to_string())?.ok_or("Codex stopped during initialization")?;
-            let Ok(v) = serde_json::from_str::<Value>(&line) else { continue };
+            let line = lines
+                .next_line()
+                .await
+                .map_err(|e| e.to_string())?
+                .ok_or("Codex stopped during initialization")?;
+            let Ok(v) = serde_json::from_str::<Value>(&line) else {
+                continue;
+            };
             if v["id"] == 1 && v.get("method").is_none() {
-                if let Some(e) = v["error"]["message"].as_str() { return Err(format!("Codex initialize: {e}")); }
-                if v.get("result").is_none() { return Err("Invalid Codex initialization response".into()); }
+                if let Some(e) = v["error"]["message"].as_str() {
+                    return Err(format!("Codex initialize: {e}"));
+                }
+                if v.get("result").is_none() {
+                    return Err("Invalid Codex initialization response".into());
+                }
                 break;
             }
         }
         write_line(stdin, json!({"method":"initialized"})).await
-    }).await.map_err(|_| "Codex initialization timed out".to_owned())?
+    })
+    .await
+    .map_err(|_| "Codex initialization timed out".to_owned())?
 }
 
-fn rpc_response(v: &Value, pending: &mut HashMap<u64, String>) -> Option<(String, Result<Value, String>)> {
-    if v.get("method").is_some() { return None; }
+fn rpc_response(
+    v: &Value,
+    pending: &mut HashMap<u64, String>,
+) -> Option<(String, Result<Value, String>)> {
+    if v.get("method").is_some() {
+        return None;
+    }
     let method = pending.remove(&v["id"].as_u64()?)?;
     let result = match v.get("error") {
-        Some(e) => Err(e["message"].as_str().unwrap_or("Unsupported or rejected Codex request").into()),
-        None => v.get("result").cloned().ok_or_else(|| "Invalid Codex response: missing result".into()),
+        Some(e) => Err(e["message"]
+            .as_str()
+            .unwrap_or("Unsupported or rejected Codex request")
+            .into()),
+        None => v
+            .get("result")
+            .cloned()
+            .ok_or_else(|| "Invalid Codex response: missing result".into()),
     };
     Some((method, result))
 }
@@ -1639,7 +1743,11 @@ async fn run_codex(
     let mut pending: HashMap<u64, String> = HashMap::new();
     next_id += 1;
     pending.insert(next_id, "account/rateLimits/read".into());
-    write_line(&mut stdin, json!({"id":next_id,"method":"account/rateLimits/read"})).await?;
+    write_line(
+        &mut stdin,
+        json!({"id":next_id,"method":"account/rateLimits/read"}),
+    )
+    .await?;
     // Messages typed before the thread opened.
     let mut queued: Vec<String> = Vec::new();
     loop {
@@ -1840,7 +1948,7 @@ async fn run_plain(
                 Some(Cmd::Restart) | None => return Ok(()),
             },
         };
-                    emit(app, id, json!({ "kind": "working", "mode": mode }));
+        emit(app, id, json!({ "kind": "working", "mode": mode }));
         let mut cmd = tokio::process::Command::new(exe);
         cmd.args(plain_args(agent, selected_mode(id, mode), &text, turns > 0));
         if let Some(c) = chat.as_ref().filter(|_| agent == Agent::Cursor) {
@@ -2017,7 +2125,10 @@ pub fn codex_events(v: &Value) -> Vec<Value> {
         }
         Some("thread/tokenUsage/updated") => {
             let u = &p["tokenUsage"];
-            let used = u["last"]["totalTokens"].as_u64().or_else(|| u["last"]["inputTokens"].as_u64()).unwrap_or(0);
+            let used = u["last"]["totalTokens"]
+                .as_u64()
+                .or_else(|| u["last"]["inputTokens"].as_u64())
+                .unwrap_or(0);
             let window = u["modelContextWindow"].as_u64().unwrap_or(0);
             if window > 0 {
                 out.push(json!({ "kind": "usage", "used": used, "window": window, "total":u["total"]["totalTokens"] }));
@@ -2072,14 +2183,26 @@ mod tests {
         let server = tokio::spawn(async move {
             let (reader, mut writer) = tokio::io::split(server);
             let mut lines = BufReader::new(reader).lines();
-            let request: Value = serde_json::from_str(&lines.next_line().await.unwrap().unwrap()).unwrap();
+            let request: Value =
+                serde_json::from_str(&lines.next_line().await.unwrap().unwrap()).unwrap();
             assert_eq!(request["method"], "initialize");
             assert_eq!(request["params"]["capabilities"]["experimentalApi"], true);
-            assert!(tokio::time::timeout(Duration::from_millis(20), lines.next_line()).await.is_err());
-            write_line(&mut writer, json!({"method":"notice","params":{}})).await.unwrap();
-            write_line(&mut writer, json!({"id":99,"result":{}})).await.unwrap();
-            write_line(&mut writer, json!({"id":1,"result":{"userAgent":"mock"}})).await.unwrap();
-            let initialized: Value = serde_json::from_str(&lines.next_line().await.unwrap().unwrap()).unwrap();
+            assert!(
+                tokio::time::timeout(Duration::from_millis(20), lines.next_line())
+                    .await
+                    .is_err()
+            );
+            write_line(&mut writer, json!({"method":"notice","params":{}}))
+                .await
+                .unwrap();
+            write_line(&mut writer, json!({"id":99,"result":{}}))
+                .await
+                .unwrap();
+            write_line(&mut writer, json!({"id":1,"result":{"userAgent":"mock"}}))
+                .await
+                .unwrap();
+            let initialized: Value =
+                serde_json::from_str(&lines.next_line().await.unwrap().unwrap()).unwrap();
             assert_eq!(initialized["method"], "initialized");
         });
         codex_initialize(&mut writer, &mut lines).await.unwrap();
@@ -2090,18 +2213,37 @@ mod tests {
     async fn mocked_app_server_rejected_initialization_is_visible() {
         let (client, mut server) = tokio::io::duplex(4096);
         let (reader, mut writer) = tokio::io::split(client);
-        write_line(&mut server, json!({"id":1,"error":{"code":-32601,"message":"Unsupported initialize"}})).await.unwrap();
-        let error = codex_initialize(&mut writer, &mut BufReader::new(reader).lines()).await.unwrap_err();
+        write_line(
+            &mut server,
+            json!({"id":1,"error":{"code":-32601,"message":"Unsupported initialize"}}),
+        )
+        .await
+        .unwrap();
+        let error = codex_initialize(&mut writer, &mut BufReader::new(reader).lines())
+            .await
+            .unwrap_err();
         assert!(error.contains("Unsupported initialize"));
     }
 
     #[test]
     fn rpc_responses_match_ids_and_surface_errors() {
-        let mut pending = HashMap::from([(2, "turn/start".into()), (3, "account/rateLimits/read".into())]);
+        let mut pending = HashMap::from([
+            (2, "turn/start".into()),
+            (3, "account/rateLimits/read".into()),
+        ]);
         assert!(rpc_response(&json!({"id":2,"method":"requestApproval"}), &mut pending).is_none());
         assert!(rpc_response(&json!({"id":99,"result":{}}), &mut pending).is_none());
-        assert_eq!(rpc_response(&json!({"id":3,"result":{"rateLimits":{}}}), &mut pending).unwrap().0, "account/rateLimits/read");
-        let response = rpc_response(&json!({"id":2,"error":{"message":"Sandbox rejected"}}), &mut pending).unwrap();
+        assert_eq!(
+            rpc_response(&json!({"id":3,"result":{"rateLimits":{}}}), &mut pending)
+                .unwrap()
+                .0,
+            "account/rateLimits/read"
+        );
+        let response = rpc_response(
+            &json!({"id":2,"error":{"message":"Sandbox rejected"}}),
+            &mut pending,
+        )
+        .unwrap();
         assert_eq!(response.1.unwrap_err(), "Sandbox rejected");
         assert!(pending.is_empty());
     }
@@ -2110,10 +2252,28 @@ mod tests {
     fn codex_turn_settings_include_real_plan_and_restore_default() {
         let path = Path::new("C:/project");
         for mode in [Mode::Plan, Mode::Ask, Mode::Edit, Mode::Full] {
-            let params = codex_turn_params("protocol-test", "t", json!([]), path, mode, Some("test-model")).unwrap();
+            let params = codex_turn_params(
+                "protocol-test",
+                "t",
+                json!([]),
+                path,
+                mode,
+                Some("test-model"),
+            )
+            .unwrap();
             assert_eq!(params["approvalPolicy"], mode.codex().1);
-            assert_eq!(params["collaborationMode"]["mode"], if mode == Mode::Plan {"plan"} else {"default"});
-            assert_eq!(params["collaborationMode"]["settings"]["model"], "test-model");
+            assert_eq!(
+                params["collaborationMode"]["mode"],
+                if mode == Mode::Plan {
+                    "plan"
+                } else {
+                    "default"
+                }
+            );
+            assert_eq!(
+                params["collaborationMode"]["settings"]["model"],
+                "test-model"
+            );
             assert!(params["collaborationMode"]["settings"]["developer_instructions"].is_null());
         }
     }
@@ -2130,10 +2290,14 @@ mod tests {
 
     #[test]
     fn codex_reports_context_separately_from_session_total_and_all_windows() {
-        let events = codex_events(&json!({"method":"thread/tokenUsage/updated","params":{"tokenUsage":{"last":{"totalTokens":500},"total":{"totalTokens":9000},"modelContextWindow":1000}}}));
+        let events = codex_events(
+            &json!({"method":"thread/tokenUsage/updated","params":{"tokenUsage":{"last":{"totalTokens":500},"total":{"totalTokens":9000},"modelContextWindow":1000}}}),
+        );
         assert_eq!(events[0]["used"], 500);
         assert_eq!(events[0]["total"], 9000);
-        let limits = codex_limits(&json!({"rateLimits":{"primary":{"usedPercent":0.5,"windowDurationMins":300,"resetsAt":123},"secondary":{"usedPercent":90,"windowDurationMins":10080}}}));
+        let limits = codex_limits(
+            &json!({"rateLimits":{"primary":{"usedPercent":0.5,"windowDurationMins":300,"resetsAt":123},"secondary":{"usedPercent":90,"windowDurationMins":10080}}}),
+        );
         assert_eq!(limits.len(), 2);
         assert_eq!(limits[0]["used"], 0.005);
         assert_eq!(limits[1]["window"], "seven_day");
@@ -2254,14 +2418,33 @@ mod tests {
         std::fs::write(dir.join("a.txt"), &original).unwrap();
         std::fs::write(dir.join("existing.txt"), "untracked before\n").unwrap();
         let before = review::capture(&dir, None).unwrap();
-        with(&SESSIONS, |s| { let h = s.get_mut(&id).unwrap(); h.baseline = Some(before.clone()); h.checkpoints = vec![before]; });
-        let changed = original.replace("line 1\n", "accepted\n").replace("line 17\n", "pending\n");
+        with(&SESSIONS, |s| {
+            let h = s.get_mut(&id).unwrap();
+            h.baseline = Some(before.clone());
+            h.checkpoints = vec![before];
+        });
+        let changed = original
+            .replace("line 1\n", "accepted\n")
+            .replace("line 17\n", "pending\n");
         std::fs::write(dir.join("a.txt"), changed).unwrap();
-        std::fs::write(dir.join("existing.txt"), "agent changed existing untracked\n").unwrap();
+        std::fs::write(
+            dir.join("existing.txt"),
+            "agent changed existing untracked\n",
+        )
+        .unwrap();
         turn_ended(&id);
         let first = reviews::list(&id).pop().unwrap();
         assert_eq!(first.files.len(), 2);
-        assert_eq!(first.files.iter().find(|f| f.path == "a.txt").unwrap().hunks.len(), 2);
+        assert_eq!(
+            first
+                .files
+                .iter()
+                .find(|f| f.path == "a.txt")
+                .unwrap()
+                .hunks
+                .len(),
+            2
+        );
         reviews::decide(&id, &first.id, Some("a.txt"), Some(0), true).unwrap();
         reviews::decide(&id, &first.id, Some("a.txt"), None, false).unwrap();
         let now = std::fs::read_to_string(dir.join("a.txt")).unwrap();
@@ -2271,9 +2454,14 @@ mod tests {
         assert_eq!(decisions["a.txt:0"], "accepted");
         assert_eq!(decisions["a.txt:1"], "rejected");
         std::fs::write(dir.join("existing.txt"), "later external edit\n").unwrap();
-        assert!(reviews::decide(&id, &first.id, Some("existing.txt"), None, false).unwrap_err().contains("later edits"));
+        assert!(
+            reviews::decide(&id, &first.id, Some("existing.txt"), None, false)
+                .unwrap_err()
+                .contains("later edits")
+        );
         assert_eq!(reviews::list(&id)[0].files, first.files);
-        let saved: Vec<reviews::ReviewTurn> = serde_json::from_str(&serde_json::to_string(&reviews::list(&id)).unwrap()).unwrap();
+        let saved: Vec<reviews::ReviewTurn> =
+            serde_json::from_str(&serde_json::to_string(&reviews::list(&id)).unwrap()).unwrap();
         assert_eq!(saved[0].decisions["a.txt:0"], "accepted");
         close(&id);
         std::fs::remove_dir_all(dir).unwrap();
@@ -2283,15 +2471,26 @@ mod tests {
     fn reviews_track_deleted_added_binary_files_and_new_turns() {
         let (id, dir) = session("review-multiple").expect("git must be available");
         let before = review::capture(&dir, None).unwrap();
-        with(&SESSIONS, |s| { let h = s.get_mut(&id).unwrap(); h.baseline = Some(before.clone()); h.checkpoints = vec![before]; });
+        with(&SESSIONS, |s| {
+            let h = s.get_mut(&id).unwrap();
+            h.baseline = Some(before.clone());
+            h.checkpoints = vec![before];
+        });
         std::fs::remove_file(dir.join("a.txt")).unwrap();
         std::fs::write(dir.join("binary.bin"), [0, 1, 2]).unwrap();
         turn_ended(&id);
         let first = reviews::list(&id).pop().unwrap();
         assert_eq!(first.files.len(), 2);
-        assert!(first.files.iter().any(|f| f.hunks.is_empty()), "binary files have no text hunks");
+        assert!(
+            first.files.iter().any(|f| f.hunks.is_empty()),
+            "binary files have no text hunks"
+        );
         with(&reviews::WRITING, |w| w.insert(id.clone(), true));
-        assert!(reviews::decide(&id, &first.id, None, None, false).unwrap_err().contains("writing"));
+        assert!(
+            reviews::decide(&id, &first.id, None, None, false)
+                .unwrap_err()
+                .contains("writing")
+        );
         with(&reviews::WRITING, |w| w.insert(id.clone(), false));
         reviews::decide(&id, &first.id, Some("a.txt"), None, false).unwrap();
         assert_eq!(std::fs::read_to_string(dir.join("a.txt")).unwrap(), "one\n");
@@ -2304,11 +2503,17 @@ mod tests {
     fn reviews_remain_distinct_for_multiple_turns() {
         let (id, dir) = session("review-turns").expect("git must be available");
         let before = review::capture(&dir, None).unwrap();
-        with(&SESSIONS, |s| { let h = s.get_mut(&id).unwrap(); h.baseline = Some(before.clone()); h.checkpoints = vec![before]; });
+        with(&SESSIONS, |s| {
+            let h = s.get_mut(&id).unwrap();
+            h.baseline = Some(before.clone());
+            h.checkpoints = vec![before];
+        });
         std::fs::write(dir.join("a.txt"), "first turn\n").unwrap();
         turn_ended(&id);
         let second_before = review::capture(&dir, None).unwrap();
-        with(&SESSIONS, |s| s.get_mut(&id).unwrap().checkpoints.push(second_before));
+        with(&SESSIONS, |s| {
+            s.get_mut(&id).unwrap().checkpoints.push(second_before)
+        });
         std::fs::write(dir.join("a.txt"), "second turn\n").unwrap();
         turn_ended(&id);
         let turns = reviews::list(&id);

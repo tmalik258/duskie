@@ -63,7 +63,15 @@ export function ProjectPicker({
         menuWidth={menuWidth}
         label="Project"
         value={path}
-        current={picking ? "Choosing folder..." : !path ? "Select folder" : !list.some((p) => p.path === path) ? folderName(path) : undefined}
+        current={
+          picking
+            ? "Choosing folder..."
+            : !path
+              ? "Select folder"
+              : !list.some((p) => p.path === path)
+                ? folderName(path)
+                : undefined
+        }
         onChange={(next) => void choose(next)}
         group="Project"
         options={[

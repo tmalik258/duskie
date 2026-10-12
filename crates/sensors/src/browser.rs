@@ -22,7 +22,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
 
-use crate::{http, Approvals, Sensor, SensorGate};
+use crate::{Approvals, Sensor, SensorGate, http};
 
 /// How long the extension's poll for commands is held open.
 const POLL_HOLD: Duration = Duration::from_secs(20);
@@ -572,15 +572,17 @@ mod tests {
             page_event(&serde_json::json!({ "kind": "run_this", "url": "https://x.com" }))
                 .is_none()
         );
-        assert!(page_event(
-            &serde_json::json!({ "kind": "long_read", "url": "file:///etc/passwd" })
-        )
-        .is_none());
-        assert!(page_event(&serde_json::json!({
-            "kind": "login_form",
-            "url": "https://github.com/login",
-        }))
-        .is_none());
+        assert!(
+            page_event(&serde_json::json!({ "kind": "long_read", "url": "file:///etc/passwd" }))
+                .is_none()
+        );
+        assert!(
+            page_event(&serde_json::json!({
+                "kind": "login_form",
+                "url": "https://github.com/login",
+            }))
+            .is_none()
+        );
     }
 
     #[test]
@@ -627,21 +629,27 @@ mod tests {
                 body.len()
             )
         };
-        assert!(call(port, post("https://evil.example", "t0ken"))
-            .await
-            .starts_with("HTTP/1.1 403"));
-        assert!(call(port, post("chrome-extension://abc", "wrong"))
-            .await
-            .starts_with("HTTP/1.1 401"));
+        assert!(
+            call(port, post("https://evil.example", "t0ken"))
+                .await
+                .starts_with("HTTP/1.1 403")
+        );
+        assert!(
+            call(port, post("chrome-extension://abc", "wrong"))
+                .await
+                .starts_with("HTTP/1.1 401")
+        );
         assert!(
             tokio::time::timeout(Duration::from_millis(200), rx.recv())
                 .await
                 .is_err(),
             "refused requests publish nothing"
         );
-        assert!(call(port, post("chrome-extension://abc", "t0ken"))
-            .await
-            .starts_with("HTTP/1.1 204"));
+        assert!(
+            call(port, post("chrome-extension://abc", "t0ken"))
+                .await
+                .starts_with("HTTP/1.1 204")
+        );
         let e = tokio::time::timeout(Duration::from_secs(2), rx.recv())
             .await
             .unwrap()
@@ -684,15 +692,19 @@ mod tests {
             )
         };
         // A web page, or a request with no origin, cannot ask.
-        assert!(call(port, pair("https://evil.example"))
+        assert!(
+            call(port, pair("https://evil.example"))
+                .await
+                .starts_with("HTTP/1.1 403")
+        );
+        assert!(
+            call(
+                port,
+                "POST /browser/pair HTTP/1.1\r\ncontent-length: 0\r\n\r\n".into()
+            )
             .await
-            .starts_with("HTTP/1.1 403"));
-        assert!(call(
-            port,
-            "POST /browser/pair HTTP/1.1\r\ncontent-length: 0\r\n\r\n".into()
-        )
-        .await
-        .starts_with("HTTP/1.1 403"));
+            .starts_with("HTTP/1.1 403")
+        );
         // The extension asks; the island shows the request; Allow sends the token.
         let asking = tokio::spawn(call(port, pair("chrome-extension://abcdefghij")));
         let e = tokio::time::timeout(Duration::from_secs(2), rx.recv())

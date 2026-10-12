@@ -1,7 +1,7 @@
 //! Captures only output from setup commands Sidekick generated. The terminal
 //! remains visible; a launched terminal is never reported as an installation.
 use crate::activity::{self, Phase};
-use crate::state::{lock, AppState};
+use crate::state::{AppState, lock};
 use std::collections::BTreeMap;
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::{Arc, LazyLock, Mutex};

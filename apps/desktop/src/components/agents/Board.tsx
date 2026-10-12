@@ -10,10 +10,10 @@ import {
   resumeSession,
   type Session,
   sendToSession,
-  setLayout,
-  startSession,
   sessionView,
+  setLayout,
   startHere,
+  startSession,
   usageLine,
   useAgents,
   wideScreen,
@@ -22,7 +22,7 @@ import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useSidekick } from "@/lib/store";
 import type { Agents } from "@/lib/types";
-import { Composer, AgentMark, agentMarkId, NameField, STEP_TAG } from "./AgentsTab";
+import { AgentMark, agentMarkId, Composer, NameField, STEP_TAG } from "./AgentsTab";
 import { folderName, ProjectPicker } from "./ProjectPicker";
 
 function state(s: Session): [string, string] {
@@ -266,8 +266,12 @@ function EmptySlot({
   useEffect(() => {
     if (!picking) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || useSidekick.getState().overlayHit ||
-          (e.target instanceof Element && e.target.closest("[data-project-picker]"))) return;
+      if (
+        e.defaultPrevented ||
+        useSidekick.getState().overlayHit ||
+        (e.target instanceof Element && e.target.closest("[data-project-picker]"))
+      )
+        return;
       if (e.key !== "Escape" || e.repeat) return;
       // Project menu is open: let Select take Esc first.
       if (useSidekick.getState().overlayHit) return;
@@ -302,8 +306,12 @@ function EmptySlot({
       useAgents.setState({ draftPath: next.path });
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || useSidekick.getState().overlayHit ||
-          (e.target instanceof Element && e.target.closest("[data-project-picker]"))) return;
+      if (
+        e.defaultPrevented ||
+        useSidekick.getState().overlayHit ||
+        (e.target instanceof Element && e.target.closest("[data-project-picker]"))
+      )
+        return;
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const tag = (e.target as HTMLElement | null)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
@@ -479,6 +487,7 @@ export function Board({ sessions, maxHeight }: { sessions: Session[]; keys?: boo
   const targetId = target?.id;
   const [text, setLocalText] = useState("");
   const textRef = useRef("");
+  // biome-ignore lint/correctness/useExhaustiveDependencies: restore draft only when the focused target switches
   useEffect(() => {
     const draft = target?.view?.draft ?? "";
     textRef.current = draft;
@@ -495,14 +504,15 @@ export function Board({ sessions, maxHeight }: { sessions: Session[]; keys?: boo
     () => () => {
       if (targetId) sessionView(targetId, { draft: textRef.current });
     },
-    // biome-ignore lint/correctness/useExhaustiveDependencies: persists the previous target before switching.
     [targetId],
   );
   const grid = useRef<HTMLDivElement>(null);
   const [below, setBelow] = useState(0);
   const [openNew, setOpenNew] = useState(0);
   const focusComposer = () => {
-    requestAnimationFrame(() => document.querySelector<HTMLInputElement>(".ak-board .ak-composer input")?.focus({ preventScroll: true }));
+    requestAnimationFrame(() =>
+      document.querySelector<HTMLInputElement>(".ak-board .ak-composer input")?.focus({ preventScroll: true }),
+    );
   };
   // Ready to type on open, and again when Ctrl 1-9 picks another tile.
   // biome-ignore lint/correctness/useExhaustiveDependencies: focus again when the target changes
@@ -513,8 +523,12 @@ export function Board({ sessions, maxHeight }: { sessions: Session[]; keys?: boo
   // Ctrl N: new session. Ctrl 1–9: focus a live session tile.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || useSidekick.getState().overlayHit ||
-          (e.target instanceof Element && e.target.closest("[data-project-picker]"))) return;
+      if (
+        e.defaultPrevented ||
+        useSidekick.getState().overlayHit ||
+        (e.target instanceof Element && e.target.closest("[data-project-picker]"))
+      )
+        return;
       if (!e.ctrlKey || e.altKey || e.metaKey || e.shiftKey) return;
       if (e.key.toLowerCase() === "n") {
         e.preventDefault();
@@ -621,12 +635,23 @@ export function Board({ sessions, maxHeight }: { sessions: Session[]; keys?: boo
           onSend={send}
           onBlur={flushDraft}
           keys={true}
-          onClear={() => void api.agentProject(target.id).then((path) => { setLayout("one"); startHere(path); })}
-          onReview={() => { sessionView(target.id, { reviewing: true }); setLayout("one"); useAgents.setState({ current: target.id }); }}
-          onRewind={() => { setLayout("one"); useAgents.setState({ current: target.id }); }}
+          onClear={() =>
+            void api.agentProject(target.id).then((path) => {
+              setLayout("one");
+              startHere(path);
+            })
+          }
+          onReview={() => {
+            sessionView(target.id, { reviewing: true });
+            setLayout("one");
+            useAgents.setState({ current: target.id });
+          }}
+          onRewind={() => {
+            setLayout("one");
+            useAgents.setState({ current: target.id });
+          }}
         />
       )}
-
     </div>
   );
 }

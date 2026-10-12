@@ -15,36 +15,36 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { useActivities, activityLabel } from "@/lib/activities";
+import { activityLabel, useActivities } from "@/lib/activities";
+import { type AgentCommand, commandCatalog } from "@/lib/agent-commands";
 import {
   answerQuestion,
   COMPACT_AT,
   closeSession,
   dismissCompact,
   type Entry,
+  flushAgentsView,
   handOffSession,
   interruptSession,
   messageIndex,
+  readNewPrefs,
+  readUsualAgent,
   renameSession,
   resumeSession,
   rewindSession,
   type Session,
   type Step,
   sendToSession,
-  startSession,
-  tuneSession,
-  flushAgentsView,
-  readNewPrefs,
-  readUsualAgent,
   sessionView,
   setSessionMode,
   startHere,
+  startSession,
+  tuneSession,
   usageLine,
   useAgents,
   writeNewPrefs,
   writeUsualAgent,
 } from "@/lib/agents";
-import { commandCatalog, type AgentCommand } from "@/lib/agent-commands";
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
@@ -303,7 +303,9 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
   const [busy, setBusy] = useState(false);
   const seedAgent = prefs.agent || readUsualAgent() || lastAgentId || "";
   const seedTune = (seedAgent && prefs.byAgent?.[seedAgent]) || prefs;
-  const [model, setModel] = useState<string | null>(seedTune.model ?? (seedAgent === lastAgentId ? lastModel : null) ?? null);
+  const [model, setModel] = useState<string | null>(
+    seedTune.model ?? (seedAgent === lastAgentId ? lastModel : null) ?? null,
+  );
   const [effort, setEffort] = useState<string | null>(
     seedTune.effort ?? (seedAgent === lastAgentId ? lastEffort : null) ?? null,
   );
@@ -314,9 +316,8 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
   const missing = all.filter((a) => !a.installed);
   const pickedPath = path || projects?.[0]?.path || "";
   // Seed from cache / last session so the first paint matches usual (no Claude→Codex flash).
-  const [usual, setUsual] = useState<string | null>(
-    () => readUsualAgent(pickedPath || undefined) || lastAgentId,
-  );
+  const [usual, setUsual] = useState<string | null>(() => readUsualAgent(pickedPath || undefined) || lastAgentId);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: path drives refresh; usual seed is sync
   useEffect(() => {
     if (!pickedPath) return;
     let live = true;
@@ -332,7 +333,6 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
     return () => {
       live = false;
     };
-    // biome-ignore lint/correctness/useExhaustiveDependencies: path drives refresh; usual seed is sync
   }, [pickedPath]);
   const usualChoice = choices.find((c) => c.id === usual && ready(c))?.id;
   const pickedAgent = agent || usualChoice || choices[0]?.id || "";
@@ -575,7 +575,23 @@ function ModeSwitch({ mode, onChange, agent }: { mode: AgentMode; onChange?: (m:
   return (
     <fieldset aria-label="Mode" className="ak-seg border-0">
       {MODES.map((m) => (
-        <Tip key={m.id} label={agent === "Codex" ? ({ plan: "Codex Plan collaboration mode in a read-only sandbox", ask: "Workspace access; untrusted commands require approval", edit: "Workspace files and commands allowed; asks for escalation", full: "Full access without sandbox or approval prompts" })[m.id] : agent === "Local" ? (m.id === "plan" ? "Read-only tools" : "Every edit requires approval; commands are unavailable") : m.note}>
+        <Tip
+          key={m.id}
+          label={
+            agent === "Codex"
+              ? {
+                  plan: "Codex Plan collaboration mode in a read-only sandbox",
+                  ask: "Workspace access; untrusted commands require approval",
+                  edit: "Workspace files and commands allowed; asks for escalation",
+                  full: "Full access without sandbox or approval prompts",
+                }[m.id]
+              : agent === "Local"
+                ? m.id === "plan"
+                  ? "Read-only tools"
+                  : "Every edit requires approval; commands are unavailable"
+                : m.note
+          }
+        >
           <button
             type="button"
             aria-pressed={mode === m.id}
@@ -683,6 +699,7 @@ function SessionView({
     // Coerce corrupted prefs so reopen does not land at the top of a 200kpx timeline.
     follow: savedFollow === false && savedScroll <= 0 ? true : savedFollow,
   });
+  // biome-ignore lint/correctness/useExhaustiveDependencies: restore draft/scroll only when the session switches
   useEffect(() => {
     const draft = s.view?.draft ?? "";
     textRef.current = draft;
@@ -702,7 +719,8 @@ function SessionView({
     flushAgentsView();
   };
   const reviewing = s.view?.reviewing ?? false;
-  const setReviewing = (next: boolean) => sessionView(s.id, { draft: textRef.current, ...scrollState.current, reviewing: next });
+  const setReviewing = (next: boolean) =>
+    sessionView(s.id, { draft: textRef.current, ...scrollState.current, reviewing: next });
   const [rewindAt, setRewindAt] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const { data: editors } = useCached<EditorList>("editors", api.editorsList);
@@ -737,6 +755,8 @@ function SessionView({
       cancelAnimationFrame(id);
     };
   }, [s.id, reviewing, s.entries.length, s.plan.length, s.question, s.status, active]);
+  // The cleanup intentionally captures the current session identity.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: saves on session switch/unmount
   useEffect(() => {
     if (!active) return;
     const onHide = () => flushView();
@@ -747,11 +767,10 @@ function SessionView({
       window.removeEventListener("pagehide", onHide);
       flushView();
     };
-    // The cleanup intentionally captures the current session identity.
-    // biome-ignore lint/correctness/useExhaustiveDependencies: saves on session switch/unmount
   }, [s.id, active]);
 
   // Alt 1 reviews, Alt 2 (or Alt T) carries on in a terminal.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: setReviewing is recreated each render; s.id covers the session
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (!e.altKey || e.ctrlKey || e.metaKey) return;
@@ -821,6 +840,7 @@ function SessionView({
   // Long sessions: paint the recent tail first (open lag was parsing every Markdown block).
   const TAIL = 28;
   const [showEarlier, setShowEarlier] = useState(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset the tail fold when the session switches
   useEffect(() => setShowEarlier(false), [s.id]);
   const entryStart = showEarlier || s.entries.length <= TAIL ? 0 : s.entries.length - TAIL;
   const visibleEntries = s.entries.slice(entryStart);
@@ -883,47 +903,50 @@ function SessionView({
             {visibleEntries.map((e, j) => {
               const i = entryStart + j;
               return (
-              // biome-ignore lint/suspicious/noArrayIndexKey: entries only ever append
-              <Fragment key={i}>
-                <EntryRow
-                  entry={e}
-                  onReview={() => setReviewing(true)}
-                  onRewind={e.kind === "you" && done && s.reviewable ? () => setRewindAt(i) : undefined}
-                />
-                {rewindAt === i && (
-                  <RewindConfirm
-                    session={s}
-                    entry={i}
-                    onDone={(msg) => {
-                      setRewindAt(null);
-                      setNotice(msg);
-                    }}
+                <Fragment key={i}>
+                  <EntryRow
+                    entry={e}
+                    onReview={() => setReviewing(true)}
+                    onRewind={e.kind === "you" && done && s.reviewable ? () => setRewindAt(i) : undefined}
                   />
-                )}
-                {i === planAfter && s.plan.length > 0 && (
-                  <div className="ak-todo ak-in">
-                    <div className="h">
-                      <span>Plan</span>
-                      <span>
-                        {planAt} of {s.plan.length}
-                      </span>
-                    </div>
-                    {s.plan.map((p) => (
-                      <div key={p.text} className="ak-td" data-s={p.status}>
-                        <span className="ak-cb" aria-hidden="true" />
-                        {p.text}
+                  {rewindAt === i && (
+                    <RewindConfirm
+                      session={s}
+                      entry={i}
+                      onDone={(msg) => {
+                        setRewindAt(null);
+                        setNotice(msg);
+                      }}
+                    />
+                  )}
+                  {i === planAfter && s.plan.length > 0 && (
+                    <div className="ak-todo ak-in">
+                      <div className="h">
+                        <span>Plan</span>
+                        <span>
+                          {planAt} of {s.plan.length}
+                        </span>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </Fragment>
+                      {s.plan.map((p) => (
+                        <div key={p.text} className="ak-td" data-s={p.status}>
+                          <span className="ak-cb" aria-hidden="true" />
+                          {p.text}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Fragment>
               );
             })}
 
             {working && !s.question && (
               <p className="ak-status" role="status" aria-live="polite">
                 <span className="shimmer-text text-[rgb(235_235_245/0.6)]">
-                  {activity ? activityLabel(activity, now) : current ? `${current}...` : "Waiting for the next agent step"}
+                  {activity
+                    ? activityLabel(activity, now)
+                    : current
+                      ? `${current}...`
+                      : "Waiting for the next agent step"}
                 </span>
                 <span className="ak-timer mono">{clock(now - s.turnAt)}</span>
               </p>
@@ -1033,24 +1056,42 @@ function SessionView({
               </p>
             )}
             {notice && <p className="ak-note ak-in">{notice}</p>}
-            {s.compaction && <p role="status" className="ak-note">{s.compaction === "running" ? "Compacting context…" : s.compaction === "done" ? "Context compacted" : "Compaction failed; see the session error."}</p>}
+            {s.compaction && (
+              <p role="status" className="ak-note">
+                {s.compaction === "running"
+                  ? "Compacting context…"
+                  : s.compaction === "done"
+                    ? "Context compacted"
+                    : "Compaction failed; see the session error."}
+              </p>
+            )}
           </div>
 
           {s.restored || s.status === "ended" || (s.status === "failed" && !working) ? (
-            <div><ChatControls agent={s.agent} model={s.model} effort={s.effort} usage={s.usage} limit={s.limit} onModel={(m) => tuneSession(s.id, m, s.effort ?? null)} onEffort={(e) => tuneSession(s.id, s.model ?? null, e)} />
-            <div className="ak-chips">
-              <button
-                type="button"
-                onClick={() => void resumeSession(s.id).catch((e: unknown) => setNotice(String(e)))}
-                className="ak-chip primary chip"
-              >
-                Resume
-              </button>
-              <span className="ak-note">
-                {s.restored ? "Sidekick restarted since this ran." : "This session ended."} Resume carries on where it
-                stopped.
-              </span>
-            </div></div>
+            <div>
+              <ChatControls
+                agent={s.agent}
+                model={s.model}
+                effort={s.effort}
+                usage={s.usage}
+                limit={s.limit}
+                onModel={(m) => tuneSession(s.id, m, s.effort ?? null)}
+                onEffort={(e) => tuneSession(s.id, s.model ?? null, e)}
+              />
+              <div className="ak-chips">
+                <button
+                  type="button"
+                  onClick={() => void resumeSession(s.id).catch((e: unknown) => setNotice(String(e)))}
+                  className="ak-chip primary chip"
+                >
+                  Resume
+                </button>
+                <span className="ak-note">
+                  {s.restored ? "Sidekick restarted since this ran." : "This session ended."} Resume carries on where it
+                  stopped.
+                </span>
+              </div>
+            </div>
           ) : (
             <Composer
               session={s}
@@ -1061,7 +1102,10 @@ function SessionView({
               onBlur={flushView}
               onReview={() => setReviewing(true)}
               onClear={() => {
-                void api.agentProject(s.id).then((path) => startHere(path)).catch((e) => setNotice(String(e)));
+                void api
+                  .agentProject(s.id)
+                  .then((path) => startHere(path))
+                  .catch((e) => setNotice(String(e)));
               }}
               onRewind={() => {
                 const last = s.entries
@@ -1275,7 +1319,7 @@ export function Composer({
       .agentCommands(s.id)
       .then((cmds) => setCommands(commandCatalog(s.agent, cmds)))
       .catch(() => setCommands(commandCatalog(s.agent, [])));
-  }, [s.id]);
+  }, [s.id, s.agent]);
   const slash = text.startsWith("/") && !text.includes(" ");
   const mention = /(^|\s)@([^\s@]*)$/.exec(text);
   const query = mention?.[2] ?? null;
@@ -1346,47 +1390,95 @@ export function Composer({
     setOverlayHit(hit);
   }, [float, count]);
   const runCommand = (c: Slash, args = "") => {
-    setText(""); setNotice(null);
-    if (c.execution === "terminal") { setTerminal(`${c.name}${args ? ` ${args}` : ""}`); return; }
-    if (c.execution === "provider") { sendToSession(s.id, `${c.name}${args ? ` ${args}` : ""}`); return; }
+    setText("");
+    setNotice(null);
+    if (c.execution === "terminal") {
+      setTerminal(`${c.name}${args ? ` ${args}` : ""}`);
+      return;
+    }
+    if (c.execution === "provider") {
+      sendToSession(s.id, `${c.name}${args ? ` ${args}` : ""}`);
+      return;
+    }
     const mode = c.name.slice(1) as AgentMode;
-    if (["plan", "ask", "edit", "full"].includes(mode)) { void setSessionMode(s.id, mode); return; }
+    if (["plan", "ask", "edit", "full"].includes(mode)) {
+      void setSessionMode(s.id, mode);
+      return;
+    }
     const fail = (e: unknown) => setNotice(String(e));
     switch (c.name) {
-      case "/clear": onClear(); break;
-      case "/new": useAgents.setState({ current: null }); break;
-      case "/rewind": onRewind(); break;
-      case "/diff": onReview(); break;
+      case "/clear":
+        onClear();
+        break;
+      case "/new":
+        useAgents.setState({ current: null });
+        break;
+      case "/rewind":
+        onRewind();
+        break;
+      case "/diff":
+        onReview();
+        break;
       case "/permissions":
         if (["plan", "ask", "edit", "full"].includes(args)) void setSessionMode(s.id, args as AgentMode);
-        else setNotice(`Selected: ${s.mode}. Use the mode buttons above or Shift+Tab. Codex Edit allows workspace commands and asks for escalation; Full disables the sandbox.`);
+        else
+          setNotice(
+            `Selected: ${s.mode}. Use the mode buttons above or Shift+Tab. Codex Edit allows workspace commands and asks for escalation; Full disables the sandbox.`,
+          );
         break;
       case "/model":
         if (args) tuneSession(s.id, args === "default" ? null : args, s.effort ?? null);
         else setPanel({ name: "model", at: Date.now() });
         break;
       case "/effort":
-        if (args && ["off", "low", "medium", "high", "max", "xhigh", "default"].includes(args)) tuneSession(s.id, s.model ?? null, args === "default" ? null : args);
+        if (args && ["off", "low", "medium", "high", "max", "xhigh", "default"].includes(args))
+          tuneSession(s.id, s.model ?? null, args === "default" ? null : args);
         else if (args) setNotice("Unsupported effort. Choose off, low, medium, high, max, or default.");
         else setPanel({ name: "effort", at: Date.now() });
         break;
-      case "/usage": setPanel({ name: "usage", at: Date.now() }); break;
-      case "/status": setNotice(`${s.agent} · ${s.status} · selected mode ${s.mode} · model ${s.model ?? "default"} · effort ${s.effort ?? "default"} · session ${s.id}`); break;
-      case "/rename": if (args) renameSession(s.id, args); else setNotice("Use /rename followed by a title, or edit the session title above."); break;
-      case "/copy": { const e = [...s.entries].reverse().find((e) => e.kind === "text"); if (e?.kind === "text") void navigator.clipboard.writeText(e.text).then(() => setNotice("Response copied")).catch(fail); break; }
-      case "/resume": void resumeSession(s.id).catch(fail); break;
+      case "/usage":
+        setPanel({ name: "usage", at: Date.now() });
+        break;
+      case "/status":
+        setNotice(
+          `${s.agent} · ${s.status} · selected mode ${s.mode} · model ${s.model ?? "default"} · effort ${s.effort ?? "default"} · session ${s.id}`,
+        );
+        break;
+      case "/rename":
+        if (args) renameSession(s.id, args);
+        else setNotice("Use /rename followed by a title, or edit the session title above.");
+        break;
+      case "/copy": {
+        const e = [...s.entries].reverse().find((e) => e.kind === "text");
+        if (e?.kind === "text")
+          void navigator.clipboard
+            .writeText(e.text)
+            .then(() => setNotice("Response copied"))
+            .catch(fail);
+        break;
+      }
+      case "/resume":
+        void resumeSession(s.id).catch(fail);
+        break;
       case "/compact":
-        if (working) { setNotice("Wait for the current turn to finish before compacting."); break; }
+        if (working) {
+          setNotice("Wait for the current turn to finish before compacting.");
+          break;
+        }
         if (s.agent === "Codex") void api.agentControl(s.id, "thread/compact/start").catch(fail);
         else if (s.agent === "Claude Code") sendToSession(s.id, "/compact");
         else setNotice("Compaction is not supported by this provider.");
         break;
-      default: setNotice(`Unsupported control: ${c.name}`);
+      default:
+        setNotice(`Unsupported control: ${c.name}`);
     }
   };
   const submit = () => {
     const match = /^\/(\S+)(?:\s+(.*))?$/.exec(text.trim());
-    if (!match) { onSend(); return; }
+    if (!match) {
+      onSend();
+      return;
+    }
     const command = commands.find((c) => c.name === `/${match[1].toLowerCase()}`);
     if (command) runCommand(command, match[2] ?? "");
     else setNotice(`Unsupported command /${match[1]}. Use / to see supported controls.`);
@@ -1492,7 +1584,11 @@ export function Composer({
   return (
     <>
       {pop}
-      {notice && <p role="status" className="ak-note">{notice}</p>}
+      {notice && (
+        <p role="status" className="ak-note">
+          {notice}
+        </p>
+      )}
       {terminal && (
         <div className="ak-chips">
           <span className="ak-note">
@@ -1537,7 +1633,11 @@ export function Composer({
           onEffort={(e) => tuneSession(s.id, s.model ?? null, e)}
           usage={s.usage}
           panel={panel}
-          onRefresh={s.agent === "Codex" ? () => void api.agentControl(s.id, "account/rateLimits/read").catch((e) => setNotice(String(e))) : undefined}
+          onRefresh={
+            s.agent === "Codex"
+              ? () => void api.agentControl(s.id, "account/rateLimits/read").catch((e) => setNotice(String(e)))
+              : undefined
+          }
           localModel={s.localModel}
           limit={s.limit}
           onCompact={

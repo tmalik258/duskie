@@ -3,8 +3,8 @@
 // Compact island state while the voice (and other speech models) are still
 // arriving. Shown until onboarding can speak; never a blank idle orb.
 
-import { ActivityProgress } from "./ActivityProgress";
 import type { VoiceStatus } from "@/lib/types";
+import { ActivityProgress } from "./ActivityProgress";
 
 export function PreparingVoice({ voiceStatus }: { voiceStatus: VoiceStatus | null }) {
   const models = voiceStatus?.models ?? [

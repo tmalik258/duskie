@@ -35,10 +35,7 @@ pub(super) fn capture_turn(id: &str) {
     let Some((before, path, entry, baseline)) = with(&SESSIONS, |s| {
         s.get(id).map(|h| {
             (
-                h.checkpoints
-                    .last()
-                    .cloned()
-                    .or_else(|| h.baseline.clone()),
+                h.checkpoints.last().cloned().or_else(|| h.baseline.clone()),
                 h.path.clone(),
                 h.checkpoints.len().saturating_sub(1),
                 h.baseline.clone(),
@@ -48,8 +45,10 @@ pub(super) fn capture_turn(id: &str) {
         return;
     };
 
-    let existing_idx =
-        with(&REVIEWS, |r| r.get(id).and_then(|v| v.iter().position(|t| t.entry == entry)));
+    let existing_idx = with(&REVIEWS, |r| {
+        r.get(id)
+            .and_then(|v| v.iter().position(|t| t.entry == entry))
+    });
     if let Some(idx) = existing_idx {
         let has_files = with(&REVIEWS, |r| {
             r.get(id)

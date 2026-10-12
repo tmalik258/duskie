@@ -16,23 +16,35 @@ function nextDownloadSequence() {
   return downloadSequence;
 }
 function downloadInstance() {
-  return downloadInstancePromise ??= chrome.storage.local.get("downloadInstance").then(async (saved) => {
+  downloadInstancePromise ??= chrome.storage.local.get("downloadInstance").then(async (saved) => {
     if (saved.downloadInstance) return saved.downloadInstance;
     const id = crypto.randomUUID();
     await chrome.storage.local.set({ downloadInstance: id });
     return id;
   });
+  return downloadInstancePromise;
 }
 async function sendDownload(item, sequence = nextDownloadSequence()) {
   if (item.incognito !== false || !(await token())) return;
-  const res = await call("/browser/download", { method: "POST", body: JSON.stringify({
-    instance: await downloadInstance(), sequence, id: item.id, incognito: false,
-    startedAt: Number.isFinite(Date.parse(item.startTime)) ? Date.parse(item.startTime) : null,
-    filename: item.filename, url: item.url, finalUrl: item.finalUrl || item.url,
-    referrer: item.referrer || "", bytes: item.bytesReceived,
-    total: item.totalBytes > 0 ? item.totalBytes : null, paused: item.paused,
-    state: item.state, error: item.error || null,
-  }) });
+  const res = await call("/browser/download", {
+    method: "POST",
+    body: JSON.stringify({
+      instance: await downloadInstance(),
+      sequence,
+      id: item.id,
+      incognito: false,
+      startedAt: Number.isFinite(Date.parse(item.startTime)) ? Date.parse(item.startTime) : null,
+      filename: item.filename,
+      url: item.url,
+      finalUrl: item.finalUrl || item.url,
+      referrer: item.referrer || "",
+      bytes: item.bytesReceived,
+      total: item.totalBytes > 0 ? item.totalBytes : null,
+      paused: item.paused,
+      state: item.state,
+      error: item.error || null,
+    }),
+  });
   if (res?.ok) {
     if (item.state === "in_progress") trackedDownloads.add(item.id);
     else trackedDownloads.delete(item.id);
@@ -52,15 +64,23 @@ async function scanDownloads() {
       }
     }
     for (const { item, sequence } of items) await sendDownload(item, sequence);
-  } catch { /* Reconnection polling recovers live records. */ }
-  finally { downloadScan = false; }
+  } catch {
+    /* Reconnection polling recovers live records. */
+  } finally {
+    downloadScan = false;
+  }
 }
-chrome.downloads?.onCreated.addListener((item) => { void sendDownload(item).catch(() => {}); });
+chrome.downloads?.onCreated.addListener((item) => {
+  void sendDownload(item).catch(() => {});
+});
 chrome.downloads?.onChanged.addListener((delta) => {
   const sequence = nextDownloadSequence();
-  void chrome.downloads.search({ id: delta.id }).then(async (items) => {
-    for (const item of items) await sendDownload(item, sequence);
-  }).catch(() => {});
+  void chrome.downloads
+    .search({ id: delta.id })
+    .then(async (items) => {
+      for (const item of items) await sendDownload(item, sequence);
+    })
+    .catch(() => {});
 });
 setInterval(() => void scanDownloads(), 2000);
 

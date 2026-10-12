@@ -13,7 +13,7 @@ use std::time::Duration;
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
-use crate::state::{executor, lock, AppState};
+use crate::state::{AppState, executor, lock};
 
 /// Where the AI, connections and tools sections start in the checklist.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]

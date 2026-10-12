@@ -23,7 +23,11 @@ export interface PlanItem {
 }
 
 /** One entry in a session's timeline: something said, or a step taken. */
-export type Entry = { kind: "you"; text: string } | { kind: "text"; text: string } | { kind: "step"; step: Step } | { kind: "review"; id: string; files: number; error: string | null };
+export type Entry =
+  | { kind: "you"; text: string }
+  | { kind: "text"; text: string }
+  | { kind: "step"; step: Step }
+  | { kind: "review"; id: string; files: number; error: string | null };
 
 export interface Session extends AgentStarted {
   mode: AgentMode;
@@ -103,7 +107,7 @@ function loadSessions(): Session[] {
   try {
     const raw = typeof localStorage === "undefined" ? null : localStorage.getItem(STORE_KEY);
     const saved = raw ? JSON.parse(raw) : [];
-    const list: Session[] = Array.isArray(saved) ? saved : saved.sessions ?? [];
+    const list: Session[] = Array.isArray(saved) ? saved : (saved.sessions ?? []);
     // Whatever was running stopped with Sidekick; each can be resumed.
     return list.map((s) => ({
       ...s,
@@ -122,22 +126,31 @@ function loadView(): Partial<AgentsState> {
   try {
     const saved = JSON.parse(localStorage.getItem(STORE_KEY) ?? "{}");
     const ids = new Set(loadSessions().map((s) => s.id));
-    return { current: ids.has(saved.current) ? saved.current : null,
+    return {
+      current: ids.has(saved.current) ? saved.current : null,
       focus: ids.has(saved.focus) ? saved.focus : null,
       tab: ["ask", "agents", "repos", "history"].includes(saved.tab) ? saved.tab : "ask",
-      layout: saved.layout === "board" ? "board" : saved.layout === "one" ? "one" : loadLayout() };
-  } catch { return {}; }
+      layout: saved.layout === "board" ? "board" : saved.layout === "one" ? "one" : loadLayout(),
+    };
+  } catch {
+    return {};
+  }
 }
 
 export function sessionView(id: string, patch: Partial<NonNullable<Session["view"]>>) {
-  update(id, (s) => ({ ...s, view: { draft: "", scroll: 0, follow: true, reviewing: false, active: 0, ...s.view, ...patch } }));
+  update(id, (s) => ({
+    ...s,
+    view: { draft: "", scroll: 0, follow: true, reviewing: false, active: 0, ...s.view, ...patch },
+  }));
 }
 
 export async function setSessionMode(id: string, mode: AgentMode) {
   try {
     await api.agentSetMode(id, mode);
     update(id, (s) => ({ ...s, mode }));
-  } catch (e) { update(id, (s) => ({ ...s, error: String(e) })); }
+  } catch (e) {
+    update(id, (s) => ({ ...s, error: String(e) }));
+  }
 }
 
 function loadLayout(): AgentsLayout {
@@ -445,7 +458,11 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
   const id = e.session;
   switch (e.kind) {
     case "working":
-      return update(id, (s) => ({ ...s, status: s.question ? "waiting" : "working", activeMode: (e.mode as AgentMode) ?? s.activeMode ?? s.mode }));
+      return update(id, (s) => ({
+        ...s,
+        status: s.question ? "waiting" : "working",
+        activeMode: (e.mode as AgentMode) ?? s.activeMode ?? s.mode,
+      }));
     case "control_error":
       return update(id, (s) => ({ ...s, error: String(e.error) }));
     case "compaction":
@@ -497,7 +514,12 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
       return update(id, (s) => ({ ...s, plan: (e.items as PlanItem[]) ?? [] }));
     case "usage":
       return update(id, (s) => {
-        const usage = { used: Number(e.used), window: Number(e.window), total: typeof e.total === "number" ? e.total : undefined, at: Date.now() };
+        const usage = {
+          used: Number(e.used),
+          window: Number(e.window),
+          total: typeof e.total === "number" ? e.total : undefined,
+          at: Date.now(),
+        };
         // After a compact the offer may come back the next time it fills up.
         const compactDismissed = s.compactDismissed && usage.used / usage.window >= COMPACT_AT;
         return { ...s, usage, compactDismissed };

@@ -8,18 +8,17 @@
 import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from "motion/react";
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
-import { listenToAgents, useAgents, wideScreen } from "@/lib/agents";
-import { api } from "@/lib/bridge";
 import {
-  useActivities,
-  visibleActivities,
   activityLabel,
-  terminal,
-  ownsWorking,
   INACTIVITY_MS,
   latestActivity,
+  ownsWorking,
+  terminal,
+  useActivities,
+  visibleActivities,
 } from "@/lib/activities";
-import { ActivityProgress } from "./ActivityProgress";
+import { listenToAgents, useAgents, wideScreen } from "@/lib/agents";
+import { api } from "@/lib/bridge";
 import { useNow, useSystemLook } from "@/lib/hooks";
 import { ISLAND_TOP, PANEL_PAD } from "@/lib/islandSize";
 import type { NetNotice } from "@/lib/net";
@@ -27,6 +26,7 @@ import { playSound } from "@/lib/sound";
 import { connect, installUpdate, notePick, setHovered, uiVolume, useSidekick, watchWaiting } from "@/lib/store";
 import { isPaused, type MascotState, type Suggestion } from "@/lib/types";
 import { updateBusy, updateLabel } from "@/lib/updates";
+import { ActivityProgress } from "./ActivityProgress";
 import { Announcer } from "./Announcer";
 import { ASK_MASCOT, ASK_ORB, ASK_PAD, AskPanel, VoiceBars } from "./AskPanel";
 import { Icon } from "./Icon";
@@ -689,13 +689,7 @@ export function Island() {
                     : { duration: 0.18, ease: [0.23, 1, 0.32, 1] }
               }
             >
-              {view === "settings" ? (
-                <IslandSettings />
-              ) : view === "welcome" ? (
-                <IslandWelcome />
-              ) : (
-                <AskPanel />
-              )}
+              {view === "settings" ? <IslandSettings /> : view === "welcome" ? <IslandWelcome /> : <AskPanel />}
             </motion.div>
           ) : preparingVoice ? (
             <motion.div

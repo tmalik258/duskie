@@ -605,7 +605,9 @@ pub fn agent_control(id: String, method: String) -> CmdResult<()> {
 
 #[tauri::command]
 pub fn agent_project(id: String) -> CmdResult<String> {
-    crate::sessions::project(&id).map(|p| p.to_string_lossy().into_owned()).ok_or("That session is gone.".into())
+    crate::sessions::project(&id)
+        .map(|p| p.to_string_lossy().into_owned())
+        .ok_or("That session is gone.".into())
 }
 
 #[tauri::command]
@@ -614,8 +616,18 @@ pub fn agent_reviews(id: String) -> Vec<crate::sessions::reviews::ReviewTurn> {
 }
 
 #[tauri::command]
-pub async fn agent_review_decide(id: String, turn: String, path: Option<String>, hunk: Option<usize>, accept: bool) -> CmdResult<()> {
-    tauri::async_runtime::spawn_blocking(move || crate::sessions::reviews::decide(&id, &turn, path.as_deref(), hunk, accept)).await.map_err(|e| e.to_string())?
+pub async fn agent_review_decide(
+    id: String,
+    turn: String,
+    path: Option<String>,
+    hunk: Option<usize>,
+    accept: bool,
+) -> CmdResult<()> {
+    tauri::async_runtime::spawn_blocking(move || {
+        crate::sessions::reviews::decide(&id, &turn, path.as_deref(), hunk, accept)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 /// Finish a session that ran in its own worktree: merge it back.

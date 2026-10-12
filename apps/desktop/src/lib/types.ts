@@ -879,7 +879,15 @@ export interface Activity {
   source: string;
   parentId: string | null;
   label: string;
-  phase: "running" | "downloading" | "verifying" | "installing" | "awaitingUser" | "completed" | "failed" | "unconfirmed";
+  phase:
+    | "running"
+    | "downloading"
+    | "verifying"
+    | "installing"
+    | "awaitingUser"
+    | "completed"
+    | "failed"
+    | "unconfirmed";
   startedAt: number;
   lastProgressAt: number;
   transferred: number | null;
@@ -889,7 +897,10 @@ export interface Activity {
   revision: number;
   destination: string | null;
 }
-export interface ActivitySnapshot { revision: number; activities: Activity[]; }
+export interface ActivitySnapshot {
+  revision: number;
+  activities: Activity[];
+}
 export interface AgentReviewTurn {
   id: string;
   entry: number;

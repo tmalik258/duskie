@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import { acceptActivities, beginActivity, finishActivity, ownsWorking, useActivities } from "./activities";
 import type { Expression } from "@/components/orb/expressions";
+import { acceptActivities, beginActivity, finishActivity, ownsWorking, useActivities } from "./activities";
 import { setTab, startHere } from "./agents";
 import { api, EVENTS, listen } from "./bridge";
 import { putCached, revalidate, SETUP_STATUS_CACHE_KEY } from "./cache";

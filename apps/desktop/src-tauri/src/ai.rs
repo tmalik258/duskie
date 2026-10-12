@@ -662,7 +662,16 @@ pub fn chat(
             crate::recipes::note_question(app, &last.content);
         }
     }
-    crate::activity::report(app, &format!("chat:{id}"), "chat", "Answering your question", crate::activity::Phase::Running, None, None, None);
+    crate::activity::report(
+        app,
+        &format!("chat:{id}"),
+        "chat",
+        "Answering your question",
+        crate::activity::Phase::Running,
+        None,
+        None,
+        None,
+    );
     let cancel = CancellationToken::new();
     lock(&app.state::<AppState>().chats).insert(id.clone(), cancel.clone());
     let held = attach.hold.then(|| {

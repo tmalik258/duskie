@@ -2,12 +2,12 @@
 // browser) it falls back to an in-memory mock so the UI can be developed and
 // previewed without the desktop shell.
 
-import { mock } from "./mock";
 import type { AgentCommand } from "./agent-commands";
+import { mock } from "./mock";
 import type {
-  ActivitySnapshot,
   ActionRecord,
   ActionResult,
+  ActivitySnapshot,
   AgentMode,
   AgentReviewTurn,
   AgentStarted,
@@ -145,12 +145,14 @@ export function isTauri(): boolean {
 
 let tauriCorePromise: Promise<typeof import("@tauri-apps/api/core")> | null = null;
 function getTauriCore() {
-  return (tauriCorePromise ??= import("@tauri-apps/api/core"));
+  tauriCorePromise ??= import("@tauri-apps/api/core");
+  return tauriCorePromise;
 }
 
 let tauriEventPromise: Promise<typeof import("@tauri-apps/api/event")> | null = null;
 function getTauriEvent() {
-  return (tauriEventPromise ??= import("@tauri-apps/api/event"));
+  tauriEventPromise ??= import("@tauri-apps/api/event");
+  return tauriEventPromise;
 }
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -335,8 +337,7 @@ export const api = {
   agentRewindPreview: (id: string, index: number) => invoke<number>("agent_rewind_preview", { id, index }),
   agentRewind: (id: string, index: number) => invoke<number>("agent_rewind", { id, index }),
   agentFiles: (id: string, query: string) => invoke<string[]>("agent_files", { id, query }),
-  agentCommands: (id: string) =>
-    invoke<AgentCommand[]>("agent_commands", { id }),
+  agentCommands: (id: string) => invoke<AgentCommand[]>("agent_commands", { id }),
   aiOpenLink: (target: string) => invoke<string>("ai_open_link", { target }),
   reposOverview: (fresh: boolean) => invoke<ReposOverview>("repos_overview", { fresh }),
   repoPull: (path: string, stash: boolean) => invoke<string>("repo_pull", { path, stash }),

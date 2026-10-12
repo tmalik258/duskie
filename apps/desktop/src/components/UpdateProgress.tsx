@@ -1,6 +1,6 @@
 "use client";
 
-import { useActivities, activityLabel, latestActivity } from "@/lib/activities";
+import { activityLabel, latestActivity, useActivities } from "@/lib/activities";
 import { useNow } from "@/lib/hooks";
 import type { UpdateProgress as Progress } from "@/lib/types";
 import { updateBusy, updateDetail, updateLabel, updatePercent } from "@/lib/updates";

@@ -80,7 +80,9 @@ async fn handle(app: &AppHandle, mut event: Event) {
         return;
     }
     crate::activity::observe(app, &event);
-    if event.kind == "browser.download" || event.kind == "file.download_progress" { return; }
+    if event.kind == "browser.download" || event.kind == "file.download_progress" {
+        return;
+    }
     // Pairing finished: tell the UI at once (welcome waiting guide, Connections).
     if event.kind == PAIRED {
         let _ = app.emit("browsers://changed", ());

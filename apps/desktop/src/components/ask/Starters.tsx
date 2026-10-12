@@ -6,6 +6,7 @@ import { sendChat, setAsk, useSidekick } from "@/lib/store";
 import type { AskContext, CalendarToday } from "@/lib/types";
 import { Icon, type IconName } from "../Icon";
 import { Tip } from "../Tip";
+import { pendingCount, useAltDigits } from "./Proposals";
 import { KeyHint } from "./parts";
 
 export interface Command {
@@ -20,17 +21,18 @@ export interface Command {
 
 /** What goes with the question, as one quiet line under it: the app you
  * were in and what you copied. Click one to leave it out (or back in).
- * This PC only sits at the end. */
+ * This PC only sits at the end. Hold Alt for 1 / 2 on the chips. */
 export function ContextLine({ keys }: { keys: boolean }) {
   // Clicking a chip leaves focus in the input; otherwise the next Enter
   // would press the chip again and switch it back.
   const keepFocus = (e: { preventDefault: () => void }) => e.preventDefault();
   const ask = useSidekick((s) => s.ask);
   const offline = useSidekick((s) => !s.online);
-  if (!ask) return null;
-  const { context } = ask;
+  // Answer actions already own Alt 1…n; leave chips free when those are waiting.
+  const proposalDigits = useSidekick((s) => pendingCount(s.turns.at(-1)?.proposals));
+  const { context } = ask ?? { context: null };
   const items: { id: string; label: string; on: boolean; title?: string | null; toggle: () => void }[] = [];
-  if (context.app) {
+  if (ask && context?.app) {
     items.push({
       id: "app",
       label: context.app,
@@ -39,7 +41,7 @@ export function ContextLine({ keys }: { keys: boolean }) {
       toggle: () => setAsk({ attachWindow: !ask.attachWindow }),
     });
   }
-  if (!context.clipboardSecret && context.clipboardKind) {
+  if (ask && context && !context.clipboardSecret && context.clipboardKind) {
     // What it is ("stack trace", "link"); the text itself shows on hover.
     items.push({
       id: "clip",
@@ -49,12 +51,18 @@ export function ContextLine({ keys }: { keys: boolean }) {
       toggle: () => setAsk({ attachClip: !ask.attachClip }),
     });
   }
+  useAltDigits(proposalDigits > 0 ? 0 : Math.min(items.length, 9), 0, (n) => {
+    items[n]?.toggle();
+  });
+  if (!ask || !context) return null;
   return (
     <div className="ak-ctx">
       {offline && <span className="ak-offl">Offline</span>}
-      {items.map((it) => (
-        <span key={it.id} className={`flex min-w-0 items-center ${it.id === "clip" ? "shrink" : "shrink-0"}`}>
-          <Tip label={`${it.on ? "Click to exclude" : "Click to include"}${it.title ? ` · ${it.title}` : ""}`}>
+      {items.map((it, i) => (
+        <span key={it.id} className={`relative flex min-w-0 items-center ${it.id === "clip" ? "shrink" : "shrink-0"}`}>
+          <Tip
+            label={`${it.on ? "Click to exclude" : "Click to include"}${it.title ? ` · ${it.title}` : ""} · Alt ${i + 1}`}
+          >
             <button
               type="button"
               aria-pressed={it.on}
@@ -66,6 +74,11 @@ export function ContextLine({ keys }: { keys: boolean }) {
               <span className="truncate">{it.label}</span>
             </button>
           </Tip>
+          {proposalDigits === 0 && i < 9 && (
+            <KeyHint show={keys} side="left">
+              {`Alt ${i + 1}`}
+            </KeyHint>
+          )}
         </span>
       ))}
       {context.clipboardSecret && <span className="ak-ctx-i cpy">Clipboard hidden (looks like a secret)</span>}

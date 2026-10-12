@@ -74,7 +74,9 @@ function Pop({
   requested?: number;
 }) {
   const [open, setOpen] = useState(false);
-  useEffect(() => { if (requested) setOpen(true); }, [requested]);
+  useEffect(() => {
+    if (requested) setOpen(true);
+  }, [requested]);
   const btn = useRef<HTMLButtonElement>(null);
   const box = useRef<HTMLDivElement>(null);
   const [at, setAt] = useState<{ left: number; bottom: number } | null>(null);
@@ -206,7 +208,8 @@ function UsageBody({
             <i className="ak-pfill" style={{ width: `${ctxPct}%` }} />
           </div>
           <p className="ak-note">
-            {Math.max(0, usage.window - usage.used).toLocaleString()} tokens remaining {"\u00b7"} {100 - ctxPct}% remaining
+            {Math.max(0, usage.window - usage.used).toLocaleString()} tokens remaining {"\u00b7"} {100 - ctxPct}%
+            remaining
           </p>
           <p className="ak-note">
             Latest usage: {usage.used.toLocaleString()} tokens. Session total:{" "}
@@ -231,10 +234,9 @@ function UsageBody({
                   </span>
                 </div>
                 <p className="ak-note">
-                  {p.resetsAt ? new Date(p.resetsAt * 1000).toLocaleString() : "Reset timestamp: Not reported"} {"\u00b7"}{" "}
-                  {p.resetsAt && p.resetsAt * 1000 <= now
-                    ? "Expired; refresh required"
-                    : `Cached report ${ago(p.at)}`}
+                  {p.resetsAt ? new Date(p.resetsAt * 1000).toLocaleString() : "Reset timestamp: Not reported"}{" "}
+                  {"\u00b7"}{" "}
+                  {p.resetsAt && p.resetsAt * 1000 <= now ? "Expired; refresh required" : `Cached report ${ago(p.at)}`}
                 </p>
                 <div className="ak-pbar">
                   <i
@@ -360,7 +362,27 @@ export function ChatControls({
 
   return (
     <div className="ak-ctl">
-      {panel?.name === "model" && <Pop label="Choose model" requested={panel.at} chip="Choose model">{(close) => <>{[["", "Default"], ...models].map(([value, label]) => <button type="button" className="chip ak-pop-btn" key={value} onClick={() => { onModel(value || null); close(); }}>{label}</button>)}</>}</Pop>}
+      {panel?.name === "model" && (
+        <Pop label="Choose model" requested={panel.at} chip="Choose model">
+          {(close) => (
+            <>
+              {[["", "Default"], ...models].map(([value, label]) => (
+                <button
+                  type="button"
+                  className="chip ak-pop-btn"
+                  key={value}
+                  onClick={() => {
+                    onModel(value || null);
+                    close();
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+            </>
+          )}
+        </Pop>
+      )}
       {local ? (
         <span className="ak-cchip">
           <i className="ak-cdot" style={{ background: "#30d158" }} />
@@ -458,33 +480,31 @@ export function ChatControls({
           On this PC {"\u00b7"} no limits
         </span>
       ) : (
-        (
-          <Pop
-            label="Usage"
-            requested={panel?.name === "usage" ? panel.at : undefined}
-            className="ak-cusage"
-            chip={
-              <>
-                <span className="ak-ring" aria-hidden="true">
-                  <i className="ak-cring" style={{ "--p": ringPct } as CSSProperties} />
-                </span>
-                {usageText || "Usage \u00b7 Not reported"}
-              </>
-            }
-          >
-            {() => (
-              <UsageBody
-                usage={usage}
-                ctxPct={ctxPct}
-                plans={plans}
-                now={now}
-                agent={agent}
-                onCompact={onCompact}
-                onRefresh={onRefresh}
-              />
-            )}
-          </Pop>
-        )
+        <Pop
+          label="Usage"
+          requested={panel?.name === "usage" ? panel.at : undefined}
+          className="ak-cusage"
+          chip={
+            <>
+              <span className="ak-ring" aria-hidden="true">
+                <i className="ak-cring" style={{ "--p": ringPct } as CSSProperties} />
+              </span>
+              {usageText || "Usage \u00b7 Not reported"}
+            </>
+          }
+        >
+          {() => (
+            <UsageBody
+              usage={usage}
+              ctxPct={ctxPct}
+              plans={plans}
+              now={now}
+              agent={agent}
+              onCompact={onCompact}
+              onRefresh={onRefresh}
+            />
+          )}
+        </Pop>
       )}
       {keys && <span className="ckeys mono">{keys}</span>}
     </div>
