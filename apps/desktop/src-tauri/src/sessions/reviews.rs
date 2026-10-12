@@ -70,12 +70,12 @@ pub(super) fn capture_turn(id: &str) {
     if files_error.0.is_empty() && files_error.1.is_none() && (hinted || live_nonempty(&baseline)) {
         std::thread::sleep(std::time::Duration::from_millis(200));
         files_error = snapshot_between(&before, &path);
-        if files_error.0.is_empty() && files_error.1.is_none() {
-            if let Some(live) = baseline.as_ref().and_then(|b| review::changes(b).ok()) {
-                if !live.is_empty() {
-                    files_error = (live, None);
-                }
-            }
+        if files_error.0.is_empty()
+            && files_error.1.is_none()
+            && let Some(live) = baseline.as_ref().and_then(|b| review::changes(b).ok())
+            && !live.is_empty()
+        {
+            files_error = (live, None);
         }
     }
     let (files, error) = files_error;

@@ -53,6 +53,10 @@ static REGISTRY: Mutex<Registry> = Mutex::new(Registry {
 static DOWNLOAD_REVISIONS: Mutex<BTreeMap<String, u64>> = Mutex::new(BTreeMap::new());
 static EXCLUDED_DOWNLOADS: Mutex<BTreeMap<String, i64>> = Mutex::new(BTreeMap::new());
 
+fn normalize(path: &str) -> String {
+    path.replace('\\', "/").to_lowercase()
+}
+
 pub fn exclude_download(app: &AppHandle, event: &sidekick_core::Event) {
     if event.kind != "browser.download" {
         return;
@@ -158,6 +162,7 @@ pub fn activity_open_finish(app: AppHandle, id: String, ok: bool, outcome: Strin
     }
 }
 
+#[allow(clippy::too_many_arguments)] // matches the activity event payload fields
 pub fn report(
     app: &AppHandle,
     id: &str,
@@ -466,105 +471,6 @@ pub fn observe(app: &AppHandle, event: &sidekick_core::Event) {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    fn downloading() -> Activity {
-        Activity {
-            id: "test".into(),
-            source: "browser".into(),
-            parent_id: None,
-            label: "Downloading report.zip".into(),
-            phase: Phase::Downloading,
-            started_at: 0,
-            last_progress_at: 0,
-            transferred: Some(10),
-            total: None,
-            outcome: None,
-            dismissed: false,
-            revision: 1,
-            destination: None,
-            progress_key: None,
-        }
-    }
-    #[test]
-    fn heartbeats_and_total_discovery_do_not_count_as_progress() {
-        let old = downloading();
-        assert!(!meaningful_progress(
-            Some(&old),
-            &old.phase,
-            &old.label,
-            Some(10),
-            &None
-        ));
-        assert!(!meaningful_progress(
-            Some(&old),
-            &old.phase,
-            &old.label,
-            Some(9),
-            &None
-        ));
-        assert!(meaningful_progress(
-            Some(&old),
-            &old.phase,
-            &old.label,
-            Some(11),
-            &None
-        ));
-        assert!(meaningful_progress(
-            Some(&old),
-            &Phase::AwaitingUser,
-            &old.label,
-            Some(10),
-            &None
-        ));
-        assert!(meaningful_progress(
-            Some(&old),
-            &old.phase,
-            &old.label,
-            Some(10),
-            &Some("New substantive output".into())
-        ));
-    }
-    #[test]
-    fn repeated_output_does_not_reset_inactivity() {
-        let mut old = downloading();
-        old.progress_key = Some("Still downloading".into());
-        assert!(!meaningful_progress(
-            Some(&old),
-            &old.phase,
-            &old.label,
-            Some(10),
-            &old.progress_key
-        ));
-    }
-    #[test]
-    fn excluded_browser_destinations_also_hide_matching_fallback_events() {
-        let path = "C:/Downloads/private-activity-test.zip";
-        let key = normalize(path);
-        lock(&EXCLUDED_DOWNLOADS)
-            .insert(key.clone(), chrono::Utc::now().timestamp_millis() + 120_000);
-        let event = sidekick_core::Event::new(
-            "file.download_progress",
-            "downloads",
-            serde_json::json!({"destination": "c:\\downloads\\private-activity-test.zip"}),
-        );
-        assert!(download_excluded(&event));
-        let other = sidekick_core::Event::new(
-            "file.download_progress",
-            "downloads",
-            serde_json::json!({"destination": "C:/Downloads/unrelated.zip"}),
-        );
-        assert!(!download_excluded(&other));
-        lock(&EXCLUDED_DOWNLOADS).insert(key.clone(), 0);
-        assert!(!download_excluded(&event));
-        lock(&EXCLUDED_DOWNLOADS).remove(&key);
-    }
-}
-fn normalize(path: &str) -> String {
-    path.replace('\\', "/").to_lowercase()
-}
-
 pub fn agent_event(app: &AppHandle, session: &str, data: &serde_json::Value) {
     let id = format!("agent:{session}");
     let kind = data["kind"].as_str().unwrap_or_default();
@@ -676,5 +582,101 @@ pub fn start(app: &AppHandle) {
             };
             report(&app, &id, "chat", &label, phase, None, None, signature);
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn downloading() -> Activity {
+        Activity {
+            id: "test".into(),
+            source: "browser".into(),
+            parent_id: None,
+            label: "Downloading report.zip".into(),
+            phase: Phase::Downloading,
+            started_at: 0,
+            last_progress_at: 0,
+            transferred: Some(10),
+            total: None,
+            outcome: None,
+            dismissed: false,
+            revision: 1,
+            destination: None,
+            progress_key: None,
+        }
+    }
+    #[test]
+    fn heartbeats_and_total_discovery_do_not_count_as_progress() {
+        let old = downloading();
+        assert!(!meaningful_progress(
+            Some(&old),
+            &old.phase,
+            &old.label,
+            Some(10),
+            &None
+        ));
+        assert!(!meaningful_progress(
+            Some(&old),
+            &old.phase,
+            &old.label,
+            Some(9),
+            &None
+        ));
+        assert!(meaningful_progress(
+            Some(&old),
+            &old.phase,
+            &old.label,
+            Some(11),
+            &None
+        ));
+        assert!(meaningful_progress(
+            Some(&old),
+            &Phase::AwaitingUser,
+            &old.label,
+            Some(10),
+            &None
+        ));
+        assert!(meaningful_progress(
+            Some(&old),
+            &old.phase,
+            &old.label,
+            Some(10),
+            &Some("New substantive output".into())
+        ));
+    }
+    #[test]
+    fn repeated_output_does_not_reset_inactivity() {
+        let mut old = downloading();
+        old.progress_key = Some("Still downloading".into());
+        assert!(!meaningful_progress(
+            Some(&old),
+            &old.phase,
+            &old.label,
+            Some(10),
+            &old.progress_key
+        ));
+    }
+    #[test]
+    fn excluded_browser_destinations_also_hide_matching_fallback_events() {
+        let path = "C:/Downloads/private-activity-test.zip";
+        let key = normalize(path);
+        lock(&EXCLUDED_DOWNLOADS)
+            .insert(key.clone(), chrono::Utc::now().timestamp_millis() + 120_000);
+        let event = sidekick_core::Event::new(
+            "file.download_progress",
+            "downloads",
+            serde_json::json!({"destination": "c:\\downloads\\private-activity-test.zip"}),
+        );
+        assert!(download_excluded(&event));
+        let other = sidekick_core::Event::new(
+            "file.download_progress",
+            "downloads",
+            serde_json::json!({"destination": "C:/Downloads/unrelated.zip"}),
+        );
+        assert!(!download_excluded(&other));
+        lock(&EXCLUDED_DOWNLOADS).insert(key.clone(), 0);
+        assert!(!download_excluded(&event));
+        lock(&EXCLUDED_DOWNLOADS).remove(&key);
     }
 }

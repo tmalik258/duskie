@@ -359,10 +359,8 @@ pub fn start(app: &AppHandle) {
         tokio::time::sleep(Duration::from_secs(120)).await;
         loop {
             let enabled = lock(&app.state::<AppState>().settings).check_updates;
-            if enabled {
-                if let Err(err) = check(&app).await {
-                    log::debug!("update check: {err}");
-                }
+            if enabled && let Err(err) = check(&app).await {
+                log::debug!("update check: {err}");
             }
             tokio::time::sleep(CHECK_EVERY).await;
         }
@@ -384,7 +382,7 @@ mod tests {
                 .set_read_timeout(Some(Duration::from_secs(5)))
                 .unwrap();
             let mut request = [0; 2048];
-            socket.read(&mut request).unwrap();
+            let _ = socket.read(&mut request).unwrap();
             socket
                 .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 6\r\nConnection: close\r\n\r\nabc")
                 .unwrap();
@@ -424,7 +422,7 @@ mod tests {
                 .set_read_timeout(Some(Duration::from_secs(5)))
                 .unwrap();
             let mut request = [0; 2048];
-            socket.read(&mut request).unwrap();
+            let _ = socket.read(&mut request).unwrap();
             socket
                 .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 6\r\nConnection: close\r\n\r\nabc")
                 .unwrap();

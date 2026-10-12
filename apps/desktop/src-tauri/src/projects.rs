@@ -26,7 +26,9 @@ const RECHECK: Duration = Duration::from_secs(3 * 60 * 60);
 const LIST_TTL: Duration = Duration::from_secs(30);
 
 static CHECKED: Mutex<Option<HashMap<String, Instant>>> = Mutex::new(None);
-static LIST: Mutex<Option<(Instant, Vec<PathBuf>, Vec<PathBuf>)>> = Mutex::new(None);
+/// Cached repo list: when it was built, the roots used, and the repos found.
+type RepoList = Option<(Instant, Vec<PathBuf>, Vec<PathBuf>)>;
+static LIST: Mutex<RepoList> = Mutex::new(None);
 
 pub fn invalidate() {
     *LIST.lock().unwrap_or_else(|e| e.into_inner()) = None;
