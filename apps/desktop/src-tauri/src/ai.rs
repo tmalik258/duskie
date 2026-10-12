@@ -404,8 +404,19 @@ pub async fn wait_released(id: &str) -> bool {
 }
 
 /// Shows a held chat: what it wrote so far, then the rest as it streams.
-pub fn release(id: &str) {
+pub fn release(app: &AppHandle, id: &str) {
     if let Some(tx) = lock(&HELD).remove(id) {
+        // Held chats skip the initial Running report; open it now that we show.
+        crate::activity::report(
+            app,
+            &format!("chat:{id}"),
+            "chat",
+            "Answering your question",
+            crate::activity::Phase::Running,
+            None,
+            None,
+            None,
+        );
         let _ = tx.send(true);
     }
 }
@@ -664,16 +675,20 @@ pub fn chat(
     }
     let cancel = CancellationToken::new();
     lock(&app.state::<AppState>().chats).insert(id.clone(), cancel.clone());
-    crate::activity::report(
-        app,
-        &format!("chat:{id}"),
-        "chat",
-        "Answering your question",
-        crate::activity::Phase::Running,
-        None,
-        None,
-        None,
-    );
+    // Speculative voice holds stay invisible until release; otherwise each
+    // partial transcript leaves a sticky "Answering your question" row.
+    if !attach.hold {
+        crate::activity::report(
+            app,
+            &format!("chat:{id}"),
+            "chat",
+            "Answering your question",
+            crate::activity::Phase::Running,
+            None,
+            None,
+            None,
+        );
+    }
     let held = attach.hold.then(|| {
         let (tx, rx) = tokio::sync::watch::channel(false);
         lock(&HELD).insert(id.clone(), tx);
@@ -869,7 +884,8 @@ pub fn chat(
         let cost = sink.cost();
         drop(sink);
         let Some(speak) = forward.await.ok().flatten() else {
-            // Dropped before it was ever shown: nothing to report.
+            // Dropped before it was ever shown: nothing to report to chat UI.
+            crate::activity::forget(&app, &format!("chat:{id}"));
             lock(&app.state::<AppState>().chats).remove(&id);
             return;
         };
@@ -944,6 +960,7 @@ pub fn cancel(app: &AppHandle, id: &str) {
     if let Some(token) = lock(&app.state::<AppState>().chats).remove(id) {
         token.cancel();
     }
+    crate::activity::forget(app, &format!("chat:{id}"));
 }
 
 fn send_text(app: &AppHandle, id: &str, text: String, speak: bool) {

@@ -75,6 +75,8 @@ const COMPACT = {
   /** Orb + "Listening..." + bars; grows with transcript up to voiceWidth. */
   voiceMinWidth: 156,
   voiceWidth: 320,
+  /** Working / download status: grow with the label, truncate only past this. */
+  statusMaxWidth: 520,
   height: 36,
   radius: 18,
   orb: 26,
@@ -515,7 +517,18 @@ export function Island() {
           ? GUIDE_WIDTH
           : EXPANDED.width
       : voicePill
-        ? voiceShellWidth(voicePill.text, voicePill.thinking, voicePill.working || voicePill.done)
+        ? voiceShellWidth(
+            voicePill.text,
+            voicePill.thinking,
+            !!(
+              voicePill.working ||
+              voicePill.done ||
+              voicePill.waiting ||
+              voicePill.failed ||
+              voicePill.focus ||
+              voicePill.asks
+            ),
+          )
         : waiting
           ? COMPACT.waitWidth
           : busy
@@ -812,13 +825,36 @@ function FullVoice({ text, thinking }: { text: string; thinking: boolean }) {
   );
 }
 
+/** Pixel width of the compact status label (avoids a stretch gap from char guesses). */
+let statusMeasureCanvas: HTMLCanvasElement | null = null;
+
+function statusTextWidth(label: string): number {
+  if (typeof document === "undefined") return Math.ceil([...label].length * 7.2);
+  if (!statusMeasureCanvas) statusMeasureCanvas = document.createElement("canvas");
+  const ctx = statusMeasureCanvas.getContext("2d");
+  if (!ctx) return Math.ceil([...label].length * 7.2);
+  ctx.font = '500 12.5px ui-sans-serif, system-ui, "Segoe UI", sans-serif';
+  return Math.ceil(ctx.measureText(label).width);
+}
+
 /** Compact listening shell: tight when empty, grows with speech up to voiceWidth. */
-function voiceShellWidth(text: string, thinking: boolean, working?: boolean): number {
-  const label = voiceLabel(text, thinking, working);
+function voiceShellWidth(text: string, thinking: boolean, status?: boolean): number {
+  const label = voiceLabel(text, thinking, status);
+  // Done / working / waiting: orb column + gap + trailing icon + pad + slack
+  // so "Opened in Chrome (private)" is never CSS-truncated.
+  if (status) {
+    const chrome = COMPACT.height + 4 + 6 + 16 + 14 + 16;
+    return Math.min(COMPACT.statusMaxWidth, Math.max(120, chrome + statusTextWidth(label)));
+  }
+  const textPx = Math.ceil([...label].length * 7.2);
   // Orb column, gaps, green bars, stop button, right pad.
   const chrome = COMPACT.height + 4 + 10 + 20 + 28 + 14;
-  const textPx = Math.ceil([...label].length * 7.4);
   return Math.min(COMPACT.voiceWidth, Math.max(COMPACT.voiceMinWidth, chrome + textPx));
+}
+
+function statusNeedsTruncate(label: string): boolean {
+  const chrome = COMPACT.height + 4 + 6 + 16 + 14 + 16;
+  return chrome + statusTextWidth(label) > COMPACT.statusMaxWidth;
 }
 
 /** Voice in the compact island: green bars and the words as they come
@@ -887,60 +923,74 @@ function VoicePill({
   onOpen?: () => void;
 }) {
   const label = voiceLabel(text, thinking, working || done || focus);
+  // Listening: label flexes so bars + Stop stay on the right. Status: one
+  // tight cluster (label + indicator) so the shell never shows a stretch gap.
+  const listening = !(working || thinking || done || focus || failed || waiting || asks);
+  const clip = listening || statusNeedsTruncate(label);
+  const indicator = failed ? (
+    <span role="img" aria-label="Failed" className="size-2 shrink-0 rounded-full bg-red-400" />
+  ) : waiting ? (
+    <span
+      role="img"
+      aria-label="Waiting for confirmed progress"
+      className="size-2 shrink-0 rounded-full bg-[#ff9f0a]"
+    />
+  ) : done ? (
+    <span className="shrink-0 text-[#30d158]">
+      <Icon name="check" size={14} />
+    </span>
+  ) : focus ? (
+    <button
+      type="button"
+      aria-label="End focus"
+      onClick={() => void api.focusStop()}
+      className="shrink-0 rounded-full px-2 py-0.5 text-[11px] text-white/62 hover:bg-white/10 hover:text-white"
+    >
+      End
+    </button>
+  ) : asks ? (
+    <span className="relative flex size-2 shrink-0" role="img" aria-label="Waiting for you">
+      <span className="absolute inset-0 animate-ping rounded-full bg-[#ff9f0a]/60 motion-reduce:animate-none" />
+      <span className="relative size-2 rounded-full bg-[#ff9f0a]" />
+    </span>
+  ) : dots && dots.length > 1 ? (
+    <AgentRing states={dots} />
+  ) : thinking || working ? (
+    <Activity />
+  ) : null;
+  const labelEl = onOpen ? (
+    <button
+      type="button"
+      onClick={onOpen}
+      className={`text-left text-[12.5px] font-medium text-white/90 ${
+        listening ? "min-w-0 flex-1 truncate" : clip ? "min-w-0 truncate" : "shrink-0"
+      }`}
+      title={clip ? label : undefined}
+    >
+      {label}
+    </button>
+  ) : (
+    <span
+      className={`text-[12.5px] font-medium ${
+        listening ? "min-w-0 flex-1 truncate" : clip ? "min-w-0 truncate" : "shrink-0"
+      } ${text.trim() || thinking ? "text-white/90" : "text-white/62"}`}
+      title={clip ? label : undefined}
+    >
+      {label}
+    </span>
+  );
   return (
     <motion.div
-      className="absolute top-0 right-0 flex h-9 items-center gap-2.5 pr-3.5"
+      className={`absolute top-0 right-0 flex h-9 items-center pr-3.5 ${listening ? "gap-2.5" : ""}`}
       style={{ left: COMPACT.height + 4 }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1, transition: { delay: 0.1, duration: 0.2 } }}
       exit={{ opacity: 0, transition: { duration: 0.08 } }}
       aria-live="polite"
     >
-      {onOpen ? (
-        <button
-          type="button"
-          onClick={onOpen}
-          className="min-w-0 flex-1 truncate text-left text-[12.5px] font-medium text-white/90"
-        >
-          {label}
-        </button>
-      ) : (
-        <span
-          className={`min-w-0 flex-1 truncate text-[12.5px] font-medium ${
-            text.trim() || thinking ? "text-white/90" : "text-white/62"
-          }`}
-        >
-          {label}
-        </span>
-      )}
-      {failed ? (
-        <span role="img" aria-label="Failed" className="size-2 rounded-full bg-red-400" />
-      ) : waiting ? (
-        <span role="img" aria-label="Waiting for confirmed progress" className="size-2 rounded-full bg-[#ff9f0a]" />
-      ) : done ? (
-        <span className="text-[#30d158]">
-          <Icon name="check" size={14} />
-        </span>
-      ) : focus ? (
-        <button
-          type="button"
-          aria-label="End focus"
-          onClick={() => void api.focusStop()}
-          className="rounded-full px-2 py-0.5 text-[11px] text-white/62 hover:bg-white/10 hover:text-white"
-        >
-          End
-        </button>
-      ) : asks ? (
-        <span className="relative flex size-2" role="img" aria-label="Waiting for you">
-          <span className="absolute inset-0 animate-ping rounded-full bg-[#ff9f0a]/60 motion-reduce:animate-none" />
-          <span className="relative size-2 rounded-full bg-[#ff9f0a]" />
-        </span>
-      ) : dots && dots.length > 1 ? (
-        <AgentRing states={dots} />
-      ) : thinking || working ? (
-        <Activity />
-      ) : (
+      {listening ? (
         <>
+          {labelEl}
           <VoiceBars />
           <Tip label="Stop (Esc)">
             <button
@@ -956,6 +1006,11 @@ function VoicePill({
             </button>
           </Tip>
         </>
+      ) : (
+        <div className="flex min-w-0 max-w-full items-center gap-1.5">
+          {labelEl}
+          {indicator}
+        </div>
       )}
     </motion.div>
   );
@@ -1259,7 +1314,7 @@ function runningLabel(suggestion: Suggestion, index: number): string {
   return suggestion.options[index] ?? "Working";
 }
 
-/** Shift opens a link in a private window. */
+/** Shift+click or Shift+Alt+N opens a link in a private window. */
 function choose(suggestion: Suggestion, index: number, priv = false) {
   playSound("select", uiVolume(), useSidekick.getState().settings.soundKit);
   useSidekick.setState({ running: runningLabel(suggestion, index) });

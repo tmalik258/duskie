@@ -20,6 +20,7 @@ const ISLAND_KEYS: [string, string][] = [
   ["This PC only", "Alt P"],
   ["History", "Alt H"],
   ["Pick option 1 to 9", "Alt 1–9"],
+  ["Open a link private / incognito", "Shift Alt 1–9"],
   ["Ignore a suggestion", "Alt 0"],
   ["Switch tab", "Ctrl Tab"],
   ["Previous tab", "Ctrl Shift Tab"],

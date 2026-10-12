@@ -133,6 +133,18 @@ pub fn activity_reconcile(app: AppHandle) -> bool {
 pub fn restart(id: &str) {
     lock(&REGISTRY).entries.remove(id);
 }
+
+/// Drops an activity without a Completed flash (cancelled / never shown).
+pub fn forget(app: &AppHandle, id: &str) {
+    let mut r = lock(&REGISTRY);
+    if r.entries.remove(id).is_none() {
+        return;
+    }
+    r.revision += 1;
+    let value = snapshot(&r);
+    drop(r);
+    let _ = app.emit("activity://changed", value);
+}
 #[tauri::command]
 pub fn activity_open_start(app: AppHandle, id: String, label: String) -> Result<(), String> {
     if id.len() > 128 || label.len() > 1024 {

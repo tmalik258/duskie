@@ -1227,12 +1227,11 @@ body {
 .ak-status {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   font-size: 13px;
   padding: 2px 4px;
 }
 .ak-timer {
-  margin-left: auto;
   font-size: 11px;
   color: var(--i3);
   font-variant-numeric: tabular-nums;

@@ -226,8 +226,8 @@ pub fn ai_cancel(app: AppHandle, id: String) {
 
 /// Shows an answer that was started early, at a pause in speech.
 #[tauri::command]
-pub fn ai_release(id: String) {
-    ai::release(&id);
+pub fn ai_release(app: AppHandle, id: String) {
+    ai::release(&app, &id);
 }
 
 #[tauri::command]

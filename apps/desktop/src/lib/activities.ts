@@ -2,6 +2,10 @@ import { create } from "zustand";
 import type { Activity, ActivitySnapshot } from "./types";
 
 export const INACTIVITY_MS = 120_000;
+/** Completed / failed stay on the island briefly, then drop (same idea as done pills). */
+export const ACTIVITY_HOLD_MS = 5000;
+/** Missing-partial "progress unconfirmed": short notice, then clear like a done pill. */
+export const UNCONFIRMED_HOLD_MS = 2600;
 export const terminal = (a: Activity) => a.phase === "completed" || a.phase === "failed";
 export const ownsWorking = (a: Activity) => ["action", "open", "chat", "agent"].includes(a.source) && !terminal(a);
 export const latestActivity = (activities: Activity[], source: string) =>
@@ -90,7 +94,17 @@ export function activityLabel(a: Activity, now: number): string {
 export function visibleActivities(activities: Activity[], now: number) {
   const unique = new Map(activities.map((a) => [a.id, a]));
   return [...unique.values()]
-    .filter((a) => !a.dismissed && (!terminal(a) || now - a.lastProgressAt < 5000))
+    .filter((a) => {
+      if (a.dismissed) return false;
+      const idle = now - a.lastProgressAt;
+      // Done / failed: brief hold, then gone (compact pill settles).
+      if (terminal(a) && idle >= ACTIVITY_HOLD_MS) return false;
+      // Unconfirmed never completes on its own — same short hold as done pills.
+      if (a.phase === "unconfirmed" && idle >= UNCONFIRMED_HOLD_MS) return false;
+      // Stalled downloads (no bytes for 2m): drop the compact pill; don't stick.
+      if (idle >= INACTIVITY_MS && (a.source === "browser" || a.source === "file")) return false;
+      return true;
+    })
     .sort(
       (a, b) => priority(a) - priority(b) || Number(terminal(a)) - Number(terminal(b)) || b.startedAt - a.startedAt,
     );
