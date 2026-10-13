@@ -41,8 +41,9 @@ export interface Settings {
   islandColor: IslandColor;
   soundKit: string;
   skills?: Record<string, { enabled?: boolean | null; auto?: boolean | null }>;
+  /** Ask shortcut. A leading `-` turns it off without clearing the combo. */
   paletteHotkey: string;
-  /** Global shortcuts by action; empty turns one off. */
+  /** Global shortcuts by action. A leading `-` turns one off without clearing. */
   shortcuts: Record<string, string>;
   codeFolders: string[];
   savedProjects: string[];
@@ -314,7 +315,7 @@ export interface BrowserInfo {
   port: number;
 }
 
-export const THEMES = ["pearl", "aurora", "chrome", "peach", "mint", "lilac", "onyx"] as const;
+export const THEMES = ["pearl", "aurora", "chrome", "peach", "mint", "lilac", "onyx", "atelier"] as const;
 export type Theme = (typeof THEMES)[number];
 export interface EditorList {
   editors: { id: string; name: string; minutes: number }[];
@@ -322,7 +323,15 @@ export interface EditorList {
   current: string | null;
 }
 
-export const ISLAND_COLORS = ["solid_black", "black_glass", "graphite", "midnight", "smoke", "warm_graphite"] as const;
+export const ISLAND_COLORS = [
+  "solid_black",
+  "black_glass",
+  "graphite",
+  "midnight",
+  "smoke",
+  "warm_graphite",
+  "atelier",
+] as const;
 export type IslandColor = (typeof ISLAND_COLORS)[number];
 
 export interface Suggestion {
@@ -436,7 +445,7 @@ export const DEFAULT_SETTINGS: Settings = {
   denySites: [],
   routines: true,
   routinesAuto: false,
-  hideInFullscreen: false,
+  hideInFullscreen: true,
   tips: true,
   alive: true,
   crashReports: false,

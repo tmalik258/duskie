@@ -68,12 +68,12 @@ export function Chat({ turns }: { turns: Turn[] }) {
           // biome-ignore lint/suspicious/noArrayIndexKey: turns only ever append
           <div key={i} className="group grid grid-cols-[minmax(0,1fr)] gap-2">
             {steps.length > 0 && !t.streaming && <Steps steps={steps} running={false} tookMs={t.tookMs} />}
-            {t.streaming && steps.length > 1 && <Steps steps={steps} running tookMs={t.tookMs} />}
+            {t.streaming && steps.length > 0 && <Steps steps={steps} running since={t.startedAt} tookMs={t.tookMs} />}
             {t.content ? (
               <div className="ak-ans">
                 <Answer text={splitOptions(t.content, t.streaming).body} live={isLast && !!t.streaming} />
               </div>
-            ) : t.streaming ? (
+            ) : t.streaming && steps.length === 0 ? (
               <LiveStep step={t.tool ?? null} since={t.startedAt} />
             ) : null}
             {blank(t) && t.provider && (
@@ -184,10 +184,22 @@ export function SaveRecipe({ prompt }: { prompt: string }) {
   );
 }
 
-/** The steps of a multi-step task: done ones ticked, the current one live.
- * Folds to one line once the answer is in. */
-export function Steps({ steps, running, tookMs }: { steps: string[]; running: boolean; tookMs?: number }) {
+/** The steps of a multi-step task: done ones ticked, the current one live
+ * with a timer. Folds to one line once the answer is in. */
+export function Steps({
+  steps,
+  running,
+  since,
+  tookMs,
+}: {
+  steps: string[];
+  running: boolean;
+  since?: number;
+  tookMs?: number;
+}) {
   const [open, setOpen] = useState(false);
+  const now = useNow(running ? 100 : 60_000);
+  const elapsed = running && since ? Math.max(0, now - since) : null;
   if (!running && !open) {
     return (
       <button
@@ -219,7 +231,11 @@ export function Steps({ steps, running, tookMs }: { steps: string[]; running: bo
           <span className="ml-1 opacity-60">Hide</span>
         </button>
       )}
-      <ol className="grid gap-0.5 px-1 text-[12px]">
+      <ol
+        className="grid gap-0.5 px-1 text-[12px]"
+        role={running ? "status" : undefined}
+        aria-live={running ? "polite" : undefined}
+      >
         {keyed.map(({ s, id }, i) => {
           const live = running && i === steps.length - 1;
           return (
@@ -228,7 +244,12 @@ export function Steps({ steps, running, tookMs }: { steps: string[]; running: bo
               className={`flex items-center gap-1.5 ${live ? "text-white/80" : "text-[rgb(235_235_245/0.45)]"}`}
             >
               <span className={live ? "ak-dot animate-pulse bg-white" : "text-[#30d158]"}>{live ? "" : "✓"}</span>
-              {s}
+              <span className={live ? "shimmer-text min-w-0 flex-1" : "min-w-0 flex-1"}>{s}</span>
+              {live && elapsed !== null && (
+                <span className="ak-timer mono" aria-hidden="true">
+                  · {(elapsed / 1000).toFixed(1)} s
+                </span>
+              )}
             </li>
           );
         })}

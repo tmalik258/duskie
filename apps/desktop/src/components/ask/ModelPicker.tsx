@@ -5,7 +5,7 @@
 
 import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { setAskModel, setOverlayHit } from "@/lib/store";
+import { setAskModel, setOverlayHit, useSidekick } from "@/lib/store";
 import { PROVIDER_LABELS, type ProviderStatus } from "@/lib/types";
 import { Icon } from "../Icon";
 import { Tip } from "../Tip";
@@ -99,6 +99,7 @@ export function ModelPicker({
     }
   };
   const shown = picked ?? best;
+  const islandColor = useSidekick((s) => s.settings.islandColor);
   return (
     <span ref={chipRef} className="relative shrink-0">
       <Tip label="Model (Alt M)">
@@ -136,9 +137,14 @@ export function ModelPicker({
                   ? { left: at.left, bottom: window.innerHeight - at.top, width: 256 }
                   : { left: at.left, top: at.top, width: 256 }
               }
+              data-color={islandColor}
               className="menu fixed z-30 flex w-64 flex-col gap-0.5 rounded-[14px] p-1 text-[13px]"
             >
-              <p className="px-2.5 pt-1 pb-0.5 text-[11px] font-medium text-[rgb(235_235_245/0.45)]">
+              <p
+                className={`px-2.5 pt-1 pb-0.5 text-[11px] font-medium ${
+                  islandColor === "atelier" ? "text-[rgb(from_var(--c2)_r_g_b_/_0.45)]" : "text-[rgb(235_235_245/0.45)]"
+                }`}
+              >
                 Answers come from
               </p>
               {items.map((it) => {
@@ -153,7 +159,10 @@ export function ModelPicker({
                     className="menu-item"
                   >
                     <span className="font-medium">{it.title}</span>
-                    <span className="row-span-2 text-[#0a84ff]" aria-hidden="true">
+                    <span
+                      className={`row-span-2 ${islandColor === "atelier" ? "text-[var(--c3)]" : "text-[#0a84ff]"}`}
+                      aria-hidden="true"
+                    >
                       {on && <Icon name="check" size={14} />}
                     </span>
                     {it.note && <small>{it.note}</small>}

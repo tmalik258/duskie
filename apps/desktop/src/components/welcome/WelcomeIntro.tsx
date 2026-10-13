@@ -5,10 +5,11 @@
 
 import { type ReactNode, useEffect, useState } from "react";
 import { api } from "@/lib/bridge";
+import { shortcutBinding } from "@/lib/shortcuts";
 import { updateSettings, useAssistantName, useSidekick } from "@/lib/store";
 
 export function WelcomeIntro() {
-  const hotkey = useSidekick((s) => s.settings.paletteHotkey);
+  const hotkey = shortcutBinding(useSidekick((s) => s.settings.paletteHotkey));
   const name = useAssistantName();
   const voiceStatus = useSidekick((s) => s.voiceStatus);
   const downloading = voiceStatus?.downloading ?? false;
@@ -24,7 +25,13 @@ export function WelcomeIntro() {
       )}
       <ul className="flex flex-col gap-2">
         <Point title="Summon">
-          <Kbd>{hotkey}</Kbd> or say "Hey {name}".
+          {hotkey ? (
+            <>
+              <Kbd>{hotkey}</Kbd> or say "Hey {name}".
+            </>
+          ) : (
+            <>Say "Hey {name}".</>
+          )}
         </Point>
         <Point title="Local">What I see stays on this PC.</Point>
         <Point title="Consent">I act only when you say. Anything I make can be undone.</Point>

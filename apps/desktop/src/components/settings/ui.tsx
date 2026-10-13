@@ -3,6 +3,7 @@
 // Building blocks shared by the settings tabs. Sections hide themselves when
 // the settings search does not match their title, hint or keywords.
 
+import { motion, useReducedMotion } from "motion/react";
 import {
   createContext,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -15,7 +16,9 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { setOverlayHit } from "@/lib/store";
+import { ATELIER_EASE } from "@/lib/atelier-motion";
+import { shortcutBinding, shortcutEnabled } from "@/lib/shortcuts";
+import { setOverlayHit, useSidekick } from "@/lib/store";
 import { Tip } from "../Tip";
 
 /** The settings search text; empty shows everything. */
@@ -47,6 +50,8 @@ export function Section({
 }) {
   const query = useContext(SettingsQuery);
   const [open, setOpen] = useState(false);
+  const atelier = useSidekick((s) => s.settings.islandColor === "atelier");
+  const reducedMotion = useReducedMotion() ?? false;
   if (query && !matches(query, title, hint, keywords)) return null;
   if (collapsible && !open && !query) {
     return (
@@ -69,8 +74,8 @@ export function Section({
       </button>
     );
   }
-  return (
-    <section className="flex flex-col gap-2">
+  const body = (
+    <>
       <div className="flex items-center px-4">
         <h2 className="flex-1 text-[13px] font-semibold tracking-[-0.005em] text-[rgb(235_235_245/0.7)]">{title}</h2>
         {collapsible && !query && (
@@ -87,7 +92,20 @@ export function Section({
         {children}
       </div>
       {hint && <p className="px-4 text-[12px] text-(--muted)">{hint}</p>}
-    </section>
+    </>
+  );
+  if (!atelier) {
+    return <section className="flex flex-col gap-2">{body}</section>;
+  }
+  return (
+    <motion.section
+      className="flex flex-col gap-2"
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, transform: "translateY(8px)" }}
+      animate={reducedMotion ? { opacity: 1 } : { opacity: 1, transform: "translateY(0px)" }}
+      transition={{ duration: 0.2, ease: ATELIER_EASE }}
+    >
+      {body}
+    </motion.section>
   );
 }
 
@@ -371,6 +389,8 @@ export function Select({
     return [{ value, label: labelFor }, ...rows];
   })();
   const current = currentLabel ?? list.find((r) => r.value === value)?.label ?? (value || "Default");
+  const islandColor = useSidekick((s) => s.settings.islandColor);
+  const atelier = islandColor === "atelier";
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -554,7 +574,11 @@ export function Select({
         const selected = r.value === value;
         return (
           <div key={r.value || "__default"}>
-            {r.sepBefore && !q && <div className="mx-[9px] my-[5px] h-px scale-y-50 bg-white/12" />}
+            {r.sepBefore && !q && (
+              <div
+                className={`mx-[9px] my-[5px] h-px scale-y-50 ${atelier ? "bg-[rgb(from_var(--c4)_r_g_b_/_0.35)]" : "bg-white/12"}`}
+              />
+            )}
             <div
               role="option"
               tabIndex={-1}
@@ -567,7 +591,15 @@ export function Select({
               }}
               className={`grid w-full cursor-default items-center gap-2.5 rounded-[9px] px-[9px] py-1.5 text-left text-[13px] transition-colors duration-100 ${
                 r.icon || r.image ? "grid-cols-[24px_1fr_auto]" : "grid-cols-[1fr_auto]"
-              } ${i === active ? "bg-white/[0.12] text-white" : "text-white/85 hover:bg-white/[0.06]"}`}
+              } ${
+                atelier
+                  ? i === active
+                    ? "bg-[rgb(from_var(--c4)_r_g_b_/_0.28)] text-[var(--c2)]"
+                    : "text-[rgb(from_var(--c2)_r_g_b_/_0.85)] hover:bg-[rgb(from_var(--c4)_r_g_b_/_0.16)]"
+                  : i === active
+                    ? "bg-white/[0.12] text-white"
+                    : "text-white/85 hover:bg-white/[0.06]"
+              }`}
             >
               {r.image ? (
                 <span className="grid size-6 place-items-center overflow-hidden rounded-[7px]" aria-hidden="true">
@@ -586,12 +618,20 @@ export function Select({
               )}
               <span className="grid min-w-0">
                 <span className={`truncate ${r.sub ? "font-medium" : ""}`}>{r.label}</span>
-                {r.sub && <span className="truncate text-[11.5px] text-white/62">{r.sub}</span>}
+                {r.sub && (
+                  <span
+                    className={`truncate text-[11.5px] ${atelier ? "text-[rgb(from_var(--c2)_r_g_b_/_0.55)]" : "text-white/62"}`}
+                  >
+                    {r.sub}
+                  </span>
+                )}
               </span>
               <svg
                 viewBox="0 0 16 16"
                 aria-hidden="true"
-                className={`size-3.5 transition-opacity duration-100 ${selected ? "opacity-100" : "opacity-0"}`}
+                className={`size-3.5 transition-opacity duration-100 ${selected ? "opacity-100" : "opacity-0"} ${
+                  atelier && selected ? "text-[var(--c3)]" : ""
+                }`}
               >
                 <path
                   d="M3.5 8.5 6.5 11.5 12.5 4.5"
@@ -606,7 +646,13 @@ export function Select({
           </div>
         );
       })}
-      {shown.length === 0 && <div className="px-[9px] py-2.5 text-[12.5px] text-white/45">No matches</div>}
+      {shown.length === 0 && (
+        <div
+          className={`px-[9px] py-2.5 text-[12.5px] ${atelier ? "text-[rgb(from_var(--c2)_r_g_b_/_0.45)]" : "text-white/45"}`}
+        >
+          No matches
+        </div>
+      )}
     </>
   );
 
@@ -616,6 +662,7 @@ export function Select({
       role="listbox"
       aria-label={label}
       ref={menu}
+      data-color={islandColor}
       onKeyDown={onMenuKey}
       className={`menu z-30 flex max-h-72 flex-col rounded-[15px] p-1.5 ${
         overlay
@@ -645,11 +692,19 @@ export function Select({
           placeholder={`Search ${label.toLowerCase()}…`}
           spellCheck={false}
           aria-label={`Search ${label}`}
-          className="mb-1 w-full shrink-0 rounded-[9px] bg-white/[0.08] px-2.5 py-1.5 text-[12.5px] text-white outline-none placeholder:text-white/40 focus:bg-white/[0.11]"
+          className={`mb-1 w-full shrink-0 rounded-[9px] px-2.5 py-1.5 text-[12.5px] outline-none ${
+            atelier
+              ? "bg-[rgb(from_var(--c4)_r_g_b_/_0.16)] text-[var(--c2)] placeholder:text-[rgb(from_var(--c2)_r_g_b_/_0.4)] focus:bg-[rgb(from_var(--c4)_r_g_b_/_0.24)]"
+              : "bg-white/[0.08] text-white placeholder:text-white/40 focus:bg-white/[0.11]"
+          }`}
         />
       )}
       {group && (
-        <div className="shrink-0 px-[9px] pt-1 pb-[3px] text-[10.5px] tracking-[0.06em] text-white/45 uppercase">
+        <div
+          className={`shrink-0 px-[9px] pt-1 pb-[3px] text-[10.5px] tracking-[0.06em] uppercase ${
+            atelier ? "text-[rgb(from_var(--c2)_r_g_b_/_0.45)]" : "text-white/45"
+          }`}
+        >
           {group}
         </div>
       )}
@@ -667,10 +722,26 @@ export function Select({
         aria-controls={listId}
         onClick={() => setOpen((o) => !o)}
         onKeyDown={onKey}
-        className={`chip flex w-full items-center gap-1.5 text-left whitespace-nowrap transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#0a84ff] ${
+        className={`chip flex w-full items-center gap-1.5 text-left whitespace-nowrap transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--accent,#0a84ff)] ${
           variant === "plain"
-            ? `rounded-md px-1 py-0.5 text-[inherit] ${open ? "bg-white/[0.1]" : "hover:bg-white/[0.06]"}`
-            : `rounded-[10px] px-2.5 py-1.5 text-[13px] ${open ? "bg-white/[0.14]" : "bg-white/[0.08] hover:bg-white/[0.11]"}`
+            ? `rounded-md px-1 py-0.5 text-[inherit] ${
+                atelier
+                  ? open
+                    ? "bg-[rgb(from_var(--c4)_r_g_b_/_0.22)]"
+                    : "hover:bg-[rgb(from_var(--c4)_r_g_b_/_0.14)]"
+                  : open
+                    ? "bg-white/[0.1]"
+                    : "hover:bg-white/[0.06]"
+              }`
+            : `rounded-[10px] px-2.5 py-1.5 text-[13px] ${
+                atelier
+                  ? open
+                    ? "bg-[rgb(from_var(--c4)_r_g_b_/_0.28)]"
+                    : "bg-[rgb(from_var(--c4)_r_g_b_/_0.16)] hover:bg-[rgb(from_var(--c4)_r_g_b_/_0.22)]"
+                  : open
+                    ? "bg-white/[0.14]"
+                    : "bg-white/[0.08] hover:bg-white/[0.11]"
+              }`
         }`}
       >
         <span className="min-w-0 flex-1 truncate">{current}</span>
@@ -879,7 +950,8 @@ export function FolderPicker({
   );
 }
 
-/** Records a key combination: click, press the keys, done. */
+/** Records a key combination: click, press the keys, done. Off keeps the
+ * combo (prefixed with `-`) so turning it back on restores the same keys. */
 export function ShortcutRecorder({
   value,
   onChange,
@@ -890,6 +962,8 @@ export function ShortcutRecorder({
   label: string;
 }) {
   const [recording, setRecording] = useState(false);
+  const binding = shortcutBinding(value);
+  const on = shortcutEnabled(value);
   useEffect(() => {
     if (!recording) return;
     const onKey = (e: KeyboardEvent) => {
@@ -912,18 +986,18 @@ export function ShortcutRecorder({
         aria-label={`${label} shortcut`}
         onClick={() => setRecording(true)}
         className={`min-w-32 rounded-md border px-2 py-1 text-center font-mono text-[12px] ${
-          recording ? "border-[#0a84ff] text-[#0a84ff]" : "border-(--border)"
+          recording ? "border-[#0a84ff] text-[#0a84ff]" : on ? "border-(--border)" : "border-(--border) text-white/45"
         }`}
       >
-        {recording ? "Press keys..." : value || "Off"}
+        {recording ? "Press keys..." : binding || "Off"}
       </button>
-      {value && !recording && (
-        <Button small onClick={() => onChange("")}>
-          Off
+      {binding && !recording && (
+        <Button small onClick={() => onChange(on ? `-${binding}` : binding)}>
+          {on ? "Off" : "On"}
         </Button>
       )}
-      {reservedBy(value) && !recording && (
-        <span className="text-[11px] text-[#ff9f0a]">Also used by {reservedBy(value)}</span>
+      {reservedBy(binding) && !recording && (
+        <span className="text-[11px] text-[#ff9f0a]">Also used by {reservedBy(binding)}</span>
       )}
     </div>
   );

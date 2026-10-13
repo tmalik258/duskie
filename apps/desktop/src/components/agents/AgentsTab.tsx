@@ -51,7 +51,7 @@ import { useNow } from "@/lib/hooks";
 import { Markdown } from "@/lib/markdown";
 import { setAsk, setOverlayHit } from "@/lib/store";
 import type { AgentInfo, AgentMode, Agents, CursorChat, EditorList } from "@/lib/types";
-import { KeyHint, scrollIfActive } from "../ask/parts";
+import { scrollIfActive } from "../ask/parts";
 import { Icon } from "../Icon";
 import { Select } from "../settings/ui";
 import { Tip } from "../Tip";
@@ -154,11 +154,9 @@ function useCursorChats(active: boolean): CursorChat[] {
 const CURSOR = "cursor:";
 
 export function AgentsTab({
-  keys,
   maxHeight,
   active = true,
 }: {
-  keys: boolean;
   maxHeight: number;
   /** False while Ask is closed but Agents is kept warm — skip background work. */
   active?: boolean;
@@ -168,18 +166,11 @@ export function AgentsTab({
   const layout = useAgents((s) => s.layout);
   const cursor = useCursorChats(active);
   const session = sessions.find((s) => s.id === current) ?? null;
-  if (layout === "board") return <Board sessions={sessions} keys={keys} maxHeight={maxHeight} />;
+  if (layout === "board") return <Board sessions={sessions} maxHeight={maxHeight} />;
   const watched = current?.startsWith(CURSOR) ? cursor.find((c) => CURSOR + c.id === current) : undefined;
   if (watched) return <CursorView chat={watched} sessions={sessions} cursor={cursor} />;
   return session ? (
-    <SessionView
-      key={session.id}
-      session={session}
-      sessions={sessions}
-      keys={keys}
-      maxHeight={maxHeight}
-      active={active}
-    />
+    <SessionView key={session.id} session={session} sessions={sessions} maxHeight={maxHeight} active={active} />
   ) : (
     <NewSession sessions={sessions} cursor={cursor} />
   );
@@ -680,13 +671,11 @@ function stickBottom(st: { scroll: number; follow: boolean }): boolean {
 function SessionView({
   session: s,
   sessions,
-  keys,
   maxHeight,
   active = true,
 }: {
   session: Session;
   sessions: Session[];
-  keys: boolean;
   maxHeight: number;
   active?: boolean;
 }) {
@@ -1115,7 +1104,6 @@ function SessionView({
                 if (last !== undefined) setRewindAt(last);
                 else setNotice("There is no earlier message to go back to.");
               }}
-              keys={keys}
             />
           )}
         </>
@@ -1287,7 +1275,6 @@ export function Composer({
   onReview,
   onRewind,
   onBlur,
-  keys,
 }: {
   session: Session;
   working: boolean;
@@ -1298,7 +1285,6 @@ export function Composer({
   onReview: () => void;
   onRewind: () => void;
   onBlur?: () => void;
-  keys: boolean;
 }) {
   const [commands, setCommands] = useState<Slash[]>(commandCatalog(s.agent, []));
   const [panel, setPanel] = useState<{ name: string; at: number }>();
@@ -1623,7 +1609,6 @@ export function Composer({
             onKeyDown={onKey}
             placeholder={working ? "Steer it, it reads this next" : "Ask for more, / for commands, @ for files"}
           />
-          <KeyHint show={keys}>Alt T</KeyHint>
         </div>
         <ChatControls
           agent={s.agent}

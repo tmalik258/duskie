@@ -9,6 +9,7 @@ import { useAgents } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
+import { shortcutBinding } from "@/lib/shortcuts";
 import { installUpdate, updateSettings, useAssistantName, useSidekick } from "@/lib/store";
 import { pickTip } from "@/lib/tips";
 import { type AppTime, type CalendarToday, formatDuration, type LaterItem } from "@/lib/types";
@@ -261,11 +262,11 @@ function ago(mins: number): string {
 }
 
 function QuickActions({ paused }: { paused: boolean }) {
-  const hotkey = useSidekick((s) => s.settings.paletteHotkey);
+  const hotkey = shortcutBinding(useSidekick((s) => s.settings.paletteHotkey));
   const name = useAssistantName();
   return (
     <>
-      <RoundButton label={`Ask ${name} (${hotkey})`} onClick={() => void api.askOpen()}>
+      <RoundButton label={hotkey ? `Ask ${name} (${hotkey})` : `Ask ${name}`} onClick={() => void api.askOpen()}>
         <Icon name="ask" size={15} />
       </RoundButton>
       <FocusButton />

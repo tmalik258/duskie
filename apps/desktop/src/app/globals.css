@@ -412,6 +412,57 @@ body {
   --isl-rim: transparent;
   --isl-sheen: none;
 }
+/* Atelier: near-black / porcelain / sage — opt-in test theme. */
+.island-shell[data-color="atelier"] {
+  --c1: #0a0a0a;
+  --c2: #f2f0eb;
+  --c3: #7a8f7e;
+  --c4: #95a89a;
+  --isl-bg: rgb(from var(--c1) r g b / 0.98);
+  --isl-rim: transparent;
+  --isl-sheen: none;
+  --accent: var(--c3);
+  --surface: rgb(from var(--c2) r g b / 0.14);
+  --border: rgb(from var(--c4) r g b / 0.28);
+  --muted: rgb(from var(--c2) r g b / 0.62);
+  --hover: rgb(from var(--c4) r g b / 0.16);
+  box-shadow:
+    0 10px 30px -6px rgb(0 0 0 / 0.55),
+    0 2px 6px rgb(0 0 0 / 0.3);
+}
+.island-shell__wash {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(
+    125deg,
+    rgb(from var(--c1) r g b / 0.2) 0%,
+    rgb(from var(--c3) r g b / 0.35) 35%,
+    rgb(from var(--c4) r g b / 0.4) 58%,
+    rgb(from var(--c2) r g b / 0.25) 100%
+  );
+  mix-blend-mode: soft-light;
+}
+/* Press scale only on real controls — not composer .ak-row wrappers (input click
+   keeps the parent :active and squished the field). */
+.island-shell[data-color="atelier"] .chip:active,
+.island-shell[data-color="atelier"] button.ak-row:active,
+.island-shell[data-color="atelier"] .ak-tab:active {
+  transform: scale(0.97);
+  transition: transform 160ms var(--ease-out-strong);
+}
+@media (prefers-reduced-motion: reduce) {
+  .island-shell[data-color="atelier"] .chip:active,
+  .island-shell[data-color="atelier"] button.ak-row:active,
+  .island-shell[data-color="atelier"] .ak-tab:active {
+    transform: none;
+  }
+}
+.island-shell[data-simple] .island-shell__wash {
+  display: none;
+}
 
 /* Windows transparency effects off: a solid colour, no sheen. */
 .island-shell[data-solid] {
@@ -499,6 +550,15 @@ body {
   --accent: #0a84ff;
   color: var(--text);
   color-scheme: dark;
+}
+.island-shell[data-color="atelier"] .island-settings {
+  --bg: var(--c1);
+  --surface: rgb(from var(--c2) r g b / 0.14);
+  --text: var(--c2);
+  --muted: rgb(from var(--c2) r g b / 0.62);
+  --border: rgb(from var(--c4) r g b / 0.28);
+  --hover: rgb(from var(--c4) r g b / 0.16);
+  --accent: var(--c3);
 }
 
 .island-settings [role="switch"][aria-checked="false"] {
@@ -814,6 +874,41 @@ body {
   font-size: 11.5px;
   color: rgb(235 235 245 / 0.45);
 }
+/* Atelier menus (in-shell + portaled with data-color). */
+.island-shell[data-color="atelier"] .menu,
+.menu[data-color="atelier"] {
+  --c1: #0a0a0a;
+  --c2: #f2f0eb;
+  --c3: #7a8f7e;
+  --c4: #95a89a;
+  background: rgb(from var(--c1) r g b / 0.98);
+  box-shadow:
+    inset 0 0.5px 0 rgb(from var(--c2) r g b / 0.06),
+    0 0 0 0.5px rgb(from var(--c4) r g b / 0.28),
+    0 16px 40px -8px rgb(0 0 0 / 0.65);
+  color: var(--c2);
+}
+.island-shell[data-color="atelier"] .menu-item,
+.menu[data-color="atelier"] .menu-item {
+  color: rgb(from var(--c2) r g b / 0.88);
+}
+.island-shell[data-color="atelier"] .menu-item:hover,
+.island-shell[data-color="atelier"] .menu-item:focus-visible,
+.menu[data-color="atelier"] .menu-item:hover,
+.menu[data-color="atelier"] .menu-item:focus-visible {
+  background: rgb(from var(--c4) r g b / 0.22);
+}
+.island-shell[data-color="atelier"] .menu-item small,
+.menu[data-color="atelier"] .menu-item small {
+  color: rgb(from var(--c2) r g b / 0.5);
+}
+.island-shell[data-simple][data-color="atelier"] .menu,
+.island-shell[data-solid][data-color="atelier"] .menu,
+.menu[data-color="atelier"] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--c1);
+}
 
 /* The voice: rainbow bars that follow the level. */
 /* Full listening style: a wide, quiet waveform in the island's ink. */
@@ -936,6 +1031,19 @@ body {
     "Segoe UI",
     system-ui,
     sans-serif;
+}
+.island-shell[data-color="atelier"] .ak {
+  --ink: var(--c2);
+  --i2: rgb(from var(--c2) r g b / 0.68);
+  --i3: rgb(from var(--c2) r g b / 0.52);
+  --chipbg: rgb(from var(--c4) r g b / 0.2);
+}
+.island-shell[data-color="atelier"] .ak-tab[aria-selected="true"] {
+  background: rgb(from var(--c3) r g b / 0.22);
+  color: var(--c2);
+}
+.island-shell[data-color="atelier"] .ak-row[data-sel="true"] {
+  background: rgb(from var(--c4) r g b / 0.18);
 }
 .ak > * {
   min-width: 0;
@@ -1827,6 +1935,15 @@ select.ak-mi option {
   font-size: 10.5px;
   color: var(--i3);
   white-space: nowrap;
+}
+.island-shell[data-color="atelier"] .ak-rv-head .keys,
+.island-shell[data-color="atelier"] .ak-meta .keys {
+  color: rgb(from var(--c2) r g b / 0.78);
+  background: rgb(from var(--c3) r g b / 0.28);
+  padding: 3px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  letter-spacing: 0.02em;
 }
 .ak-rv-file {
   border-radius: 14px;

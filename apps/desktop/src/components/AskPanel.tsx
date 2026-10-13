@@ -5,6 +5,7 @@
 // attachable on request. Rendered inside the island shell; the island owns
 // the morph, this owns the content.
 
+import { motion, useReducedMotion } from "motion/react";
 import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type AskTab,
@@ -17,6 +18,7 @@ import {
   setTab,
   useAgents,
 } from "@/lib/agents";
+import { atelierStaggerChild, atelierStaggerChildReduced, atelierStaggerParent } from "@/lib/atelier-motion";
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useAltHeld } from "@/lib/hooks";
@@ -146,6 +148,8 @@ export function AskPanel() {
   const hearing = useSidekick((s) => s.hearing);
   const voiceReady = useSidekick((s) => s.settings.voice.enabled && (s.voiceStatus?.listening ?? false));
   const settings = useSidekick((s) => s.settings);
+  const atelier = settings.islandColor === "atelier";
+  const reducedMotion = useReducedMotion() ?? false;
   const [text, setText] = useState(ask?.prompt ?? "");
   const alt = useAltHeld();
   const tab = useAgents((s) => s.tab);
@@ -967,7 +971,7 @@ export function AskPanel() {
       aria-hidden={tab !== "agents"}
     >
       <div data-agents-tabs="">{tab === "agents" ? tabs : null}</div>
-      <AgentsTab keys={alt} maxHeight={scrollMax} active={tab === "agents"} />
+      <AgentsTab maxHeight={scrollMax} active={tab === "agents"} />
     </div>
   ) : null;
 
@@ -1191,7 +1195,52 @@ export function AskPanel() {
         ) : firstRun ? (
           <FirstRun />
         ) : (
-          rows > 0 && (
+          rows > 0 &&
+          (atelier ? (
+            <motion.ul
+              key={slash ? "slash" : asking ? "typing" : "start"}
+              className="ak-list ak-scroll"
+              style={{ maxHeight: scrollMax }}
+              initial="hidden"
+              animate="show"
+              variants={atelierStaggerParent}
+            >
+              {items.map((it, i) => (
+                <motion.li
+                  key={it.id}
+                  ref={scrollIfActive(active === i)}
+                  variants={reducedMotion ? atelierStaggerChildReduced : atelierStaggerChild}
+                >
+                  {it.group && <p className="ak-group">{it.group}</p>}
+                  <button
+                    type="button"
+                    data-sel={active === i}
+                    onMouseMove={() => setSelected(i)}
+                    onClick={() => runRow(i)}
+                    className="ak-row"
+                  >
+                    <span className="ak-ico">{it.icon}</span>
+                    <span className="min-w-0 flex-1 truncate">{it.label}</span>
+                    {it.hint && <span className="ak-hint">{it.hint}</span>}
+                    {it.key ? (
+                      <kbd className="ak-key">{it.key}</kbd>
+                    ) : (
+                      asking &&
+                      active === i &&
+                      (it.ctrlRun ? (
+                        <span className="ak-keys">
+                          <kbd className="ak-key">Enter</kbd>
+                          <kbd className="ak-key">Ctrl Enter</kbd>
+                        </span>
+                      ) : (
+                        <kbd className="ak-key">Enter</kbd>
+                      ))
+                    )}
+                  </button>
+                </motion.li>
+              ))}
+            </motion.ul>
+          ) : (
             <ul
               key={slash ? "slash" : asking ? "typing" : "start"}
               className="ak-list ak-scroll"
@@ -1228,7 +1277,7 @@ export function AskPanel() {
                 </li>
               ))}
             </ul>
-          )
+          ))
         )}
 
         {handoffError && <p className="ak-err">{handoffError}</p>}

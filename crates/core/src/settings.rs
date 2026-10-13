@@ -71,10 +71,12 @@ pub struct Settings {
     pub sound_kit: String,
     /// Per-skill switches set by the user.
     pub skills: BTreeMap<String, SkillPref>,
-    /// Global shortcut that turns the island into Ask mode.
+    /// Global shortcut that turns the island into Ask mode. A leading `-`
+    /// keeps the combo but turns it off; empty means no binding yet.
     pub palette_hotkey: String,
     /// More global shortcuts, by action (talk, accept, dismiss, screen,
-    /// clipboard, pause, settings). Empty turns one off.
+    /// clipboard, pause, settings). A leading `-` turns one off without
+    /// clearing the combo; empty means no binding yet.
     pub shortcuts: BTreeMap<String, String>,
     /// Where projects and files open: an editor id ("cursor", "pycharm"),
     /// or "auto" for the one used most this week.
@@ -112,8 +114,8 @@ pub struct Settings {
     pub routines: bool,
     /// Open the usual setup without asking (offered after five Open alls).
     pub routines_auto: bool,
-    /// Fade the island out while a fullscreen app is in front. Off: the
-    /// island stays on top of everything, fullscreen apps included.
+    /// Fade the island out while a fullscreen app is in front. On by default
+    /// so games and videos stay undisturbed; off keeps the island on top.
     pub hide_in_fullscreen: bool,
     /// Now and then, when nothing needs you, a short tip on the island.
     pub tips: bool,
@@ -619,18 +621,19 @@ pub struct SkillPref {
 /// turns it off.
 pub const SENSORS_OFF_BY_DEFAULT: [&str; 0] = [];
 
-pub const THEMES: [&str; 7] = [
-    "pearl", "aurora", "chrome", "peach", "mint", "lilac", "onyx",
+pub const THEMES: [&str; 8] = [
+    "pearl", "aurora", "chrome", "peach", "mint", "lilac", "onyx", "atelier",
 ];
 /// Island colours, the default first; the glass ones are a deep tint with
 /// a light rim.
-pub const ISLAND_COLORS: [&str; 6] = [
+pub const ISLAND_COLORS: [&str; 7] = [
     "solid_black",
     "black_glass",
     "graphite",
     "midnight",
     "smoke",
     "warm_graphite",
+    "atelier",
 ];
 /// "sidekick" is synthesized in the app (soft tones with character);
 /// "01" is the SND kit.
@@ -670,7 +673,7 @@ impl Default for Settings {
             deny_sites: Vec::new(),
             routines: true,
             routines_auto: false,
-            hide_in_fullscreen: false,
+            hide_in_fullscreen: true,
             tips: true,
             alive: true,
             crash_reports: false,
@@ -692,6 +695,21 @@ impl Default for Settings {
 pub const DEFAULT_PALETTE_HOTKEY: &str = "Ctrl+Space";
 /// Screens in the first-run welcome (Welcome, Your AI, Connect, Tools, Extras).
 pub const WELCOME_STEP_COUNT: u32 = 5;
+
+/// Trims a shortcut; keeps a leading `-` so Off does not clear the combo.
+fn sanitize_shortcut(raw: &str) -> String {
+    let t = raw.trim();
+    if let Some(rest) = t.strip_prefix('-') {
+        let combo = rest.trim();
+        if combo.is_empty() {
+            String::new()
+        } else {
+            format!("-{combo}")
+        }
+    } else {
+        t.to_owned()
+    }
+}
 
 #[derive(Debug, thiserror::Error)]
 pub enum SettingsError {
@@ -769,8 +787,10 @@ impl Settings {
         if !SOUND_KITS.contains(&self.sound_kit.as_str()) {
             self.sound_kit = SOUND_KITS[0].to_string();
         }
-        if self.palette_hotkey.trim().is_empty() {
-            self.palette_hotkey = DEFAULT_PALETTE_HOTKEY.into();
+        // Trim; keep a leading `-` (Off) so the combo stays saved.
+        self.palette_hotkey = sanitize_shortcut(&self.palette_hotkey);
+        for keys in self.shortcuts.values_mut() {
+            *keys = sanitize_shortcut(keys);
         }
         self.ai = self.ai.sanitized();
         self.voice.speed = if self.voice.speed.is_finite() {
@@ -865,7 +885,7 @@ mod tests {
         let mut s = Settings::default();
         s.ai.order = vec!["local".into(), "bogus".into(), "local".into()];
         s.ai.semif.mode = "weird".into();
-        s.palette_hotkey = " ".into();
+        s.palette_hotkey = " Ctrl+Space ".into();
         let s = s.sanitized();
         assert_eq!(
             s.ai.order,
@@ -881,7 +901,21 @@ mod tests {
         );
         assert_eq!(s.ai.coding_agent, "auto");
         assert_eq!(s.ai.semif.mode, "direct");
-        assert_eq!(s.palette_hotkey, DEFAULT_PALETTE_HOTKEY);
+        assert_eq!(s.palette_hotkey, "Ctrl+Space");
+    }
+
+    #[test]
+    fn empty_palette_hotkey_stays_empty() {
+        let mut s = Settings::default();
+        s.palette_hotkey = "  ".into();
+        assert_eq!(s.sanitized().palette_hotkey, "");
+    }
+
+    #[test]
+    fn off_palette_hotkey_keeps_combo() {
+        let mut s = Settings::default();
+        s.palette_hotkey = " -Ctrl+Space ".into();
+        assert_eq!(s.sanitized().palette_hotkey, "-Ctrl+Space");
     }
 
     #[test]

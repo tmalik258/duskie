@@ -29,6 +29,7 @@ import { updateBusy, updateLabel } from "@/lib/updates";
 import { ActivityProgress } from "./ActivityProgress";
 import { Announcer } from "./Announcer";
 import { ASK_MASCOT, ASK_ORB, ASK_PAD, AskPanel, VoiceBars } from "./AskPanel";
+import { AtelierWash } from "./AtelierWash";
 import { Icon } from "./Icon";
 import { Glance, RoundButton } from "./IslandGlance";
 import { IslandGuide, useGuide } from "./IslandGuide";
@@ -633,9 +634,15 @@ export function Island() {
         onPointerEnter={() => setHovered(true)}
         onPointerLeave={() => setHovered(false)}
       >
+        <AtelierWash
+          enabled={settings.islandColor === "atelier"}
+          simple={look.simple}
+          mascot={mascot}
+          donePill={donePill}
+        />
         <Announcer />
         <motion.div
-          className="absolute top-0 left-0"
+          className="absolute top-0 left-0 z-1"
           initial={false}
           animate={{ x: orbX, y: orbY, scale: orbScale }}
           transition={transition}

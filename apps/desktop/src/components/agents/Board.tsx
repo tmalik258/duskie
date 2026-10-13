@@ -479,7 +479,7 @@ function plain(md: string): string {
     .trim();
 }
 
-export function Board({ sessions, maxHeight }: { sessions: Session[]; keys?: boolean; maxHeight: number }) {
+export function Board({ sessions, maxHeight }: { sessions: Session[]; maxHeight: number }) {
   const focus = useAgents((s) => s.focus);
   const live = sessions;
   const paused = sessions.filter((s) => s.restored && s.status === "ended");
@@ -634,7 +634,6 @@ export function Board({ sessions, maxHeight }: { sessions: Session[]; keys?: boo
           setText={setText}
           onSend={send}
           onBlur={flushDraft}
-          keys={true}
           onClear={() =>
             void api.agentProject(target.id).then((path) => {
               setLayout("one");
