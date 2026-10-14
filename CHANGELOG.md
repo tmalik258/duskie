@@ -4,6 +4,28 @@ All notable changes to Sidekick are listed here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-14
+
+### Look and feel
+
+- Atelier is the new default theme and island colour (near-black glass with porcelain accents). Pearl, Aurora and the other looks stay in Appearance.
+- Tooltips on glance actions and settings controls.
+
+### Focus
+
+- Focus mode: a timed stretch with Do Not Disturb on; suggestions and alerts wait until you are done. Start from the island glance, the Focus shortcut, or by voice. Hold Shift on Focus to Pause or Resume instead.
+
+### Voice
+
+- Voice settings in AI: wake word, listening style, speak answers, interrupt while speaking, conversation mode, speak suggestions, words voice gets wrong, voice pick and speed.
+- New installs and previous defaults move to Supertonic Female 4 (bright); a voice you already chose is kept.
+
+### Ask and agents
+
+- Multi-select choices (`OPTION_MULTI` / "pick any that apply") with Confirm.
+- Codex plan replies parse into a clearer plan panel.
+- Ask and other shortcuts can be turned Off with a leading `-` without clearing the combo.
+
 ## [0.2.1] - 2026-10-12
 
 ### Live activity
@@ -247,7 +269,8 @@ The first public release.
 - Update checks once a day. A small sign on the island shows a waiting update; installs are checked against SHA256SUMS.txt and only run after your click.
 - History with Undo for files Sidekick creates (24 hours).
 
-[Unreleased]: https://github.com/tmalik258/sidekick/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/tmalik258/sidekick/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/tmalik258/sidekick/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/tmalik258/sidekick/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/tmalik258/sidekick/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/tmalik258/sidekick/releases/tag/v0.1.0
