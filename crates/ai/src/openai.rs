@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::time::Duration;
 
 use async_trait::async_trait;
@@ -256,8 +257,81 @@ fn thinks_by_default(model: &str) -> bool {
 
 /// Warming the same model again within this time does nothing.
 const WARM_AGAIN: Duration = Duration::from_secs(60);
-static LAST_WARM: std::sync::Mutex<Option<(String, std::time::Instant)>> =
-    std::sync::Mutex::new(None);
+static LAST_WARM: std::sync::LazyLock<std::sync::Mutex<HashMap<String, std::time::Instant>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+
+/// Loads each model into Ollama and keeps it for 30 minutes. Requests run
+/// in parallel. No-op when the URL is not Ollama or `models` is empty.
+pub async fn warm_models(base_url: &str, models: &[String]) {
+    let base = loopback(base_url.trim().trim_end_matches('/'));
+    let Some(root) = ollama_root(&base) else {
+        return;
+    };
+    let mut uniq = Vec::new();
+    for m in models {
+        let m = m.trim();
+        if !m.is_empty() && !uniq.iter().any(|u: &String| u == m) {
+            uniq.push(m.to_owned());
+        }
+    }
+    if uniq.is_empty() {
+        return;
+    }
+    let now = std::time::Instant::now();
+    let to_warm: Vec<String> = {
+        let last = LAST_WARM.lock().unwrap_or_else(|e| e.into_inner());
+        uniq.into_iter()
+            .filter(|m| {
+                !last
+                    .get(m)
+                    .is_some_and(|at| now.duration_since(*at) < WARM_AGAIN)
+            })
+            .collect()
+    };
+    if to_warm.is_empty() {
+        return;
+    }
+    let mut client = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(3))
+        .timeout(Duration::from_secs(120));
+    if is_local_url(&base) {
+        client = client.no_proxy();
+    }
+    let Ok(client) = client.build() else {
+        return;
+    };
+    let root = root.to_owned();
+    let jobs: Vec<_> = to_warm
+        .into_iter()
+        .map(|model| {
+            let client = client.clone();
+            let root = root.clone();
+            async move {
+                let sent = client
+                    .post(format!("{root}/api/generate"))
+                    .json(&json!({
+                        "model": model,
+                        "prompt": "",
+                        "keep_alive": "30m",
+                        "stream": false,
+                    }))
+                    .send()
+                    .await;
+                if let Err(err) = sent {
+                    log::debug!("could not warm {model}: {err}");
+                    return None;
+                }
+                Some(model)
+            }
+        })
+        .collect();
+    let warmed = futures_util::future::join_all(jobs).await;
+    let mut last = LAST_WARM.lock().unwrap_or_else(|e| e.into_inner());
+    let at = std::time::Instant::now();
+    for model in warmed.into_iter().flatten() {
+        last.insert(model, at);
+    }
+}
 
 /// `localhost` as `127.0.0.1`. Windows tries `::1` first, and Ollama only
 /// listens on IPv4 unless "Expose Ollama to the network" is on, so a refused
@@ -331,22 +405,10 @@ impl OpenAiCompat {
     /// Ollama's unload timer to its 5 minute default, so this runs after each
     /// local answer: the next question does not wait for a cold load.
     pub async fn keep_loaded(&self) {
-        let Some(root) = ollama_root(&self.base_url) else {
-            return;
-        };
         let Ok(model) = self.pick_model().await else {
             return;
         };
-        let sent = self
-            .client
-            .post(format!("{root}/api/generate"))
-            .json(&json!({ "model": model, "keep_alive": "30m" }))
-            .timeout(Duration::from_secs(120))
-            .send()
-            .await;
-        if let Err(err) = sent {
-            log::debug!("could not keep {model} loaded: {err}");
-        }
+        warm_models(&self.base_url, &[model]).await;
     }
 
     /// Asks Ollama to write `tool`'s arguments again with its JSON schema as
@@ -979,32 +1041,10 @@ impl AiProvider for OpenAiCompat {
     /// Ollama unloads a model after a few idle minutes; this loads it (and
     /// keeps it for 30 minutes) while the user types. Every Ask open renews it.
     async fn warm(&self) {
-        let Some(root) = ollama_root(&self.base_url) else {
-            return;
-        };
         let Ok(model) = self.pick_model().await else {
             return;
         };
-        {
-            let mut last = LAST_WARM.lock().unwrap_or_else(|e| e.into_inner());
-            if last
-                .as_ref()
-                .is_some_and(|(m, at)| *m == model && at.elapsed() < WARM_AGAIN)
-            {
-                return;
-            }
-            *last = Some((model.clone(), std::time::Instant::now()));
-        }
-        let sent = self
-            .client
-            .post(format!("{root}/api/generate"))
-            .json(&json!({ "model": model, "keep_alive": "30m" }))
-            .timeout(Duration::from_secs(120))
-            .send()
-            .await;
-        if let Err(err) = sent {
-            log::debug!("could not warm {model}: {err}");
-        }
+        warm_models(&self.base_url, &[model]).await;
     }
 
     async fn chat(
@@ -1099,6 +1139,20 @@ mod tests {
         );
         assert_eq!(ollama_root("http://localhost:1234/v1"), None);
         assert_eq!(ollama_root("http://localhost:11434"), None);
+    }
+
+    #[test]
+    fn warm_body_uses_stream_false_shape() {
+        // Documented contract for /api/generate warm payloads.
+        let body = json!({
+            "model": "qwen3:4b",
+            "prompt": "",
+            "keep_alive": "30m",
+            "stream": false,
+        });
+        assert_eq!(body["stream"], false);
+        assert_eq!(body["keep_alive"], "30m");
+        assert_eq!(body["prompt"], "");
     }
 
     #[test]

@@ -10,6 +10,7 @@ import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
 import type { RepoRow, ReposOverview } from "@/lib/types";
+import { Tip } from "../Tip";
 
 const CI_COLOR = { pass: "#30d158", fail: "#ff453a", pending: "#ff9f0a", none: "rgb(255 255 255 / 0.25)" } as const;
 const CI_LABEL = { pass: "Checks pass", fail: "Checks failing", pending: "Checks running", none: "No checks" } as const;
@@ -145,15 +146,11 @@ export function Repos({ maxHeight }: { maxHeight?: number }) {
         <span>
           {data.repos.length} repo{data.repos.length === 1 ? "" : "s"} · {via}
         </span>
-        <button
-          type="button"
-          className="ak-rcheck"
-          title="Check now: fetch every repo and look for new commits and PRs"
-          disabled={checking}
-          onClick={() => void check()}
-        >
-          {checking ? "Checking..." : `checked ${since(checked, now)}`}
-        </button>
+        <Tip label="Check now: fetch every repo and look for new commits and PRs">
+          <button type="button" className="ak-rcheck" disabled={checking} onClick={() => void check()}>
+            {checking ? "Checking..." : `checked ${since(checked, now)}`}
+          </button>
+        </Tip>
       </div>
       {error && (
         <p className="ak-rnote" role="alert">
@@ -174,13 +171,14 @@ export function Repos({ maxHeight }: { maxHeight?: number }) {
                 aria-expanded={expanded}
                 onClick={() => setOpen(expanded ? null : r.path)}
               >
-                <span
-                  className="ak-rdot"
-                  style={{ background: CI_COLOR[r.ci] }}
-                  role="img"
-                  aria-label={CI_LABEL[r.ci]}
-                  title={CI_LABEL[r.ci]}
-                />
+                <Tip label={CI_LABEL[r.ci]} className="inline-flex shrink-0">
+                  <span
+                    className="ak-rdot"
+                    style={{ background: CI_COLOR[r.ci] }}
+                    role="img"
+                    aria-label={CI_LABEL[r.ci]}
+                  />
+                </Tip>
                 <span className="min-w-0">
                   <span className="ak-rn">{r.name}</span>
                   <span className="ak-rb">⎇ {r.branch}</span>

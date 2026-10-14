@@ -48,6 +48,8 @@ interface SidekickState {
   netNotice: NetNotice | null;
   /** Cursor is over the island's interactive area (reported by Rust). */
   hovered: boolean;
+  /** Shift (hovered) or Shift+Alt (suggestion) — Rust polls; webview has no focus. */
+  shiftHeld: boolean;
   /** Extra interactive area while a floating menu is open (unioned into the hit rect). */
   overlayHit: HitRect | null;
   /** False while a fullscreen app is in front; the island fades away. */
@@ -186,6 +188,7 @@ export const useSidekick = create<SidekickState>(() => ({
   offlineSince: null,
   netNotice: null,
   hovered: false,
+  shiftHeld: false,
   overlayHit: null,
   visible: true,
   fullscreen: false,
@@ -675,14 +678,17 @@ function chatRequest(q: string, attach?: ChatAttach) {
     { role: "user", content: q },
   ];
   const auto = autoContext(q, ask);
+  const windowOn = (ask?.attachWindow ?? false) || auto.window;
+  // App chip / window-about-app phrases capture the window (PNG), same path as Screen.
+  const screenOn = attach?.screen ?? (auto.screen || windowOn);
   return {
     history,
     attach: {
-      window: (ask?.attachWindow ?? false) || auto.window,
+      window: windowOn,
       clipboard: attach?.clipboard ?? ((ask?.attachClip ?? false) || auto.clipboard),
       page: chatPage,
       skill: chatSkill,
-      screen: attach?.screen ?? false,
+      screen: screenOn,
       // Every answer follows the speaker button, typed or spoken.
       speak: attach?.speak ?? settings.voice.speakAnswers,
       voice: attach?.voice ?? false,
@@ -723,7 +729,7 @@ function startEarly(q: string, speak: boolean) {
 }
 
 export function sendChat(prompt: string, attach?: ChatAttach): boolean {
-  const { turns, chatId } = useSidekick.getState();
+  const { turns, chatId, ask } = useSidekick.getState();
   const q = prompt.trim();
   if (!q || chatId) {
     dropEarly();
@@ -734,10 +740,22 @@ export function sendChat(prompt: string, attach?: ChatAttach): boolean {
   if (!adopted) dropEarly();
   early = null;
   const id = adopted?.id ?? crypto.randomUUID();
-  const screen = attach?.screen ?? false;
+  const auto = autoContext(q, ask);
+  // Flip chips on when the question clearly wants that context, so the UI
+  // matches what goes with the send and follow-ups keep it.
+  const nextAsk =
+    ask && (auto.window || auto.clipboard)
+      ? {
+          ...ask,
+          attachWindow: ask.attachWindow || auto.window,
+          attachClip: ask.attachClip || auto.clipboard,
+        }
+      : ask;
   const req = chatRequest(q, attach);
+  const screen = req.attach.screen;
   useSidekick.setState({
     chatId: id,
+    ask: nextAsk,
     turns: [
       ...turns,
       { role: "user", content: q, screen, localOnly: req.localOnly },
@@ -763,17 +781,34 @@ export function sendChat(prompt: string, attach?: ChatAttach): boolean {
 
 /**
  * Context a question plainly points at, so you rarely tick the chips: "this
- * error" or "here" means the window in front, "what I copied" the clipboard.
- * Secrets on the clipboard are never added this way.
+ * error" or "here" means the window in front, "what I copied" the clipboard,
+ * "what's on my screen" a screenshot. Secrets on the clipboard are never
+ * added this way.
  */
-export function autoContext(q: string, ask: AskState | null): { window: boolean; clipboard: boolean } {
+export function autoContext(q: string, ask: AskState | null): { window: boolean; clipboard: boolean; screen: boolean } {
   const text = q.toLowerCase();
-  const win = Boolean(ask?.context.app) && /\b(this|here|current(ly)?|in front)\b/.test(text);
+  const app = ask?.context.app?.trim().toLowerCase() ?? "";
+  const mentionsApp = app.length > 1 && text.includes(app);
+  const win =
+    Boolean(ask?.context.app) &&
+    (/\b(this|here|current(ly)?|in front)\b/.test(text) ||
+      /\b(on|in) (the |my |this )?(app|window)\b/.test(text) ||
+      /\bwhat (i'?m|i am|you'?re|you are) doing\b/.test(text) ||
+      /\bwhat('s| is) (wrong|the issue|broken)\b/.test(text) ||
+      /\bhow (do i|to|can i) (fix|resolve|solve|use|do|find|open)\b/.test(text) ||
+      /\b(where|which) (is|are|do i|can i)\b/.test(text) ||
+      /\bpoint (at|to|out)\b/.test(text) ||
+      /\b(first|this|that) control\b/.test(text) ||
+      /\b(walk me through|guide me|show me how)\b/.test(text) ||
+      mentionsApp);
   const clipboard =
     Boolean(ask?.context.clipboardKind) &&
     !ask?.context.clipboardSecret &&
     /\b(copied|clipboard|pasted|i just copied|this (error|trace|stack ?trace|snippet|link|url))\b/.test(text);
-  return { window: win, clipboard };
+  const screen = /\b(on (my )?screen|what('s| is) on (my |the )?screen|look at (my )?screen|see (my )?screen)\b/.test(
+    text,
+  );
+  return { window: win, clipboard, screen };
 }
 
 /** Saves the conversation so Ask mode can list it later. */
@@ -867,8 +902,10 @@ function muteSuggestionCue(state: MascotState, previous: MascotState | null): bo
   return state === "listening" || previous === "listening";
 }
 
-export function newChat() {
-  cancelChat();
+/** Clears the Ask thread. Pass `cancel: false` to leave an in-flight answer
+ * running unbound (Ctrl+N) so it can finish in the background. */
+export function newChat(opts?: { cancel?: boolean }) {
+  if (opts?.cancel !== false) cancelChat();
   const { ask, settings } = useSidekick.getState();
   useSidekick.setState({
     // A new chat starts from the setting; the old chat's choice stays with it.
@@ -922,7 +959,16 @@ function updateLastTurn(id: string, fn: (t: Turn) => Turn) {
   useSidekick.setState({ turns: [...turns.slice(0, -1), fn(last)] });
 }
 
-export const setHovered = (hovered: boolean) => useSidekick.setState({ hovered });
+export const setHovered = (hovered: boolean) => {
+  if (hovered) {
+    useSidekick.setState({ hovered });
+    return;
+  }
+  // Leave shiftHeld alone while a suggestion is up — Shift+Alt morph is global
+  // and must survive the cursor leaving the island.
+  const keepShift = useSidekick.getState().suggestion != null;
+  useSidekick.setState(keepShift ? { hovered } : { hovered, shiftHeld: false });
+};
 
 /** Grow the clickable area around a floating menu so it is not click-through. */
 export const setOverlayHit = (overlayHit: HitRect | null) => {
@@ -1057,7 +1103,9 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
         reactToResult(lastResult, sounds);
       }),
       listen(EVENTS.suggestionClear, (id) => {
-        if (useSidekick.getState().suggestion?.id === id) useSidekick.setState({ suggestion: null });
+        if (useSidekick.getState().suggestion?.id === id) {
+          useSidekick.setState({ suggestion: null, shiftHeld: false });
+        }
       }),
       listen(EVENTS.suggestionLater, (later) => {
         // Everything that was waiting is dealt with: a small celebration.
@@ -1066,6 +1114,7 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
         if (before >= 2 && later === 0) setMood("celebrate", 3000, sounds ? "tada" : undefined);
       }),
       listen(EVENTS.islandHover, setHovered),
+      listen(EVENTS.islandShift, (shiftHeld: boolean) => useSidekick.setState({ shiftHeld })),
       listen(EVENTS.islandVisible, (visible) => useSidekick.setState({ visible })),
       listen(EVENTS.islandFullscreen, (fullscreen) => useSidekick.setState({ fullscreen })),
       listen(EVENTS.browsersChanged, () => onBrowsersChanged()),

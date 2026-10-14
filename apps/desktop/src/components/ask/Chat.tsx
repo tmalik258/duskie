@@ -12,6 +12,7 @@ import { extractChoices, splitOptions } from "@/lib/options";
 import { useReveal } from "@/lib/reveal";
 import { askAgain, askWhenOnline, retryLast, setAsk, setAskModel, thinkHarder, useSidekick } from "@/lib/store";
 import { type Agents, type AiSettings, PROVIDER_LABELS, type ProviderStatus, type Turn } from "@/lib/types";
+import { Tip } from "../Tip";
 import { AnswerOptions, Proposals, pendingCount } from "./Proposals";
 import { FailureCard } from "./States";
 
@@ -171,20 +172,21 @@ export function SaveRecipe({ prompt }: { prompt: string }) {
   if (!prompt.trim()) return null;
   if (saved) return <span className="max-w-40 truncate whitespace-nowrap">{saved}</span>;
   return (
-    <button
-      type="button"
-      onClick={() =>
-        void api
-          .recipeSave({ id: "", name: "", prompt, trigger: { when: "manual" }, auto: false, enabled: true })
-          .then(setSaved)
-          .catch((e) => setSaved(String(e)))
-      }
-      aria-label="Save as recipe"
-      title="Save as recipe"
-      className="ak-act chip"
-    >
-      <ActIcon d="M7 4h10v16l-5-3.5L7 20z" />
-    </button>
+    <Tip label="Save as recipe">
+      <button
+        type="button"
+        onClick={() =>
+          void api
+            .recipeSave({ id: "", name: "", prompt, trigger: { when: "manual" }, auto: false, enabled: true })
+            .then(setSaved)
+            .catch((e) => setSaved(String(e)))
+        }
+        aria-label="Save as recipe"
+        className="ak-act chip"
+      >
+        <ActIcon d="M7 4h10v16l-5-3.5L7 20z" />
+      </button>
+    </Tip>
   );
 }
 
@@ -291,7 +293,10 @@ function AnswerActions({
   const speaking = useSidekick((s) => s.speaking);
   const read = () => void (speaking ? api.voiceStop() : api.voiceRead(text));
   const copy = () => {
-    void navigator.clipboard.writeText(text).then(() => setCopied(true));
+    void api
+      .clipboardCopy(text)
+      .then(() => setCopied(true))
+      .catch(() => undefined);
   };
   useEffect(() => {
     if (!keys) return;
@@ -318,51 +323,53 @@ function AnswerActions({
   return (
     <div className="grid gap-1">
       <div className="ak-acts" data-detail={detail}>
-        <button
-          type="button"
-          onClick={copy}
-          onMouseLeave={() => setCopied(false)}
-          aria-label={copied ? "Copied" : "Copy"}
-          title={copied ? "Copied" : "Copy · Alt C"}
-          className="ak-act ico chip"
-        >
-          <ActIcon
-            d={
-              copied ? "M5 12.5l4.5 4.5L19 7.5" : "M8 8h12v12H8zM16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
-            }
-          />
-        </button>
-        <button
-          type="button"
-          onClick={read}
-          aria-label={speaking ? "Stop reading" : "Read aloud"}
-          title={speaking ? "Stop reading" : "Read aloud · Alt L"}
-          className="ak-act ico chip"
-        >
-          <ActIcon
-            d={
-              speaking
-                ? "M11 5 6 9H3v6h3l5 4zM16 9l5 6M21 9l-5 6"
-                : "M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"
-            }
-          />
-        </button>
-        {again && (
+        <Tip label={copied ? "Copied" : "Copy · Alt C"}>
           <button
             type="button"
-            onClick={() => askAgain()}
-            aria-label="Retry"
-            title="Retry · Alt T"
+            onClick={copy}
+            onMouseLeave={() => setCopied(false)}
+            aria-label={copied ? "Copied" : "Copy"}
             className="ak-act ico chip"
           >
-            <ActIcon d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5" />
+            <ActIcon
+              d={
+                copied
+                  ? "M5 12.5l4.5 4.5L19 7.5"
+                  : "M8 8h12v12H8zM16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
+              }
+            />
           </button>
+        </Tip>
+        <Tip label={speaking ? "Stop reading" : "Read aloud · Alt L"}>
+          <button
+            type="button"
+            onClick={read}
+            aria-label={speaking ? "Stop reading" : "Read aloud"}
+            className="ak-act ico chip"
+          >
+            <ActIcon
+              d={
+                speaking
+                  ? "M11 5 6 9H3v6h3l5 4zM16 9l5 6M21 9l-5 6"
+                  : "M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"
+              }
+            />
+          </button>
+        </Tip>
+        {again && (
+          <Tip label="Retry · Alt T">
+            <button type="button" onClick={() => askAgain()} aria-label="Retry" className="ak-act ico chip">
+              <ActIcon d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5" />
+            </button>
+          </Tip>
         )}
         {think && (
-          <button type="button" onClick={() => thinkHarder()} className="ak-act chip">
-            <ActIcon d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" />
-            Think harder {key("K")}
-          </button>
+          <Tip label="Think harder · Alt K">
+            <button type="button" onClick={() => thinkHarder()} className="ak-act chip">
+              <ActIcon d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" />
+              Think harder {key("K")}
+            </button>
+          </Tip>
         )}
         {recipe && (
           <span className="ak-acts-hover">

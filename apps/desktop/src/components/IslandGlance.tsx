@@ -3,6 +3,7 @@
 // One hover glance: day head + actions, then optional sections (needs you,
 // away, activity, later, tip). Cached data shows at once and refreshes behind.
 
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type ReactNode, useEffect, useState } from "react";
 import { useActivities, visibleActivities } from "@/lib/activities";
 import { useAgents } from "@/lib/agents";
@@ -49,23 +50,23 @@ export function Glance({ paused }: { paused: boolean }) {
   return (
     <div className="flex flex-col">
       {crash && <CrashCard note={crash} onDone={() => void refreshCrash()} />}
-      <div className="flex flex-col gap-0.5">
-        <div className="flex items-center gap-3">
-          <p className="min-w-0 flex-1 truncate font-display text-[15px] leading-8 font-semibold tracking-[-0.015em] text-white">
+      <div className="flex items-center gap-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <p className="truncate font-display text-[15px] leading-5 font-semibold tracking-[-0.015em] text-white">
             {head.title}
           </p>
-          <div className="flex shrink-0 items-center gap-1.5">
-            {head.join && (
-              <RoundButton label="Join meeting" onClick={() => void api.openReference("page", head.join ?? "")}>
-                <Icon name="play" size={14} />
-              </RoundButton>
-            )}
-            <QuickActions paused={paused} focusOpen={focusOpen} onFocusOpenChange={setFocusOpen} />
-          </div>
+          <p className="truncate text-[13px] leading-4 tracking-[-0.005em] text-[rgb(235_235_245/0.6)] tabular-nums">
+            {head.detail}
+          </p>
         </div>
-        <p className="truncate text-[13px] leading-4 tracking-[-0.005em] text-[rgb(235_235_245/0.6)] tabular-nums">
-          {head.detail}
-        </p>
+        <div className="flex shrink-0 items-center gap-1.5">
+          {head.join && (
+            <RoundButton label="Join meeting" onClick={() => void api.openReference("page", head.join ?? "")}>
+              <Icon name="play" size={14} />
+            </RoundButton>
+          )}
+          <QuickActions paused={paused} focusOpen={focusOpen} onFocusOpenChange={setFocusOpen} />
+        </div>
       </div>
       {focusOpen && <FocusPicker onDone={() => setFocusOpen(false)} />}
       <NeedsYouSection sessions={sessions} />
@@ -289,30 +290,88 @@ function QuickActions({
   focusOpen: boolean;
   onFocusOpenChange: (open: boolean) => void;
 }) {
-  const hotkey = shortcutBinding(useSidekick((s) => s.settings.paletteHotkey));
-  const name = useAssistantName();
   const update = useSidekick((s) => s.update);
+  const shift = useShiftHeld();
   // Single row keeps the glance short — two rows stacked taller than the copy.
   return (
     <div className="flex gap-1.5">
-      <RoundButton label={hotkey ? `Ask ${name} (${hotkey})` : `Ask ${name}`} onClick={() => void api.askOpen()}>
-        <Icon name="ask" size={15} />
-      </RoundButton>
-      <RoundButton label="Agents" onClick={openAgentsBoard}>
-        <Icon name="terminal" size={15} />
-      </RoundButton>
-      <FocusButton open={focusOpen} onOpenChange={onFocusOpenChange} />
-      <RoundButton
-        label={paused ? "Resume" : "Pause 15 minutes"}
-        onClick={() => void (paused ? api.sensorsResume() : api.sensorsPause(15))}
-      >
-        <Icon name={paused ? "play" : "pause"} size={14} />
-      </RoundButton>
+      <AskShiftAgentsButton shift={shift} />
+      <FocusShiftPauseButton paused={paused} open={focusOpen} onOpenChange={onFocusOpenChange} shift={shift} />
       {update ? <UpdateButton /> : null}
       <RoundButton label="Settings" onClick={() => void api.openSettings()}>
         <Icon name="settings" size={15} />
       </RoundButton>
     </div>
+  );
+}
+
+/** Shift for glance morphs. The shell stays unfocused, so keydown never
+ * arrives — Rust polls while hovered (and Shift+Alt for suggestions); pointer
+ * events back it up when the cursor is over the webview. */
+function useShiftHeld(): boolean {
+  const fromRust = useSidekick((s) => s.shiftHeld);
+  const [fromPointer, setFromPointer] = useState(false);
+  useEffect(() => {
+    const sync = (e: PointerEvent | KeyboardEvent) => setFromPointer(e.shiftKey);
+    const clear = () => setFromPointer(false);
+    window.addEventListener("pointermove", sync);
+    window.addEventListener("pointerdown", sync);
+    window.addEventListener("pointerover", sync);
+    window.addEventListener("keydown", sync);
+    window.addEventListener("keyup", sync);
+    window.addEventListener("blur", clear);
+    return () => {
+      window.removeEventListener("pointermove", sync);
+      window.removeEventListener("pointerdown", sync);
+      window.removeEventListener("pointerover", sync);
+      window.removeEventListener("keydown", sync);
+      window.removeEventListener("keyup", sync);
+      window.removeEventListener("blur", clear);
+    };
+  }, []);
+  return fromRust || fromPointer;
+}
+
+function keyHint(keys: string | undefined): string {
+  const k = keys ? shortcutBinding(keys) : "";
+  return k ? ` (${k})` : "";
+}
+
+/** Ask by default; hold Shift to morph into Agents (one slot, animated icon). */
+function AskShiftAgentsButton({ shift }: { shift: boolean }) {
+  const askKeys = shortcutBinding(useSidekick((s) => s.settings.paletteHotkey));
+  const agentsKeys = shortcutBinding(useSidekick((s) => s.settings.shortcuts.agents ?? ""));
+  const name = useAssistantName();
+  const reduced = useReducedMotion() ?? false;
+  const agents = shift;
+  const label = agents
+    ? `Agents${keyHint(agentsKeys)}`
+    : `Ask ${name}${keyHint(askKeys)} · Shift for Agents${keyHint(agentsKeys)}`;
+  return (
+    <Tip label={label}>
+      <button
+        type="button"
+        aria-label={label}
+        onClick={(e) => {
+          if (e.shiftKey || agents) openAgentsBoard();
+          else void api.askOpen();
+        }}
+        className="chip relative grid size-8 place-items-center overflow-hidden rounded-full bg-white/12 text-white/90 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff]"
+      >
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={agents ? "agents" : "ask"}
+            className="grid place-items-center"
+            initial={reduced ? false : { opacity: 0, scale: 0.7, rotate: agents ? -20 : 20 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            exit={reduced ? undefined : { opacity: 0, scale: 0.7, rotate: agents ? 20 : -20 }}
+            transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
+          >
+            <Icon name={agents ? "terminal" : "ask"} size={15} />
+          </motion.span>
+        </AnimatePresence>
+      </button>
+    </Tip>
   );
 }
 
@@ -339,18 +398,53 @@ function writeLastFocus(minutes: number) {
   }
 }
 
-/** Opens the duration picker, or ends an active focus stretch. */
-function FocusButton({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+/** Focus by default; hold Shift to morph into Pause / Resume (one slot). When
+ * sensors are already paused, Resume is primary and Shift reveals Focus. */
+function FocusShiftPauseButton({
+  paused,
+  open,
+  onOpenChange,
+  shift,
+}: {
+  paused: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  shift: boolean;
+}) {
   const focusing = useSidekick((s) => s.focusUntil !== null && s.focusUntil > Date.now());
-  const keys = useSidekick((s) => s.settings.shortcuts.focus);
-  const hint = keys ? ` (${keys})` : "";
+  const focusKeys = useSidekick((s) => s.settings.shortcuts.focus);
+  const pauseKeys = useSidekick((s) => s.settings.shortcuts.pause);
+  const reduced = useReducedMotion() ?? false;
+  // Paused → Resume is primary; otherwise Focus is primary and Shift → Pause.
+  const pauseSide = paused ? !shift : shift;
+  const focusHint = keyHint(focusKeys);
+  const pauseHint = keyHint(pauseKeys);
+  const label = pauseSide
+    ? paused
+      ? `Resume${pauseHint} · Shift for Focus${focusHint}`
+      : `Pause 15 minutes${pauseHint}`
+    : focusing
+      ? `End focus${focusHint}`
+      : open
+        ? "Close"
+        : paused
+          ? `Focus${focusHint}`
+          : `Focus${focusHint} · Shift for Pause${pauseHint}`;
+  const active = !pauseSide && (open || focusing);
+  const icon = pauseSide ? (paused ? "play" : "pause") : "focus";
   return (
-    <Tip label={focusing ? `End focus${hint}` : open ? "Close" : `Focus${hint}`}>
+    <Tip label={label}>
       <button
         type="button"
-        aria-label={focusing ? `End focus${hint}` : open ? "Close focus picker" : `Focus${hint}`}
-        aria-expanded={open}
-        onClick={() => {
+        aria-label={label}
+        aria-expanded={pauseSide ? undefined : open}
+        onClick={(e) => {
+          const wantPause = e.shiftKey ? !paused : pauseSide;
+          if (wantPause) {
+            onOpenChange(false);
+            void (paused ? api.sensorsResume() : api.sensorsPause(15));
+            return;
+          }
           if (focusing) {
             onOpenChange(false);
             void api.focusStop();
@@ -358,11 +452,22 @@ function FocusButton({ open, onOpenChange }: { open: boolean; onOpenChange: (ope
           }
           onOpenChange(!open);
         }}
-        className={`chip grid size-8 place-items-center rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff] ${
-          open || focusing ? "bg-white text-black hover:bg-white/90" : "bg-white/12 text-white/90 hover:bg-white/20"
+        className={`chip relative grid size-8 place-items-center overflow-hidden rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff] ${
+          active ? "bg-white text-black hover:bg-white/90" : "bg-white/12 text-white/90 hover:bg-white/20"
         }`}
       >
-        <Icon name="focus" size={15} />
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={icon}
+            className="grid place-items-center"
+            initial={reduced ? false : { opacity: 0, scale: 0.7, rotate: pauseSide ? -20 : 20 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            exit={reduced ? undefined : { opacity: 0, scale: 0.7, rotate: pauseSide ? 20 : -20 }}
+            transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
+          >
+            <Icon name={icon} size={pauseSide ? 14 : 15} />
+          </motion.span>
+        </AnimatePresence>
       </button>
     </Tip>
   );

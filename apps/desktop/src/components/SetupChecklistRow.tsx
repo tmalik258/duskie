@@ -122,7 +122,7 @@ export const SetupRow = memo(function SetupRow({
     startWaiting(item.id, item.title, {
       resumeTab: item.tab ?? "home",
       steps: item.opensApp
-        ? [`Sidekick opened the ${item.title} app.`, "This finishes by itself when it is running."]
+        ? [`Sidekick is starting ${item.title} in the background.`, "This finishes by itself when it is running."]
         : item.opensTerminal
           ? [
               "PowerShell is open. The command is already on the clipboard.",

@@ -78,6 +78,7 @@ const SAFE: &[&str] = &[
     "launch_app",
     "open_app",
     "open_app_and_url",
+    "accept_prompt",
     "dnd_on",
     "dnd_off",
     "create_env",
@@ -254,6 +255,22 @@ impl Executor {
             "open_app" => {
                 let name = arg(args, "name")?.to_owned();
                 tokio::task::spawn_blocking(move || pc::open_app(&name))
+                    .await
+                    .map_err(fail)?
+            }
+            // Nearby Share / Quick Share / Bluetooth: click Accept on the prompt.
+            "accept_prompt" => {
+                let name = args
+                    .get("name")
+                    .and_then(Value::as_str)
+                    .unwrap_or("")
+                    .to_owned();
+                let code = args
+                    .get("code")
+                    .and_then(Value::as_str)
+                    .filter(|c| !c.is_empty())
+                    .map(str::to_owned);
+                tokio::task::spawn_blocking(move || uia::accept_prompt(&name, code.as_deref()))
                     .await
                     .map_err(fail)?
             }

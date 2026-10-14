@@ -31,13 +31,21 @@ export function ContextLine({ keys }: { keys: boolean }) {
   // Answer actions already own Alt 1…n; leave chips free when those are waiting.
   const proposalDigits = useSidekick((s) => pendingCount(s.turns.at(-1)?.proposals));
   const { context } = ask ?? { context: null };
-  const items: { id: string; label: string; on: boolean; title?: string | null; toggle: () => void }[] = [];
+  const items: {
+    id: string;
+    label: string;
+    on: boolean;
+    title?: string | null;
+    tip: string;
+    toggle: () => void;
+  }[] = [];
   if (ask && context?.app) {
     items.push({
       id: "app",
       label: context.app,
       on: ask.attachWindow,
       title: context.title,
+      tip: ask.attachWindow ? `Exclude what's visible in ${context.app}` : `Include what's visible in ${context.app}`,
       toggle: () => setAsk({ attachWindow: !ask.attachWindow }),
     });
   }
@@ -48,6 +56,7 @@ export function ContextLine({ keys }: { keys: boolean }) {
       label: `Copied: ${context.clipboardKind.replace(/_/g, " ")}`,
       on: ask.attachClip,
       title: context.clipboardPreview,
+      tip: ask.attachClip ? "Exclude clipboard" : "Include clipboard",
       toggle: () => setAsk({ attachClip: !ask.attachClip }),
     });
   }
@@ -60,9 +69,7 @@ export function ContextLine({ keys }: { keys: boolean }) {
       {offline && <span className="ak-offl">Offline</span>}
       {items.map((it, i) => (
         <span key={it.id} className={`relative flex min-w-0 items-center ${it.id === "clip" ? "shrink" : "shrink-0"}`}>
-          <Tip
-            label={`${it.on ? "Click to exclude" : "Click to include"}${it.title ? ` · ${it.title}` : ""} · Alt ${i + 1}`}
-          >
+          <Tip label={`${it.tip}${it.title ? ` · ${it.title}` : ""} · Alt ${i + 1}`}>
             <button
               type="button"
               aria-pressed={it.on}

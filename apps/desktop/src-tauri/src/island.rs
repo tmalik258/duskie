@@ -15,6 +15,10 @@ pub const LABEL: &str = "island";
 pub const HOVER_EVENT: &str = "island://hover";
 pub const CURSOR_EVENT: &str = "island://cursor";
 pub const VISIBLE_EVENT: &str = "island://visible";
+/// Shift (or Shift+Alt with a suggestion) for morph labels without focus.
+/// Glance: Shift while hovered. Suggestion chips: Shift+Alt even when the
+/// cursor is elsewhere — Alt+N shortcuts are global, so the words must be too.
+pub const SHIFT_EVENT: &str = "island://shift";
 /// Whether a fullscreen app is in front on the island's screen, so the glance
 /// can offer "Hide while fullscreen" right there.
 pub const FULLSCREEN_EVENT: &str = "island://fullscreen";
@@ -265,6 +269,7 @@ pub fn follow_fullscreen(app: &AppHandle, payload: &serde_json::Value) {
 fn spawn_hover_tracker(app: AppHandle, window: WebviewWindow) {
     tauri::async_runtime::spawn(async move {
         let mut inside = false;
+        let mut last_shift = false;
         // Click-through as last applied, with what it was worked out from:
         // re-applied whenever any of them changes.
         let mut applied: Option<(bool, bool, bool)> = None;
@@ -281,9 +286,12 @@ fn spawn_hover_tracker(app: AppHandle, window: WebviewWindow) {
             };
             let state = app.state::<AppState>();
             let asking = crate::ask::is_open(&app);
+            let suggesting = lock(&state.active).is_some();
             let hidden = *lock(&state.island_hidden);
             let rect = *lock(&state.hit_rect);
-            let near = asking || rect.contains_within(pos.x, pos.y, NEAR);
+            // Keep a fast poll while a suggestion is up so Shift+Alt morphs
+            // feel instant even when the cursor is nowhere near the island.
+            let near = asking || suggesting || rect.contains_within(pos.x, pos.y, NEAR);
             wait = if near { CURSOR_POLL } else { CURSOR_POLL_FAR };
             // Faded out for a fullscreen app: no eyes to move.
             if !hidden && last.is_none_or(|l| l.moved_from(pos)) {
@@ -310,18 +318,62 @@ fn spawn_hover_tracker(app: AppHandle, window: WebviewWindow) {
                 ensure_click_through(&window);
             }
             let now_inside = rect.contains(pos.x, pos.y);
-            if now_inside == inside {
-                continue;
+            if now_inside != inside {
+                inside = now_inside;
+                state
+                    .hovered
+                    .store(inside, std::sync::atomic::Ordering::Relaxed);
+                // The UI decides what hover shows (a waiting guide, or the
+                // parked welcome), after its hover-intent delay.
+                let _ = app.emit_to(LABEL, HOVER_EVENT, inside);
             }
-            inside = now_inside;
-            state
-                .hovered
-                .store(inside, std::sync::atomic::Ordering::Relaxed);
-            // The UI decides what hover shows (a waiting guide, or the
-            // parked welcome), after its hover-intent delay.
-            let _ = app.emit_to(LABEL, HOVER_EVENT, inside);
+            // Poll modifiers here: the webview stays unfocused / click-through.
+            // Hovered → Shift alone (glance Ask↔Agents, Focus↔Pause).
+            // Suggestion on screen → Shift+Alt globally (open_url → Incognito words).
+            let shift = if inside {
+                shift_held()
+            } else if suggesting {
+                shift_held() && alt_held()
+            } else {
+                false
+            };
+            if shift != last_shift {
+                last_shift = shift;
+                let _ = app.emit_to(LABEL, SHIFT_EVENT, shift);
+            }
         }
     });
+}
+
+/// True while either Shift key is down (for glance morphs without focus).
+#[cfg(windows)]
+fn shift_held() -> bool {
+    key_down(windows_sys::Win32::UI::Input::KeyboardAndMouse::VK_SHIFT)
+}
+
+#[cfg(not(windows))]
+fn shift_held() -> bool {
+    false
+}
+
+/// True while either Alt key is down (Shift+Alt private open morph).
+#[cfg(windows)]
+fn alt_held() -> bool {
+    key_down(windows_sys::Win32::UI::Input::KeyboardAndMouse::VK_MENU)
+}
+
+#[cfg(not(windows))]
+fn alt_held() -> bool {
+    false
+}
+
+#[cfg(windows)]
+fn key_down(vk: u16) -> bool {
+    // SAFETY: GetAsyncKeyState is a process-wide read of the key state table.
+    unsafe {
+        windows_sys::Win32::UI::Input::KeyboardAndMouse::GetAsyncKeyState(vk as i32) as u16 & 0x8000
+            != 0
+    }
 }
 
 /// Cursor position in logical pixels relative to the window's top-left corner.

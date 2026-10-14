@@ -24,7 +24,7 @@ const ISLAND_KEYS: [string, string][] = [
   ["Ignore a suggestion", "Alt 0"],
   ["Switch tab", "Ctrl Tab"],
   ["Previous tab", "Ctrl Shift Tab"],
-  ["New agent session", "Ctrl N"],
+  ["New chat (Ask) / New agent session", "Ctrl N"],
   ["Cycle agent mode", "Ctrl ."],
 ];
 

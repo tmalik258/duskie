@@ -112,6 +112,8 @@ pub struct Sorted {
     pub level: Level,
     pub why: &'static str,
     pub code: Option<String>,
+    /// Nearby Share / Quick Share / Bluetooth-style prompt: Accept, not Copy.
+    pub share: bool,
     /// No rule was sure (used when no model is running).
     pub unsure: bool,
     /// The model's one-line reason, shown on the card.
@@ -124,6 +126,34 @@ static CODE_WORDS: LazyLock<Regex> = LazyLock::new(|| {
 });
 static CODE: LazyLock<Regex> =
     LazyLock::new(|| Regex::new(r"\b(?:[A-Z]-)?(\d{4,8})\b").expect("code digits"));
+/// Share or pair prompts (PIN is shown to match devices; Accept is the action).
+static SHARE_WORDS: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"(?i)\b(wants to share|want to share|sharing a |share a link|share a file|receive from|pairing request|pair with|connect to|connection request|nearby share|quick share)\b")
+        .expect("share words")
+});
+static SHARE_APPS: &[&str] = &[
+    "nearbyshare",
+    "nearby share",
+    "nearby sharing",
+    "quickshare",
+    "quick share",
+    "bluetooth",
+    "phone link",
+    "your phone",
+    "cross device",
+];
+
+fn is_share(app: &str, title: &str, body: &str) -> bool {
+    let a = app.to_lowercase();
+    if SHARE_APPS.iter().any(|s| a.contains(s)) {
+        return true;
+    }
+    SHARE_WORDS.is_match(&format!("{title}\n{body}"))
+}
+
+fn code_in(text: &str) -> Option<String> {
+    CODE.captures(text).map(|c| c[1].to_owned())
+}
 static SECURITY: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"(?i)(security alert|unusual (sign|activity)|new sign-in|password (was )?(changed|reset)|suspicious|virus|threat|ransomware|account (locked|suspended))")
         .expect("security")
@@ -170,19 +200,32 @@ pub fn sort(app: &str, title: &str, body: &str, s: &NotificationSettings) -> Sor
         level,
         why,
         code: None,
+        share: false,
         unsure: false,
         reason: None,
     };
     if user == Some(Level::Never) {
         return pick(Level::Never, "muted app");
     }
+    // Share/pair before login-code: a Nearby Share PIN is not an OTP to copy.
+    if is_share(app, title, body) {
+        return Sorted {
+            level: Level::Now,
+            why: "share or pair",
+            code: code_in(&text),
+            share: true,
+            unsure: false,
+            reason: None,
+        };
+    }
     if CODE_WORDS.is_match(&text)
-        && let Some(c) = CODE.captures(&text)
+        && let Some(c) = code_in(&text)
     {
         return Sorted {
             level: Level::Now,
             why: "login code",
-            code: Some(c[1].to_owned()),
+            code: Some(c),
+            share: false,
             unsure: false,
             reason: None,
         };
@@ -223,6 +266,7 @@ pub fn sort(app: &str, title: &str, body: &str, s: &NotificationSettings) -> Sor
         level: Level::Digest,
         why: "everything else",
         code: None,
+        share: false,
         unsure: true,
         reason: None,
     }
@@ -564,8 +608,8 @@ async fn take(app: &AppHandle, settings: &sidekick_core::Settings, t: Toast, thi
         return;
     }
     let mut sorted = sort(&t.app, &t.title, &t.body, &settings.notifications);
-    // Muted apps and login codes need no judgement (and codes no delay).
-    let firm = matches!(sorted.why, "muted app" | "login code") || !think;
+    // Muted apps, login codes, and share/pair prompts need no judgement.
+    let firm = matches!(sorted.why, "muted app" | "login code" | "share or pair") || !think;
     let text = format!("{} {}", t.title, t.body);
     let vector = if firm { None } else { embed(app, &text).await };
     let similar = if firm {
@@ -660,6 +704,7 @@ async fn take(app: &AppHandle, settings: &sidekick_core::Settings, t: Toast, thi
                 "body": clip(&item.body, 160),
                 "why": item.why,
                 "code": item.code,
+                "share": sorted.share.then_some(true),
                 "link": first_link(&format!("{} {}", item.title, item.body)),
             }),
         ));
@@ -1016,6 +1061,32 @@ mod tests {
         assert_eq!(
             sort("Chrome", "Shop", "Order 12345 shipped", &s()).code,
             None
+        );
+        let share = sort(
+            "NearbyShare",
+            "Talha's S24 Ultra wants to share a link",
+            "PIN: 3490",
+            &s(),
+        );
+        assert_eq!(share.level, Level::Now);
+        assert!(share.share);
+        assert_eq!(share.code.as_deref(), Some("3490"));
+        assert_eq!(share.why, "share or pair");
+        let bt = sort(
+            "Bluetooth",
+            "Pairing request",
+            "WH-1000XM4 wants to connect",
+            &s(),
+        );
+        assert!(bt.share);
+        assert!(
+            !sort(
+                "Chrome",
+                "Google",
+                "G-482913 is your verification code",
+                &s()
+            )
+            .share
         );
     }
 

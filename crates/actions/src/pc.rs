@@ -979,17 +979,48 @@ pub fn launch_app(q: &str) -> Result<Outcome, ActionError> {
     Ok(Outcome::msg(format!("Opened {name}")))
 }
 
+/// Other window titles / names to try when `open_app` is given a toast source.
+fn app_aliases(q: &str) -> Vec<String> {
+    let key = squash(q);
+    let extra: &[&str] = match key.as_str() {
+        "nearbyshare" | "nearbysharing" | "nearbyshareexe" => {
+            &["Nearby Share", "Nearby sharing", "Quick Share", "Share"]
+        }
+        "quickshare" | "quicksharing" => &["Quick Share", "Nearby Share", "Nearby sharing"],
+        "bluetooth" => &["Bluetooth", "Settings"],
+        "phonelink" | "yourphone" => &["Phone Link", "Your Phone", "Link to Windows"],
+        _ => &[],
+    };
+    let mut out = vec![q.trim().to_owned()];
+    for a in extra {
+        if !out.iter().any(|o| squash(o) == squash(a)) {
+            out.push((*a).to_owned());
+        }
+    }
+    out
+}
+
 /// Brings an app to the front, or starts it when it is not open.
 pub fn open_app(q: &str) -> Result<Outcome, ActionError> {
-    focus_window(q).or_else(|e| {
-        launch_app(q).or_else(|_| match web_app(q) {
-            // A service people use in the browser (Gmail, WhatsApp Web).
-            Some(url) => open::that_detached(url)
-                .map(|()| Outcome::msg(format!("Opened {}", q.trim())))
-                .map_err(|e| ActionError::Failed(e.to_string())),
-            None => Err(e),
-        })
-    })
+    let mut last = ActionError::Failed(format!("no open window matches {}", q.trim()));
+    for name in app_aliases(q) {
+        match focus_window(&name) {
+            Ok(o) => return Ok(o),
+            Err(e) => last = e,
+        }
+    }
+    for name in app_aliases(q) {
+        if let Ok(o) = launch_app(&name) {
+            return Ok(o);
+        }
+    }
+    match web_app(q) {
+        // A service people use in the browser (Gmail, WhatsApp Web).
+        Some(url) => open::that_detached(url)
+            .map(|()| Outcome::msg(format!("Opened {}", q.trim())))
+            .map_err(|e| ActionError::Failed(e.to_string())),
+        None => Err(last),
+    }
 }
 
 /// The web address of a service that is often only a website, for

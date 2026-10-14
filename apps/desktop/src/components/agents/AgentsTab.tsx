@@ -176,7 +176,7 @@ export function AgentsTab({
   const layout = useAgents((s) => s.layout);
   const cursor = useCursorChats(active);
   const session = sessions.find((s) => s.id === current) ?? null;
-  if (layout === "board") return <Board sessions={sessions} maxHeight={maxHeight} />;
+  if (layout === "board") return <Board sessions={sessions} maxHeight={maxHeight} active={active} />;
   const watched = current?.startsWith(CURSOR) ? cursor.find((c) => CURSOR + c.id === current) : undefined;
   if (watched) return <CursorView chat={watched} sessions={sessions} cursor={cursor} />;
   return session ? (

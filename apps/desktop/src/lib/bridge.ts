@@ -69,6 +69,7 @@ export const EVENTS = {
   islandCursor: "island://cursor",
   islandVisible: "island://visible",
   islandFullscreen: "island://fullscreen",
+  islandShift: "island://shift",
   inboxChanged: "inbox://changed",
   aiDelta: "ai://delta",
   aiDone: "ai://done",

@@ -310,7 +310,7 @@ export type SelectOption =
       value: string;
       label: string;
       sub?: string;
-      /** Full text for the native tooltip (e.g. a complete path). */
+      /** Full text for the Tip (e.g. a complete path). */
       title?: string;
       icon?: string;
       /** Picture instead of the letter icon (e.g. Claude Code's Clawd). */
@@ -562,57 +562,65 @@ export function Select({
     <>
       {shown.map((r, i) => {
         const selected = r.value === value;
+        const option = (
+          <div
+            role="option"
+            tabIndex={-1}
+            aria-selected={selected}
+            onMouseEnter={() => setActive(i)}
+            onClick={() => pick(r.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") pick(r.value);
+            }}
+            className={`grid w-full cursor-default items-center gap-2.5 rounded-[9px] px-[9px] py-1.5 text-left text-[13px] transition-colors duration-100 ${
+              r.icon || r.image ? "grid-cols-[24px_1fr_auto]" : "grid-cols-[1fr_auto]"
+            } ${i === active ? "bg-(--hover) text-(--text)" : "text-(--text)/85 hover:bg-(--surface)"}`}
+          >
+            {r.image ? (
+              <span className="grid size-6 place-items-center overflow-hidden rounded-[7px]" aria-hidden="true">
+                <img src={r.image} alt="" className="size-5 object-contain" draggable={false} />
+              </span>
+            ) : (
+              r.icon && (
+                <span
+                  className="grid size-6 place-items-center rounded-[7px] text-[10.5px] font-bold text-white shadow-[inset_0_0_0_0.5px_rgb(255_255_255/0.12)]"
+                  style={{ background: r.color ?? "#2b2b30" }}
+                  aria-hidden="true"
+                >
+                  {r.icon}
+                </span>
+              )
+            )}
+            <span className="grid min-w-0">
+              <span className={`truncate ${r.sub ? "font-medium" : ""}`}>{r.label}</span>
+              {r.sub && <span className="truncate text-[11.5px] text-(--muted)">{r.sub}</span>}
+            </span>
+            <svg
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              className={`size-3.5 text-(--accent) transition-opacity duration-100 ${selected ? "opacity-100" : "opacity-0"}`}
+            >
+              <path
+                d="M3.5 8.5 6.5 11.5 12.5 4.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+        );
         return (
           <div key={r.value || "__default"}>
             {r.sepBefore && !q && <div className="mx-[9px] my-[5px] h-px scale-y-50 bg-(--border)" />}
-            <div
-              role="option"
-              tabIndex={-1}
-              aria-selected={selected}
-              title={r.title}
-              onMouseEnter={() => setActive(i)}
-              onClick={() => pick(r.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") pick(r.value);
-              }}
-              className={`grid w-full cursor-default items-center gap-2.5 rounded-[9px] px-[9px] py-1.5 text-left text-[13px] transition-colors duration-100 ${
-                r.icon || r.image ? "grid-cols-[24px_1fr_auto]" : "grid-cols-[1fr_auto]"
-              } ${i === active ? "bg-(--hover) text-(--text)" : "text-(--text)/85 hover:bg-(--surface)"}`}
-            >
-              {r.image ? (
-                <span className="grid size-6 place-items-center overflow-hidden rounded-[7px]" aria-hidden="true">
-                  <img src={r.image} alt="" className="size-5 object-contain" draggable={false} />
-                </span>
-              ) : (
-                r.icon && (
-                  <span
-                    className="grid size-6 place-items-center rounded-[7px] text-[10.5px] font-bold text-white shadow-[inset_0_0_0_0.5px_rgb(255_255_255/0.12)]"
-                    style={{ background: r.color ?? "#2b2b30" }}
-                    aria-hidden="true"
-                  >
-                    {r.icon}
-                  </span>
-                )
-              )}
-              <span className="grid min-w-0">
-                <span className={`truncate ${r.sub ? "font-medium" : ""}`}>{r.label}</span>
-                {r.sub && <span className="truncate text-[11.5px] text-(--muted)">{r.sub}</span>}
-              </span>
-              <svg
-                viewBox="0 0 16 16"
-                aria-hidden="true"
-                className={`size-3.5 text-(--accent) transition-opacity duration-100 ${selected ? "opacity-100" : "opacity-0"}`}
-              >
-                <path
-                  d="M3.5 8.5 6.5 11.5 12.5 4.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
+            {r.title ? (
+              <Tip label={r.title} className="block w-full">
+                {option}
+              </Tip>
+            ) : (
+              option
+            )}
           </div>
         );
       })}

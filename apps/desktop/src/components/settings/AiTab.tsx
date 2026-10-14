@@ -119,9 +119,20 @@ const CODING_AGENTS: [string, string][] = [
 
 function Providers({ ai, onError }: { ai: AiSettings; onError: (e: string) => void }) {
   // Last known answers paint at once; dots and lists only change when the data does.
-  const { data: status, refresh: reloadStatus } = useCached<ProviderStatus[]>("ai-status", api.aiStatus);
-  const { data: models, refresh: reloadModels } = useCached<LocalModels>("local-models", api.localModels);
-  const { data: setup } = useCached<SetupStatus>(SETUP_STATUS_CACHE_KEY, api.setupStatus);
+  // Revalidate on mount so StatusDot and model lists agree with Ollama right now.
+  const { data: status, refresh: reloadStatus } = useCached<ProviderStatus[]>(
+    "ai-status",
+    api.aiStatus,
+    undefined,
+    true,
+  );
+  const { data: models, refresh: reloadModels } = useCached<LocalModels>(
+    "local-models",
+    api.localModels,
+    undefined,
+    true,
+  );
+  const { data: setup, refresh: reloadSetup } = useCached<SetupStatus>(SETUP_STATUS_CACHE_KEY, api.setupStatus);
   const ollama = setup?.items.find((i) => i.id === "ollama");
   const [starting, setStarting] = useState<string | null>(null);
   // Start (or install) Ollama from here, then wait for it to answer.
@@ -139,8 +150,9 @@ function Providers({ ai, onError }: { ai: AiSettings; onError: (e: string) => vo
       return;
     }
     setStarting(null);
-    reloadModels();
-    reloadStatus();
+    void reloadModels().catch(() => undefined);
+    void reloadStatus().catch(() => undefined);
+    void reloadSetup().catch(() => undefined);
   };
   const first = useRef(true);
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-check when the local server address changes
@@ -203,23 +215,39 @@ function Providers({ ai, onError }: { ai: AiSettings; onError: (e: string) => vo
               <>
                 <div className="flex items-center gap-3">
                   {handle}
-                  <StatusDot state={status === null ? "checking" : available(id) ? "ok" : "off"} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[14px] font-medium">
-                      {i + 1}. {PROVIDER_LABELS[id]}
-                    </p>
-                    <p className="text-[12px] text-(--muted)">{PROVIDER_HINTS[id]}</p>
-                  </div>
-                  {status !== null && !available(id) ? (
-                    // Nothing to switch on yet: the step below sets it up.
-                    <span className="shrink-0 text-[12.5px] text-(--muted)">
-                      {id === "claude_code" && setup?.items.find((x) => x.id === "claude_code")?.done
-                        ? "Out of usage"
-                        : NOT_READY[id]}
-                    </span>
-                  ) : (
-                    <Switch checked={enabled(id)} onChange={(on) => setEnabled(id, on)} label={PROVIDER_LABELS[id]} />
-                  )}
+                  {(() => {
+                    // Local ready follows local-models (same source as the dropdowns),
+                    // not ai-status, so "Not running" never fights a populated model list.
+                    const checking = id === "local" ? models === null : status === null;
+                    const ok = id === "local" ? models?.reachable === true : Boolean(available(id));
+                    return (
+                      <>
+                        <StatusDot state={checking ? "checking" : ok ? "ok" : "off"} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[14px] font-medium">
+                            {i + 1}. {PROVIDER_LABELS[id]}
+                          </p>
+                          <p className="text-[12px] text-(--muted)">{PROVIDER_HINTS[id]}</p>
+                        </div>
+                        {!checking && !ok ? (
+                          // Nothing to switch on yet: the step below sets it up.
+                          <span className="shrink-0 text-[12.5px] text-(--muted)">
+                            {id === "claude_code" && setup?.items.find((x) => x.id === "claude_code")?.done
+                              ? "Out of usage"
+                              : NOT_READY[id]}
+                          </span>
+                        ) : checking ? (
+                          <span className="shrink-0 text-[12.5px] text-(--muted)">Checking...</span>
+                        ) : (
+                          <Switch
+                            checked={enabled(id)}
+                            onChange={(on) => setEnabled(id, on)}
+                            label={PROVIDER_LABELS[id]}
+                          />
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 <SetupItems ids={PROVIDER_SETUP[id]} />
                 {id === "claude_code" && (

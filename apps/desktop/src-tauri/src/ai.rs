@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 use serde::{Deserialize, Serialize};
 use sidekick_ai::{
     AiProvider, Anthropic, CancellationToken, ChatRequest, ClaudeCode, Codex, Decider,
-    LocalDecider, Message, OpenAiCompat, Router, SemIf, Sink,
+    LocalDecider, Message, OpenAiCompat, Router, SemIf, Sink, first_chat_model, warm_models,
 };
 use sidekick_core::{AiSettings, Settings};
 use sidekick_sensors::classify::{ClipKind, clip_kind};
@@ -20,6 +20,8 @@ pub const DONE_EVENT: &str = "ai://done";
 
 /// Longest clipboard text attached to a chat.
 const MAX_CLIP: usize = 8_000;
+/// Longest UI Automation dump attached with the app chip.
+const MAX_UIA: usize = 12_000;
 const SEMIF_TIMEOUT: Duration = Duration::from_secs(90);
 
 pub(crate) const SYSTEM: &str = "You are Sidekick, the assistant on the user's Windows PC. You help \
@@ -194,13 +196,78 @@ async fn chat_router(
     Router::new(prefer_first(list, prefer))
 }
 
-/// Gets ready while the user types: loads the local model, opens the
-/// Composio connection, starts a session for the first agent in the user's
-/// order, and reads the screen text for the local model.
+/// First enabled provider id in the user's Ask order.
+pub(crate) fn first_enabled_provider(ai: &AiSettings) -> Option<&str> {
+    ai.order.iter().map(String::as_str).find(|id| match *id {
+        "local" => ai.local.enabled,
+        "claude_code" => ai.claude_code.enabled,
+        "codex" => ai.codex.enabled,
+        "anthropic" => ai.anthropic.enabled,
+        "gemini" => ai.gemini.enabled,
+        "groq" => ai.groq.enabled,
+        "openrouter" => ai.openrouter.enabled,
+        _ => false,
+    })
+}
+
+/// Ollama model tags Ask should keep loaded for the current settings.
+pub(crate) fn ask_warm_models(settings: &Settings) -> Vec<String> {
+    let ai = &settings.ai;
+    let first = first_enabled_provider(ai);
+    let mut out = Vec::new();
+    if first == Some("local") && ai.local.enabled {
+        let chat = ai.local.model.trim();
+        if !chat.is_empty() {
+            out.push(chat.to_owned());
+        }
+        let vision = ai.local.vision_model.trim();
+        if !vision.is_empty() && !vision.eq_ignore_ascii_case("off") {
+            out.push(vision.to_owned());
+        }
+    }
+    let need_embed =
+        first == Some("local") || ai.gemini.enabled || ai.groq.enabled || ai.openrouter.enabled;
+    if need_embed && settings.semantic_search.enabled {
+        let embed = settings.semantic_search.model.trim();
+        if !embed.is_empty() {
+            out.push(embed.to_owned());
+        }
+    }
+    out
+}
+
+async fn ensure_and_warm_ollama(settings: &Settings) {
+    let mut models = ask_warm_models(settings);
+    if models.is_empty() && first_enabled_provider(&settings.ai) != Some("local") {
+        return;
+    }
+    let base = settings.ai.local.base_url.clone();
+    if let Err(err) = crate::setup::ensure_ollama(&base).await {
+        log::debug!("could not start Ollama for warm-up: {err}");
+        return;
+    }
+    // Empty chat model name: use the first chat model Ollama lists.
+    if first_enabled_provider(&settings.ai) == Some("local")
+        && settings.ai.local.model.trim().is_empty()
+        && let Some(listed) = crate::setup::ollama_models(&base).await
+        && let Some(chat) = first_chat_model(&listed)
+    {
+        models.insert(0, chat.to_owned());
+    }
+    if models.is_empty() {
+        return;
+    }
+    warm_models(&base, &models).await;
+}
+
+/// Gets ready while the user types: starts Ollama if needed, loads the
+/// models Ask will use, opens Composio, warms the first coding agent, and
+/// reads the screen text for the local model.
 pub fn warm_up(app: &AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let settings = lock(&app.state::<AppState>().settings).clone();
+        ensure_and_warm_ollama(&settings).await;
         let mut agent_warmed = false;
         let mut jobs = Vec::new();
         for p in providers(&app, &settings.ai, false) {
@@ -511,7 +578,7 @@ pub const FIXED_END: &str = "\n\nRight now:";
 /// Longest page text attached to a chat.
 const MAX_PAGE: usize = 20_000;
 
-fn system_prompt(app: &AppHandle, attach: &Attach) -> String {
+async fn system_prompt(app: &AppHandle, attach: &Attach) -> String {
     if attach.skill {
         return format!(
             "{SKILL_SYSTEM}\n\nEvents and their fields:\n{EVENT_CATALOG}\n\nThe skill format:\n{}",
@@ -576,6 +643,12 @@ fn system_prompt(app: &AppHandle, attach: &Attach) -> String {
             "\n\nThe user was just in {name}, window title: {}",
             ctx.title.as_deref().unwrap_or("(none)")
         ));
+        // Structured controls help when OCR misses dialogs and error text.
+        if let Some(uia) = window_uia(app).await {
+            system.push_str(&format!(
+                "\n\nUI in that window (accessibility tree):\n```\n{uia}\n```"
+            ));
+        }
     }
     if attach.clipboard
         && !ctx.clipboard_secret
@@ -588,6 +661,27 @@ fn system_prompt(app: &AppHandle, attach: &Attach) -> String {
         ));
     }
     system
+}
+
+/// UI Automation dump of the last foreground window; None if it fails.
+async fn window_uia(app: &AppHandle) -> Option<String> {
+    let pid = lock(&app.state::<AppState>().last_window)
+        .as_ref()
+        .and_then(|w| w["pid"].as_u64())
+        .and_then(|p| u32::try_from(p).ok())?;
+    let target = sidekick_actions::uia::Target {
+        pid: Some(pid),
+        app: None,
+    };
+    tokio::task::spawn_blocking(move || {
+        sidekick_actions::uia::snapshot(&target)
+            .ok()
+            .map(|s| s.describe().chars().take(MAX_UIA).collect::<String>())
+            .filter(|t| !t.trim().is_empty())
+    })
+    .await
+    .ok()
+    .flatten()
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -831,7 +925,7 @@ pub fn chat(
             );
         }
         let req = ChatRequest {
-            system: system_prompt(&app, &attach),
+            system: system_prompt(&app, &attach).await,
             messages,
             image,
             think,
@@ -899,9 +993,13 @@ pub fn chat(
         if let (Ok(answer), Some(q)) = (&result, &question) {
             crate::search::index_chat(&app, &id, q, &answer.text);
         }
-        if result.as_ref().is_ok_and(|a| a.provider == "local") {
-            let local = local_model(&lock(&app.state::<AppState>().settings).ai);
-            tauri::async_runtime::spawn(async move { local.keep_loaded().await });
+        // Renew chat/vision/embed after a turn that used local or cloud
+        // OpenAI-compat (those use embedding tool pick).
+        if result.as_ref().is_ok_and(|a| is_compat(&a.provider)) {
+            let settings = lock(&app.state::<AppState>().settings).clone();
+            tauri::async_runtime::spawn(async move {
+                ensure_and_warm_ollama(&settings).await;
+            });
         }
         let handoff = lock(&handoff).take();
         let done = match result {
@@ -1111,4 +1209,77 @@ pub async fn refresh_readiness(app: &AppHandle) {
     app.state::<AppState>()
         .ai_ready
         .store(ready, std::sync::atomic::Ordering::Relaxed);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ask_warm_models, first_enabled_provider};
+    use sidekick_core::Settings;
+
+    #[test]
+    fn local_first_warms_chat_vision_and_embed() {
+        let mut s = Settings::default();
+        s.ai.order = vec!["local".into(), "gemini".into(), "claude_code".into()];
+        s.ai.local.enabled = true;
+        s.ai.local.model = "qwen3:4b".into();
+        s.ai.local.vision_model = "moondream".into();
+        s.ai.claude_code.enabled = false;
+        s.ai.codex.enabled = false;
+        s.semantic_search.enabled = true;
+        s.semantic_search.model = "nomic-embed-text".into();
+        assert_eq!(first_enabled_provider(&s.ai), Some("local"));
+        assert_eq!(
+            ask_warm_models(&s),
+            vec![
+                "qwen3:4b".to_owned(),
+                "moondream".to_owned(),
+                "nomic-embed-text".to_owned(),
+            ]
+        );
+    }
+
+    #[test]
+    fn cloud_first_warms_embed_only() {
+        let mut s = Settings::default();
+        s.ai.order = vec!["gemini".into(), "local".into()];
+        s.ai.local.enabled = true;
+        s.ai.local.model = "qwen3:4b".into();
+        s.ai.local.vision_model = "moondream".into();
+        s.ai.gemini.enabled = true;
+        s.ai.claude_code.enabled = false;
+        s.ai.codex.enabled = false;
+        s.semantic_search.enabled = true;
+        s.semantic_search.model = "nomic-embed-text".into();
+        assert_eq!(first_enabled_provider(&s.ai), Some("gemini"));
+        assert_eq!(ask_warm_models(&s), vec!["nomic-embed-text".to_owned()]);
+    }
+
+    #[test]
+    fn claude_first_warms_no_ollama_models() {
+        let mut s = Settings::default();
+        s.ai.order = vec!["claude_code".into(), "local".into()];
+        s.ai.local.enabled = true;
+        s.ai.local.model = "qwen3:4b".into();
+        s.ai.claude_code.enabled = true;
+        s.ai.gemini.enabled = false;
+        s.ai.groq.enabled = false;
+        s.ai.openrouter.enabled = false;
+        s.semantic_search.enabled = true;
+        s.semantic_search.model = "nomic-embed-text".into();
+        assert_eq!(first_enabled_provider(&s.ai), Some("claude_code"));
+        assert!(ask_warm_models(&s).is_empty());
+    }
+
+    #[test]
+    fn skips_vision_when_off() {
+        let mut s = Settings::default();
+        s.ai.order = vec!["local".into()];
+        s.ai.local.enabled = true;
+        s.ai.local.model = "qwen3:4b".into();
+        s.ai.local.vision_model = "off".into();
+        s.ai.claude_code.enabled = false;
+        s.ai.codex.enabled = false;
+        s.semantic_search.enabled = false;
+        assert_eq!(ask_warm_models(&s), vec!["qwen3:4b".to_owned()]);
+    }
 }

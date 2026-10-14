@@ -281,6 +281,7 @@ pub const ACTIONS: &[&str] = &[
     "launch_app",
     "open_app",
     "open_app_and_url",
+    "accept_prompt",
     "notify_level",
     "recipe_run",
     "recipe_save",

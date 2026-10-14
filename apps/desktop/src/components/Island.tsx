@@ -15,7 +15,6 @@ import {
   dismissLocal,
   INACTIVITY_MS,
   latestActivity,
-  needsActions,
   ownsWorking,
   terminal,
   useActivities,
@@ -242,7 +241,13 @@ export function Island() {
       chatWorking ??
       agentWorking ??
       downloadWorking);
-  const displayedActivity = liveActivities.find((a) => activityLabel(a, activityNow) === working);
+  // Prefer an exact label match. Multi-download and update-without-activity
+  // labels are synthetic, so fall back to the owning row when find misses.
+  const displayedActivity = working
+    ? (liveActivities.find((a) => activityLabel(a, activityNow) === working) ??
+      (working === downloadWorking ? (background[0] ?? backgroundAll[0]) : undefined) ??
+      (working === updateWorking ? (updateActivity ?? undefined) : undefined))
+    : undefined;
   const activityWaiting =
     (working === downloadWorking && background.length > 1 && (pausedDownloads > 0 || waitingDownloads > 0)) ||
     (displayedActivity &&
@@ -303,7 +308,7 @@ export function Island() {
     const id = setTimeout(() => setQuiet(false), HOVER_OUT_MS);
     return () => clearTimeout(id);
   }, [quiet, rawHover]);
-  const pillActions = !!displayedActivity && needsActions(displayedActivity, activityNow);
+  const pillActions = !!displayedActivity;
   const intent = useIntent(rawHover && !quiet, pillActions ? HOVER_IN_ACTIONS_MS : HOVER_IN_MS);
   // Until onboarding is done, hover shows the steps being waited on, or else
   // brings the welcome back; the idle card ("watching for moments") would
@@ -524,10 +529,8 @@ export function Island() {
           ? GUIDE_WIDTH
           : EXPANDED.width
       : voicePill
-        ? voiceShellWidth(
-            voicePill.text,
-            voicePill.thinking,
-            !!(
+        ? voiceShellWidth(voicePill.text, voicePill.thinking, {
+            status: !!(
               voicePill.working ||
               voicePill.done ||
               voicePill.waiting ||
@@ -535,8 +538,18 @@ export function Island() {
               voicePill.focus ||
               voicePill.asks
             ),
-            agentsOnly,
-          )
+            cancel: agentsOnly || !!voicePill.focus,
+            // Focus is label + cancel only; do not reserve spinner/dot chrome.
+            indicator: !!(
+              voicePill.working ||
+              voicePill.thinking ||
+              voicePill.done ||
+              voicePill.waiting ||
+              voicePill.failed ||
+              voicePill.asks ||
+              (voicePill.dots && voicePill.dots.length > 0)
+            ),
+          })
         : waiting
           ? COMPACT.waitWidth
           : busy
@@ -861,13 +874,17 @@ function statusTextWidth(label: string): number {
 }
 
 /** Compact listening shell: tight when empty, grows with speech up to voiceWidth. */
-function voiceShellWidth(text: string, thinking: boolean, status?: boolean, cancel?: boolean): number {
+function voiceShellWidth(
+  text: string,
+  thinking: boolean,
+  opts?: { status?: boolean; cancel?: boolean; indicator?: boolean },
+): number {
+  const status = !!opts?.status;
   const label = voiceLabel(text, thinking, status);
-  // Done / working / waiting: orb + gap + activity (+ cancel) + right pad.
-  // Keep chrome tight so the shell does not trail empty space past Cancel.
+  // Status: orb + gap + label + optional indicator/cancel + right pad.
+  // Charge only for chrome that is actually on screen (Focus has no spinner).
   if (status) {
-    const chrome = COMPACT.height + 4 + 5 + 12 + 8 + (cancel ? 6 + 24 : 0);
-    return Math.min(COMPACT.statusMaxWidth, Math.max(120, chrome + statusTextWidth(label)));
+    return Math.min(COMPACT.statusMaxWidth, Math.max(120, statusChrome(opts) + statusTextWidth(label)));
   }
   const textPx = Math.ceil([...label].length * 7.2);
   // Orb column, gaps, green bars, stop button, right pad.
@@ -875,9 +892,16 @@ function voiceShellWidth(text: string, thinking: boolean, status?: boolean, canc
   return Math.min(COMPACT.voiceWidth, Math.max(COMPACT.voiceMinWidth, chrome + textPx));
 }
 
-function statusNeedsTruncate(label: string, cancel?: boolean): boolean {
-  const chrome = COMPACT.height + 4 + 5 + 12 + 8 + (cancel ? 6 + 24 : 0);
-  return chrome + statusTextWidth(label) > COMPACT.statusMaxWidth;
+/** Orb column + trailing controls for a compact status pill (gap-1.5 + pr-2). */
+function statusChrome(opts?: { cancel?: boolean; indicator?: boolean }): number {
+  let chrome = COMPACT.height + 4 + 8;
+  if (opts?.indicator) chrome += 6 + 12;
+  if (opts?.cancel) chrome += 6 + 24;
+  return chrome;
+}
+
+function statusNeedsTruncate(label: string, opts?: { cancel?: boolean; indicator?: boolean }): boolean {
+  return statusChrome(opts) + statusTextWidth(label) > COMPACT.statusMaxWidth;
 }
 
 /** Voice in the compact island: green bars and the words as they come
@@ -951,7 +975,8 @@ function VoicePill({
 }) {
   const now = useNow(1000);
   const elapsed = activity ? activityElapsedSecs(activity, now) : null;
-  const showActions = !!activity && needsActions(activity, now);
+  // Compact pill always offers icon actions when an activity is on screen.
+  const showActions = !!activity;
   // Split · Ns out of the label so copy, timer, and activity can be spaced apart.
   const baseText = activity && elapsed !== null ? activityLabel(activity, now, { elapsed: false }) : text;
   const label = voiceLabel(baseText, thinking, working || done || focus);
@@ -959,7 +984,12 @@ function VoicePill({
   // Listening: label flexes so bars + Stop stay on the right. Status: one
   // tight cluster (label + indicator) so the shell never shows a stretch gap.
   const listening = !(working || thinking || done || focus || failed || waiting || asks);
-  const clip = listening || statusNeedsTruncate(fullLabel, !!onCancel);
+  const clip =
+    listening ||
+    statusNeedsTruncate(fullLabel, {
+      cancel: !!onCancel || !!focus,
+      indicator: !!(thinking || working || done || waiting || failed || asks || (dots && dots.length > 0)),
+    });
   const indicator = failed ? (
     <span role="img" aria-label="Failed" className="size-2 shrink-0 rounded-full bg-red-400" />
   ) : waiting ? (
@@ -972,15 +1002,6 @@ function VoicePill({
     <span className="shrink-0 text-[#30d158]">
       <Icon name="check" size={14} />
     </span>
-  ) : focus ? (
-    <button
-      type="button"
-      aria-label="End focus"
-      onClick={() => void api.focusStop()}
-      className="shrink-0 rounded-full px-2 py-0.5 text-[11px] text-white/62 hover:bg-white/10 hover:text-white"
-    >
-      End
-    </button>
   ) : asks ? (
     <span className="relative flex size-2 shrink-0" role="img" aria-label="Waiting for you">
       <span className="absolute inset-0 animate-ping rounded-full bg-[#ff9f0a]/60 motion-reduce:animate-none" />
@@ -994,15 +1015,15 @@ function VoicePill({
   const labelClass = `text-[12.5px] font-medium ${
     listening ? "min-w-0 flex-1 truncate" : clip ? "min-w-0 truncate" : "shrink-0"
   } ${text.trim() || thinking || working ? "text-white/90" : "text-white/62"}`;
+  const labelInner = <span className="min-w-0 truncate">{label}</span>;
   const labelEl = onOpen ? (
-    <button type="button" onClick={onOpen} className={`text-left ${labelClass}`} title={clip ? fullLabel : undefined}>
-      <span className="min-w-0 truncate">{label}</span>
+    <button type="button" onClick={onOpen} className={`text-left ${labelClass}`}>
+      {labelInner}
     </button>
   ) : (
-    <span className={labelClass} title={clip ? fullLabel : undefined}>
-      <span className="min-w-0 truncate">{label}</span>
-    </span>
+    <span className={labelClass}>{labelInner}</span>
   );
+  const labeled = clip ? <Tip label={fullLabel}>{labelEl}</Tip> : labelEl;
   const actions = showActions ? (
     <span className="flex shrink-0 items-center gap-0.5">
       <Tip label="Check again">
@@ -1018,7 +1039,7 @@ function VoicePill({
           }}
           className="chip grid size-6 place-items-center rounded-full text-white/55 hover:bg-white/10 hover:text-white"
         >
-          <Icon name="update" size={12} />
+          <Icon name="refresh" size={12} />
         </button>
       </Tip>
       <Tip label="Dismiss">
@@ -1037,7 +1058,12 @@ function VoicePill({
       </Tip>
     </span>
   ) : null;
-  const showCancel = !!onCancel && !!(working || asks);
+  const showCancel = !!focus || (!!onCancel && !!(working || asks));
+  const cancelLabel = focus ? "End focus" : "Cancel";
+  const runCancel = () => {
+    if (focus) void api.focusStop();
+    else onCancel?.();
+  };
   return (
     <motion.div
       className={`absolute top-0 right-0 flex h-9 items-center ${listening ? "gap-2.5 pr-3.5" : "pr-2"}`}
@@ -1049,7 +1075,7 @@ function VoicePill({
     >
       {listening ? (
         <>
-          {labelEl}
+          {labeled}
           <VoiceBars />
           <Tip label="Stop (Esc)">
             <button
@@ -1066,35 +1092,27 @@ function VoicePill({
           </Tip>
         </>
       ) : (
-        <div className="flex min-w-0 max-w-full items-center">
-          {labelEl}
+        <div className="flex min-w-0 max-w-full items-center gap-1.5">
+          {labeled}
           {elapsed !== null && (
-            <span className="shrink-0 text-[12.5px] font-medium text-white/90 tabular-nums" style={{ marginLeft: 3 }}>
-              · {elapsed}s
-            </span>
+            <span className="shrink-0 text-[12.5px] font-medium text-white/90 tabular-nums">· {elapsed}s</span>
           )}
-          {indicator && (
-            <span className="flex shrink-0 items-center" style={{ marginLeft: 5 }}>
-              {indicator}
-            </span>
-          )}
-          {actions && <span className="ml-1.5 flex shrink-0">{actions}</span>}
+          {indicator && <span className="flex shrink-0 items-center">{indicator}</span>}
+          {actions}
           {showCancel && (
-            <span className="ml-1.5 flex shrink-0">
-              <Tip label="Cancel">
-                <button
-                  type="button"
-                  aria-label="Cancel"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCancel();
-                  }}
-                  className="chip grid size-6 shrink-0 place-items-center rounded-full bg-white/[0.09] hover:bg-white/[0.15]"
-                >
-                  <span className="size-2 rounded-[2px] bg-white" />
-                </button>
-              </Tip>
-            </span>
+            <Tip label={cancelLabel}>
+              <button
+                type="button"
+                aria-label={cancelLabel}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  runCancel();
+                }}
+                className="chip grid size-6 shrink-0 place-items-center rounded-full bg-white/[0.09] hover:bg-white/[0.15]"
+              >
+                <span className="size-2 rounded-[2px] bg-white" />
+              </button>
+            </Tip>
           )}
         </div>
       )}
@@ -1314,31 +1332,37 @@ function UndoButton({ id }: { id: number }) {
 
 function Options({ suggestion }: { suggestion: Suggestion }) {
   const alwaysAt = suggestion.always?.findIndex(Boolean) ?? -1;
+  // Shift while hovered, or Shift+Alt anywhere — Rust polls; no hover required.
+  const priv = useSidekick((s) => s.shiftHeld);
   return (
     <div className="mt-3 flex flex-wrap items-center gap-1.5">
-      {suggestion.options.map((option, i) => (
-        <motion.button
-          // biome-ignore lint/suspicious/noArrayIndexKey: labels can repeat and the list never reorders
-          key={`${i}-${option}`}
-          type="button"
-          onClick={(e) => choose(suggestion, i, e.shiftKey)}
-          initial={{ opacity: 0, y: 6, filter: "blur(4px)" }}
-          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-          transition={{ duration: 0.26, delay: 0.12 + i * 0.04, ease: [0.23, 1, 0.32, 1] }}
-          className={`chip flex max-w-full min-h-8 items-center gap-2 rounded-full px-3 py-1.5 text-left text-[13px] font-medium tracking-[-0.01em] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff] ${
-            i === 0 ? "bg-white text-black hover:bg-white/90" : "bg-white/12 text-white hover:bg-white/20"
-          }`}
-        >
-          <span className="max-w-60 leading-snug text-balance">{option}</span>
-          <kbd
-            className={`shrink-0 self-center font-sans text-[11px] leading-none ${
-              i === 0 ? "text-black/40" : "text-white/45"
+      {suggestion.options.map((option, i) => {
+        const openUrl = suggestion.actions[i] === "open_url";
+        const label = priv && openUrl ? privateOpenLabel(option) : option;
+        return (
+          <motion.button
+            // biome-ignore lint/suspicious/noArrayIndexKey: labels can repeat and the list never reorders
+            key={`${i}-${option}`}
+            type="button"
+            onClick={(e) => choose(suggestion, i, e.shiftKey || (priv && openUrl))}
+            initial={{ opacity: 0, y: 6, filter: "blur(4px)" }}
+            animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            transition={{ duration: 0.26, delay: 0.12 + i * 0.04, ease: [0.23, 1, 0.32, 1] }}
+            className={`chip flex max-w-full min-h-8 items-center gap-2 rounded-full px-3 py-1.5 text-left text-[13px] font-medium tracking-[-0.01em] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff] ${
+              i === 0 ? "bg-white text-black hover:bg-white/90" : "bg-white/12 text-white hover:bg-white/20"
             }`}
           >
-            Alt {i + 1}
-          </kbd>
-        </motion.button>
-      ))}
+            <span className="max-w-60 leading-snug text-balance">{label}</span>
+            <kbd
+              className={`shrink-0 self-center font-sans text-[11px] leading-none ${
+                i === 0 ? "text-black/40" : "text-white/45"
+              }`}
+            >
+              Alt {i + 1}
+            </kbd>
+          </motion.button>
+        );
+      })}
       {alwaysAt >= 0 && (
         <Tip label={`From now on, "${suggestion.options[alwaysAt]}" without asking. Undo in Settings > Skills.`}>
           <motion.button
@@ -1387,6 +1411,27 @@ const OPEN_ACTIONS = new Set([
   "routine_open",
   "routine_open_all",
 ]);
+
+/** Shift+Alt morph: browser chips become their private/incognito names. */
+function privateOpenLabel(option: string): string {
+  if (/\b(private|incognito|inprivate)\b/i.test(option)) return option;
+  switch (option.trim().toLowerCase()) {
+    case "edge":
+      return "Edge InPrivate";
+    case "firefox":
+      return "Firefox Private";
+    case "zen":
+      return "Zen Private";
+    case "brave":
+      return "Brave Incognito";
+    case "chrome":
+      return "Chrome Incognito";
+    case "default browser":
+      return "Private window";
+    default:
+      return `${option} private`;
+  }
+}
 
 function runningLabel(suggestion: Suggestion, index: number): string {
   const action = suggestion.actions[index];

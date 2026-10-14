@@ -6,6 +6,7 @@
 
 import { useState } from "react";
 import { api, type DiskGroup } from "@/lib/bridge";
+import { Tip } from "../Tip";
 import { Button, Section } from "./ui";
 
 export function StorageTab({ onError }: { onError: (e: string) => void }) {
@@ -116,14 +117,15 @@ function GroupItems({
                 onChange={() => toggle(i.path)}
               />
             )}
-            <button
-              type="button"
-              title="Show in folder"
-              onClick={() => void api.revealPath(i.path)}
-              className="min-w-0 flex-1 truncate text-left hover:underline"
-            >
-              {i.path}
-            </button>
+            <Tip label="Show in folder" className="min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={() => void api.revealPath(i.path)}
+                className="w-full truncate text-left hover:underline"
+              >
+                {i.path}
+              </button>
+            </Tip>
             <span className="shrink-0 font-mono text-[11.5px] text-(--muted) tabular-nums">{human(i.bytes)}</span>
           </li>
         ))}

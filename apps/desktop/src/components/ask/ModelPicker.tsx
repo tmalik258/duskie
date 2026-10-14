@@ -33,13 +33,19 @@ export function ModelPicker({
   best,
   picked,
   keys,
+  disabled = false,
 }: {
   choices: ProviderStatus[];
   best: ProviderStatus;
   picked: ProviderStatus | null;
   keys: boolean;
+  /** Keep the chip visible while answering; no menu or Alt M step. */
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
   const listRef = useRef<HTMLDivElement>(null);
   const chipRef = useRef<HTMLSpanElement>(null);
   // The menu floats over the window, so the island keeps its size.
@@ -101,13 +107,17 @@ export function ModelPicker({
   const shown = picked ?? best;
   const islandColor = useSidekick((s) => s.settings.islandColor);
   return (
-    <span ref={chipRef} className="relative shrink-0">
-      <Tip label="Model (Alt M)">
+    <span ref={chipRef} className={`relative shrink-0 ${disabled ? "opacity-60" : ""}`}>
+      <Tip label={disabled ? "Model (answering…)" : "Model (Alt M)"}>
         <button
           type="button"
           aria-haspopup="menu"
           aria-expanded={open}
-          onClick={() => setOpen((o) => !o)}
+          aria-disabled={disabled || undefined}
+          disabled={disabled}
+          onClick={() => {
+            if (!disabled) setOpen((o) => !o);
+          }}
           className="ak-model chip"
         >
           <span className="ak-dot" aria-hidden="true" />
@@ -115,8 +125,9 @@ export function ModelPicker({
           <Icon name="chevron" size={10} />
         </button>
       </Tip>
-      <KeyHint show={keys}>Alt M</KeyHint>
+      {!disabled && <KeyHint show={keys}>Alt M</KeyHint>}
       {open &&
+        !disabled &&
         at &&
         createPortal(
           <>
