@@ -541,7 +541,7 @@ function FocusPicker({ onDone }: { onDone: () => void }) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="font-display text-[14px] leading-5 font-semibold tracking-[-0.015em] text-white">Focus</p>
-          <p className="mt-0.5 text-[12px] leading-4 text-[rgb(235_235_245/0.55)]">
+          <p className="mt-0.5 text-[12px] leading-4 text-[rgb(235_235_245/0.6)]">
             Suggestions and alerts wait until you are done.
           </p>
         </div>
@@ -600,7 +600,7 @@ function FocusPicker({ onDone }: { onDone: () => void }) {
         <button
           type="button"
           onClick={onDone}
-          className="chip shrink-0 rounded-full px-3 py-2 text-[12.5px] text-white/50 hover:bg-white/10 hover:text-white"
+          className="chip shrink-0 rounded-full px-3 py-2 text-[12.5px] text-white/60 hover:bg-white/10 hover:text-white"
         >
           Not now
         </button>
