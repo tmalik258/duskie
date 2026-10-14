@@ -2120,10 +2120,10 @@ pub fn codex_events(v: &Value) -> Vec<Value> {
                 }
                 // Plan-mode document from Codex — full markdown, not a tool step.
                 Some("plan") => {
-                    if done {
-                        if let Some(text) = item["text"].as_str().filter(|t| !t.trim().is_empty()) {
-                            out.push(json!({ "kind": "plan_doc", "text": text }));
-                        }
+                    if done
+                        && let Some(text) = item["text"].as_str().filter(|t| !t.trim().is_empty())
+                    {
+                        out.push(json!({ "kind": "plan_doc", "text": text }));
                     }
                     return out;
                 }

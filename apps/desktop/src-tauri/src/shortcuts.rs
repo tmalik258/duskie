@@ -81,22 +81,6 @@ pub fn valid(keys: &str) -> bool {
     combo.is_empty() || combo.parse::<Shortcut>().is_ok()
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn off_prefix_keeps_binding() {
-        assert!(!is_enabled(""));
-        assert!(!is_enabled("-Ctrl+Space"));
-        assert!(is_enabled("Ctrl+Space"));
-        assert_eq!(binding("-Ctrl+Space"), "Ctrl+Space");
-        assert_eq!(binding("Ctrl+Space"), "Ctrl+Space");
-        assert!(valid("-Ctrl+Space"));
-        assert!(valid(""));
-    }
-}
-
 fn run(app: &AppHandle, action: &str) {
     log::info!("shortcut: {action}");
     match action {
@@ -165,5 +149,21 @@ fn run(app: &AppHandle, action: &str) {
             let _ = crate::commands::set_pause(app, pause);
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn off_prefix_keeps_binding() {
+        assert!(!is_enabled(""));
+        assert!(!is_enabled("-Ctrl+Space"));
+        assert!(is_enabled("Ctrl+Space"));
+        assert_eq!(binding("-Ctrl+Space"), "Ctrl+Space");
+        assert_eq!(binding("Ctrl+Space"), "Ctrl+Space");
+        assert!(valid("-Ctrl+Space"));
+        assert!(valid(""));
     }
 }
