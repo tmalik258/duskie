@@ -146,11 +146,25 @@ fn codex_turn_params(
             json!({"type":"workspaceWrite","writableRoots":[path.to_string_lossy()],"networkAccess":false})
         }
     };
+    // Clarifying choices become Sidekick's selectable list when written as OPTION lines.
+    // Plan mode also needs a structured collaboration plan Sidekick can show and edit.
+    let instructions = if mode == Mode::Plan {
+        "You are in Plan mode (read-only). Produce a concrete step-by-step plan the user can review before any changes. \
+When the user must choose first, ask in one short sentence, then end with up to six lines each starting with OPTION: and a short label in their words. \
+When several choices may all apply, use OPTION_MULTI: lines instead (checkboxes + Confirm). \
+After they answer (or when no choice is needed), update the collaboration plan with clear actionable steps, then say the plan is ready for review. \
+Never say the plan is ready without those steps in the plan. Do not implement or write files in Plan mode."
+    } else {
+        "When the user must choose before you continue, ask in one short sentence, \
+then end with up to six lines each starting with OPTION: and a short label in their words. \
+When several choices may all apply, use OPTION_MULTI: lines instead. \
+Do not leave the only choices buried in prose."
+    };
     Ok(
         json!({"threadId":thread,"input":input,"model":model,"effort":effort,
         "approvalPolicy":mode.codex().1,"sandboxPolicy":sandbox,
         "collaborationMode":{"mode":if mode == Mode::Plan {"plan"} else {"default"},
-            "settings":{"model":model,"reasoning_effort":effort,"developer_instructions":null}}}),
+            "settings":{"model":model,"reasoning_effort":effort,"developer_instructions":instructions}}}),
     )
 }
 
@@ -1327,7 +1341,14 @@ pub fn describe_tool(tool: &str, input: &Value) -> (String, String) {
         "Grep" => (format!("Search for {}", s("pattern")), String::new()),
         "Glob" => (format!("Find files {}", s("pattern")), String::new()),
         "WebFetch" => (format!("Read {}", s("url")), String::new()),
-        "WebSearch" => (format!("Search the web for {}", s("query")), String::new()),
+        "WebSearch" => {
+            let q = s("query");
+            if q.is_empty() {
+                ("Search the web".into(), String::new())
+            } else {
+                (format!("Search the web for {q}"), q)
+            }
+        }
         "TodoWrite" => ("Update the plan".into(), String::new()),
         other => (
             other
@@ -2088,14 +2109,24 @@ pub fn codex_events(v: &Value) -> Vec<Value> {
                     item["tool"].as_str().unwrap_or("tool").replace('_', " "),
                     String::new(),
                 ),
-                Some("webSearch") => (
-                    "WebSearch",
-                    format!(
-                        "Search the web for {}",
-                        item["query"].as_str().unwrap_or_default()
-                    ),
-                    String::new(),
-                ),
+                Some("webSearch") => {
+                    let q = web_search_query(item);
+                    let label = if q.is_empty() {
+                        "Search the web".into()
+                    } else {
+                        format!("Search the web for {q}")
+                    };
+                    ("WebSearch", label, q)
+                }
+                // Plan-mode document from Codex — full markdown, not a tool step.
+                Some("plan") => {
+                    if done {
+                        if let Some(text) = item["text"].as_str().filter(|t| !t.trim().is_empty()) {
+                            out.push(json!({ "kind": "plan_doc", "text": text }));
+                        }
+                    }
+                    return out;
+                }
                 _ => return out,
             };
             let failed = done
@@ -2151,6 +2182,41 @@ pub fn codex_events(v: &Value) -> Vec<Value> {
 
 /// The command as the user would type it. Codex wraps each one as
 /// `"C:\\...\\pwsh.exe" -Command "..."`; only the inner part matters.
+/// Codex often starts a webSearch with an empty `query` and only fills
+/// `action.query` / `action.queries` when the item completes.
+fn web_search_query(item: &Value) -> String {
+    let top = item["query"].as_str().unwrap_or("").trim();
+    if !top.is_empty() {
+        return top.to_owned();
+    }
+    let action = &item["action"];
+    if let Some(q) = action["query"]
+        .as_str()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        return q.to_owned();
+    }
+    if let Some(parts) = action["queries"].as_array() {
+        let joined: Vec<&str> = parts
+            .iter()
+            .filter_map(|v| v.as_str())
+            .map(str::trim)
+            .filter(|s| !s.is_empty())
+            .collect();
+        if !joined.is_empty() {
+            return joined.join(", ");
+        }
+    }
+    action["url"]
+        .as_str()
+        .or_else(|| action["pattern"].as_str())
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+        .unwrap_or("")
+        .to_owned()
+}
+
 fn shown_command(cmd: &str) -> String {
     let cmd = cmd.trim();
     let lower = cmd.to_ascii_lowercase();
@@ -2274,7 +2340,14 @@ mod tests {
                 params["collaborationMode"]["settings"]["model"],
                 "test-model"
             );
-            assert!(params["collaborationMode"]["settings"]["developer_instructions"].is_null());
+            let instructions = params["collaborationMode"]["settings"]["developer_instructions"]
+                .as_str()
+                .unwrap_or("");
+            assert!(instructions.contains("OPTION:"));
+            assert!(instructions.contains("OPTION_MULTI:"));
+            if mode == Mode::Plan {
+                assert!(instructions.contains("collaboration plan"));
+            }
         }
     }
 
@@ -2652,6 +2725,25 @@ mod tests {
         .unwrap();
         let ev = codex_events(&plan);
         assert_eq!(ev[0]["items"][1]["status"], "in_progress");
+
+        let search_start: Value = serde_json::from_str(
+            r#"{"method":"item/started","params":{"item":{"type":"webSearch","id":"s1","query":""}}}"#,
+        )
+        .unwrap();
+        let ev = codex_events(&search_start);
+        assert_eq!(ev[0]["label"], "Search the web");
+        assert_eq!(ev[0]["detail"], "");
+
+        let search_done: Value = serde_json::from_str(
+            r#"{"method":"item/completed","params":{"item":{"type":"webSearch","id":"s1","query":"","action":{"type":"search","query":"google drive reclaim storage"}}}}"#,
+        )
+        .unwrap();
+        let ev = codex_events(&search_done);
+        assert_eq!(
+            ev[0]["label"],
+            "Search the web for google drive reclaim storage"
+        );
+        assert_eq!(ev[0]["detail"], "google drive reclaim storage");
     }
 
     #[test]

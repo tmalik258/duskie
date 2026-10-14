@@ -677,9 +677,9 @@ function VoiceSection({ voice, onError }: { voice: VoiceSettings; onError: (e: s
               ? `Downloading ${progress.label}: ${mb(progress.done)} of ${mb(progress.total)}`
               : `Speech models are not downloaded yet (${mb(missing)}, once).`}
             {downloading && progress && (
-              <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-white/10">
+              <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-(--surface)">
                 <span
-                  className="block h-full rounded-full bg-[#0a84ff] transition-[width] duration-300"
+                  className="block h-full rounded-full bg-(--accent) transition-[width] duration-300"
                   style={{ width: `${Math.round((progress.done / Math.max(1, progress.total)) * 100)}%` }}
                 />
               </span>
@@ -814,7 +814,7 @@ function DragRow({
             onStep(e.key === "ArrowUp" ? -1 : 1);
           }
         }}
-        className="chip grid h-8 w-5 shrink-0 cursor-grab touch-none place-items-center rounded-md text-white/40 hover:text-white/80 active:cursor-grabbing"
+        className="chip grid h-8 w-5 shrink-0 cursor-grab touch-none place-items-center rounded-md text-(--muted) hover:text-(--text) active:cursor-grabbing"
       >
         <svg aria-hidden="true" viewBox="0 0 8 14" className="h-3.5 w-2">
           <g fill="currentColor">

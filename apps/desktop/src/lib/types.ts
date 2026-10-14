@@ -315,7 +315,7 @@ export interface BrowserInfo {
   port: number;
 }
 
-export const THEMES = ["pearl", "aurora", "chrome", "peach", "mint", "lilac", "onyx", "atelier"] as const;
+export const THEMES = ["atelier", "pearl", "aurora", "chrome", "peach", "mint", "lilac", "onyx"] as const;
 export type Theme = (typeof THEMES)[number];
 export interface EditorList {
   editors: { id: string; name: string; minutes: number }[];
@@ -324,13 +324,13 @@ export interface EditorList {
 }
 
 export const ISLAND_COLORS = [
+  "atelier",
   "solid_black",
   "black_glass",
   "graphite",
   "midnight",
   "smoke",
   "warm_graphite",
-  "atelier",
 ] as const;
 export type IslandColor = (typeof ISLAND_COLORS)[number];
 
@@ -393,9 +393,9 @@ export const DEFAULT_SETTINGS: Settings = {
   launchAtLogin: true,
   sensors: {},
   pause: { kind: "none" },
-  theme: "pearl",
+  theme: "atelier",
   codeEditor: "auto",
-  islandColor: "solid_black",
+  islandColor: "atelier",
   soundKit: "sidekick",
   paletteHotkey: "Ctrl+Space",
   shortcuts: {

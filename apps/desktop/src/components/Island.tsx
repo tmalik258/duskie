@@ -9,31 +9,34 @@ import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } fr
 import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import {
+  acceptActivities,
+  activityElapsedSecs,
   activityLabel,
+  dismissLocal,
   INACTIVITY_MS,
   latestActivity,
+  needsActions,
   ownsWorking,
   terminal,
   useActivities,
   visibleActivities,
 } from "@/lib/activities";
-import { listenToAgents, useAgents, wideScreen } from "@/lib/agents";
+import { interruptSession, listenToAgents, useAgents, wideScreen } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { useNow, useSystemLook } from "@/lib/hooks";
 import { ISLAND_TOP, PANEL_PAD } from "@/lib/islandSize";
 import type { NetNotice } from "@/lib/net";
 import { playSound } from "@/lib/sound";
 import { connect, installUpdate, notePick, setHovered, uiVolume, useSidekick, watchWaiting } from "@/lib/store";
-import { isPaused, type MascotState, type Suggestion } from "@/lib/types";
+import { type Activity as ActivityItem, isPaused, type MascotState, type Suggestion } from "@/lib/types";
 import { updateBusy, updateLabel } from "@/lib/updates";
-import { ActivityProgress } from "./ActivityProgress";
 import { Announcer } from "./Announcer";
 import { ASK_MASCOT, ASK_ORB, ASK_PAD, AskPanel, VoiceBars } from "./AskPanel";
-import { AtelierWash } from "./AtelierWash";
 import { Icon } from "./Icon";
 import { Glance, RoundButton } from "./IslandGlance";
 import { IslandGuide, useGuide } from "./IslandGuide";
 import { IslandSettings } from "./IslandSettings";
+import { IslandWash } from "./IslandWash";
 import { IslandWelcome } from "./IslandWelcome";
 import { MergeCard } from "./MergeCard";
 import { Orb } from "./Orb";
@@ -100,6 +103,8 @@ const TOP = ISLAND_TOP;
 
 /** Delay before hover expands, so a cursor passing over the top edge does not trigger it. */
 const HOVER_IN_MS = 140;
+/** Longer in-delay when the compact pill shows dismiss / recheck (easy to brush). */
+const HOVER_IN_ACTIONS_MS = 450;
 /** Grace period before collapsing after the cursor leaves. */
 const HOVER_OUT_MS = 320;
 
@@ -298,7 +303,8 @@ export function Island() {
     const id = setTimeout(() => setQuiet(false), HOVER_OUT_MS);
     return () => clearTimeout(id);
   }, [quiet, rawHover]);
-  const intent = useIntent(rawHover && !quiet);
+  const pillActions = !!displayedActivity && needsActions(displayedActivity, activityNow);
+  const intent = useIntent(rawHover && !quiet, pillActions ? HOVER_IN_ACTIONS_MS : HOVER_IN_MS);
   // Until onboarding is done, hover shows the steps being waited on, or else
   // brings the welcome back; the idle card ("watching for moments") would
   // just flash on the way.
@@ -529,6 +535,7 @@ export function Island() {
               voicePill.focus ||
               voicePill.asks
             ),
+            agentsOnly,
           )
         : waiting
           ? COMPACT.waitWidth
@@ -634,12 +641,7 @@ export function Island() {
         onPointerEnter={() => setHovered(true)}
         onPointerLeave={() => setHovered(false)}
       >
-        <AtelierWash
-          enabled={settings.islandColor === "atelier"}
-          simple={look.simple}
-          mascot={mascot}
-          donePill={donePill}
-        />
+        <IslandWash simple={look.simple} mascot={mascot} donePill={donePill} />
         <Announcer />
         <motion.div
           className="absolute top-0 left-0 z-1"
@@ -661,7 +663,21 @@ export function Island() {
 
         <AnimatePresence initial={false}>
           {!expanded && voicePill && (
-            <VoicePill key="voice" {...voicePill} onOpen={agentsOnly ? () => openBoard() : undefined} />
+            <VoicePill
+              key="voice"
+              {...voicePill}
+              activity={displayedActivity}
+              onOpen={agentsOnly ? () => openBoard() : undefined}
+              onCancel={
+                agentsOnly
+                  ? () => {
+                      for (const s of useAgents.getState().sessions) {
+                        if (s.status === "working" || s.status === "waiting") interruptSession(s.id);
+                      }
+                    }
+                  : undefined
+              }
+            />
           )}
           {!expanded && !bare && !voicePill && (
             <CompactTrailing
@@ -845,12 +861,12 @@ function statusTextWidth(label: string): number {
 }
 
 /** Compact listening shell: tight when empty, grows with speech up to voiceWidth. */
-function voiceShellWidth(text: string, thinking: boolean, status?: boolean): number {
+function voiceShellWidth(text: string, thinking: boolean, status?: boolean, cancel?: boolean): number {
   const label = voiceLabel(text, thinking, status);
-  // Done / working / waiting: orb column + gap + trailing icon + pad + slack
-  // so "Opened in Chrome (private)" is never CSS-truncated.
+  // Done / working / waiting: orb + gap + activity (+ cancel) + right pad.
+  // Keep chrome tight so the shell does not trail empty space past Cancel.
   if (status) {
-    const chrome = COMPACT.height + 4 + 6 + 16 + 14 + 16;
+    const chrome = COMPACT.height + 4 + 5 + 12 + 8 + (cancel ? 6 + 24 : 0);
     return Math.min(COMPACT.statusMaxWidth, Math.max(120, chrome + statusTextWidth(label)));
   }
   const textPx = Math.ceil([...label].length * 7.2);
@@ -859,8 +875,8 @@ function voiceShellWidth(text: string, thinking: boolean, status?: boolean): num
   return Math.min(COMPACT.voiceWidth, Math.max(COMPACT.voiceMinWidth, chrome + textPx));
 }
 
-function statusNeedsTruncate(label: string): boolean {
-  const chrome = COMPACT.height + 4 + 6 + 16 + 14 + 16;
+function statusNeedsTruncate(label: string, cancel?: boolean): boolean {
+  const chrome = COMPACT.height + 4 + 5 + 12 + 8 + (cancel ? 6 + 24 : 0);
   return chrome + statusTextWidth(label) > COMPACT.statusMaxWidth;
 }
 
@@ -916,7 +932,9 @@ function VoicePill({
   waiting,
   failed,
   dots,
+  activity,
   onOpen,
+  onCancel,
 }: {
   text: string;
   thinking: boolean;
@@ -927,13 +945,21 @@ function VoicePill({
   waiting?: boolean;
   failed?: boolean;
   dots?: string[];
+  activity?: ActivityItem;
   onOpen?: () => void;
+  onCancel?: () => void;
 }) {
-  const label = voiceLabel(text, thinking, working || done || focus);
+  const now = useNow(1000);
+  const elapsed = activity ? activityElapsedSecs(activity, now) : null;
+  const showActions = !!activity && needsActions(activity, now);
+  // Split · Ns out of the label so copy, timer, and activity can be spaced apart.
+  const baseText = activity && elapsed !== null ? activityLabel(activity, now, { elapsed: false }) : text;
+  const label = voiceLabel(baseText, thinking, working || done || focus);
+  const fullLabel = elapsed !== null ? `${label} · ${elapsed}s` : label;
   // Listening: label flexes so bars + Stop stay on the right. Status: one
   // tight cluster (label + indicator) so the shell never shows a stretch gap.
   const listening = !(working || thinking || done || focus || failed || waiting || asks);
-  const clip = listening || statusNeedsTruncate(label);
+  const clip = listening || statusNeedsTruncate(fullLabel, !!onCancel);
   const indicator = failed ? (
     <span role="img" aria-label="Failed" className="size-2 shrink-0 rounded-full bg-red-400" />
   ) : waiting ? (
@@ -965,30 +991,56 @@ function VoicePill({
   ) : thinking || working ? (
     <Activity />
   ) : null;
+  const labelClass = `text-[12.5px] font-medium ${
+    listening ? "min-w-0 flex-1 truncate" : clip ? "min-w-0 truncate" : "shrink-0"
+  } ${text.trim() || thinking || working ? "text-white/90" : "text-white/62"}`;
   const labelEl = onOpen ? (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={`text-left text-[12.5px] font-medium text-white/90 ${
-        listening ? "min-w-0 flex-1 truncate" : clip ? "min-w-0 truncate" : "shrink-0"
-      }`}
-      title={clip ? label : undefined}
-    >
-      {label}
+    <button type="button" onClick={onOpen} className={`text-left ${labelClass}`} title={clip ? fullLabel : undefined}>
+      <span className="min-w-0 truncate">{label}</span>
     </button>
   ) : (
-    <span
-      className={`text-[12.5px] font-medium ${
-        listening ? "min-w-0 flex-1 truncate" : clip ? "min-w-0 truncate" : "shrink-0"
-      } ${text.trim() || thinking ? "text-white/90" : "text-white/62"}`}
-      title={clip ? label : undefined}
-    >
-      {label}
+    <span className={labelClass} title={clip ? fullLabel : undefined}>
+      <span className="min-w-0 truncate">{label}</span>
     </span>
   );
+  const actions = showActions ? (
+    <span className="flex shrink-0 items-center gap-0.5">
+      <Tip label="Check again">
+        <button
+          type="button"
+          aria-label="Check again"
+          onClick={(e) => {
+            e.stopPropagation();
+            void api
+              .activityCheck(activity.id)
+              .then(acceptActivities)
+              .catch(() => {});
+          }}
+          className="chip grid size-6 place-items-center rounded-full text-white/55 hover:bg-white/10 hover:text-white"
+        >
+          <Icon name="update" size={12} />
+        </button>
+      </Tip>
+      <Tip label="Dismiss">
+        <button
+          type="button"
+          aria-label="Dismiss"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (activity.source === "open") dismissLocal(activity.id);
+            void api.activityDismiss(activity.id).catch(() => {});
+          }}
+          className="chip grid size-6 place-items-center rounded-full text-white/55 hover:bg-white/10 hover:text-white"
+        >
+          <Icon name="close" size={12} />
+        </button>
+      </Tip>
+    </span>
+  ) : null;
+  const showCancel = !!onCancel && !!(working || asks);
   return (
     <motion.div
-      className={`absolute top-0 right-0 flex h-9 items-center pr-3.5 ${listening ? "gap-2.5" : ""}`}
+      className={`absolute top-0 right-0 flex h-9 items-center ${listening ? "gap-2.5 pr-3.5" : "pr-2"}`}
       style={{ left: COMPACT.height + 4 }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1, transition: { delay: 0.1, duration: 0.2 } }}
@@ -1014,9 +1066,36 @@ function VoicePill({
           </Tip>
         </>
       ) : (
-        <div className="flex min-w-0 max-w-full items-center gap-1.5">
+        <div className="flex min-w-0 max-w-full items-center">
           {labelEl}
-          {indicator}
+          {elapsed !== null && (
+            <span className="shrink-0 text-[12.5px] font-medium text-white/90 tabular-nums" style={{ marginLeft: 3 }}>
+              · {elapsed}s
+            </span>
+          )}
+          {indicator && (
+            <span className="flex shrink-0 items-center" style={{ marginLeft: 5 }}>
+              {indicator}
+            </span>
+          )}
+          {actions && <span className="ml-1.5 flex shrink-0">{actions}</span>}
+          {showCancel && (
+            <span className="ml-1.5 flex shrink-0">
+              <Tip label="Cancel">
+                <button
+                  type="button"
+                  aria-label="Cancel"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCancel();
+                  }}
+                  className="chip grid size-6 shrink-0 place-items-center rounded-full bg-white/[0.09] hover:bg-white/[0.15]"
+                >
+                  <span className="size-2 rounded-[2px] bg-white" />
+                </button>
+              </Tip>
+            </span>
+          )}
         </div>
       )}
     </motion.div>
@@ -1107,24 +1186,18 @@ function ExpandedContent({
   suggestion: Suggestion | null;
 }) {
   const activityState = useActivities();
-  const activityNow = useNow(1000);
-  const hasActivities =
-    visibleActivities([...activityState.activities, ...activityState.local], activityNow).length > 0;
-  const agentQuestion = useAgents((s) => s.sessions.some((agent) => agent.question));
   const result = useSidekick((s) => s.lastResult);
   const running = useSidekick((s) => s.running);
   const netNotice = useSidekick((s) => s.netNotice);
   const merge = useSidekick((s) => s.merge);
   const progress = useSidekick((s) => s.updateProgress);
   const reporting = (mascot === "success" || mascot === "error" || mascot === "working") && !suggestion;
-  if (agentQuestion && !suggestion) return <Glance paused={paused} />;
   if (merge && !suggestion) return <MergeCard path={merge.path} />;
   if (netNotice && !suggestion) return <NetNoticeCard notice={netNotice} />;
   if (progress && !suggestion && !latestActivity(activityState.activities, "update")?.dismissed) {
     return (
       <div className="flex flex-col gap-3">
         <UpdateProgress progress={progress} />
-        <ActivityProgress sources={["update"]} />
         {progress.phase === "failed" && (
           <div className="flex gap-3 text-[13px]">
             <button
@@ -1143,12 +1216,12 @@ function ExpandedContent({
             </button>
           </div>
         )}
+        <Glance paused={paused} />
       </div>
     );
   }
-  if (hasActivities && !suggestion) return <ActivityProgress />;
-  // A suggestion that expired or was taken leaves nothing to show: fall back to the glance.
-  if (!suggestion && (mascot === "idle" || mascot === "sleeping" || mascot === "suggesting")) {
+  // Idle / suggesting / agent working / needs-you: one unified glance (activities are a section).
+  if (!suggestion && (mascot === "idle" || mascot === "sleeping" || mascot === "suggesting" || mascot === "working")) {
     return <Glance paused={paused} />;
   }
   // Working names what it is doing; done and error say what happened.
@@ -1340,13 +1413,13 @@ function dismiss(suggestion: Suggestion) {
   void api.suggestionDismiss(suggestion.id, "user");
 }
 
-/** Hover with intent: a short delay in, a grace period out. */
-function useIntent(raw: boolean): boolean {
+/** Hover with intent: a short delay in (or longer when the pill has actions), a grace period out. */
+function useIntent(raw: boolean, inMs = HOVER_IN_MS): boolean {
   const [value, setValue] = useState(false);
   useEffect(() => {
-    const id = setTimeout(() => setValue(raw), raw ? HOVER_IN_MS : HOVER_OUT_MS);
+    const id = setTimeout(() => setValue(raw), raw ? inMs : HOVER_OUT_MS);
     return () => clearTimeout(id);
-  }, [raw]);
+  }, [raw, inMs]);
   return value;
 }
 

@@ -220,7 +220,7 @@ function Capabilities({ onError }: { onError: (e: string) => void }) {
       <div className="flex flex-wrap gap-1.5">
         {info?.found.length ? (
           info.found.map((f) => (
-            <span key={f} className="rounded-full bg-black/5 px-2.5 py-1 dark:bg-white/10">
+            <span key={f} className="rounded-full bg-(--surface) px-2.5 py-1">
               {f}
             </span>
           ))
@@ -297,7 +297,7 @@ export function Memory({ onError }: { onError: (e: string) => void }) {
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           placeholder="Sign my emails as Ali"
-          className="min-w-0 flex-1 rounded-lg border border-(--border) bg-transparent px-2.5 py-1.5 text-[13px] outline-none focus:border-[#0a84ff]"
+          className="min-w-0 flex-1 rounded-lg border border-(--border) bg-transparent px-2.5 py-1.5 text-[13px] outline-none focus:border-(--accent)"
         />
         <Button small primary disabled={!draft.trim()} onClick={add}>
           Add

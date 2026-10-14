@@ -3,21 +3,12 @@ import {
   acceptActivities,
   activityLabel,
   dismissLocal,
-  INACTIVITY_MS,
+  needsActions,
   useActivities,
   visibleActivities,
 } from "@/lib/activities";
 import { api } from "@/lib/bridge";
 import { useNow } from "@/lib/hooks";
-
-function needsActions(a: { phase: string; lastProgressAt: number; source: string }, now: number): boolean {
-  // Chat/agent rows stay one line while healthy; Check again / Dismiss only
-  // when stuck. Other sources keep actions (setup, downloads, updates).
-  if (a.source !== "chat" && a.source !== "agent") return true;
-  if (a.phase === "failed" || a.phase === "unconfirmed" || a.phase === "awaitingUser") return true;
-  if (a.phase === "completed") return true;
-  return now - a.lastProgressAt >= INACTIVITY_MS;
-}
 
 export function ActivityProgress({ sources }: { sources?: string[] } = {}) {
   const state = useActivities();
@@ -25,6 +16,7 @@ export function ActivityProgress({ sources }: { sources?: string[] } = {}) {
   const activities = visibleActivities([...state.activities, ...state.local], now).filter(
     (a) => !sources || sources.includes(a.source),
   );
+  if (activities.length === 0) return null;
   return (
     <div className="flex flex-col gap-2">
       {activities.map((a) => {

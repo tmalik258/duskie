@@ -16,9 +16,9 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { ATELIER_EASE } from "@/lib/atelier-motion";
 import { shortcutBinding, shortcutEnabled } from "@/lib/shortcuts";
 import { setOverlayHit, useSidekick } from "@/lib/store";
+import { EASE_OUT_STRONG } from "@/lib/ui-motion";
 import { Tip } from "../Tip";
 
 /** The settings search text; empty shows everything. */
@@ -50,7 +50,6 @@ export function Section({
 }) {
   const query = useContext(SettingsQuery);
   const [open, setOpen] = useState(false);
-  const atelier = useSidekick((s) => s.settings.islandColor === "atelier");
   const reducedMotion = useReducedMotion() ?? false;
   if (query && !matches(query, title, hint, keywords)) return null;
   if (collapsible && !open && !query) {
@@ -59,10 +58,10 @@ export function Section({
         type="button"
         onClick={() => setOpen(true)}
         aria-expanded={false}
-        className="chip flex items-center gap-3 rounded-2xl bg-(--surface) px-4 py-3 text-left shadow-[0_0_0_0.5px_var(--border)] hover:bg-white/[0.06]"
+        className="chip flex items-center gap-3 rounded-2xl bg-(--surface) px-4 py-3 text-left shadow-[0_0_0_0.5px_var(--border)] hover:bg-(--hover)"
       >
         <span className="min-w-0 flex-1">
-          <span className="block text-[14px] font-medium text-white">{title}</span>
+          <span className="block text-[14px] font-medium text-(--text)">{title}</span>
           {summary && <span className="block truncate text-[12px] text-(--muted)">{summary}</span>}
         </span>
         <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3 shrink-0 -rotate-90 text-(--muted)">
@@ -74,15 +73,20 @@ export function Section({
       </button>
     );
   }
-  const body = (
-    <>
+  return (
+    <motion.section
+      className="flex flex-col gap-2"
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, transform: "translateY(8px)" }}
+      animate={reducedMotion ? { opacity: 1 } : { opacity: 1, transform: "translateY(0px)" }}
+      transition={{ duration: 0.2, ease: EASE_OUT_STRONG }}
+    >
       <div className="flex items-center px-4">
-        <h2 className="flex-1 text-[13px] font-semibold tracking-[-0.005em] text-[rgb(235_235_245/0.7)]">{title}</h2>
+        <h2 className="flex-1 text-[13px] font-semibold tracking-[-0.005em] text-(--muted)">{title}</h2>
         {collapsible && !query && (
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="chip text-[12px] text-(--muted) hover:text-white"
+            className="chip text-[12px] text-(--muted) hover:text-(--text)"
           >
             Close
           </button>
@@ -92,19 +96,6 @@ export function Section({
         {children}
       </div>
       {hint && <p className="px-4 text-[12px] text-(--muted)">{hint}</p>}
-    </>
-  );
-  if (!atelier) {
-    return <section className="flex flex-col gap-2">{body}</section>;
-  }
-  return (
-    <motion.section
-      className="flex flex-col gap-2"
-      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, transform: "translateY(8px)" }}
-      animate={reducedMotion ? { opacity: 1 } : { opacity: 1, transform: "translateY(0px)" }}
-      transition={{ duration: 0.2, ease: ATELIER_EASE }}
-    >
-      {body}
     </motion.section>
   );
 }
@@ -129,9 +120,9 @@ export function Button({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`chip shrink-0 rounded-full font-medium transition-[background-color,transform] duration-150 active:scale-[0.96] disabled:opacity-40 disabled:active:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff] ${
-        primary ? "bg-[#f5f5f7] text-black hover:bg-white" : "bg-white/[0.09] text-white hover:bg-white/[0.15]"
-      } ${small ? "px-2.5 py-[5px] text-[12px]" : "px-3 py-[7px] text-[13px]"} ${active ? "shadow-[inset_0_0_0_1.5px_#0a84ff]" : ""}`}
+      className={`chip shrink-0 rounded-full font-medium transition-[background-color,transform] duration-150 active:scale-[0.96] disabled:opacity-40 disabled:active:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent) ${
+        primary ? "bg-(--text) text-(--bg) hover:opacity-90" : "bg-(--surface) text-(--text) hover:bg-(--hover)"
+      } ${small ? "px-2.5 py-[5px] text-[12px]" : "px-3 py-[7px] text-[13px]"} ${active ? "shadow-[inset_0_0_0_1.5px_var(--accent)]" : ""}`}
     >
       {children}
     </button>
@@ -154,7 +145,7 @@ export function Segmented<T extends string>({
   disabled?: boolean;
 }) {
   return (
-    <fieldset aria-label={label} className="flex shrink-0 gap-0.5 rounded-[10px] bg-white/[0.08] p-[3px]">
+    <fieldset aria-label={label} className="flex shrink-0 gap-0.5 rounded-[10px] bg-(--surface) p-[3px]">
       {options.map(([v, text]) => (
         <button
           key={v}
@@ -162,8 +153,8 @@ export function Segmented<T extends string>({
           aria-pressed={value === v}
           disabled={disabled}
           onClick={() => onChange(v)}
-          className={`chip rounded-[8px] px-2.5 py-[5px] text-[12.5px] leading-none transition-colors duration-150 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#0a84ff] ${
-            value === v ? "bg-[#f5f5f7] font-semibold text-black" : "text-[rgb(235_235_245/0.62)] hover:text-white"
+          className={`chip rounded-[8px] px-2.5 py-[5px] text-[12.5px] leading-none transition-colors duration-150 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-(--accent) ${
+            value === v ? "bg-(--text) font-semibold text-(--bg)" : "text-(--muted) hover:text-(--text)"
           }`}
         >
           {text}
@@ -390,7 +381,6 @@ export function Select({
   })();
   const current = currentLabel ?? list.find((r) => r.value === value)?.label ?? (value || "Default");
   const islandColor = useSidekick((s) => s.settings.islandColor);
-  const atelier = islandColor === "atelier";
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -574,11 +564,7 @@ export function Select({
         const selected = r.value === value;
         return (
           <div key={r.value || "__default"}>
-            {r.sepBefore && !q && (
-              <div
-                className={`mx-[9px] my-[5px] h-px scale-y-50 ${atelier ? "bg-[rgb(from_var(--c4)_r_g_b_/_0.35)]" : "bg-white/12"}`}
-              />
-            )}
+            {r.sepBefore && !q && <div className="mx-[9px] my-[5px] h-px scale-y-50 bg-(--border)" />}
             <div
               role="option"
               tabIndex={-1}
@@ -591,15 +577,7 @@ export function Select({
               }}
               className={`grid w-full cursor-default items-center gap-2.5 rounded-[9px] px-[9px] py-1.5 text-left text-[13px] transition-colors duration-100 ${
                 r.icon || r.image ? "grid-cols-[24px_1fr_auto]" : "grid-cols-[1fr_auto]"
-              } ${
-                atelier
-                  ? i === active
-                    ? "bg-[rgb(from_var(--c4)_r_g_b_/_0.28)] text-[var(--c2)]"
-                    : "text-[rgb(from_var(--c2)_r_g_b_/_0.85)] hover:bg-[rgb(from_var(--c4)_r_g_b_/_0.16)]"
-                  : i === active
-                    ? "bg-white/[0.12] text-white"
-                    : "text-white/85 hover:bg-white/[0.06]"
-              }`}
+              } ${i === active ? "bg-(--hover) text-(--text)" : "text-(--text)/85 hover:bg-(--surface)"}`}
             >
               {r.image ? (
                 <span className="grid size-6 place-items-center overflow-hidden rounded-[7px]" aria-hidden="true">
@@ -618,20 +596,12 @@ export function Select({
               )}
               <span className="grid min-w-0">
                 <span className={`truncate ${r.sub ? "font-medium" : ""}`}>{r.label}</span>
-                {r.sub && (
-                  <span
-                    className={`truncate text-[11.5px] ${atelier ? "text-[rgb(from_var(--c2)_r_g_b_/_0.55)]" : "text-white/62"}`}
-                  >
-                    {r.sub}
-                  </span>
-                )}
+                {r.sub && <span className="truncate text-[11.5px] text-(--muted)">{r.sub}</span>}
               </span>
               <svg
                 viewBox="0 0 16 16"
                 aria-hidden="true"
-                className={`size-3.5 transition-opacity duration-100 ${selected ? "opacity-100" : "opacity-0"} ${
-                  atelier && selected ? "text-[var(--c3)]" : ""
-                }`}
+                className={`size-3.5 text-(--accent) transition-opacity duration-100 ${selected ? "opacity-100" : "opacity-0"}`}
               >
                 <path
                   d="M3.5 8.5 6.5 11.5 12.5 4.5"
@@ -646,13 +616,7 @@ export function Select({
           </div>
         );
       })}
-      {shown.length === 0 && (
-        <div
-          className={`px-[9px] py-2.5 text-[12.5px] ${atelier ? "text-[rgb(from_var(--c2)_r_g_b_/_0.45)]" : "text-white/45"}`}
-        >
-          No matches
-        </div>
-      )}
+      {shown.length === 0 && <div className="px-[9px] py-2.5 text-[12.5px] text-(--muted)">No matches</div>}
     </>
   );
 
@@ -692,19 +656,11 @@ export function Select({
           placeholder={`Search ${label.toLowerCase()}…`}
           spellCheck={false}
           aria-label={`Search ${label}`}
-          className={`mb-1 w-full shrink-0 rounded-[9px] px-2.5 py-1.5 text-[12.5px] outline-none ${
-            atelier
-              ? "bg-[rgb(from_var(--c4)_r_g_b_/_0.16)] text-[var(--c2)] placeholder:text-[rgb(from_var(--c2)_r_g_b_/_0.4)] focus:bg-[rgb(from_var(--c4)_r_g_b_/_0.24)]"
-              : "bg-white/[0.08] text-white placeholder:text-white/40 focus:bg-white/[0.11]"
-          }`}
+          className="mb-1 w-full shrink-0 rounded-[9px] bg-(--surface) px-2.5 py-1.5 text-[12.5px] text-(--text) outline-none placeholder:text-(--muted) focus:bg-(--hover)"
         />
       )}
       {group && (
-        <div
-          className={`shrink-0 px-[9px] pt-1 pb-[3px] text-[10.5px] tracking-[0.06em] uppercase ${
-            atelier ? "text-[rgb(from_var(--c2)_r_g_b_/_0.45)]" : "text-white/45"
-          }`}
-        >
+        <div className="shrink-0 px-[9px] pt-1 pb-[3px] text-[10.5px] tracking-[0.06em] text-(--muted) uppercase">
           {group}
         </div>
       )}
@@ -722,26 +678,10 @@ export function Select({
         aria-controls={listId}
         onClick={() => setOpen((o) => !o)}
         onKeyDown={onKey}
-        className={`chip flex w-full items-center gap-1.5 text-left whitespace-nowrap transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--accent,#0a84ff)] ${
+        className={`chip flex w-full items-center gap-1.5 text-left whitespace-nowrap transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-(--accent) ${
           variant === "plain"
-            ? `rounded-md px-1 py-0.5 text-[inherit] ${
-                atelier
-                  ? open
-                    ? "bg-[rgb(from_var(--c4)_r_g_b_/_0.22)]"
-                    : "hover:bg-[rgb(from_var(--c4)_r_g_b_/_0.14)]"
-                  : open
-                    ? "bg-white/[0.1]"
-                    : "hover:bg-white/[0.06]"
-              }`
-            : `rounded-[10px] px-2.5 py-1.5 text-[13px] ${
-                atelier
-                  ? open
-                    ? "bg-[rgb(from_var(--c4)_r_g_b_/_0.28)]"
-                    : "bg-[rgb(from_var(--c4)_r_g_b_/_0.16)] hover:bg-[rgb(from_var(--c4)_r_g_b_/_0.22)]"
-                  : open
-                    ? "bg-white/[0.14]"
-                    : "bg-white/[0.08] hover:bg-white/[0.11]"
-              }`
+            ? `rounded-md px-1 py-0.5 text-[inherit] ${open ? "bg-(--hover)" : "hover:bg-(--surface)"}`
+            : `rounded-[10px] px-2.5 py-1.5 text-[13px] ${open ? "bg-(--hover)" : "bg-(--surface) hover:bg-(--hover)"}`
         }`}
       >
         <span className="min-w-0 flex-1 truncate">{current}</span>
@@ -774,11 +714,7 @@ export function StatusDot({ state }: { state: "ok" | "off" | "checking" }) {
         role="img"
         aria-label={label}
         className={`size-2 shrink-0 rounded-full ${
-          state === "ok"
-            ? "bg-[#30d158]"
-            : state === "off"
-              ? "bg-black/20 dark:bg-white/25"
-              : "animate-pulse bg-amber-400"
+          state === "ok" ? "bg-[#30d158]" : state === "off" ? "bg-(--muted)/40" : "animate-pulse bg-amber-400"
         }`}
       />
     </Tip>
@@ -836,13 +772,13 @@ export function ChipList({
       <div className="flex flex-wrap gap-1.5">
         {items.map((i) => (
           <Tip key={i} label={i}>
-            <span className="flex items-center gap-1 rounded-full bg-black/5 py-0.5 pr-1 pl-2.5 text-[12px] dark:bg-white/10">
+            <span className="flex items-center gap-1 rounded-full bg-(--surface) py-0.5 pr-1 pl-2.5 text-[12px]">
               {format(i)}
               <button
                 type="button"
                 aria-label={`Remove ${format(i)}`}
                 onClick={() => onChange(items.filter((x) => x !== i))}
-                className="grid size-4 place-items-center rounded-full text-(--muted) hover:bg-black/10 hover:text-(--text) dark:hover:bg-white/15"
+                className="grid size-4 place-items-center rounded-full text-(--muted) hover:bg-(--hover) hover:text-(--text)"
               >
                 ×
               </button>
@@ -986,7 +922,11 @@ export function ShortcutRecorder({
         aria-label={`${label} shortcut`}
         onClick={() => setRecording(true)}
         className={`min-w-32 rounded-md border px-2 py-1 text-center font-mono text-[12px] ${
-          recording ? "border-[#0a84ff] text-[#0a84ff]" : on ? "border-(--border)" : "border-(--border) text-white/45"
+          recording
+            ? "border-(--accent) text-(--accent)"
+            : on
+              ? "border-(--border)"
+              : "border-(--border) text-(--muted)"
         }`}
       >
         {recording ? "Press keys..." : binding || "Off"}

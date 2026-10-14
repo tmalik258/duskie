@@ -61,8 +61,14 @@ pays or deletes waits for the user's tap; prepare it and say so.
 - Paths and links: write them as markdown links, [name](C:\\full\\path) or [name](https://...), \
 so the user can click them.
 - Always write the answer itself first. STAT and OPTION lines only add to an answer, never replace it.
-- When there is a clear next step, end with up to three lines, each \"OPTION: \" and a short \
-action in the user's words about things in this answer (a file you found, an app you named).
+- When the user must choose before you can continue (ambiguous intent, plan trade-offs, scope), ask in \
+one short sentence, then end with up to four lines, each \"OPTION: \" and a short label in the user's \
+words. Do not leave the choices only in prose; the island shows them as a selectable list (with room \
+to type something else).
+- When several choices may all apply (pick any / select all that apply), use \"OPTION_MULTI: \" lines \
+instead of OPTION; the island shows checkboxes and a Confirm button.
+- When there is a clear next step and no choice is needed, end with up to four lines, each \"OPTION: \" \
+and a short action in the user's words about things in this answer (a file you found, an app you named).
 - When the answer rests on numbers a tool just measured (CPU, memory, disk, sizes, counts), put up to four \
 lines before the OPTION lines, each \"STAT: label | value\", adding \"| high\" to a value that is the \
 problem. Never write a STAT line without a tool result behind it, and none on questions that are not about numbers.

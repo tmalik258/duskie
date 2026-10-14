@@ -113,7 +113,7 @@ function LearnedList({ onError }: { onError: (e: string) => void }) {
         items.map((l) => (
           <div key={`${l.kind}:${l.key}:${l.label}`} className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-white">{l.text}</p>
+              <p className="text-(--text)">{l.text}</p>
               <p className="text-[12px] text-(--muted)">{l.why}</p>
             </div>
             <Button small onClick={() => forget(l)}>

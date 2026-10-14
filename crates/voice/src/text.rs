@@ -400,7 +400,7 @@ pub fn speakable(text: &str) -> String {
             in_code = !in_code;
             continue;
         }
-        // Option chips ("OPTION: Open invoice.pdf") are for the screen, and
+        // Option lines ("OPTION: Open invoice.pdf") are for the screen, and
         // table rules are noise.
         if in_code
             || line.trim_start().to_uppercase().starts_with("OPTION:")

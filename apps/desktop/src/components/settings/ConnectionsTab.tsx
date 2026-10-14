@@ -188,7 +188,7 @@ function ComposioCard({ onError }: { onError: (e: string) => void }) {
     return (
       <div className="flex flex-col gap-3 text-[13px]">
         {waiting ? (
-          <div className="flex flex-col gap-1.5 rounded-xl bg-[#0a84ff]/10 p-3">
+          <div className="flex flex-col gap-1.5 rounded-xl bg-(--accent)/10 p-3">
             <p className="font-medium">Finish in the browser</p>
             <p className="text-(--muted)">Sign in to Composio and press Allow.</p>
             <div>
@@ -276,7 +276,7 @@ function OtherWays({ onError }: { onError: (e: string) => void }) {
             value={key}
             placeholder="ck_..."
             onChange={(e) => setKey(e.target.value)}
-            className="min-w-0 flex-1 rounded-lg border border-(--border) bg-transparent px-2.5 py-1.5 font-mono text-[12px] outline-none focus:border-[#0a84ff]"
+            className="min-w-0 flex-1 rounded-lg border border-(--border) bg-transparent px-2.5 py-1.5 font-mono text-[12px] outline-none focus:border-(--accent)"
           />
           <Button
             small
@@ -420,7 +420,7 @@ function BrowserCard() {
             )}
           </div>
           {guide?.id === b.id && (
-            <div className="flex flex-col gap-1.5 rounded-lg bg-[#0a84ff]/10 p-2.5 text-[12.5px]">
+            <div className="flex flex-col gap-1.5 rounded-lg bg-(--accent)/10 p-2.5 text-[12.5px]">
               <p>{b.name} opened. Then:</p>
               <ol className="list-decimal space-y-0.5 pl-5">
                 {guide.guide.steps.map((s) => (
@@ -447,7 +447,7 @@ function PairingCode() {
     <details className="text-[12.5px]">
       <summary className="cursor-pointer text-(--muted)">Pair with a code instead</summary>
       <div className="mt-2 flex items-center gap-2">
-        <code className="min-w-0 flex-1 truncate rounded-lg bg-black/5 px-3 py-2 font-mono text-[12px] select-all dark:bg-white/5">
+        <code className="min-w-0 flex-1 truncate rounded-lg bg-(--surface) px-3 py-2 font-mono text-[12px] select-all">
           {info?.token || "..."}
         </code>
         <CopyButton text={info?.token ?? ""} />

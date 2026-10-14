@@ -5,6 +5,7 @@
 import { create } from "zustand";
 import { api, EVENTS, listen } from "./bridge";
 import { mask } from "./mask";
+import { parsePlanDocument, parsePlanFromText } from "./plan";
 import type { AgentMode, AgentStarted } from "./types";
 
 export interface Step {
@@ -18,8 +19,19 @@ export interface Step {
 }
 
 export interface PlanItem {
+  /** Short step heading. */
   text: string;
+  /** Full step write-up under the heading. */
+  detail?: string;
   status: "pending" | "in_progress" | "completed";
+}
+
+/** Full plan document shown in Plan mode (Cursor-style), not just todos. */
+export interface PlanDoc {
+  title: string;
+  items: PlanItem[];
+  assumptions?: string;
+  markdown: string;
 }
 
 /** One entry in a session's timeline: something said, or a step taken. */
@@ -38,6 +50,8 @@ export interface Session extends AgentStarted {
   status: "working" | "waiting" | "idle" | "ended" | "failed";
   entries: Entry[];
   plan: PlanItem[];
+  /** Full plan write-up when parsed from prose or a Codex plan item. */
+  planDoc?: PlanDoc | null;
   usage: { used: number; window: number; total?: number; at?: number } | null;
   /** The plan's usage limit, when the agent says it is close or reached. */
   limit?: { status: string; window: string; resetsAt: number | null; used: number | null } | null;
@@ -151,6 +165,15 @@ export async function setSessionMode(id: string, mode: AgentMode) {
   } catch (e) {
     update(id, (s) => ({ ...s, error: String(e) }));
   }
+}
+
+/** Replace the session checklist and optional full plan document. */
+export function setSessionPlan(id: string, plan: PlanItem[], planDoc?: PlanDoc | null) {
+  update(id, (s) => ({
+    ...s,
+    plan,
+    planDoc: planDoc === undefined ? s.planDoc : planDoc,
+  }));
 }
 
 function loadLayout(): AgentsLayout {
@@ -417,6 +440,7 @@ export async function rewindSession(id: string, entry: number): Promise<number> 
     ...x,
     entries: x.entries.slice(0, entry),
     plan: [],
+    planDoc: null,
     note: `(I rewound this conversation to before my message "${said.slice(0, 80)}". The file changes made after it were undone. Ignore everything after that point and work from here.)`,
   }));
   return n;
@@ -485,13 +509,19 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
         if (at >= 0) {
           const entries = [...s.entries];
           const old = entries[at] as { kind: "step"; step: Step };
+          // Prefer the longer text so a completed web search query replaces "Search the web".
+          const prefer = (next: unknown, prev: string) => {
+            const n = String(next ?? "").trim();
+            if (!n) return prev;
+            return n.length >= prev.trim().length ? String(next ?? "") : prev;
+          };
           entries[at] = {
             kind: "step",
             step: {
               ...old.step,
               state: e.state as Step["state"],
-              label: (e.label as string) || old.step.label,
-              detail: (e.detail as string) || old.step.detail,
+              label: prefer(e.label, old.step.label),
+              detail: prefer(e.detail, old.step.detail),
               output: (e.output as string) || old.step.output,
             },
           };
@@ -512,6 +542,16 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
       return update(id, (s) => ({ ...s, localModel: String(e.name ?? "") }));
     case "plan":
       return update(id, (s) => ({ ...s, plan: (e.items as PlanItem[]) ?? [] }));
+    case "plan_doc": {
+      const doc = parsePlanDocument(String(e.text ?? ""));
+      if (!doc)
+        return update(id, (s) => ({ ...s, planDoc: { title: "Plan", items: s.plan, markdown: String(e.text ?? "") } }));
+      return update(id, (s) => ({
+        ...s,
+        plan: doc.items.length > 0 ? doc.items : s.plan,
+        planDoc: doc,
+      }));
+    }
     case "usage":
       return update(id, (s) => {
         const usage = {
@@ -561,14 +601,38 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
       return update(id, (s) => ({ ...s, changes: Math.max(s.changes, 1) }));
     }
     case "turn":
-      return update(id, (s) => ({
-        ...s,
-        status: e.error ? "failed" : "idle",
-        error: e.error ? String(e.error) : null,
-        tookMs: Date.now() - s.turnAt,
-        changes: Number(e.changes ?? s.changes),
-        entries: appendReview(s.entries, e.review),
-      }));
+      return update(id, (s) => {
+        const entries = appendReview(s.entries, e.review);
+        // Plan mode often answers in prose without turn/plan/updated — lift the doc.
+        let plan = s.plan;
+        let planDoc = s.planDoc;
+        if ((s.mode === "plan" || s.activeMode === "plan") && (plan.length === 0 || !planDoc)) {
+          for (let i = entries.length - 1; i >= 0; i--) {
+            const row = entries[i];
+            if (row?.kind !== "text") continue;
+            const doc = parsePlanDocument(row.text);
+            if (doc && doc.items.length > 0) {
+              plan = doc.items;
+              planDoc = doc;
+              break;
+            }
+            if (plan.length === 0) {
+              const parsed = parsePlanFromText(row.text);
+              if (parsed.length > 0) plan = parsed;
+            }
+          }
+        }
+        return {
+          ...s,
+          status: e.error ? "failed" : "idle",
+          error: e.error ? String(e.error) : null,
+          tookMs: Date.now() - s.turnAt,
+          changes: Number(e.changes ?? s.changes),
+          entries,
+          plan,
+          planDoc,
+        };
+      });
     case "ended":
       return update(id, (s) => ({
         ...s,

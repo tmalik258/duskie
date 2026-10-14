@@ -8,7 +8,7 @@ import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
 import { Markdown } from "@/lib/markdown";
-import { splitOptions } from "@/lib/options";
+import { extractChoices, splitOptions } from "@/lib/options";
 import { useReveal } from "@/lib/reveal";
 import { askAgain, askWhenOnline, retryLast, setAsk, setAskModel, thinkHarder, useSidekick } from "@/lib/store";
 import { type Agents, type AiSettings, PROVIDER_LABELS, type ProviderStatus, type Turn } from "@/lib/types";
@@ -45,9 +45,11 @@ export function Chat({ turns }: { turns: Turn[] }) {
   const ai = useSidekick((s) => s.settings.ai);
   const last = turns.at(-1);
   // A reply that is only chips (a weak model copying its instructions) is no answer.
-  const blank = (t: Turn) => !t.streaming && !t.error && !splitOptions(t.content).body.trim();
-  const options =
-    last?.role === "assistant" && !last.streaming && !blank(last) ? splitOptions(last.content).options : [];
+  const blank = (t: Turn) => !t.streaming && !t.error && !extractChoices(t.content).body.trim();
+  const lastChoices =
+    last?.role === "assistant" && !last.streaming && !blank(last) ? extractChoices(last.content) : null;
+  const options = lastChoices?.options ?? [];
+  const multi = lastChoices?.multi ?? false;
   return (
     <div className="ak-body py-0.5">
       {turns.map((t, i) => {
@@ -71,7 +73,7 @@ export function Chat({ turns }: { turns: Turn[] }) {
             {t.streaming && steps.length > 0 && <Steps steps={steps} running since={t.startedAt} tookMs={t.tookMs} />}
             {t.content ? (
               <div className="ak-ans">
-                <Answer text={splitOptions(t.content, t.streaming).body} live={isLast && !!t.streaming} />
+                <Answer text={extractChoices(t.content, t.streaming).body} live={isLast && !!t.streaming} />
               </div>
             ) : t.streaming && steps.length === 0 ? (
               <LiveStep step={t.tool ?? null} since={t.startedAt} />
@@ -124,7 +126,9 @@ export function Chat({ turns }: { turns: Turn[] }) {
             {isLast && !t.streaming && !t.error && t.offline && <OfflineChips />}
             {skillMode && !t.streaming && yamlBlock(t.content) && <AddSkill yaml={yamlBlock(t.content) ?? ""} />}
             {t.proposals && t.proposals.length > 0 && <Proposals items={t.proposals} keys={isLast} />}
-            {isLast && options.length > 0 && <AnswerOptions options={options} start={pendingCount(t.proposals)} />}
+            {isLast && options.length > 0 && (
+              <AnswerOptions options={options} multi={multi} start={pendingCount(t.proposals)} />
+            )}
           </div>
         );
       })}

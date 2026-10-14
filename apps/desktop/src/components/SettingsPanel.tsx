@@ -142,7 +142,7 @@ export function SettingsPanel() {
           placeholder="Search settings"
           aria-label="Search settings"
           spellCheck={false}
-          className="w-full rounded-lg bg-white/[0.08] px-3 py-1.5 text-[13px] text-white placeholder:text-white/40 outline-none focus:bg-white/[0.12]"
+          className="w-full rounded-lg bg-(--surface) px-3 py-1.5 text-[13px] text-(--text) placeholder:text-(--muted) outline-none focus:bg-(--hover)"
         />
         {!searching && (
           <nav aria-label="Settings sections" className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto px-1">
@@ -154,8 +154,8 @@ export function SettingsPanel() {
                 onClick={() => pick(t.id)}
                 className={`chip shrink-0 rounded-full px-3 py-1 text-[12.5px] font-medium ${
                   tab === t.id
-                    ? "bg-white text-black"
-                    : "bg-white/[0.08] text-[rgb(235_235_245/0.7)] hover:bg-white/[0.14]"
+                    ? "bg-(--text) text-(--bg)"
+                    : "bg-(--surface) text-(--muted) hover:bg-(--hover) hover:text-(--text)"
                 }`}
               >
                 {t.label}

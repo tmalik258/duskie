@@ -15,6 +15,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { AnswerOptions } from "@/components/ask/Proposals";
 import { activityLabel, useActivities } from "@/lib/activities";
 import { type AgentCommand, commandCatalog } from "@/lib/agent-commands";
 import {
@@ -49,6 +50,8 @@ import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
 import { Markdown } from "@/lib/markdown";
+import { extractChoices } from "@/lib/options";
+import { parsePlanDocument } from "@/lib/plan";
 import { setAsk, setOverlayHit } from "@/lib/store";
 import type { AgentInfo, AgentMode, Agents, CursorChat, EditorList } from "@/lib/types";
 import { scrollIfActive } from "../ask/parts";
@@ -57,6 +60,7 @@ import { Select } from "../settings/ui";
 import { Tip } from "../Tip";
 import { Board } from "./Board";
 import { ChatControls } from "./Controls";
+import { PlanPanel } from "./PlanPanel";
 import { ProjectPicker } from "./ProjectPicker";
 import { Review } from "./Review";
 
@@ -66,6 +70,12 @@ const MODES: { id: AgentMode; label: string; note: string }[] = [
   { id: "edit", label: "Edit", note: "Edits files, asks before commands" },
   { id: "full", label: "Full", note: "Does everything without asking" },
 ];
+
+/** Next Plan → Ask → Edit → Full (wraps). Bound to Ctrl+. in the composer. */
+function nextAgentMode(mode: AgentMode): AgentMode {
+  const i = MODES.findIndex((m) => m.id === mode);
+  return MODES[(i + 1) % MODES.length].id;
+}
 
 /** Letter and colour for each agent in the picker. */
 export const AGENT_MARKS: Record<string, [string, string]> = {
@@ -414,7 +424,10 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
                 }}
               />
             </span>
-            <ModeSwitch mode={mode} onChange={pickMode} />
+            <div className="ak-modes">
+              <ModeSwitch mode={mode} onChange={pickMode} />
+              <span className="keys mono">Ctrl+.</span>
+            </div>
           </div>
           {picked && !ready(picked) && <FixLine agent={picked} />}
           {picked?.local && ready(picked) && (
@@ -430,6 +443,11 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
                 onKeyDown={(e) => {
+                  if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key === ".") {
+                    e.preventDefault();
+                    pickMode(nextAgentMode(mode));
+                    return;
+                  }
                   if (e.key === "Enter") {
                     e.preventDefault();
                     go();
@@ -712,6 +730,8 @@ function SessionView({
     sessionView(s.id, { draft: textRef.current, ...scrollState.current, reviewing: next });
   const [rewindAt, setRewindAt] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  /** Bumped after rewind so the composer focuses and selects the restored draft. */
+  const [editFocus, setEditFocus] = useState(0);
   const { data: editors } = useCached<EditorList>("editors", api.editorsList);
   const editor = editors?.editors.find((e) => e.id === editors.current)?.name ?? null;
   const scroll = useRef<HTMLDivElement>(null);
@@ -820,11 +840,6 @@ function SessionView({
     setLocalText("");
     sessionView(s.id, { draft: "", ...scrollState.current });
   };
-  const planDone = s.plan.filter((p) => p.status === "completed").length;
-  const planAt = Math.min(planDone + 1, s.plan.length);
-  // The plan reads after the first thing said, where the agent made it.
-  const firstSaid = s.entries.findIndex((e) => e.kind === "text");
-  const planAfter = firstSaid >= 0 ? firstSaid : 0;
   const usedPct = s.usage ? Math.round(Math.min(1, s.usage.used / s.usage.window) * 100) : null;
   // Long sessions: paint the recent tail first (open lag was parsing every Markdown block).
   const TAIL = 28;
@@ -833,6 +848,13 @@ function SessionView({
   useEffect(() => setShowEarlier(false), [s.id]);
   const entryStart = showEarlier || s.entries.length <= TAIL ? 0 : s.entries.length - TAIL;
   const visibleEntries = s.entries.slice(entryStart);
+  let lastAgentText = -1;
+  for (let k = s.entries.length - 1; k >= 0; k--) {
+    if (s.entries[k].kind === "text") {
+      lastAgentText = k;
+      break;
+    }
+  }
 
   return (
     <>
@@ -863,7 +885,7 @@ function SessionView({
         <SessionMemory id={s.id} live={active && s.status !== "ended" && s.status !== "failed" && !s.restored} />
         <div className="ak-modes">
           <ModeSwitch agent={s.agent} mode={s.mode} onChange={(mode) => void setSessionMode(s.id, mode)} />
-          <span className="keys mono">Shift+Tab</span>
+          <span className="keys mono">Ctrl+.</span>
         </div>
         {working && s.activeMode !== s.mode && <span className="ak-note">Applies to next message</span>}
       </div>
@@ -891,48 +913,64 @@ function SessionView({
             )}
             {visibleEntries.map((e, j) => {
               const i = entryStart + j;
+              // Last agent prose (idle or still "working" after a clarifying ask).
+              const lastText = e.kind === "text" && !s.question && i === lastAgentText;
+              // Full plan lives in PlanPanel — don't repeat the same prose above it.
+              const planCovers =
+                lastText && !!s.planDoc && e.kind === "text" && (parsePlanDocument(e.text)?.items.length ?? 0) >= 2;
               return (
                 <Fragment key={i}>
-                  <EntryRow
-                    entry={e}
-                    onReview={() => setReviewing(true)}
-                    onRewind={e.kind === "you" && done && s.reviewable ? () => setRewindAt(i) : undefined}
-                  />
+                  {!planCovers && (
+                    <EntryRow
+                      entry={e}
+                      choices={lastText}
+                      onPick={(t) => sendToSession(s.id, t)}
+                      onReview={() => setReviewing(true)}
+                      onRewind={e.kind === "you" && done && s.reviewable ? () => setRewindAt(i) : undefined}
+                    />
+                  )}
                   {rewindAt === i && (
                     <RewindConfirm
                       session={s}
                       entry={i}
-                      onDone={(msg) => {
+                      onDone={(msg, draft) => {
                         setRewindAt(null);
                         setNotice(msg);
+                        if (draft) {
+                          setText(draft);
+                          setEditFocus((n) => n + 1);
+                        }
                       }}
                     />
                   )}
-                  {i === planAfter && s.plan.length > 0 && (
-                    <div className="ak-todo ak-in">
-                      <div className="h">
-                        <span>Plan</span>
-                        <span>
-                          {planAt} of {s.plan.length}
-                        </span>
-                      </div>
-                      {s.plan.map((p) => (
-                        <div key={p.text} className="ak-td" data-s={p.status}>
-                          <span className="ak-cb" aria-hidden="true" />
-                          {p.text}
-                        </div>
-                      ))}
-                    </div>
+                  {i === lastAgentText && (
+                    <PlanPanel
+                      session={s}
+                      onDraft={(t) => {
+                        setText(t);
+                        setEditFocus((n) => n + 1);
+                      }}
+                    />
                   )}
                 </Fragment>
               );
             })}
+            {/* Plan with no agent text yet still needs a home. */}
+            {lastAgentText < 0 && (
+              <PlanPanel
+                session={s}
+                onDraft={(t) => {
+                  setText(t);
+                  setEditFocus((n) => n + 1);
+                }}
+              />
+            )}
 
             {working && !s.question && (
               <p className="ak-status" role="status" aria-live="polite">
                 <span className="shimmer-text text-[rgb(235_235_245/0.6)]">
                   {activity
-                    ? activityLabel(activity, now)
+                    ? activityLabel(activity, now, { elapsed: false })
                     : current
                       ? `${current}...`
                       : "Waiting for the next agent step"}
@@ -1087,6 +1125,7 @@ function SessionView({
               working={working}
               text={text}
               setText={setText}
+              editFocus={editFocus}
               onSend={send}
               onBlur={flushView}
               onReview={() => setReviewing(true)}
@@ -1131,7 +1170,20 @@ export const STEP_TAG: Record<string, string> = {
   webSearch: "Web",
 };
 
-function EntryRow({ entry: e, onRewind, onReview }: { entry: Entry; onRewind?: () => void; onReview?: () => void }) {
+function EntryRow({
+  entry: e,
+  onRewind,
+  onReview,
+  choices,
+  onPick,
+}: {
+  entry: Entry;
+  onRewind?: () => void;
+  onReview?: () => void;
+  /** Last agent reply while idle: show selectable clarifying choices. */
+  choices?: boolean;
+  onPick?: (text: string) => void;
+}) {
   if (e.kind === "review") {
     return (
       <div className="ak-chips">
@@ -1154,9 +1206,18 @@ function EntryRow({ entry: e, onRewind, onReview }: { entry: Entry; onRewind?: (
     );
   }
   if (e.kind === "text") {
+    // Always hide OPTION/STAT lines from prose; the selectable UI owns them.
+    const parsed = extractChoices(e.text, !choices);
     return (
-      <div className="ak-ans ak-in px-0">
-        <Markdown text={e.text} />
+      <div className="grid gap-2">
+        {parsed.body.trim() ? (
+          <div className="ak-ans ak-in px-0">
+            <Markdown text={parsed.body} />
+          </div>
+        ) : null}
+        {choices && parsed.options.length > 0 && onPick && (
+          <AnswerOptions options={parsed.options} multi={parsed.multi} onPick={onPick} />
+        )}
       </div>
     );
   }
@@ -1177,20 +1238,18 @@ function EntryRow({ entry: e, onRewind, onReview }: { entry: Entry; onRewind?: (
   );
 }
 
-/** A command's output, folded to its last lines; click for the rest. */
+/** A command's output: collapsed to a line count until opened. */
 function Output({ step }: { step: Step }) {
   const [open, setOpen] = useState(false);
   const lines = (step.output ?? "").split("\n");
-  // Folded: the last three lines that say something.
-  const shown = open ? lines : lines.filter((l) => l.trim()).slice(-3);
+  const count = lines.length;
   return (
     <div className="ak-term ak-in">
-      <pre className="mono">{shown.join("\n")}</pre>
-      {lines.length > 3 && (
-        <button type="button" onClick={() => setOpen((o) => !o)} className="chip">
-          {open ? "Show less" : `Show all ${lines.length} lines`}
-        </button>
-      )}
+      <button type="button" onClick={() => setOpen((o) => !o)} className="chip flex items-center gap-1.5">
+        <Icon name="chevron" size={12} className={open ? "" : "-rotate-90"} />
+        {open ? "Show less" : `${count} ${count === 1 ? "line" : "lines"}`}
+      </button>
+      {open && <pre className="mono">{step.output ?? ""}</pre>}
     </div>
   );
 }
@@ -1203,7 +1262,8 @@ function RewindConfirm({
 }: {
   session: Session;
   entry: number;
-  onDone: (message: string | null) => void;
+  /** `draft` is the removed user message, put back in the composer to edit. */
+  onDone: (message: string | null, draft?: string) => void;
 }) {
   const [files, setFiles] = useState<number | null>(null);
   useEffect(() => {
@@ -1212,11 +1272,13 @@ function RewindConfirm({
       .then(setFiles)
       .catch(() => setFiles(0));
   }, [s, entry]);
+  const said = s.entries[entry]?.kind === "you" ? (s.entries[entry] as { text: string }).text : "";
   const go = () =>
     void rewindSession(s.id, entry)
-      .then((n) =>
-        onDone(`↺ Rewound · ${n} ${n === 1 ? "file" : "files"} put back · write a new message to go another way`),
-      )
+      .then((n) => {
+        const filesNote = n === 0 ? "No files to put back" : `${n} ${n === 1 ? "file" : "files"} put back`;
+        onDone(`↺ Rewound · ${filesNote} · edit and send`, said);
+      })
       .catch((e: unknown) => onDone(String(e)));
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
@@ -1232,7 +1294,6 @@ function RewindConfirm({
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   });
-  const said = s.entries[entry]?.kind === "you" ? (s.entries[entry] as { text: string }).text : "";
   return (
     <div
       className="ak-ask ak-in"
@@ -1248,7 +1309,8 @@ function RewindConfirm({
           ? ""
           : files === 0
             ? "No files changed since then."
-            : `This puts back ${files} ${files === 1 ? "file" : "files"} the agent changed since.`}
+            : `This puts back ${files} ${files === 1 ? "file" : "files"} the agent changed since.`}{" "}
+        Your message opens in the box to edit.
       </p>
       <div className="ak-chips">
         <button type="button" onClick={go} className="ak-chip primary chip">
@@ -1270,6 +1332,7 @@ export function Composer({
   working,
   text,
   setText,
+  editFocus = 0,
   onSend,
   onClear,
   onReview,
@@ -1280,6 +1343,8 @@ export function Composer({
   working: boolean;
   text: string;
   setText: (t: string) => void;
+  /** After rewind: focus the box and select the restored draft (Cursor-style edit). */
+  editFocus?: number;
   onSend: () => void;
   onClear: () => void;
   onReview: () => void;
@@ -1300,6 +1365,15 @@ export function Composer({
   useEffect(() => {
     requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
   }, [s.id]);
+  useEffect(() => {
+    if (!editFocus) return;
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus({ preventScroll: true });
+      el.select();
+    });
+  }, [editFocus]);
   useEffect(() => {
     void api
       .agentCommands(s.id)
@@ -1409,7 +1483,7 @@ export function Composer({
         if (["plan", "ask", "edit", "full"].includes(args)) void setSessionMode(s.id, args as AgentMode);
         else
           setNotice(
-            `Selected: ${s.mode}. Use the mode buttons above or Shift+Tab. Codex Edit allows workspace commands and asks for escalation; Full disables the sandbox.`,
+            `Selected: ${s.mode}. Use the mode buttons above or Ctrl+. to cycle. Codex Edit allows workspace commands and asks for escalation; Full disables the sandbox.`,
           );
         break;
       case "/model":
@@ -1475,11 +1549,10 @@ export function Composer({
     inputRef.current?.focus({ preventScroll: true });
   };
   const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Tab" && e.shiftKey && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key === ".") {
       e.preventDefault();
       e.stopPropagation();
-      const modes: AgentMode[] = ["plan", "ask", "edit", "full"];
-      void setSessionMode(s.id, modes[(modes.indexOf(s.mode) + 1) % modes.length]);
+      void setSessionMode(s.id, nextAgentMode(s.mode));
       return;
     }
     if (count && (e.key === "ArrowDown" || e.key === "ArrowUp")) {

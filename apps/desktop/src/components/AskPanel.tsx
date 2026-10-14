@@ -18,7 +18,6 @@ import {
   setTab,
   useAgents,
 } from "@/lib/agents";
-import { atelierStaggerChild, atelierStaggerChildReduced, atelierStaggerParent } from "@/lib/atelier-motion";
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useAltHeld } from "@/lib/hooks";
@@ -47,6 +46,7 @@ import {
   type ProviderStatus,
   type SearchHit,
 } from "@/lib/types";
+import { staggerChild, staggerChildReduced, staggerParent } from "@/lib/ui-motion";
 import { AgentsTab } from "./agents/AgentsTab";
 import { Repos } from "./agents/Repos";
 import { Chat, useAgentName } from "./ask/Chat";
@@ -148,7 +148,6 @@ export function AskPanel() {
   const hearing = useSidekick((s) => s.hearing);
   const voiceReady = useSidekick((s) => s.settings.voice.enabled && (s.voiceStatus?.listening ?? false));
   const settings = useSidekick((s) => s.settings);
-  const atelier = settings.islandColor === "atelier";
   const reducedMotion = useReducedMotion() ?? false;
   const [text, setText] = useState(ask?.prompt ?? "");
   const alt = useAltHeld();
@@ -1195,21 +1194,20 @@ export function AskPanel() {
         ) : firstRun ? (
           <FirstRun />
         ) : (
-          rows > 0 &&
-          (atelier ? (
+          rows > 0 && (
             <motion.ul
               key={slash ? "slash" : asking ? "typing" : "start"}
               className="ak-list ak-scroll"
               style={{ maxHeight: scrollMax }}
               initial="hidden"
               animate="show"
-              variants={atelierStaggerParent}
+              variants={staggerParent}
             >
               {items.map((it, i) => (
                 <motion.li
                   key={it.id}
                   ref={scrollIfActive(active === i)}
-                  variants={reducedMotion ? atelierStaggerChildReduced : atelierStaggerChild}
+                  variants={reducedMotion ? staggerChildReduced : staggerChild}
                 >
                   {it.group && <p className="ak-group">{it.group}</p>}
                   <button
@@ -1240,44 +1238,7 @@ export function AskPanel() {
                 </motion.li>
               ))}
             </motion.ul>
-          ) : (
-            <ul
-              key={slash ? "slash" : asking ? "typing" : "start"}
-              className="ak-list ak-scroll"
-              style={{ maxHeight: scrollMax }}
-            >
-              {items.map((it, i) => (
-                <li key={it.id} ref={scrollIfActive(active === i)}>
-                  {it.group && <p className="ak-group">{it.group}</p>}
-                  <button
-                    type="button"
-                    data-sel={active === i}
-                    onMouseMove={() => setSelected(i)}
-                    onClick={() => runRow(i)}
-                    className="ak-row"
-                  >
-                    <span className="ak-ico">{it.icon}</span>
-                    <span className="min-w-0 flex-1 truncate">{it.label}</span>
-                    {it.hint && <span className="ak-hint">{it.hint}</span>}
-                    {it.key ? (
-                      <kbd className="ak-key">{it.key}</kbd>
-                    ) : (
-                      asking &&
-                      active === i &&
-                      (it.ctrlRun ? (
-                        <span className="ak-keys">
-                          <kbd className="ak-key">Enter</kbd>
-                          <kbd className="ak-key">Ctrl Enter</kbd>
-                        </span>
-                      ) : (
-                        <kbd className="ak-key">Enter</kbd>
-                      ))
-                    )}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ))
+          )
         )}
 
         {handoffError && <p className="ak-err">{handoffError}</p>}

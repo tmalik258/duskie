@@ -1,19 +1,17 @@
 "use client";
 
-// One-shot accent wash on the island shell when something completes under Atelier.
+// One-shot accent wash on the island shell when something completes.
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { ATELIER_WASH_MS, atelierWashReduced, atelierWashTransition } from "@/lib/atelier-motion";
 import type { MascotState } from "@/lib/types";
+import { WASH_MS, washReduced, washTransition } from "@/lib/ui-motion";
 
-export function AtelierWash({
-  enabled,
+export function IslandWash({
   simple,
   mascot,
   donePill,
 }: {
-  enabled: boolean;
   simple: boolean;
   mascot: MascotState;
   donePill: string | null;
@@ -24,7 +22,7 @@ export function AtelierWash({
   const prevDone = useRef(donePill);
 
   useEffect(() => {
-    if (!enabled || simple) {
+    if (simple) {
       setActive(false);
       prevMascot.current = mascot;
       prevDone.current = donePill;
@@ -36,19 +34,19 @@ export function AtelierWash({
     prevDone.current = donePill;
     if (!successEdge && !doneEdge) return;
     setActive(true);
-    const id = window.setTimeout(() => setActive(false), ATELIER_WASH_MS);
+    const id = window.setTimeout(() => setActive(false), WASH_MS);
     return () => window.clearTimeout(id);
-  }, [enabled, simple, mascot, donePill]);
+  }, [simple, mascot, donePill]);
 
-  if (!enabled || simple) return null;
+  if (simple) return null;
 
-  const t = reduced ? atelierWashReduced : atelierWashTransition;
+  const t = reduced ? washReduced : washTransition;
 
   return (
     <AnimatePresence>
       {active && (
         <motion.div
-          key="atelier-wash"
+          key="island-wash"
           className="island-shell__wash"
           aria-hidden
           initial={reduced ? { opacity: 0 } : { opacity: 0, transform: "scale(0.98)" }}

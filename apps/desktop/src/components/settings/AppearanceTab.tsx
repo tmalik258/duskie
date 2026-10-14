@@ -41,8 +41,8 @@ const ISLAND_SWATCH: Record<IslandColor, string> = {
 const tile = (on: boolean) =>
   `chip flex flex-col items-center gap-[7px] rounded-xl px-1 pt-2.5 pb-2 text-[12px] transition-[box-shadow,background-color,transform] duration-150 active:scale-[0.97] ${
     on
-      ? "bg-white/[0.07] text-white shadow-[inset_0_0_0_1.5px_var(--accent,#0a84ff)]"
-      : "bg-white/[0.04] text-[rgb(235_235_245/0.62)] shadow-[inset_0_0_0_1px_rgb(255_255_255/0.06)] hover:bg-white/[0.06]"
+      ? "bg-(--surface) text-(--text) shadow-[inset_0_0_0_1.5px_var(--accent)]"
+      : "bg-(--surface)/60 text-(--muted) shadow-[inset_0_0_0_1px_var(--border)] hover:bg-(--hover)"
   }`;
 
 export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
@@ -86,7 +86,7 @@ export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
 
       <Section
         title="Island"
-        hint="The capsule around the mascot when it opens. Menus always use Graphite."
+        hint="The capsule around the mascot when it opens. Menus follow this colour."
         keywords="island color colour glass black graphite midnight smoke atelier sage green background"
       >
         <div className="grid grid-cols-3 gap-2.5">

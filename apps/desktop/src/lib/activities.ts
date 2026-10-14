@@ -61,7 +61,26 @@ export function dismissLocal(id: string) {
   useActivities.setState((s) => ({ local: s.local.map((a) => (a.id === id ? { ...a, dismissed: true } : a)) }));
 }
 const size = (bytes: number) => `${(bytes / 1_000_000).toFixed(bytes < 10_000_000 ? 1 : 0)} MB`;
-export function activityLabel(a: Activity, now: number): string {
+
+/** Check again / Dismiss: always for downloads & setup; chat/agent only when stuck or done. */
+export function needsActions(a: Activity, now: number): boolean {
+  if (a.source !== "chat" && a.source !== "agent") return true;
+  if (a.phase === "failed" || a.phase === "unconfirmed" || a.phase === "awaitingUser") return true;
+  if (a.phase === "completed") return true;
+  return now - a.lastProgressAt >= INACTIVITY_MS;
+}
+
+/** Seconds to show beside a running label; null when the label carries progress instead. */
+export function activityElapsedSecs(a: Activity, now: number): number | null {
+  if (a.phase === "failed" || a.phase === "completed" || a.phase === "awaitingUser") return null;
+  const idle = Math.max(0, now - a.lastProgressAt);
+  if (a.phase === "unconfirmed" || idle >= INACTIVITY_MS) return null;
+  if (a.transferred !== null) return null;
+  return Math.max(0, Math.floor((now - a.startedAt) / 1000));
+}
+
+/** `elapsed: false` when a separate timer sits beside the label. */
+export function activityLabel(a: Activity, now: number, opts?: { elapsed?: boolean }): string {
   if (a.phase === "failed") return `${a.label} · ${a.outcome || "Failed"}`;
   if (a.phase === "completed") return a.outcome || `${a.label} · Completed`;
   if (a.phase === "awaitingUser")
@@ -89,6 +108,7 @@ export function activityLabel(a: Activity, now: number): string {
         : `${size(a.transferred)} received`;
     return `${label} · ${progress}`;
   }
+  if (opts?.elapsed === false) return `${label}…`;
   return `${label}… · ${Math.max(0, Math.floor((now - a.startedAt) / 1000))}s`;
 }
 export function visibleActivities(activities: Activity[], now: number) {

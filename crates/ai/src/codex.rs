@@ -180,6 +180,53 @@ pub(crate) fn sweep_sessions() {
     SESSIONS.sweep();
 }
 
+/// Joins several agent messages in one turn without gluing sentences
+/// (`answered.The`). Deltas after a completed message get a blank line first.
+#[derive(Debug, Default)]
+struct Join {
+    full: String,
+    streamed: bool,
+    needs_sep: bool,
+}
+
+impl Join {
+    fn delta(&mut self, text: &str) -> String {
+        let mut out = String::new();
+        if self.needs_sep && !text.is_empty() && !self.full.is_empty() {
+            out.push_str("\n\n");
+            self.full.push_str("\n\n");
+            self.needs_sep = false;
+        }
+        self.streamed = true;
+        out.push_str(text);
+        self.full.push_str(text);
+        out
+    }
+
+    /// Whole message with no prior deltas for it. After streamed deltas, marks
+    /// the next piece for a separator and ignores duplicate full text.
+    fn message(&mut self, text: &str) -> String {
+        if self.streamed {
+            self.streamed = false;
+            if !self.full.is_empty() {
+                self.needs_sep = true;
+            }
+            return String::new();
+        }
+        if text.is_empty() {
+            return String::new();
+        }
+        let mut out = String::new();
+        if !self.full.is_empty() {
+            out.push_str("\n\n");
+            self.full.push_str("\n\n");
+        }
+        out.push_str(text);
+        self.full.push_str(text);
+        out
+    }
+}
+
 /// What one app-server line means while a turn runs.
 #[derive(Debug, PartialEq)]
 enum Event {
@@ -283,8 +330,7 @@ impl Session {
         self.send(&json!({ "id": id, "method": "turn/start",
             "params": { "threadId": thread, "input": input } }))
             .await?;
-        let mut full = String::new();
-        let mut streamed = false;
+        let mut join = Join::default();
         loop {
             let v = tokio::select! {
                 _ = cancel.cancelled() => return Err(AiError::Cancelled),
@@ -298,24 +344,22 @@ impl Session {
             }
             match parse_event(&v) {
                 Event::Delta(text) => {
-                    streamed = true;
-                    sink.send(&text);
-                    full.push_str(&text);
+                    let chunk = join.delta(&text);
+                    if !chunk.is_empty() {
+                        sink.send(&chunk);
+                    }
                 }
                 // Several messages (a plan, then the answer) without deltas.
-                Event::Message(text) if !streamed && !text.is_empty() => {
-                    if !full.is_empty() {
-                        sink.send("\n\n");
-                        full.push_str("\n\n");
+                Event::Message(text) => {
+                    let chunk = join.message(&text);
+                    if !chunk.is_empty() {
+                        sink.send(&chunk);
                     }
-                    sink.send(&text);
-                    full.push_str(&text);
                 }
-                Event::Message(_) => streamed = false,
-                Event::Done => return Ok(full),
-                Event::Failed(msg) if !full.is_empty() => {
+                Event::Done => return Ok(join.full),
+                Event::Failed(msg) if !join.full.is_empty() => {
                     log::warn!("Codex ended with an error after answering: {msg}");
-                    return Ok(full);
+                    return Ok(join.full);
                 }
                 Event::Failed(msg) => return Err(AiError::Failed(login_hint(&msg))),
                 Event::Request(rid) => self.decline(rid).await?,
@@ -511,8 +555,7 @@ impl Codex {
         });
 
         let mut lines = BufReader::new(child.stdout.take().expect("piped stdout")).lines();
-        let mut full = String::new();
-        let mut streamed = false;
+        let mut join = Join::default();
         let mut result: Option<Result<String, AiError>> = None;
         loop {
             let line = tokio::select! {
@@ -525,28 +568,27 @@ impl Codex {
             let Ok(Some(line)) = line else { break };
             match parse_line(&line) {
                 Line::Delta(text) => {
-                    streamed = true;
-                    sink.send(&text);
-                    full.push_str(&text);
+                    let chunk = join.delta(&text);
+                    if !chunk.is_empty() {
+                        sink.send(&chunk);
+                    }
                 }
                 // Codex may send a few messages (a plan, then the answer);
                 // the last one is the answer.
-                Line::Message(text) if !streamed && !text.is_empty() => {
-                    if !full.is_empty() {
-                        sink.send("\n\n");
-                        full.push_str("\n\n");
+                Line::Message(text) => {
+                    let chunk = join.message(&text);
+                    if !chunk.is_empty() {
+                        sink.send(&chunk);
                     }
-                    sink.send(&text);
-                    full.push_str(&text);
                 }
                 Line::Done(last) => {
-                    if full.is_empty()
+                    if join.full.is_empty()
                         && let Some(text) = last
                     {
                         sink.send(&text);
-                        full = text;
+                        join.full = text;
                     }
-                    result = Some(Ok(full.clone()));
+                    result = Some(Ok(join.full.clone()));
                 }
                 Line::Error(msg) if !msg.is_empty() => result = Some(Err(AiError::Failed(msg))),
                 _ => {}
@@ -555,12 +597,12 @@ impl Codex {
         let status = child.wait().await.ok();
         let stderr = err_task.await.unwrap_or_default();
         match result {
-            Some(Err(e)) if !full.is_empty() => {
+            Some(Err(e)) if !join.full.is_empty() => {
                 log::warn!("Codex ended with an error after answering: {e}");
-                Ok(full)
+                Ok(join.full)
             }
             Some(r) => r,
-            None if !full.is_empty() => Ok(full),
+            None if !join.full.is_empty() => Ok(join.full),
             None => {
                 let detail = stderr
                     .lines()
@@ -591,6 +633,23 @@ impl Codex {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn joins_streamed_messages_with_blank_line() {
+        let mut join = Join::default();
+        assert_eq!(join.delta("answered."), "answered.");
+        assert_eq!(join.message("answered."), "");
+        assert_eq!(join.delta("The repo is empty"), "\n\nThe repo is empty");
+        assert_eq!(join.full, "answered.\n\nThe repo is empty");
+    }
+
+    #[test]
+    fn joins_whole_messages_without_deltas() {
+        let mut join = Join::default();
+        assert_eq!(join.message("First."), "First.");
+        assert_eq!(join.message("Second."), "\n\nSecond.");
+        assert_eq!(join.full, "First.\n\nSecond.");
+    }
 
     #[test]
     fn reads_current_events() {
