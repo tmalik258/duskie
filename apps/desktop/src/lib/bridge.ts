@@ -108,6 +108,7 @@ export interface EventPayloads {
   [EVENTS.islandCursor]: { x: number; y: number };
   [EVENTS.islandVisible]: boolean;
   [EVENTS.islandFullscreen]: boolean;
+  [EVENTS.islandShift]: boolean;
   [EVENTS.netStatus]: boolean;
   [EVENTS.updateAvailable]: UpdateInfo;
   [EVENTS.updateProgress]: UpdateProgress;

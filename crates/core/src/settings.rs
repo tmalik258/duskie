@@ -926,15 +926,19 @@ mod tests {
 
     #[test]
     fn empty_palette_hotkey_stays_empty() {
-        let mut s = Settings::default();
-        s.palette_hotkey = "  ".into();
+        let s = Settings {
+            palette_hotkey: "  ".into(),
+            ..Default::default()
+        };
         assert_eq!(s.sanitized().palette_hotkey, "");
     }
 
     #[test]
     fn off_palette_hotkey_keeps_combo() {
-        let mut s = Settings::default();
-        s.palette_hotkey = " -Ctrl+Space ".into();
+        let s = Settings {
+            palette_hotkey: " -Ctrl+Space ".into(),
+            ..Default::default()
+        };
         assert_eq!(s.sanitized().palette_hotkey, "-Ctrl+Space");
     }
 
