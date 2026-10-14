@@ -107,6 +107,7 @@ export function Button({
   small,
   active,
   primary,
+  "aria-label": ariaLabel,
 }: {
   children: ReactNode;
   onClick: () => void;
@@ -114,12 +115,14 @@ export function Button({
   small?: boolean;
   active?: boolean;
   primary?: boolean;
+  "aria-label"?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
+      aria-label={ariaLabel}
       className={`chip shrink-0 rounded-full font-medium transition-[background-color,transform] duration-150 active:scale-[0.96] disabled:opacity-40 disabled:active:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent) ${
         primary ? "bg-(--text) text-(--bg) hover:opacity-90" : "bg-(--surface) text-(--text) hover:bg-(--hover)"
       } ${small ? "px-2.5 py-[5px] text-[12px]" : "px-3 py-[7px] text-[13px]"} ${active ? "shadow-[inset_0_0_0_1.5px_var(--accent)]" : ""}`}

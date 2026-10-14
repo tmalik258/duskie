@@ -603,6 +603,11 @@ impl AiSettings {
         if !["torch", "mlx", "llamacpp"].contains(&self.semif.backend.as_str()) {
             self.semif.backend = "llamacpp".into();
         }
+        // Groq retired these for free/developer tiers (Aug 2026).
+        let groq = self.groq.model.trim();
+        if groq == "llama-3.3-70b-versatile" || groq == "llama-3.1-8b-instant" {
+            self.groq.model = "openai/gpt-oss-120b".into();
+        }
         self
     }
 }
@@ -916,6 +921,18 @@ mod tests {
         let mut s = Settings::default();
         s.palette_hotkey = " -Ctrl+Space ".into();
         assert_eq!(s.sanitized().palette_hotkey, "-Ctrl+Space");
+    }
+
+    #[test]
+    fn retired_groq_models_move_to_gpt_oss_120b() {
+        for retired in ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"] {
+            let mut s = Settings::default();
+            s.ai.groq.model = retired.into();
+            assert_eq!(s.sanitized().ai.groq.model, "openai/gpt-oss-120b");
+        }
+        let mut keep = Settings::default();
+        keep.ai.groq.model = "openai/gpt-oss-20b".into();
+        assert_eq!(keep.sanitized().ai.groq.model, "openai/gpt-oss-20b");
     }
 
     #[test]

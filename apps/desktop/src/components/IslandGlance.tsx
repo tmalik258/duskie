@@ -6,7 +6,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type ReactNode, useEffect, useState } from "react";
 import { useActivities, visibleActivities } from "@/lib/activities";
-import { useAgents } from "@/lib/agents";
+import { setTab, useAgents } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
@@ -28,6 +28,11 @@ const LATER_SHOWN = 3;
 
 function openAgentsBoard() {
   useAgents.setState({ tab: "agents", layout: "board" });
+  void api.askOpen();
+}
+
+function openHistory() {
+  setTab("history");
   void api.askOpen();
 }
 
@@ -298,9 +303,7 @@ function QuickActions({
       <AskShiftAgentsButton shift={shift} />
       <FocusShiftPauseButton paused={paused} open={focusOpen} onOpenChange={onFocusOpenChange} shift={shift} />
       {update ? <UpdateButton /> : null}
-      <RoundButton label="Settings" onClick={() => void api.openSettings()}>
-        <Icon name="settings" size={15} />
-      </RoundButton>
+      <SettingsShiftHistoryButton shift={shift} />
     </div>
   );
 }
@@ -335,6 +338,39 @@ function useShiftHeld(): boolean {
 function keyHint(keys: string | undefined): string {
   const k = keys ? shortcutBinding(keys) : "";
   return k ? ` (${k})` : "";
+}
+
+/** Settings by default; hold Shift to morph into History (one slot, animated icon). */
+function SettingsShiftHistoryButton({ shift }: { shift: boolean }) {
+  const reduced = useReducedMotion() ?? false;
+  const history = shift;
+  const label = history ? "History" : "Settings · Shift for History";
+  return (
+    <Tip label={label}>
+      <button
+        type="button"
+        aria-label={label}
+        onClick={(e) => {
+          if (e.shiftKey || history) openHistory();
+          else void api.openSettings();
+        }}
+        className="chip relative grid size-8 place-items-center overflow-hidden rounded-full bg-white/12 text-white/90 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff]"
+      >
+        <AnimatePresence mode="popLayout" initial={false}>
+          <motion.span
+            key={history ? "history" : "settings"}
+            className="grid place-items-center"
+            initial={reduced ? false : { opacity: 0, scale: 0.7, rotate: history ? -20 : 20 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            exit={reduced ? undefined : { opacity: 0, scale: 0.7, rotate: history ? 20 : -20 }}
+            transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
+          >
+            <Icon name={history ? "history" : "settings"} size={15} />
+          </motion.span>
+        </AnimatePresence>
+      </button>
+    </Tip>
+  );
 }
 
 /** Ask by default; hold Shift to morph into Agents (one slot, animated icon). */

@@ -2,7 +2,7 @@
 
 // The conversation: turns, live steps, the streamed answer, retry and handoff.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { handOff } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
@@ -291,7 +291,35 @@ function AnswerActions({
   const [copied, setCopied] = useState(false);
   const [pinned, setPinned] = useState(false);
   const speaking = useSidekick((s) => s.speaking);
-  const read = () => void (speaking ? api.voiceStop() : api.voiceRead(text));
+  const [loading, setLoading] = useState(false);
+  const readGen = useRef(0);
+  useEffect(() => {
+    if (speaking) setLoading(false);
+  }, [speaking]);
+  const phase = loading ? "loading" : speaking ? "playing" : "idle";
+  const read = () => {
+    if (phase === "playing" || phase === "loading") {
+      readGen.current += 1;
+      setLoading(false);
+      void api.voiceStop();
+      return;
+    }
+    const id = ++readGen.current;
+    setLoading(true);
+    void api
+      .voiceRead(text)
+      .then(() => {
+        // Invoke can finish before audio starts; keep the spinner until then.
+        window.setTimeout(() => {
+          if (readGen.current !== id) return;
+          setLoading(false);
+        }, 2000);
+      })
+      .catch(() => {
+        if (readGen.current !== id) return;
+        setLoading(false);
+      });
+  };
   const copy = () => {
     void api
       .clipboardCopy(text)
@@ -320,6 +348,7 @@ function AnswerActions({
         {k}
       </kbd>
     );
+  const readLabel = phase === "loading" ? "Starting…" : phase === "playing" ? "Stop reading" : "Read aloud · Alt L";
   return (
     <div className="grid gap-1">
       <div className="ak-acts" data-detail={detail}>
@@ -340,20 +369,18 @@ function AnswerActions({
             />
           </button>
         </Tip>
-        <Tip label={speaking ? "Stop reading" : "Read aloud · Alt L"}>
-          <button
-            type="button"
-            onClick={read}
-            aria-label={speaking ? "Stop reading" : "Read aloud"}
-            className="ak-act ico chip"
-          >
-            <ActIcon
-              d={
-                speaking
-                  ? "M11 5 6 9H3v6h3l5 4zM16 9l5 6M21 9l-5 6"
-                  : "M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"
-              }
-            />
+        <Tip label={readLabel}>
+          <button type="button" onClick={read} aria-label={readLabel} className="ak-act ico chip">
+            {phase === "loading" ? (
+              <span
+                aria-hidden="true"
+                className="size-3 animate-spin rounded-full border border-current border-r-transparent"
+              />
+            ) : phase === "playing" ? (
+              <StopIcon />
+            ) : (
+              <ActIcon d="M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />
+            )}
           </button>
         </Tip>
         {again && (
@@ -405,6 +432,14 @@ function ActIcon({ d }: { d: string }) {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
       <path d={d} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function StopIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
     </svg>
   );
 }

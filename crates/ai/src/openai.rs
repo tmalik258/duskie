@@ -34,7 +34,7 @@ pub const CLOUD: [(&str, &str, &str); 3] = [
     (
         "groq",
         "https://api.groq.com/openai/v1",
-        "llama-3.3-70b-versatile",
+        "openai/gpt-oss-120b",
     ),
     (
         "openrouter",

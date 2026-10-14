@@ -105,7 +105,7 @@ const PROVIDER_SETUP: Record<AiProviderId, string[]> = {
 /** Where each cloud provider hands out keys, and its default model. */
 const CLOUD_KEYS: Record<CloudId, { url: string; site: string; model: string }> = {
   gemini: { url: "https://aistudio.google.com/apikey", site: "Google AI Studio", model: "gemini-2.5-flash" },
-  groq: { url: "https://console.groq.com/keys", site: "GroqCloud", model: "llama-3.3-70b-versatile" },
+  groq: { url: "https://console.groq.com/keys", site: "GroqCloud", model: "openai/gpt-oss-120b" },
   openrouter: { url: "https://openrouter.ai/settings/keys", site: "OpenRouter", model: "openrouter/auto" },
 };
 
@@ -871,32 +871,74 @@ function DragRow({
   );
 }
 
-/** Test with a loading state while a new voice loads, then Playing. */
+/** Speaker → spinner while the voice prepares → stop while audio plays. */
 function VoiceTest({ onError }: { onError: (e: string) => void }) {
-  const [loading, setLoading] = useState(false);
   const speaking = useSidekick((s) => s.speaking);
-  const [asked, setAsked] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "loading" | "playing">("idle");
+  const gen = useRef(0);
+
   useEffect(() => {
-    if (!speaking && asked && !loading) setAsked(false);
-  }, [speaking, asked, loading]);
-  const playing = asked && speaking;
+    if (phase === "loading" && speaking) setPhase("playing");
+    else if (phase === "playing" && !speaking) setPhase("idle");
+  }, [speaking, phase]);
+
+  const label = phase === "loading" ? "Loading voice" : phase === "playing" ? "Stop" : "Test voice";
+
   return (
-    <Button
-      small
-      disabled={loading}
-      onClick={() => {
-        setLoading(true);
-        setAsked(true);
-        api
-          .voiceTest()
-          .catch((e) => {
-            setAsked(false);
-            onError(String(e));
-          })
-          .finally(() => setLoading(false));
-      }}
-    >
-      {loading ? "Loading voice…" : playing ? "Playing…" : "Test"}
-    </Button>
+    <Tip label={label}>
+      <Button
+        small
+        aria-label={label}
+        disabled={phase === "loading"}
+        active={phase !== "idle"}
+        onClick={() => {
+          if (phase === "playing") {
+            gen.current += 1;
+            setPhase("idle");
+            void api.voiceStop();
+            return;
+          }
+          const id = ++gen.current;
+          setPhase("loading");
+          api
+            .voiceTest()
+            .then(() => {
+              // Invoke can finish before the speaking event; keep the spinner
+              // until audio starts, or idle if nothing plays.
+              window.setTimeout(() => {
+                if (gen.current !== id) return;
+                setPhase((p) => (p === "loading" ? "idle" : p));
+              }, 2000);
+            })
+            .catch((e) => {
+              if (gen.current !== id) return;
+              setPhase("idle");
+              onError(String(e));
+            });
+        }}
+      >
+        {phase === "loading" ? (
+          <span
+            aria-hidden="true"
+            className="block size-3 animate-spin rounded-full border border-current border-r-transparent"
+          />
+        ) : phase === "playing" ? (
+          <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
+          </svg>
+        ) : (
+          <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.7"
+            />
+          </svg>
+        )}
+      </Button>
+    </Tip>
   );
 }
