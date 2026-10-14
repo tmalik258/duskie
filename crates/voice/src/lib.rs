@@ -13,7 +13,7 @@ pub use listen::{Control, Heard, Listener, ListenerConfig};
 pub use models::{MODELS, Model};
 pub use speak::{
     DEFAULT_VOICE, Speaker, SpeechEvent, SpeechEvents, VOICES, respell, speaker_id, synthesize,
-    tts_config,
+    test_line, tts_config,
 };
 
 #[derive(Debug, thiserror::Error)]

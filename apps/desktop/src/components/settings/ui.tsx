@@ -416,7 +416,8 @@ export function Select({
     const spaceBelow = window.innerHeight - r.bottom;
     const spaceAbove = r.top;
     const above = spaceBelow < want && spaceAbove >= spaceBelow;
-    const width = menuWidth ?? Math.min(296, Math.max(rich ? 220 : r.width, r.width));
+    // Don't shrink to a short chip ("Male 3") when labels are longer.
+    const width = menuWidth ?? Math.min(296, Math.max(rich ? 220 : 200, r.width));
     const left = Math.min(Math.max(8, r.left), window.innerWidth - width - 8);
     const top = above ? r.top - 4 : r.bottom + 4;
     setUp(above);

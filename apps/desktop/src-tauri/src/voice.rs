@@ -1144,7 +1144,7 @@ pub fn test(app: &AppHandle) -> Result<(), String> {
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
     let wanted = lock(&app.state::<AppState>().settings).voice.clone();
-    let line = "Hi, I'm Sidekick. Say hey Sidekick whenever you need me.";
+    let line = sidekick_voice::test_line(&wanted.voice);
     {
         let runtime = lock(&v.runtime);
         if let Some(s) = runtime

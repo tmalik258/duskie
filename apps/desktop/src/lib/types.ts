@@ -469,7 +469,7 @@ export const DEFAULT_SETTINGS: Settings = {
     conversation: true,
     speakSuggestions: true,
     interrupt: true,
-    voice: "f5",
+    voice: "f4",
     speed: 1,
   },
 };

@@ -333,13 +333,14 @@ pub struct VoiceSettings {
     /// While you talk: "compact" (one slim line) or "full" (a waveform and
     /// your words larger).
     pub listening_style: String,
-    /// Voice id, e.g. "f5" (Supertonic 3's Female 5).
+    /// Voice id, e.g. "f4" (Supertonic 3's Female 4, bright).
     pub voice: String,
     /// 0.5 to 2.0.
     pub speed: f32,
-    /// Which voice model the voice was picked for (1 Kokoro v0.19, 2 Kokoro
-    /// v1.0, 3 Supertonic 3). Files saved before had no such field and read
-    /// as 1. A voice from an older model is moved to the default once.
+    /// Which voice model / default rev the voice was picked for (1 Kokoro
+    /// v0.19, 2 Kokoro v1.0, 3 Supertonic with Female 5, 4 Female 4 bright).
+    /// Files saved before had no such field and read as 1. Staying on the
+    /// previous default moves once; a voice picked on purpose is kept.
     #[serde(default = "voice_model_v1")]
     pub model: u32,
     /// Words voice gets wrong, comma separated: "horsepot = hotspot".
@@ -351,7 +352,9 @@ fn voice_model_v1() -> u32 {
     1
 }
 
-pub const VOICE_MODEL: u32 = 3;
+pub const VOICE_MODEL: u32 = 4;
+/// Default voice before [`VOICE_MODEL`] 4 (Supertonic launch default).
+const PREVIOUS_DEFAULT_VOICE: &str = "f5";
 
 impl Default for VoiceSettings {
     fn default() -> Self {
@@ -363,7 +366,7 @@ impl Default for VoiceSettings {
             conversation: true,
             speak_suggestions: true,
             interrupt: true,
-            voice: "f5".into(),
+            voice: "f4".into(),
             speed: 1.0,
             model: VOICE_MODEL,
             fixes: String::new(),
@@ -807,10 +810,12 @@ impl Settings {
             self.semantic_search.model = SemanticSearch::default().model;
         }
         self.calendar.remind_minutes = self.calendar.remind_minutes.clamp(1, 30);
-        // Voices of an older model do not exist in the new one: they move
-        // to the default once. A voice picked on purpose since is kept.
+        // Older models / previous shipped defaults move once. A voice the
+        // user picked on purpose (not the last default) is kept.
         if self.voice.model < VOICE_MODEL {
-            self.voice.voice = VoiceSettings::default().voice;
+            if self.voice.model < 3 || self.voice.voice == PREVIOUS_DEFAULT_VOICE {
+                self.voice.voice = VoiceSettings::default().voice;
+            }
             self.voice.model = VOICE_MODEL;
         }
         if self.voice.voice.trim().is_empty() {
@@ -876,11 +881,21 @@ mod tests {
     fn moves_older_voices_to_the_new_default_once() {
         let old: Settings = serde_json::from_str(r#"{"voice": {"voice": "af_bella"}}"#).unwrap();
         let mut old = old.sanitized();
-        assert_eq!(old.voice.voice, "f5");
+        assert_eq!(old.voice.voice, "f4");
+        assert_eq!(old.voice.model, VOICE_MODEL);
         let kokoro: Settings =
             serde_json::from_str(r#"{"voice": {"voice": "bm_george", "model": 2}}"#).unwrap();
-        assert_eq!(kokoro.sanitized().voice.voice, "f5");
-        // Picking another voice later is respected.
+        assert_eq!(kokoro.sanitized().voice.voice, "f4");
+        // Still on the previous Supertonic default → Female 4.
+        let warm: Settings =
+            serde_json::from_str(r#"{"voice": {"voice": "f5", "model": 3}}"#).unwrap();
+        assert_eq!(warm.sanitized().voice.voice, "f4");
+        // A voice picked on purpose after Supertonic is kept.
+        let custom: Settings =
+            serde_json::from_str(r#"{"voice": {"voice": "m2", "model": 3}}"#).unwrap();
+        let custom = custom.sanitized();
+        assert_eq!(custom.voice.voice, "m2");
+        assert_eq!(custom.voice.model, VOICE_MODEL);
         old.voice.voice = "m2".into();
         assert_eq!(old.sanitized().voice.voice, "m2");
     }

@@ -797,6 +797,7 @@ function VoiceSection({ voice, onError }: { voice: VoiceSettings; onError: (e: s
             value={voice.voice}
             options={(status?.voices ?? []).map((v) => [v.id, v.label])}
             onChange={(v) => void set({ voice: v })}
+            menuWidth={240}
           />
           <VoiceTest onError={onError} />
         </div>
@@ -879,20 +880,28 @@ function VoiceTest({ onError }: { onError: (e: string) => void }) {
 
   useEffect(() => {
     if (phase === "loading" && speaking) setPhase("playing");
-    else if (phase === "playing" && !speaking) setPhase("idle");
   }, [speaking, phase]);
 
+  // Speaker::busy can flicker false between pieces; don't drop Stop for that.
+  useEffect(() => {
+    if (phase !== "playing" || speaking) return;
+    const t = window.setTimeout(() => {
+      setPhase((p) => (p === "playing" ? "idle" : p));
+    }, 280);
+    return () => clearTimeout(t);
+  }, [phase, speaking]);
+
   const label = phase === "loading" ? "Loading voice" : phase === "playing" ? "Stop" : "Test voice";
+  const busy = phase !== "idle";
 
   return (
     <Tip label={label}>
       <Button
         small
         aria-label={label}
-        disabled={phase === "loading"}
-        active={phase !== "idle"}
+        active={busy}
         onClick={() => {
-          if (phase === "playing") {
+          if (busy) {
             gen.current += 1;
             setPhase("idle");
             void api.voiceStop();

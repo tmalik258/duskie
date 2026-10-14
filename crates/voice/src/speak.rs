@@ -32,11 +32,29 @@ pub const VOICES: &[(&str, &str, i32)] = &[
     ("m5", "Male 5 (deep)", 9),
 ];
 
-pub const DEFAULT_VOICE: &str = "f5";
+pub const DEFAULT_VOICE: &str = "f4";
 
-/// Denoising steps per sentence: more is cleaner and slower. 10 stays far
-/// faster than real time on a laptop CPU.
-const STEPS: i32 = 10;
+/// A short line for the settings Test button. Each voice gets its own so
+/// switching voices is obvious, not the same clip on loop.
+pub fn test_line(voice: &str) -> &'static str {
+    match voice {
+        "f1" => "This is Female 1 — clear, steady, and easy to follow.",
+        "f2" => "Hey! Female 2 here — lively, bright, and ready to jump in.",
+        "f3" => "Hello from Female 3. A calm voice for everyday questions.",
+        "f4" => "Hi — Female 4, bright and upbeat when you need a quick answer.",
+        "f5" => "Hi, I'm Sidekick. Female 5 is warm — say hey Sidekick anytime.",
+        "m1" => "Hello. Male 1 speaking — straightforward and clear.",
+        "m2" => "Hey there. Male 2 — deep, lively, and easy on the ears.",
+        "m3" => "Hi. Male 3 here — a solid everyday voice for Sidekick.",
+        "m4" => "Hello. Male 4 — calm and measured when things get busy.",
+        "m5" => "Hi. Male 5 — deep and steady for longer answers.",
+        _ => "Hi, I'm Sidekick. Say hey Sidekick whenever you need me.",
+    }
+}
+
+/// Denoising steps per sentence: more is cleaner and slower. 10 was about
+/// real-time on a laptop (queue underruns between pieces); 5 stays ahead.
+const STEPS: i32 = 5;
 
 /// The speaker number for `voice`; unknown ids (older voices) fall back to
 /// the default.
@@ -47,7 +65,7 @@ pub fn speaker_id(voice: &str) -> i32 {
             .find(|(id, _, _)| *id == v)
             .map(|(_, _, sid)| *sid)
     };
-    find(voice).or_else(|| find(DEFAULT_VOICE)).unwrap_or(4)
+    find(voice).or_else(|| find(DEFAULT_VOICE)).unwrap_or(3)
 }
 
 /// The engine settings. Separate so a test can run the model without a
@@ -95,8 +113,8 @@ pub fn synthesize(tts: &OfflineTts, text: &str, sid: i32, speed: f32) -> Option<
 /// Written how the voice should say it. Supertonic softens "Sidekick" into
 /// something like "cider kick"; "Syde kick" was recognised as the name 5
 /// times in 6 by the wake word model, plain "Sidekick" 0 in 6. Mid-line
-/// stops become commas so the model breathes without saying "dot" — and we
-/// keep one synthesize call (splitting clauses stalls on the next synth).
+/// stops become commas so the model breathes without saying "dot". Pieces
+/// stay short so the next synth finishes before the speaker queue runs dry.
 pub fn respell(text: &str) -> String {
     let mut out = String::with_capacity(text.len() + 8);
     let mut rest = text;
@@ -144,13 +162,13 @@ fn tts_punctuation(text: &str) -> String {
     out
 }
 
-/// A short breath after a sentence, so sentences synthesized one at a time
-/// do not run into each other.
+/// Almost no injected silence between pieces — joins already reset prosody,
+/// and extra quiet made every cut feel like a stall. A tiny breath only after
+/// a full stop.
 fn pause_after(text: &str) -> f32 {
     match text.trim_end().chars().last() {
-        Some('.' | '!' | '?') => 0.28,
-        Some(',' | ';' | ':') => 0.12,
-        _ => 0.05,
+        Some('.' | '!' | '?') => 0.04,
+        _ => 0.0,
     }
 }
 
@@ -410,9 +428,11 @@ mod tests {
     fn picks_voices() {
         assert_eq!(speaker_id("f1"), 0);
         assert_eq!(speaker_id("m5"), 9);
-        // Kokoro ids from before fall back to the default voice.
-        assert_eq!(speaker_id("af_heart"), 4);
+        // Kokoro ids from before fall back to the default voice (Female 4).
+        assert_eq!(speaker_id("af_heart"), 3);
         assert!(pause_after("Hi there!") > pause_after("so,"));
+        assert_ne!(test_line("f1"), test_line("m2"));
+        assert!(test_line("f5").contains("Female 5"));
     }
 
     #[test]
