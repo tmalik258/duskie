@@ -69,7 +69,12 @@ pub fn tracked(skill_id: &str) -> bool {
         && !skill_id.starts_with("debug.")
         // Notifications learn per app instead (inbox.rs).
         && !skill_id.starts_with("notify.")
+        // Screenshots and copied links always interrupt; no mute, no score line.
+        && !ALWAYS_SUGGEST.contains(&skill_id)
 }
+
+/// Always show these: no dismiss-streak mute, no "you skipped N of M" score.
+const ALWAYS_SUGGEST: &[&str] = &["files.screenshot", "clipboard.open-url"];
 
 /// Skills never offered as automatic: each time needs its own choice.
 /// A screenshot is already on the clipboard, so "always copy" adds nothing.
@@ -97,6 +102,9 @@ fn save(app: &AppHandle, h: &Habit) {
 }
 
 pub fn is_muted(app: &AppHandle, skill_id: &str) -> bool {
+    if !tracked(skill_id) {
+        return false;
+    }
     load(app, skill_id)
         .and_then(|h| h.muted_until)
         .and_then(|t| DateTime::parse_from_rfc3339(&t).ok())
@@ -214,6 +222,8 @@ mod tests {
     fn sidekick_itself_is_not_learned() {
         assert!(tracked("files.download"));
         assert!(!tracked(OFFER_SKILL));
+        assert!(!tracked("files.screenshot"));
+        assert!(!tracked("clipboard.open-url"));
         assert!(!can_automate("files.screenshot"));
         assert!(can_automate("files.download"));
         assert!(!tracked("mcp.notify"));

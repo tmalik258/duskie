@@ -5,9 +5,10 @@
 // that opens a small popover above it, so no slash commands are needed.
 
 import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { type Session, seenUsage, seenWindows } from "@/lib/agents";
 import { CLAUDE_MODELS, CODEX_MODELS, FAST_CLAUDE_MODEL } from "@/lib/ai-models";
-import { setOverlayHit } from "@/lib/store";
+import { setOverlayHit, useSidekick } from "@/lib/store";
 import { Select, type SelectOption } from "../settings/ui";
 import { AGENT_IMAGES, AGENT_MARKS } from "./AgentsTab";
 
@@ -59,7 +60,8 @@ const Brain = () => (
   </svg>
 );
 
-/** A chip that opens a popover above itself. */
+/** A chip that opens a popover above itself (portaled so the island shell
+ *  does not clip it; same pattern as the model Select overlay). */
 function Pop({
   label,
   chip,
@@ -79,6 +81,7 @@ function Pop({
   }, [requested]);
   const btn = useRef<HTMLButtonElement>(null);
   const box = useRef<HTMLDivElement>(null);
+  const islandColor = useSidekick((s) => s.settings.islandColor);
   const [at, setAt] = useState<{ left: number; bottom: number } | null>(null);
   useEffect(() => {
     if (!open) {
@@ -133,17 +136,21 @@ function Pop({
       >
         {chip}
       </button>
-      {open && (
-        <div
-          ref={box}
-          role="dialog"
-          aria-label={label}
-          className="ak-pop menu"
-          style={{ left: at?.left ?? -9999, bottom: at?.bottom ?? 0 }}
-        >
-          {children(() => setOpen(false))}
-        </div>
-      )}
+      {open &&
+        at &&
+        createPortal(
+          <div
+            ref={box}
+            role="dialog"
+            aria-label={label}
+            data-color={islandColor}
+            className="ak-pop menu"
+            style={{ left: at.left, bottom: at.bottom, zIndex: 100 }}
+          >
+            {children(() => setOpen(false))}
+          </div>,
+          document.body,
+        )}
     </>
   );
 }
@@ -480,31 +487,33 @@ export function ChatControls({
           On this PC {"\u00b7"} no limits
         </span>
       ) : (
-        <Pop
-          label="Usage"
-          requested={panel?.name === "usage" ? panel.at : undefined}
-          className="ak-cusage"
-          chip={
-            <>
-              <span className="ak-ring" aria-hidden="true">
-                <i className="ak-cring" style={{ "--p": ringPct } as CSSProperties} />
-              </span>
-              {usageText || "Usage \u00b7 Not reported"}
-            </>
-          }
-        >
-          {() => (
-            <UsageBody
-              usage={usage}
-              ctxPct={ctxPct}
-              plans={plans}
-              now={now}
-              agent={agent}
-              onCompact={onCompact}
-              onRefresh={onRefresh}
-            />
-          )}
-        </Pop>
+        (usageText || panel?.name === "usage") && (
+          <Pop
+            label="Usage"
+            requested={panel?.name === "usage" ? panel.at : undefined}
+            className="ak-cusage"
+            chip={
+              <>
+                <span className="ak-ring" aria-hidden="true">
+                  <i className="ak-cring" style={{ "--p": ringPct } as CSSProperties} />
+                </span>
+                {usageText || "Usage"}
+              </>
+            }
+          >
+            {() => (
+              <UsageBody
+                usage={usage}
+                ctxPct={ctxPct}
+                plans={plans}
+                now={now}
+                agent={agent}
+                onCompact={onCompact}
+                onRefresh={onRefresh}
+              />
+            )}
+          </Pop>
+        )
       )}
       {keys && <span className="ckeys mono">{keys}</span>}
     </div>

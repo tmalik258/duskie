@@ -13,10 +13,10 @@ use std::time::{Duration, Instant};
 use async_trait::async_trait;
 use chrono::Utc;
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{Value, json};
 use sidekick_ai::{
-    AiError, AiProvider, CancellationToken, ChatRequest, McpClient, McpTool, OpenAiCompat, Sink,
-    ToolDef, ToolRunner,
+    AiError, AiProvider, CancellationToken, ChatRequest, McpClient, McpTool, Message, OpenAiCompat,
+    Sink, ToolDef, ToolRunner,
 };
 use sidekick_core::{ActionRecord, ComposioSettings};
 use tauri::{AppHandle, Emitter, Manager};
@@ -579,6 +579,26 @@ fn log_call(app: &AppHandle, name: &str, ok: bool, message: &str) {
     }
 }
 
+/// Puts OCR screen text into the chat prompt and clears the image.
+async fn inject_screen_ocr(app: &AppHandle, req: &mut ChatRequest, png: &[u8]) {
+    req.image = None;
+    let text = match crate::ask_tools::cached_screen(app) {
+        Some(text) => Ok(text),
+        None => crate::ask_tools::screen_text(app, png).await,
+    };
+    match text {
+        Ok(text) if !text.is_empty() => req.system.push_str(&format!(
+            "\n\nText on the user's screen (read with OCR, layout lost):\n```\n{text}\n```"
+        )),
+        Ok(_) => req
+            .system
+            .push_str("\n\nThe screenshot has no readable text; say so and ask what they need."),
+        Err(err) => req.system.push_str(&format!(
+            "\n\nThe screen could not be read ({err}); say so in one sentence."
+        )),
+    }
+}
+
 /// The local model with Sidekick's own tools (search, today, recent, open),
 /// plus Composio's when they are set up and reachable.
 pub struct LocalWithTools {
@@ -634,17 +654,48 @@ impl AiProvider for LocalWithTools {
             .map(|m| m.content.as_str())
             .unwrap_or_default();
         let started = std::time::Instant::now();
-        // The local model picks tools by words: an embedding call first
-        // would make Ollama swap models on every question.
-        let mut defs = if self.inner.id() == "local" {
-            if crate::ask_tools::needs_no_tools(question) {
-                Vec::new()
-            } else {
-                crate::ask_tools::by_words(question, crate::ask_tools::defs())
+        let mut with_tools = req.clone();
+        // Screen first: local vision describes then chat answers; cloud keeps
+        // the image for native multimodal; OCR when vision is off or fails.
+        if let Some(png) = req.image.as_ref() {
+            let ai = lock(&self.app.state::<AppState>().settings)
+                .ai
+                .local
+                .clone();
+            let vision_name = ai.vision_model.trim();
+            if self.inner.id() == "local"
+                && !vision_name.is_empty()
+                && !vision_name.eq_ignore_ascii_case("off")
+            {
+                let vision = OpenAiCompat::new(Some(ai.base_url), Some(ai.vision_model));
+                let desc = ChatRequest {
+                    system: "Describe what is on the user's screen for another assistant. \
+Focus on readable text, the active app or UI, and what they might be asking about. \
+Be concise."
+                        .into(),
+                    messages: vec![Message::user("What is on this screen?")],
+                    image: Some(png.clone()),
+                    think: false,
+                };
+                match vision.complete(&desc, json!({})).await {
+                    Ok(text) if !text.trim().is_empty() => {
+                        with_tools.image = None;
+                        with_tools.system.push_str(&format!(
+                            "\n\nWhat is on the user's screen (seen by a vision model):\n```\n{}\n```",
+                            text.trim()
+                        ));
+                    }
+                    _ => {
+                        inject_screen_ocr(&self.app, &mut with_tools, png).await;
+                    }
+                }
+            } else if self.inner.id() == "local" {
+                inject_screen_ocr(&self.app, &mut with_tools, png).await;
             }
-        } else {
-            crate::ask_tools::pick(&self.app, question, crate::ask_tools::defs()).await
-        };
+            // Cloud OpenAI-compat: leave image on the request for native vision.
+        }
+        // Embedding tool pick for local and cloud (by_words if embedder missing).
+        let mut defs = crate::ask_tools::pick(&self.app, question, crate::ask_tools::defs()).await;
         if self.offline {
             defs.retain(|d| !crate::ask_tools::is_web(&d.name));
         }
@@ -663,46 +714,12 @@ impl AiProvider for LocalWithTools {
             self.inner.id(),
             started.elapsed().as_millis()
         );
-        let mut with_tools = req.clone();
         // Right after the fixed rules, so the start of the prompt stays the
         // same from message to message and the local server reuses its cache.
         match with_tools.system.find(crate::ai::FIXED_END) {
             _ if chatty => {}
             Some(at) => with_tools.system.insert_str(at, TOOLS_SYSTEM),
             None => with_tools.system.push_str(TOOLS_SYSTEM),
-        }
-        // A screenshot: a vision model sees it when one is set; otherwise
-        // the text model gets the screen's text, read here with OCR.
-        if let Some(png) = req.image.as_ref() {
-            let ai = lock(&self.app.state::<AppState>().settings)
-                .ai
-                .local
-                .clone();
-            let vision_name = ai.vision_model.trim();
-            // The local vision model only stands in for the local text model.
-            if self.inner.id() == "local"
-                && !vision_name.is_empty()
-                && !vision_name.eq_ignore_ascii_case("off")
-            {
-                let vision = OpenAiCompat::new(Some(ai.base_url), Some(ai.vision_model));
-                return vision.chat(req, sink, cancel).await;
-            }
-            with_tools.image = None;
-            let text = match crate::ask_tools::cached_screen(&self.app) {
-                Some(text) => Ok(text),
-                None => crate::ask_tools::screen_text(&self.app, png).await,
-            };
-            match text {
-                Ok(text) if !text.is_empty() => with_tools.system.push_str(&format!(
-                    "\n\nText on the user's screen (read with OCR, layout lost):\n```\n{text}\n```"
-                )),
-                Ok(_) => with_tools.system.push_str(
-                    "\n\nThe screenshot has no readable text; say so and ask what they need.",
-                ),
-                Err(err) => with_tools.system.push_str(&format!(
-                    "\n\nThe screen could not be read ({err}); say so in one sentence."
-                )),
-            }
         }
         let runner = Runner {
             client,
@@ -721,7 +738,7 @@ impl AiProvider for LocalWithTools {
                 if !sink.has_sent() && err.to_lowercase().contains("tools") =>
             {
                 log::info!("local model has no tool support, answering without tools: {err}");
-                return self.inner.chat(req, sink, cancel).await;
+                return self.inner.chat(&with_tools, sink, cancel).await;
             }
             other => other?,
         };

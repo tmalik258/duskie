@@ -37,6 +37,9 @@ const BODIES = {
   wifi: '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><path d="M2 8.8a15 15 0 0 1 20 0"/><path d="M5.3 12.5a10 10 0 0 1 13.4 0"/><path d="M8.6 16.1a5 5 0 0 1 6.8 0"/></g><circle cx="12" cy="19.5" r="1.25" fill="currentColor"/>',
   update:
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><path d="M12 16.5v-9M8.5 11 12 7.5l3.5 3.5"/></g>',
+  // Drawn for Sidekick (not from Solar), in the same 1.5 stroke style.
+  refresh:
+    '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="M19.5 12a7.5 7.5 0 0 1-13.2 4.9M4.5 12A7.5 7.5 0 0 1 17.7 7.1"/><path d="M19.5 7.5V12h-4.5M4.5 16.5V12H9"/></g>',
   wifiOff:
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><path d="M2 8.8a15 15 0 0 1 20 0"/><path d="M5.3 12.5a10 10 0 0 1 13.4 0"/><path d="M8.6 16.1a5 5 0 0 1 6.8 0"/><path d="M3.5 3.5l17 17"/></g><circle cx="12" cy="19.5" r="1.25" fill="currentColor"/>',
   // Drawn for Sidekick (not from Solar).

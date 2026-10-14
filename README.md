@@ -31,14 +31,14 @@ Sidekick lives in a small island at the top of your screen, with a friendly orb 
 - **Works without AI.** Rules handle the everyday moments. Add Claude Code, the Anthropic API, Codex or a local model through Ollama for answers, drafts and multi-step tasks.
 - **Yours to shape.** Switch skills on, off or to automatic, record your own shortcuts, and write your own skills in YAML.
 
-## What's new in v0.2.1
+## What's new in v0.2.2
 
-Released October 12, 2026. See the [full changelog](CHANGELOG.md#021---2026-10-12) for everything since v0.2.0.
+Released October 14, 2026. See the [full changelog](CHANGELOG.md#022---2026-10-14) for everything since v0.2.1.
 
-- **Live activity:** downloads, setup, agents and updates show progress in the island, with Check again and Dismiss.
-- **Clearer updates:** percentage, size, verify and install errors in the island and Settings; release builds check that installers match the tagged version.
-- **Projects and GitHub:** folder picker when no repos are found, fresher project lists, and steadier `gh` connection checks.
-- **Faster Agents:** last agent and model restore immediately, long sessions open on the recent timeline, and the open animation settles without a height jump.
+- **Atelier:** new default theme and island colour; other looks stay in Appearance.
+- **Focus mode:** timed Do Not Disturb from the island, shortcut or voice; suggestions wait until you are done.
+- **Voice settings:** wake word, speak answers, interrupt, conversation, word fixes, voice and speed in Settings > AI.
+- **Ask polish:** multi-select choices with Confirm, clearer Codex plans, and shortcuts you can turn Off without losing the combo.
 
 ## Install
 

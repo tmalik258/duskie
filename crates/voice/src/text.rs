@@ -400,7 +400,7 @@ pub fn speakable(text: &str) -> String {
             in_code = !in_code;
             continue;
         }
-        // Option chips ("OPTION: Open invoice.pdf") are for the screen, and
+        // Option lines ("OPTION: Open invoice.pdf") are for the screen, and
         // table rules are noise.
         if in_code
             || line.trim_start().to_uppercase().starts_with("OPTION:")
@@ -462,6 +462,9 @@ pub struct Sentences {
 const MIN_SENTENCE: usize = 24;
 /// Shortest first clause spoken on its own.
 const MIN_CLAUSE: usize = 12;
+/// Soft-break cap. With fast synth, longer pieces mean fewer joins (each join
+/// resets prosody and sounds like a hitch even when the queue never underruns).
+const MAX_PIECE: usize = 140;
 
 impl Sentences {
     pub fn push(&mut self, text: &str) -> Vec<String> {
@@ -485,26 +488,42 @@ impl Sentences {
         (!rest.is_empty()).then(|| rest.to_owned())
     }
 
-    /// Byte index just past the first sentence end that leaves a piece of
-    /// at least [`MIN_SENTENCE`] bytes, followed by whitespace.
+    /// Byte index just past the first sentence end. The first comma clause
+    /// starts speech early; later commas stay inside the piece. Past
+    /// [`MAX_PIECE`] we soft-break, preferring a comma over a bare space.
     fn boundary(&self) -> Option<usize> {
         let bytes = self.buf.as_bytes();
+        let mut soft_comma = None;
+        let mut soft_space = None;
         for (i, c) in self.buf.char_indices() {
+            let end = i + c.len_utf8();
             // A line break always ends a piece (lists, code fences).
             if c == '\n' {
-                return Some(i + 1);
+                return Some(end);
             }
-            let clause = !self.started && c == ',' && i + 1 >= MIN_CLAUSE;
-            if i + 1 < MIN_SENTENCE && !clause {
-                continue;
+            let after_ws = bytes.get(end).is_some_and(|b| b.is_ascii_whitespace());
+            // Only the opening clause splits on a comma — later ones made
+            // every comma a synth boundary (and a pause).
+            let clause = !self.started && c == ',' && end >= MIN_CLAUSE && after_ws;
+            let punct = matches!(c, '.' | '!' | '?' | ':' | ';') && after_ws;
+            if clause || (punct && end >= MIN_SENTENCE) {
+                return Some(end);
             }
-            let ends = clause || matches!(c, '.' | '!' | '?' | ':' | ';');
-            if ends
-                && bytes
-                    .get(i + c.len_utf8())
-                    .is_some_and(|b| b.is_ascii_whitespace())
-            {
-                return Some(i + c.len_utf8());
+            if end <= MAX_PIECE {
+                if c == ',' && after_ws {
+                    soft_comma = Some(end);
+                } else if c.is_whitespace() {
+                    soft_space = Some(end);
+                }
+            }
+            if end > MAX_PIECE {
+                let at = soft_comma.or(soft_space)?;
+                // Avoid a stub piece like "project." after the soft break.
+                let rest = self.buf.len().saturating_sub(at);
+                if rest > 0 && rest < MIN_SENTENCE && self.buf.len() < MAX_PIECE * 2 {
+                    return None;
+                }
+                return Some(at);
             }
         }
         None
@@ -675,13 +694,38 @@ mod tests {
             s.push("Your next meeting, the design review, starts"),
             vec!["Your next meeting,"]
         );
-        assert!(
-            s.push(" soon").is_empty(),
-            "later commas wait for the whole sentence"
-        );
+        // " the design review," is under MIN_SENTENCE, so it still waits.
+        assert!(s.push(" soon").is_empty());
         assert_eq!(
             s.push(" at three. Then"),
             vec!["the design review, starts soon at three."]
+        );
+    }
+
+    #[test]
+    fn later_commas_stay_in_the_piece_but_long_runs_soft_break() {
+        let mut s = Sentences::default();
+        assert_eq!(
+            s.push(
+                "Your screen shows the Cursor application, which is an integrated development environment. "
+            ),
+            vec![
+                "Your screen shows the Cursor application,",
+                "which is an integrated development environment."
+            ]
+        );
+        let long = "In the main part of the window, you see a code editor with several lines of text visible there, and below that another panel continues with more detail about the open files and recent activity in the workspace. ";
+        let mut pieces = s.push(long);
+        if let Some(rest) = s.finish() {
+            pieces.push(rest);
+        }
+        assert!(
+            pieces.iter().all(|p| p.len() <= MAX_PIECE + MIN_SENTENCE),
+            "expected soft-broken pieces near MAX_PIECE, got {pieces:?}"
+        );
+        assert!(
+            pieces.iter().any(|p| p.contains(',')),
+            "expected a comma kept inside a piece, got {pieces:?}"
         );
     }
 }

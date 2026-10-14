@@ -370,6 +370,7 @@ body {
   --isl-bg: rgb(10 10 12 / 0.94);
   --isl-rim: rgb(255 255 255 / 0.12);
   --isl-sheen: radial-gradient(120% 70% at 18% -10%, rgb(255 255 255 / 0.08), transparent 55%);
+  --accent: #0a84ff;
   background-color: var(--isl-bg);
   box-shadow:
     inset 0 0.5px 0 var(--isl-rim),
@@ -411,6 +412,55 @@ body {
   --isl-bg: #000;
   --isl-rim: transparent;
   --isl-sheen: none;
+}
+/* Atelier: near-black / porcelain / sage — opt-in test theme. */
+.island-shell[data-color="atelier"] {
+  --c1: #0a0a0a;
+  --c2: #f2f0eb;
+  --c3: #7a8f7e;
+  --c4: #95a89a;
+  --isl-bg: rgb(from var(--c1) r g b / 0.98);
+  --isl-rim: transparent;
+  --isl-sheen: none;
+  --accent: var(--c3);
+  --surface: rgb(from var(--c2) r g b / 0.14);
+  --border: rgb(from var(--c4) r g b / 0.28);
+  --muted: rgb(from var(--c2) r g b / 0.62);
+  --hover: rgb(from var(--c4) r g b / 0.16);
+  box-shadow:
+    0 10px 30px -6px rgb(0 0 0 / 0.55),
+    0 2px 6px rgb(0 0 0 / 0.3);
+}
+.island-shell__wash {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(
+    125deg,
+    rgb(from var(--isl-bg) r g b / 0.2) 0%,
+    rgb(from var(--accent) r g b / 0.35) 35%,
+    rgb(255 255 255 / 0.18) 58%,
+    rgb(255 255 255 / 0.12) 100%
+  );
+  mix-blend-mode: soft-light;
+}
+/* Press scale only on real controls — not composer .ak-row wrappers (input click
+   keeps the parent :active and squished the field). */
+.island-shell button.ak-row:active,
+.island-shell .ak-tab:active {
+  transform: scale(0.97);
+  transition: transform 160ms var(--ease-out-strong);
+}
+@media (prefers-reduced-motion: reduce) {
+  .island-shell button.ak-row:active,
+  .island-shell .ak-tab:active {
+    transform: none;
+  }
+}
+.island-shell[data-simple] .island-shell__wash {
+  display: none;
 }
 
 /* Windows transparency effects off: a solid colour, no sheen. */
@@ -469,21 +519,38 @@ body {
 
 /* ---------- Ask ---------- */
 
-/* Scrollbars stay hidden everywhere in Sidekick; content still scrolls. */
-.ask-scroll {
-  overscroll-behavior: contain;
+/* Scrollbars stay hidden everywhere in Sidekick; content still scrolls.
+   Includes Plan mode (timeline + plan editor) and nested overflow (code, pre). */
+.ask-scroll,
+.island-scroll,
+.ak-scroll,
+.ak-sess,
+.ak-pop,
+.ak-grid,
+.ak-plan-edit,
+.ak-ask code,
+.ak pre,
+.nk-files {
   scrollbar-width: none;
 }
-.ask-scroll::-webkit-scrollbar {
+.ask-scroll::-webkit-scrollbar,
+.island-scroll::-webkit-scrollbar,
+.ak-scroll::-webkit-scrollbar,
+.ak-sess::-webkit-scrollbar,
+.ak-pop::-webkit-scrollbar,
+.ak-grid::-webkit-scrollbar,
+.ak-plan-edit::-webkit-scrollbar,
+.ak-ask code::-webkit-scrollbar,
+.ak pre::-webkit-scrollbar,
+.nk-files::-webkit-scrollbar {
+  width: 0;
+  height: 0;
   display: none;
 }
 
+.ask-scroll,
 .island-scroll {
   overscroll-behavior: contain;
-  scrollbar-width: none;
-}
-.island-scroll::-webkit-scrollbar {
-  display: none;
 }
 
 /* ---------- Settings inside the island ---------- */
@@ -500,9 +567,24 @@ body {
   color: var(--text);
   color-scheme: dark;
 }
+.island-shell[data-color="atelier"] .island-settings {
+  --bg: var(--c1);
+  --surface: rgb(from var(--c2) r g b / 0.14);
+  --text: var(--c2);
+  --muted: rgb(from var(--c2) r g b / 0.62);
+  --border: rgb(from var(--c4) r g b / 0.28);
+  --hover: rgb(from var(--c4) r g b / 0.16);
+  --accent: var(--c3);
+}
 
 .island-settings [role="switch"][aria-checked="false"] {
   background-color: rgb(255 255 255 / 0.2);
+}
+.island-shell[data-color="atelier"] .island-settings [role="switch"][aria-checked="false"] {
+  background-color: rgb(from var(--c2) r g b / 0.22);
+}
+.island-shell[data-color="atelier"] .chip:focus-visible {
+  box-shadow: 0 0 0 2px rgb(from var(--c3) r g b / 0.85);
 }
 
 /* An edge fades only when there is more to scroll to on that side
@@ -522,6 +604,8 @@ body {
   scrollbar-width: none;
 }
 .settings-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
   display: none;
 }
 .settings-scroll[data-fade-top] {
@@ -535,6 +619,8 @@ body {
   scrollbar-width: none;
 }
 .no-scrollbar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
   display: none;
 }
 
@@ -768,6 +854,13 @@ body {
 
 /* Menus: near-black, light edge so they separate from the island. */
 .menu {
+  --text: #fff;
+  --muted: rgb(235 235 245 / 0.62);
+  --surface: rgb(255 255 255 / 0.08);
+  --hover: rgb(255 255 255 / 0.12);
+  --border: rgb(255 255 255 / 0.12);
+  --accent: #0a84ff;
+  --bg: #121214;
   background: rgb(18 18 20 / 0.97);
   /* Menus sit over the app's own content, which they can blur. */
   -webkit-backdrop-filter: blur(28px) saturate(170%);
@@ -813,6 +906,48 @@ body {
   grid-column: 1;
   font-size: 11.5px;
   color: rgb(235 235 245 / 0.45);
+}
+/* Atelier menus (in-shell + portaled with data-color). */
+.island-shell[data-color="atelier"] .menu,
+.menu[data-color="atelier"] {
+  --c1: #0a0a0a;
+  --c2: #f2f0eb;
+  --c3: #7a8f7e;
+  --c4: #95a89a;
+  --bg: var(--c1);
+  --text: var(--c2);
+  --muted: rgb(from var(--c2) r g b / 0.62);
+  --surface: rgb(from var(--c4) r g b / 0.16);
+  --hover: rgb(from var(--c4) r g b / 0.28);
+  --border: rgb(from var(--c4) r g b / 0.28);
+  --accent: var(--c3);
+  background: rgb(from var(--c1) r g b / 0.98);
+  box-shadow:
+    inset 0 0.5px 0 rgb(from var(--c2) r g b / 0.06),
+    0 0 0 0.5px rgb(from var(--c4) r g b / 0.28),
+    0 16px 40px -8px rgb(0 0 0 / 0.65);
+  color: var(--c2);
+}
+.island-shell[data-color="atelier"] .menu-item,
+.menu[data-color="atelier"] .menu-item {
+  color: rgb(from var(--c2) r g b / 0.88);
+}
+.island-shell[data-color="atelier"] .menu-item:hover,
+.island-shell[data-color="atelier"] .menu-item:focus-visible,
+.menu[data-color="atelier"] .menu-item:hover,
+.menu[data-color="atelier"] .menu-item:focus-visible {
+  background: rgb(from var(--c4) r g b / 0.22);
+}
+.island-shell[data-color="atelier"] .menu-item small,
+.menu[data-color="atelier"] .menu-item small {
+  color: rgb(from var(--c2) r g b / 0.5);
+}
+.island-shell[data-simple][data-color="atelier"] .menu,
+.island-shell[data-solid][data-color="atelier"] .menu,
+.menu[data-color="atelier"] {
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+  background: var(--c1);
 }
 
 /* The voice: rainbow bars that follow the level. */
@@ -936,6 +1071,19 @@ body {
     "Segoe UI",
     system-ui,
     sans-serif;
+}
+.island-shell[data-color="atelier"] .ak {
+  --ink: var(--c2);
+  --i2: rgb(from var(--c2) r g b / 0.68);
+  --i3: rgb(from var(--c2) r g b / 0.52);
+  --chipbg: rgb(from var(--c4) r g b / 0.2);
+}
+.island-shell[data-color="atelier"] .ak-tab[aria-selected="true"] {
+  background: rgb(from var(--c3) r g b / 0.22);
+  color: var(--c2);
+}
+.island-shell[data-color="atelier"] .ak-row[data-sel="true"] {
+  background: rgb(from var(--c4) r g b / 0.18);
 }
 .ak > * {
   min-width: 0;
@@ -1354,10 +1502,6 @@ body {
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: none;
-}
-.ak-scroll::-webkit-scrollbar {
-  display: none;
 }
 .ak-in {
   animation: ak-in 240ms var(--ease-out-strong) both;
@@ -1420,6 +1564,125 @@ body {
   .ak.ak-enter .ak-composer {
     animation: none;
   }
+}
+/* Clarifying question choices (OPTION lines): radio list, not chips. */
+.ak-askq {
+  margin: 4px 0 2px;
+  border: none;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.05);
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.ak-askq-list {
+  display: grid;
+  gap: 2px;
+}
+.ak-askq-opt {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  width: 100%;
+  color: var(--ink);
+  transition: background-color 160ms ease;
+  cursor: pointer;
+}
+.ak-askq-opt:hover,
+.ak-askq-opt.on {
+  background: rgb(255 255 255 / 0.07);
+}
+.ak-askq-opt kbd {
+  margin-left: auto;
+  font-size: 10.5px;
+  color: var(--i3);
+  flex: none;
+}
+.ak-askq-hint {
+  margin: 2px 10px 4px;
+  font-size: 11.5px;
+  color: var(--i3);
+}
+.ak-askq-radio,
+.ak-askq-check {
+  width: 14px;
+  height: 14px;
+  box-shadow: inset 0 0 0 1.5px rgb(255 255 255 / 0.35);
+  flex: none;
+}
+.ak-askq-radio {
+  border-radius: 999px;
+}
+.ak-askq-check {
+  border-radius: 4px;
+}
+.ak-askq-radio.on {
+  box-shadow: inset 0 0 0 4px #f5f5f7;
+  background: #f5f5f7;
+}
+.ak-askq-check.on {
+  background: #f5f5f7;
+  box-shadow: none;
+  display: grid;
+  place-items: center;
+}
+.ak-askq-check.on::after {
+  content: "✓";
+  font-size: 10px;
+  font-weight: 700;
+  color: #000;
+  line-height: 1;
+}
+.ak-askq-custom {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 2px 4px 4px 28px;
+}
+.ak-askq-confirm {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 4px 2px 28px;
+}
+.ak-askq-confirm kbd {
+  font-size: 10.5px;
+  color: var(--i3);
+}
+.ak-askq-input {
+  flex: 1;
+  min-width: 0;
+  background: rgb(0 0 0 / 0.25);
+  border: none;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 13px;
+  color: var(--ink);
+  outline: none;
+}
+.ak-askq-input::placeholder {
+  color: var(--i3);
+}
+.ak-askq-input:focus {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
+}
+.ak-askq-send {
+  flex: none;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  background: #f5f5f7;
+  color: #000;
+  cursor: pointer;
+}
+.ak-askq-send:disabled {
+  opacity: 0.4;
+  cursor: default;
 }
 .ak-prs {
   display: grid;
@@ -1506,10 +1769,6 @@ body {
   display: flex;
   gap: 6px;
   overflow-x: auto;
-  scrollbar-width: none;
-}
-.ak-sess::-webkit-scrollbar {
-  display: none;
 }
 .ak-sp {
   display: inline-flex;
@@ -1653,6 +1912,121 @@ select.ak-mi option {
   border-radius: 14px;
   background: rgb(255 255 255 / 0.04);
   font-size: 13px;
+}
+.ak-plan-doc {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgb(255 255 255 / 0.04);
+  font-size: 13px;
+  min-width: 0;
+}
+.ak-plan-doc-h {
+  font-size: 11.5px;
+  color: var(--i3);
+  display: flex;
+  justify-content: space-between;
+}
+.ak-plan-doc-title {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  line-height: 1.35;
+  margin: 0 0 8px;
+}
+.ak-plan-doc-body {
+  min-width: 0;
+}
+.ak-plan-doc-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+.ak-plan-step-h {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  color: var(--ink);
+  font-weight: 600;
+  line-height: 1.35;
+}
+.ak-plan-step-n {
+  color: var(--i3);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+.ak-plan-step-t {
+  min-width: 0;
+}
+.ak-plan-step-d {
+  margin: 4px 0 0 30px;
+  color: var(--i2);
+  font-size: 12.5px;
+  line-height: 1.45;
+  font-weight: 400;
+}
+.ak-plan-step-d .ak-ans,
+.ak-plan-step-d p {
+  margin: 0;
+}
+.ak-plan-step[data-s="completed"] .ak-plan-step-t {
+  color: var(--i3);
+  text-decoration: line-through;
+  text-decoration-color: rgb(255 255 255 / 0.25);
+}
+.ak-plan-step[data-s="completed"] .ak-cb {
+  background: #f5f5f7;
+  box-shadow: none;
+}
+.ak-plan-step[data-s="completed"] .ak-cb::after {
+  content: "✓";
+}
+.ak-plan-step[data-s="in_progress"] .ak-cb {
+  box-shadow: inset 0 0 0 1.5px #f5f5f7;
+}
+.ak-plan-doc-notes {
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid rgb(255 255 255 / 0.06);
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--i2);
+}
+.ak-plan-doc-notes span {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--i3);
+}
+.ak-plan-doc-empty {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--i2);
+}
+.ak-plan-edit {
+  width: 100%;
+  min-height: 160px;
+  resize: vertical;
+  border: none;
+  border-radius: 10px;
+  background: rgb(0 0 0 / 0.28);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.45;
+  padding: 8px 10px;
+  outline: none;
+}
+.ak-plan-edit:focus {
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.16);
 }
 .ak-todo .h {
   font-size: 11.5px;
@@ -1824,8 +2198,12 @@ select.ak-mi option {
 }
 .ak-rv-head .keys,
 .ak-meta .keys {
-  font-size: 10.5px;
-  color: var(--i3);
+  font-size: 10px;
+  letter-spacing: 0.02em;
+  color: var(--i2);
+  background: rgb(from var(--accent) r g b / 0.28);
+  padding: 3px 7px;
+  border-radius: 6px;
   white-space: nowrap;
 }
 .ak-rv-file {
@@ -1986,7 +2364,6 @@ select.ak-mi option {
   max-height: 200px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-width: none;
   border-radius: 14px;
   background: rgb(18 18 20);
   box-shadow:
@@ -1997,9 +2374,6 @@ select.ak-mi option {
   display: grid;
   gap: 1px;
   box-sizing: border-box;
-}
-.ak-pop::-webkit-scrollbar {
-  display: none;
 }
 /* Floated above the composer: keep enter animation off transform so it
    does not fight fixed bottom positioning. */
@@ -2501,10 +2875,6 @@ select.ak-mi option {
   /* Two full-height tile rows (196×2 + gap); Board also sets maxHeight from Ask. */
   max-height: 400px;
   overflow-y: auto;
-  scrollbar-width: none;
-}
-.ak-grid::-webkit-scrollbar {
-  display: none;
 }
 .ak-grid[data-more="true"] {
   mask-image: linear-gradient(#000 82%, transparent);
@@ -3316,11 +3686,20 @@ button.ak-cchip:hover,
   padding: 12px;
   display: grid;
   gap: 10px;
-  color: #fff;
+  /* Own ink tokens: portaled to body, outside .ak */
+  --ink: #f5f5f7;
+  --i2: rgb(235 235 245 / 0.6);
+  --i3: rgb(235 235 245 / 0.45);
+  color: var(--ink);
   font-size: 13px;
   border-radius: 16px;
   animation: popin 220ms cubic-bezier(0.23, 1, 0.32, 1) both;
   transform-origin: bottom left;
+}
+.ak-pop[data-color="atelier"] {
+  --ink: var(--c2);
+  --i2: rgb(from var(--c2) r g b / 0.68);
+  --i3: rgb(from var(--c2) r g b / 0.52);
 }
 .ak-pop-h {
   display: flex;
@@ -3434,10 +3813,6 @@ button.ak-cchip:hover,
   margin-top: 12px;
   max-height: 340px;
   overflow-y: auto;
-  scrollbar-width: none;
-}
-.nk-files::-webkit-scrollbar {
-  display: none;
 }
 .nk-file {
   border-radius: 14px;

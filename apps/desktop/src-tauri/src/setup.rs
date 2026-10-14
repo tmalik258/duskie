@@ -1,13 +1,14 @@
 //! Setup checklist: what is installed, connected and configured, and the
 //! exact command or Settings tab for each item that is not. Status checks are
 //! read-only. "Run" opens a visible PowerShell window with an allowlisted
-//! command from this file, except starting Ollama, which opens the Ollama
-//! app like its Start menu shortcut, and paste-only steps (API keys), which
-//! copy the command and open a blank PowerShell for the user. "Add for me"
-//! (hooks/MCP) and the browser helper live in other modules and run only
-//! when the user presses the button.
+//! command from this file, except starting Ollama, which runs headless
+//! `ollama serve` via `ensure_ollama` (no window), and paste-only steps
+//! (API keys), which copy the command and open a blank PowerShell for the
+//! user. "Add for me" (hooks/MCP) and
+//! the browser helper live in other modules and run only when the user
+//! presses the button.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use serde::Serialize;
@@ -39,9 +40,9 @@ pub struct SetupItem {
     pub command: Option<String>,
     /// The command can be run from Sidekick in a new terminal window.
     pub runnable: bool,
-    /// Button label for running it: "Install", "Download", "Sign in", "Run".
+    /// Button label for running it: "Install", "Download", "Sign in", "Start".
     pub action: &'static str,
-    /// "Run" opens the installed app instead of a terminal window.
+    /// "Start" begins the installed app (or headless serve) instead of a terminal.
     pub opens_app: bool,
     /// Opens a terminal and copies the command; the user pastes and edits it.
     pub opens_terminal: bool,
@@ -83,12 +84,12 @@ impl SetupItem {
         self.action = action;
         self
     }
-    /// "Run" opens the app through [`open_app`]; there is no command.
+    /// "Start" opens the app or starts a headless service; there is no command.
     fn opens_app(mut self) -> Self {
         self.command = None;
         self.runnable = true;
         self.opens_app = true;
-        self.action("Run")
+        self.action("Start")
     }
     fn copy(mut self, command: impl Into<String>) -> Self {
         self.command = Some(command.into());
@@ -222,12 +223,12 @@ const OLLAMA_LIGHT: [(&str, &str); 4] = [
     ("OLLAMA_KV_CACHE_TYPE", "q8_0"),
 ];
 
-/// Quits Ollama so it starts again with new settings, then starts it.
-const OLLAMA_RESTART: &str = "Get-Process 'ollama app','ollama' -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep 1; $env:OLLAMA_CONTEXT_LENGTH='8192'; $env:OLLAMA_NUM_PARALLEL='1'; $env:OLLAMA_FLASH_ATTENTION='1'; $env:OLLAMA_KV_CACHE_TYPE='q8_0'; $app = Join-Path (Split-Path (Get-Command ollama).Source) 'ollama app.exe'; if (Test-Path $app) { Start-Process $app }";
+/// Quits Ollama so it starts again with new settings, then starts `serve`.
+const OLLAMA_RESTART: &str = "Get-Process 'ollama app','ollama' -ErrorAction SilentlyContinue | Stop-Process -Force; Start-Sleep 1; $env:OLLAMA_CONTEXT_LENGTH='8192'; $env:OLLAMA_NUM_PARALLEL='1'; $env:OLLAMA_FLASH_ATTENTION='1'; $env:OLLAMA_KV_CACHE_TYPE='q8_0'; $exe = (Get-Command ollama -ErrorAction SilentlyContinue).Source; if (-not $exe) { $exe = Join-Path $env:LOCALAPPDATA 'Programs\\Ollama\\ollama.exe' }; if (Test-Path $exe) { Start-Process -WindowStyle Hidden $exe -ArgumentList 'serve' }";
 
-/// Starts the Ollama app if it is not running and waits until it answers,
-/// so `ollama pull` right after an install works.
-const OLLAMA_START: &str = "$app = Join-Path (Split-Path (Get-Command ollama).Source) 'ollama app.exe'; if (-not (Get-Process 'ollama app' -ErrorAction SilentlyContinue) -and (Test-Path $app)) { Start-Process $app }; foreach ($i in 1..60) { try { Invoke-RestMethod http://127.0.0.1:11434/api/version -TimeoutSec 2 | Out-Null; break } catch { Start-Sleep 1 } }";
+/// Starts `ollama serve` if needed and waits until it answers, so `ollama
+/// pull` right after an install works.
+const OLLAMA_START: &str = "$exe = (Get-Command ollama -ErrorAction SilentlyContinue).Source; if (-not $exe) { $exe = Join-Path $env:LOCALAPPDATA 'Programs\\Ollama\\ollama.exe' }; if (-not (Test-Path $exe)) { $exe = 'C:\\Program Files\\Ollama\\ollama.exe' }; try { Invoke-RestMethod http://127.0.0.1:11434/api/version -TimeoutSec 2 | Out-Null } catch { if (Test-Path $exe) { Start-Process -WindowStyle Hidden $exe -ArgumentList 'serve' } }; foreach ($i in 1..60) { try { Invoke-RestMethod http://127.0.0.1:11434/api/version -TimeoutSec 2 | Out-Null; break } catch { Start-Sleep 1 } }";
 
 /// Ollama names models `name:tag`; `nomic-embed-text` matches
 /// `nomic-embed-text:latest`.
@@ -906,7 +907,7 @@ pub async fn run(app: &AppHandle, id: &str) -> Result<(), String> {
             return Err("Copy this one instead".into());
         }
         if item.opens_app {
-            return open_app(item.id);
+            return start_or_open(app, item.id).await;
         }
         if item.opens_terminal {
             let command = item.command.clone().ok_or("Nothing to paste")?;
@@ -940,42 +941,106 @@ pub async fn run(app: &AppHandle, id: &str) -> Result<(), String> {
     }
 }
 
-/// Opens an installed app the way its Start menu shortcut does.
-fn open_app(id: &str) -> Result<(), String> {
+/// Starts Ollama headlessly, or opens another installed app.
+async fn start_or_open(app: &AppHandle, id: &str) -> Result<(), String> {
     match id {
-        "ollama" => open_ollama(),
+        "ollama" => {
+            let base = lock(&app.state::<AppState>().settings)
+                .ai
+                .local
+                .base_url
+                .clone();
+            ensure_ollama(&base).await
+        }
         _ => Err(format!("{id} has no app to open")),
     }
 }
 
-/// The Ollama app (`ollama app.exe`, next to `ollama.exe`) starts the server
-/// and keeps it running from the tray.
-#[cfg(windows)]
-fn open_ollama() -> Result<(), String> {
-    use std::process::Stdio;
-    let exe = which::which("ollama").map_err(|e| format!("Ollama was not found on PATH: {e}"))?;
-    let app = exe.with_file_name("ollama app.exe");
-    if !app.is_file() {
-        return Err(format!(
-            "The Ollama app was not found next to {}. Open Ollama from the Start menu.",
-            exe.display()
-        ));
-    }
-    std::process::Command::new(&app)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .map(|_| ())
-        .map_err(|e| format!("could not open {}: {e}", app.display()))
+/// Ollama's native API root from the OpenAI-style base URL in settings.
+fn ollama_api_root(base_url: &str) -> String {
+    let b = sidekick_ai::loopback(base_url.trim().trim_end_matches('/'));
+    let b = if b.is_empty() {
+        sidekick_ai::OLLAMA_URL.to_owned()
+    } else {
+        b
+    };
+    b.trim_end_matches("/v1").to_owned()
 }
 
-#[cfg(not(windows))]
-fn open_ollama() -> Result<(), String> {
-    Err(
-        "Opening Ollama from Sidekick is only available on Windows; open the Ollama app instead"
-            .into(),
-    )
+/// Where `ollama.exe` is: PATH, then common Windows install folders.
+pub fn find_ollama_exe() -> Option<PathBuf> {
+    if let Ok(p) = which::which("ollama") {
+        return Some(p);
+    }
+    #[cfg(windows)]
+    {
+        if let Some(local) = std::env::var_os("LOCALAPPDATA") {
+            let p = PathBuf::from(local).join(r"Programs\Ollama\ollama.exe");
+            if p.is_file() {
+                return Some(p);
+            }
+        }
+        let program_files = PathBuf::from(r"C:\Program Files\Ollama\ollama.exe");
+        if program_files.is_file() {
+            return Some(program_files);
+        }
+    }
+    None
+}
+
+async fn ollama_api_ready(root: &str) -> bool {
+    let Ok(client) = reqwest::Client::builder()
+        .timeout(Duration::from_secs(2))
+        .no_proxy()
+        .build()
+    else {
+        return false;
+    };
+    client
+        .get(format!("{root}/api/version"))
+        .send()
+        .await
+        .ok()
+        .is_some_and(|r| r.status().is_success())
+}
+
+/// Starts `ollama serve` with no window when the API is down, then waits
+/// until it answers (or ~45s). No-op when already running.
+pub async fn ensure_ollama(base_url: &str) -> Result<(), String> {
+    let root = ollama_api_root(base_url);
+    if ollama_api_ready(&root).await {
+        return Ok(());
+    }
+    let exe = find_ollama_exe().ok_or_else(|| {
+        "Ollama was not found. Install it from Settings > AI, or from ollama.com.".to_owned()
+    })?;
+    spawn_ollama_serve(&exe)?;
+    let deadline = std::time::Instant::now() + Duration::from_secs(45);
+    while std::time::Instant::now() < deadline {
+        if ollama_api_ready(&root).await {
+            return Ok(());
+        }
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
+    Err("Ollama did not start. Check that it is installed and try again.".into())
+}
+
+fn spawn_ollama_serve(exe: &Path) -> Result<(), String> {
+    use std::process::Stdio;
+    let mut cmd = std::process::Command::new(exe);
+    cmd.arg("serve")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd.spawn()
+        .map(|_| ())
+        .map_err(|e| format!("could not start {}: {e}", exe.display()))
 }
 
 /// After an installer runs, PowerShell still has the old PATH; read it again
@@ -1002,8 +1067,8 @@ pub async fn run_many(app: &AppHandle, ids: &[String]) -> Result<Vec<String>, St
         rest.into_iter().partition(|i| i.opens_terminal);
     let mut done = Vec::new();
     for item in apps {
-        open_app(item.id)?;
-        done.push(format!("Launch requested for {}", item.title));
+        start_or_open(app, item.id).await?;
+        done.push(format!("Started {}", item.title));
     }
     for item in pastes {
         let command = item.command.as_deref().ok_or("Nothing to paste")?;
@@ -1353,12 +1418,23 @@ mod tests {
     }
 
     #[test]
-    fn running_ollama_opens_the_app_not_a_terminal() {
+    fn running_ollama_starts_serve_not_a_terminal() {
         let item = SetupItem::new("ollama", Group::Ai, "Ollama", "w").opens_app();
         assert!(item.runnable && item.opens_app);
         assert_eq!(item.command, None);
-        assert_eq!(item.action, "Run");
+        assert_eq!(item.action, "Start");
         assert_eq!(install_all(&[item]), None);
+    }
+
+    #[test]
+    fn finds_ollama_paths_shape() {
+        // which() may or may not see it; known install dirs are PathBuf checks only.
+        let _ = find_ollama_exe();
+        #[cfg(windows)]
+        {
+            let pf = PathBuf::from(r"C:\Program Files\Ollama\ollama.exe");
+            assert!(pf.is_absolute());
+        }
     }
 
     #[test]

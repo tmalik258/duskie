@@ -105,7 +105,7 @@ const PROVIDER_SETUP: Record<AiProviderId, string[]> = {
 /** Where each cloud provider hands out keys, and its default model. */
 const CLOUD_KEYS: Record<CloudId, { url: string; site: string; model: string }> = {
   gemini: { url: "https://aistudio.google.com/apikey", site: "Google AI Studio", model: "gemini-2.5-flash" },
-  groq: { url: "https://console.groq.com/keys", site: "GroqCloud", model: "llama-3.3-70b-versatile" },
+  groq: { url: "https://console.groq.com/keys", site: "GroqCloud", model: "openai/gpt-oss-120b" },
   openrouter: { url: "https://openrouter.ai/settings/keys", site: "OpenRouter", model: "openrouter/auto" },
 };
 
@@ -119,9 +119,20 @@ const CODING_AGENTS: [string, string][] = [
 
 function Providers({ ai, onError }: { ai: AiSettings; onError: (e: string) => void }) {
   // Last known answers paint at once; dots and lists only change when the data does.
-  const { data: status, refresh: reloadStatus } = useCached<ProviderStatus[]>("ai-status", api.aiStatus);
-  const { data: models, refresh: reloadModels } = useCached<LocalModels>("local-models", api.localModels);
-  const { data: setup } = useCached<SetupStatus>(SETUP_STATUS_CACHE_KEY, api.setupStatus);
+  // Revalidate on mount so StatusDot and model lists agree with Ollama right now.
+  const { data: status, refresh: reloadStatus } = useCached<ProviderStatus[]>(
+    "ai-status",
+    api.aiStatus,
+    undefined,
+    true,
+  );
+  const { data: models, refresh: reloadModels } = useCached<LocalModels>(
+    "local-models",
+    api.localModels,
+    undefined,
+    true,
+  );
+  const { data: setup, refresh: reloadSetup } = useCached<SetupStatus>(SETUP_STATUS_CACHE_KEY, api.setupStatus);
   const ollama = setup?.items.find((i) => i.id === "ollama");
   const [starting, setStarting] = useState<string | null>(null);
   // Start (or install) Ollama from here, then wait for it to answer.
@@ -139,8 +150,9 @@ function Providers({ ai, onError }: { ai: AiSettings; onError: (e: string) => vo
       return;
     }
     setStarting(null);
-    reloadModels();
-    reloadStatus();
+    void reloadModels().catch(() => undefined);
+    void reloadStatus().catch(() => undefined);
+    void reloadSetup().catch(() => undefined);
   };
   const first = useRef(true);
   // biome-ignore lint/correctness/useExhaustiveDependencies: re-check when the local server address changes
@@ -203,23 +215,39 @@ function Providers({ ai, onError }: { ai: AiSettings; onError: (e: string) => vo
               <>
                 <div className="flex items-center gap-3">
                   {handle}
-                  <StatusDot state={status === null ? "checking" : available(id) ? "ok" : "off"} />
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[14px] font-medium">
-                      {i + 1}. {PROVIDER_LABELS[id]}
-                    </p>
-                    <p className="text-[12px] text-(--muted)">{PROVIDER_HINTS[id]}</p>
-                  </div>
-                  {status !== null && !available(id) ? (
-                    // Nothing to switch on yet: the step below sets it up.
-                    <span className="shrink-0 text-[12.5px] text-(--muted)">
-                      {id === "claude_code" && setup?.items.find((x) => x.id === "claude_code")?.done
-                        ? "Out of usage"
-                        : NOT_READY[id]}
-                    </span>
-                  ) : (
-                    <Switch checked={enabled(id)} onChange={(on) => setEnabled(id, on)} label={PROVIDER_LABELS[id]} />
-                  )}
+                  {(() => {
+                    // Local ready follows local-models (same source as the dropdowns),
+                    // not ai-status, so "Not running" never fights a populated model list.
+                    const checking = id === "local" ? models === null : status === null;
+                    const ok = id === "local" ? models?.reachable === true : Boolean(available(id));
+                    return (
+                      <>
+                        <StatusDot state={checking ? "checking" : ok ? "ok" : "off"} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[14px] font-medium">
+                            {i + 1}. {PROVIDER_LABELS[id]}
+                          </p>
+                          <p className="text-[12px] text-(--muted)">{PROVIDER_HINTS[id]}</p>
+                        </div>
+                        {!checking && !ok ? (
+                          // Nothing to switch on yet: the step below sets it up.
+                          <span className="shrink-0 text-[12.5px] text-(--muted)">
+                            {id === "claude_code" && setup?.items.find((x) => x.id === "claude_code")?.done
+                              ? "Out of usage"
+                              : NOT_READY[id]}
+                          </span>
+                        ) : checking ? (
+                          <span className="shrink-0 text-[12.5px] text-(--muted)">Checking...</span>
+                        ) : (
+                          <Switch
+                            checked={enabled(id)}
+                            onChange={(on) => setEnabled(id, on)}
+                            label={PROVIDER_LABELS[id]}
+                          />
+                        )}
+                      </>
+                    );
+                  })()}
                 </div>
                 <SetupItems ids={PROVIDER_SETUP[id]} />
                 {id === "claude_code" && (
@@ -677,9 +705,9 @@ function VoiceSection({ voice, onError }: { voice: VoiceSettings; onError: (e: s
               ? `Downloading ${progress.label}: ${mb(progress.done)} of ${mb(progress.total)}`
               : `Speech models are not downloaded yet (${mb(missing)}, once).`}
             {downloading && progress && (
-              <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-white/10">
+              <span className="mt-1.5 block h-1 overflow-hidden rounded-full bg-(--surface)">
                 <span
-                  className="block h-full rounded-full bg-[#0a84ff] transition-[width] duration-300"
+                  className="block h-full rounded-full bg-(--accent) transition-[width] duration-300"
                   style={{ width: `${Math.round((progress.done / Math.max(1, progress.total)) * 100)}%` }}
                 />
               </span>
@@ -769,6 +797,7 @@ function VoiceSection({ voice, onError }: { voice: VoiceSettings; onError: (e: s
             value={voice.voice}
             options={(status?.voices ?? []).map((v) => [v.id, v.label])}
             onChange={(v) => void set({ voice: v })}
+            menuWidth={240}
           />
           <VoiceTest onError={onError} />
         </div>
@@ -814,7 +843,7 @@ function DragRow({
             onStep(e.key === "ArrowUp" ? -1 : 1);
           }
         }}
-        className="chip grid h-8 w-5 shrink-0 cursor-grab touch-none place-items-center rounded-md text-white/40 hover:text-white/80 active:cursor-grabbing"
+        className="chip grid h-8 w-5 shrink-0 cursor-grab touch-none place-items-center rounded-md text-(--muted) hover:text-(--text) active:cursor-grabbing"
       >
         <svg aria-hidden="true" viewBox="0 0 8 14" className="h-3.5 w-2">
           <g fill="currentColor">
@@ -843,32 +872,82 @@ function DragRow({
   );
 }
 
-/** Test with a loading state while a new voice loads, then Playing. */
+/** Speaker → spinner while the voice prepares → stop while audio plays. */
 function VoiceTest({ onError }: { onError: (e: string) => void }) {
-  const [loading, setLoading] = useState(false);
   const speaking = useSidekick((s) => s.speaking);
-  const [asked, setAsked] = useState(false);
+  const [phase, setPhase] = useState<"idle" | "loading" | "playing">("idle");
+  const gen = useRef(0);
+
   useEffect(() => {
-    if (!speaking && asked && !loading) setAsked(false);
-  }, [speaking, asked, loading]);
-  const playing = asked && speaking;
+    if (phase === "loading" && speaking) setPhase("playing");
+  }, [speaking, phase]);
+
+  // Speaker::busy can flicker false between pieces; don't drop Stop for that.
+  useEffect(() => {
+    if (phase !== "playing" || speaking) return;
+    const t = window.setTimeout(() => {
+      setPhase((p) => (p === "playing" ? "idle" : p));
+    }, 280);
+    return () => clearTimeout(t);
+  }, [phase, speaking]);
+
+  const label = phase === "loading" ? "Loading voice" : phase === "playing" ? "Stop" : "Test voice";
+  const busy = phase !== "idle";
+
   return (
-    <Button
-      small
-      disabled={loading}
-      onClick={() => {
-        setLoading(true);
-        setAsked(true);
-        api
-          .voiceTest()
-          .catch((e) => {
-            setAsked(false);
-            onError(String(e));
-          })
-          .finally(() => setLoading(false));
-      }}
-    >
-      {loading ? "Loading voice…" : playing ? "Playing…" : "Test"}
-    </Button>
+    <Tip label={label}>
+      <Button
+        small
+        aria-label={label}
+        active={busy}
+        onClick={() => {
+          if (busy) {
+            gen.current += 1;
+            setPhase("idle");
+            void api.voiceStop();
+            return;
+          }
+          const id = ++gen.current;
+          setPhase("loading");
+          api
+            .voiceTest()
+            .then(() => {
+              // Invoke can finish before the speaking event; keep the spinner
+              // until audio starts, or idle if nothing plays.
+              window.setTimeout(() => {
+                if (gen.current !== id) return;
+                setPhase((p) => (p === "loading" ? "idle" : p));
+              }, 2000);
+            })
+            .catch((e) => {
+              if (gen.current !== id) return;
+              setPhase("idle");
+              onError(String(e));
+            });
+        }}
+      >
+        {phase === "loading" ? (
+          <span
+            aria-hidden="true"
+            className="block size-3 animate-spin rounded-full border border-current border-r-transparent"
+          />
+        ) : phase === "playing" ? (
+          <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
+          </svg>
+        ) : (
+          <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"
+              fill="none"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="1.7"
+            />
+          </svg>
+        )}
+      </Button>
+    </Tip>
   );
 }

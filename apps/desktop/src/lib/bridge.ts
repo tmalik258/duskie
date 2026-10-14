@@ -69,6 +69,7 @@ export const EVENTS = {
   islandCursor: "island://cursor",
   islandVisible: "island://visible",
   islandFullscreen: "island://fullscreen",
+  islandShift: "island://shift",
   inboxChanged: "inbox://changed",
   aiDelta: "ai://delta",
   aiDone: "ai://done",
@@ -107,6 +108,7 @@ export interface EventPayloads {
   [EVENTS.islandCursor]: { x: number; y: number };
   [EVENTS.islandVisible]: boolean;
   [EVENTS.islandFullscreen]: boolean;
+  [EVENTS.islandShift]: boolean;
   [EVENTS.netStatus]: boolean;
   [EVENTS.updateAvailable]: UpdateInfo;
   [EVENTS.updateProgress]: UpdateProgress;

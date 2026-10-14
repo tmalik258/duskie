@@ -23,6 +23,7 @@ export const ISLAND_COLOR_LABELS: Record<IslandColor, string> = {
   smoke: "Smoke",
   warm_graphite: "Warm graphite",
   solid_black: "Solid black",
+  atelier: "Atelier",
 };
 
 /** Tile previews; the real colours live in globals.css (.island-shell). */
@@ -33,14 +34,15 @@ const ISLAND_SWATCH: Record<IslandColor, string> = {
   smoke: "rgb(48 48 54)",
   warm_graphite: "rgb(36 32 30)",
   solid_black: "#000",
+  atelier: "#0a0a0a",
 };
 
-/** A tile in the plan's style: faint glass, a blue ring on the picked one. */
+/** A tile in the plan's style: faint glass, accent ring on the picked one. */
 const tile = (on: boolean) =>
-  `chip flex flex-col items-center gap-[7px] rounded-xl px-1 pt-2.5 pb-2 text-[12px] transition-[box-shadow,background-color,scale] duration-150 active:scale-[0.96] ${
+  `chip flex flex-col items-center gap-[7px] rounded-xl px-1 pt-2.5 pb-2 text-[12px] transition-[box-shadow,background-color,transform] duration-150 active:scale-[0.97] ${
     on
-      ? "bg-white/[0.07] text-white shadow-[inset_0_0_0_1.5px_#0a84ff]"
-      : "bg-white/[0.04] text-[rgb(235_235_245/0.62)] shadow-[inset_0_0_0_1px_rgb(255_255_255/0.06)] hover:bg-white/[0.06]"
+      ? "bg-(--surface) text-(--text) shadow-[inset_0_0_0_1.5px_var(--accent)]"
+      : "bg-(--surface)/60 text-(--muted) shadow-[inset_0_0_0_1px_var(--border)] hover:bg-(--hover)"
   }`;
 
 export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
@@ -50,7 +52,10 @@ export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
 
   return (
     <>
-      <Section title="Mascot" keywords="theme orb color colour look mascot pearl aurora chrome peach mint lilac onyx">
+      <Section
+        title="Mascot"
+        keywords="theme orb color colour look mascot pearl aurora chrome peach mint lilac onyx atelier sage"
+      >
         <div className="grid grid-cols-4 gap-2.5">
           {THEMES.map((t) => (
             <button
@@ -81,8 +86,8 @@ export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
 
       <Section
         title="Island"
-        hint="The capsule around the mascot when it opens. Menus always use Graphite."
-        keywords="island color colour glass black graphite midnight smoke background"
+        hint="The capsule around the mascot when it opens. Menus follow this colour."
+        keywords="island color colour glass black graphite midnight smoke atelier sage green background"
       >
         <div className="grid grid-cols-3 gap-2.5">
           {ISLAND_COLORS.map((c) => (
@@ -101,7 +106,9 @@ export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
                   boxShadow:
                     c === "solid_black"
                       ? "0 0 0 0.5px rgb(255 255 255 / 0.14)"
-                      : "inset 0 0.5px 0 rgb(255 255 255 / 0.18), 0 0 0 0.5px rgb(255 255 255 / 0.14)",
+                      : c === "atelier"
+                        ? "inset 0 0.5px 0 rgb(242 240 235 / 0.18), 0 0 0 0.5px rgb(122 143 126 / 0.45)"
+                        : "inset 0 0.5px 0 rgb(255 255 255 / 0.18), 0 0 0 0.5px rgb(255 255 255 / 0.14)",
                 }}
               >
                 <span className="orb-still">

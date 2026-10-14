@@ -78,6 +78,17 @@ export const THEME_STYLES: Record<ThemeName, Material & { label: string }> = {
     eye: "#ffffff",
     eyeGlow: "rgb(255 255 255 / 0.5)",
   },
+  // Warm stone → porcelain (like Pearl, quieter); sage halo.
+  atelier: {
+    label: "Atelier",
+    body: ["#9a948c", "#f2f0eb"],
+    halo: ["#7a8f7e", "#95a89a", "#a8b5a8"],
+    haloOpacity: 0.4,
+    eye: "#1c1c1e",
+    eyeGlow: "rgb(0 0 0 / 0)",
+    sheen:
+      "linear-gradient(168deg, rgb(255 255 255 / 0.5) 0%, rgb(255 255 255 / 0) 30%, rgb(40 36 32 / 0.18) 50%, rgb(122 143 126 / 0.12) 62%, rgb(255 255 255 / 0) 80%)",
+  },
 };
 
 /** Gaze returns to center after the cursor rests this long. */

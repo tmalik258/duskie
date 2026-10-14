@@ -2,16 +2,17 @@
 
 // The conversation: turns, live steps, the streamed answer, retry and handoff.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { handOff } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
 import { Markdown } from "@/lib/markdown";
-import { splitOptions } from "@/lib/options";
+import { extractChoices, splitOptions } from "@/lib/options";
 import { useReveal } from "@/lib/reveal";
 import { askAgain, askWhenOnline, retryLast, setAsk, setAskModel, thinkHarder, useSidekick } from "@/lib/store";
 import { type Agents, type AiSettings, PROVIDER_LABELS, type ProviderStatus, type Turn } from "@/lib/types";
+import { Tip } from "../Tip";
 import { AnswerOptions, Proposals, pendingCount } from "./Proposals";
 import { FailureCard } from "./States";
 
@@ -45,9 +46,11 @@ export function Chat({ turns }: { turns: Turn[] }) {
   const ai = useSidekick((s) => s.settings.ai);
   const last = turns.at(-1);
   // A reply that is only chips (a weak model copying its instructions) is no answer.
-  const blank = (t: Turn) => !t.streaming && !t.error && !splitOptions(t.content).body.trim();
-  const options =
-    last?.role === "assistant" && !last.streaming && !blank(last) ? splitOptions(last.content).options : [];
+  const blank = (t: Turn) => !t.streaming && !t.error && !extractChoices(t.content).body.trim();
+  const lastChoices =
+    last?.role === "assistant" && !last.streaming && !blank(last) ? extractChoices(last.content) : null;
+  const options = lastChoices?.options ?? [];
+  const multi = lastChoices?.multi ?? false;
   return (
     <div className="ak-body py-0.5">
       {turns.map((t, i) => {
@@ -68,12 +71,12 @@ export function Chat({ turns }: { turns: Turn[] }) {
           // biome-ignore lint/suspicious/noArrayIndexKey: turns only ever append
           <div key={i} className="group grid grid-cols-[minmax(0,1fr)] gap-2">
             {steps.length > 0 && !t.streaming && <Steps steps={steps} running={false} tookMs={t.tookMs} />}
-            {t.streaming && steps.length > 1 && <Steps steps={steps} running tookMs={t.tookMs} />}
+            {t.streaming && steps.length > 0 && <Steps steps={steps} running since={t.startedAt} tookMs={t.tookMs} />}
             {t.content ? (
               <div className="ak-ans">
-                <Answer text={splitOptions(t.content, t.streaming).body} live={isLast && !!t.streaming} />
+                <Answer text={extractChoices(t.content, t.streaming).body} live={isLast && !!t.streaming} />
               </div>
-            ) : t.streaming ? (
+            ) : t.streaming && steps.length === 0 ? (
               <LiveStep step={t.tool ?? null} since={t.startedAt} />
             ) : null}
             {blank(t) && t.provider && (
@@ -124,7 +127,9 @@ export function Chat({ turns }: { turns: Turn[] }) {
             {isLast && !t.streaming && !t.error && t.offline && <OfflineChips />}
             {skillMode && !t.streaming && yamlBlock(t.content) && <AddSkill yaml={yamlBlock(t.content) ?? ""} />}
             {t.proposals && t.proposals.length > 0 && <Proposals items={t.proposals} keys={isLast} />}
-            {isLast && options.length > 0 && <AnswerOptions options={options} start={pendingCount(t.proposals)} />}
+            {isLast && options.length > 0 && (
+              <AnswerOptions options={options} multi={multi} start={pendingCount(t.proposals)} />
+            )}
           </div>
         );
       })}
@@ -167,27 +172,40 @@ export function SaveRecipe({ prompt }: { prompt: string }) {
   if (!prompt.trim()) return null;
   if (saved) return <span className="max-w-40 truncate whitespace-nowrap">{saved}</span>;
   return (
-    <button
-      type="button"
-      onClick={() =>
-        void api
-          .recipeSave({ id: "", name: "", prompt, trigger: { when: "manual" }, auto: false, enabled: true })
-          .then(setSaved)
-          .catch((e) => setSaved(String(e)))
-      }
-      aria-label="Save as recipe"
-      title="Save as recipe"
-      className="ak-act chip"
-    >
-      <ActIcon d="M7 4h10v16l-5-3.5L7 20z" />
-    </button>
+    <Tip label="Save as recipe">
+      <button
+        type="button"
+        onClick={() =>
+          void api
+            .recipeSave({ id: "", name: "", prompt, trigger: { when: "manual" }, auto: false, enabled: true })
+            .then(setSaved)
+            .catch((e) => setSaved(String(e)))
+        }
+        aria-label="Save as recipe"
+        className="ak-act chip"
+      >
+        <ActIcon d="M7 4h10v16l-5-3.5L7 20z" />
+      </button>
+    </Tip>
   );
 }
 
-/** The steps of a multi-step task: done ones ticked, the current one live.
- * Folds to one line once the answer is in. */
-export function Steps({ steps, running, tookMs }: { steps: string[]; running: boolean; tookMs?: number }) {
+/** The steps of a multi-step task: done ones ticked, the current one live
+ * with a timer. Folds to one line once the answer is in. */
+export function Steps({
+  steps,
+  running,
+  since,
+  tookMs,
+}: {
+  steps: string[];
+  running: boolean;
+  since?: number;
+  tookMs?: number;
+}) {
   const [open, setOpen] = useState(false);
+  const now = useNow(running ? 100 : 60_000);
+  const elapsed = running && since ? Math.max(0, now - since) : null;
   if (!running && !open) {
     return (
       <button
@@ -219,7 +237,11 @@ export function Steps({ steps, running, tookMs }: { steps: string[]; running: bo
           <span className="ml-1 opacity-60">Hide</span>
         </button>
       )}
-      <ol className="grid gap-0.5 px-1 text-[12px]">
+      <ol
+        className="grid gap-0.5 px-1 text-[12px]"
+        role={running ? "status" : undefined}
+        aria-live={running ? "polite" : undefined}
+      >
         {keyed.map(({ s, id }, i) => {
           const live = running && i === steps.length - 1;
           return (
@@ -228,7 +250,12 @@ export function Steps({ steps, running, tookMs }: { steps: string[]; running: bo
               className={`flex items-center gap-1.5 ${live ? "text-white/80" : "text-[rgb(235_235_245/0.45)]"}`}
             >
               <span className={live ? "ak-dot animate-pulse bg-white" : "text-[#30d158]"}>{live ? "" : "✓"}</span>
-              {s}
+              <span className={live ? "shimmer-text min-w-0 flex-1" : "min-w-0 flex-1"}>{s}</span>
+              {live && elapsed !== null && (
+                <span className="ak-timer mono" aria-hidden="true">
+                  · {(elapsed / 1000).toFixed(1)} s
+                </span>
+              )}
             </li>
           );
         })}
@@ -264,9 +291,40 @@ function AnswerActions({
   const [copied, setCopied] = useState(false);
   const [pinned, setPinned] = useState(false);
   const speaking = useSidekick((s) => s.speaking);
-  const read = () => void (speaking ? api.voiceStop() : api.voiceRead(text));
+  const [loading, setLoading] = useState(false);
+  const readGen = useRef(0);
+  useEffect(() => {
+    if (speaking) setLoading(false);
+  }, [speaking]);
+  const phase = loading ? "loading" : speaking ? "playing" : "idle";
+  const read = () => {
+    if (phase === "playing" || phase === "loading") {
+      readGen.current += 1;
+      setLoading(false);
+      void api.voiceStop();
+      return;
+    }
+    const id = ++readGen.current;
+    setLoading(true);
+    void api
+      .voiceRead(text)
+      .then(() => {
+        // Invoke can finish before audio starts; keep the spinner until then.
+        window.setTimeout(() => {
+          if (readGen.current !== id) return;
+          setLoading(false);
+        }, 2000);
+      })
+      .catch(() => {
+        if (readGen.current !== id) return;
+        setLoading(false);
+      });
+  };
   const copy = () => {
-    void navigator.clipboard.writeText(text).then(() => setCopied(true));
+    void api
+      .clipboardCopy(text)
+      .then(() => setCopied(true))
+      .catch(() => undefined);
   };
   useEffect(() => {
     if (!keys) return;
@@ -290,54 +348,55 @@ function AnswerActions({
         {k}
       </kbd>
     );
+  const readLabel = phase === "loading" ? "Starting…" : phase === "playing" ? "Stop reading" : "Read aloud · Alt L";
   return (
     <div className="grid gap-1">
       <div className="ak-acts" data-detail={detail}>
-        <button
-          type="button"
-          onClick={copy}
-          onMouseLeave={() => setCopied(false)}
-          aria-label={copied ? "Copied" : "Copy"}
-          title={copied ? "Copied" : "Copy · Alt C"}
-          className="ak-act ico chip"
-        >
-          <ActIcon
-            d={
-              copied ? "M5 12.5l4.5 4.5L19 7.5" : "M8 8h12v12H8zM16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
-            }
-          />
-        </button>
-        <button
-          type="button"
-          onClick={read}
-          aria-label={speaking ? "Stop reading" : "Read aloud"}
-          title={speaking ? "Stop reading" : "Read aloud · Alt L"}
-          className="ak-act ico chip"
-        >
-          <ActIcon
-            d={
-              speaking
-                ? "M11 5 6 9H3v6h3l5 4zM16 9l5 6M21 9l-5 6"
-                : "M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"
-            }
-          />
-        </button>
-        {again && (
+        <Tip label={copied ? "Copied" : "Copy · Alt C"}>
           <button
             type="button"
-            onClick={() => askAgain()}
-            aria-label="Retry"
-            title="Retry · Alt T"
+            onClick={copy}
+            onMouseLeave={() => setCopied(false)}
+            aria-label={copied ? "Copied" : "Copy"}
             className="ak-act ico chip"
           >
-            <ActIcon d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5" />
+            <ActIcon
+              d={
+                copied
+                  ? "M5 12.5l4.5 4.5L19 7.5"
+                  : "M8 8h12v12H8zM16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"
+              }
+            />
           </button>
+        </Tip>
+        <Tip label={readLabel}>
+          <button type="button" onClick={read} aria-label={readLabel} className="ak-act ico chip">
+            {phase === "loading" ? (
+              <span
+                aria-hidden="true"
+                className="size-3 animate-spin rounded-full border border-current border-r-transparent"
+              />
+            ) : phase === "playing" ? (
+              <StopIcon />
+            ) : (
+              <ActIcon d="M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />
+            )}
+          </button>
+        </Tip>
+        {again && (
+          <Tip label="Retry · Alt T">
+            <button type="button" onClick={() => askAgain()} aria-label="Retry" className="ak-act ico chip">
+              <ActIcon d="M20 12a8 8 0 1 1-2.3-5.6M20 4v4.5h-4.5" />
+            </button>
+          </Tip>
         )}
         {think && (
-          <button type="button" onClick={() => thinkHarder()} className="ak-act chip">
-            <ActIcon d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" />
-            Think harder {key("K")}
-          </button>
+          <Tip label="Think harder · Alt K">
+            <button type="button" onClick={() => thinkHarder()} className="ak-act chip">
+              <ActIcon d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1" />
+              Think harder {key("K")}
+            </button>
+          </Tip>
         )}
         {recipe && (
           <span className="ak-acts-hover">
@@ -373,6 +432,14 @@ function ActIcon({ d }: { d: string }) {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
       <path d={d} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.7" />
+    </svg>
+  );
+}
+
+function StopIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" aria-hidden="true">
+      <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
     </svg>
   );
 }

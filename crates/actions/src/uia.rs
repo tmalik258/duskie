@@ -317,6 +317,96 @@ pub fn selection(target: &Target) -> Result<String, ActionError> {
     Ok(text)
 }
 
+/// Accept / Receive / Pair / Connect on a share or Bluetooth prompt.
+/// Finds a matching system window and clicks the affirmative button.
+/// Optional `code` is typed into a PIN field first when one is present.
+pub fn accept_prompt(hint: &str, code: Option<&str>) -> Result<Outcome, ActionError> {
+    let hint = clean_query(hint);
+    let code = code.unwrap_or("").trim();
+    let out = powershell(
+        &format!(
+            r##"{UIA}
+$hint=$env:SK_HINT
+$code=$env:SK_CODE
+$keys=@('Accept','Receive','Connect','Pair','Allow','Yes','Save','Open','OK')
+$prefer=@('nearby','share','bluetooth','phone','pair','device','quick')
+function Score($title,$proc){{
+  $t=($title+' '+$proc).ToLowerInvariant()
+  $n=0
+  if($hint -and $t -like "*$($hint.ToLowerInvariant())*"){{ $n+=5 }}
+  foreach($p in $prefer){{ if($t -like "*$p*"){{ $n+=2 }} }}
+  return $n
+}}
+function Click-Named($win,$name){{
+  $all=$win.FindAll($S::Descendants,$All)
+  foreach($e in $all){{
+    $c=$e.Current
+    $k=$c.ControlType.ProgrammaticName -replace '^ControlType\.',''
+    if($k -ne 'Button' -and $k -ne 'SplitButton' -and $k -ne 'Hyperlink' -and $k -ne 'MenuItem'){{ continue }}
+    if(-not $c.IsEnabled -or $c.IsOffscreen){{ continue }}
+    if($c.Name -ne $name){{ continue }}
+    $p=$null
+    if($e.TryGetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern,[ref]$p)){{
+      $p.Invoke(); return $true
+    }}
+  }}
+  return $false
+}}
+function Type-Pin($win,$text){{
+  if(-not $text){{ return $false }}
+  $all=$win.FindAll($S::Descendants,$All)
+  foreach($e in $all){{
+    $c=$e.Current
+    $k=$c.ControlType.ProgrammaticName -replace '^ControlType\.',''
+    if($k -ne 'Edit' -or $c.IsPassword -or -not $c.IsEnabled -or $c.IsOffscreen){{ continue }}
+    $n=($c.Name+' ').ToLowerInvariant()
+    if($n -notmatch 'pin|code|pass'){{ continue }}
+    $vp=$null
+    if($e.TryGetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern,[ref]$vp)){{
+      $vp.SetValue($text); return $true
+    }}
+  }}
+  return $false
+}}
+$cands=@()
+Get-Process | Where-Object {{ $_.MainWindowHandle -ne 0 }} | ForEach-Object {{
+  $sc=Score $_.MainWindowTitle $_.ProcessName
+  if($sc -gt 0){{
+    $cands += [pscustomobject]@{{ Proc=$_; Score=$sc; Handle=$_.MainWindowHandle }}
+  }}
+}}
+$cands=$cands | Sort-Object Score -Descending
+foreach($c in $cands){{
+  try {{
+    $win=$A::FromHandle([IntPtr]$c.Handle)
+    if(-not $win){{ continue }}
+    if($code){{ [void](Type-Pin $win $code) }}
+    foreach($k in $keys){{
+      if(Click-Named $win $k){{
+        $sh=New-Object -ComObject WScript.Shell
+        [void]$sh.AppActivate($c.Proc.Id)
+        Write-Output ("#ok`t" + $k)
+        exit
+      }}
+    }}
+  }} catch {{}}
+}}
+Write-Output "#error`tNo Accept button found for that prompt"
+"##
+        ),
+        &[("SK_HINT", &hint), ("SK_CODE", code)],
+    )?;
+    if let Some(e) = error_of(&out) {
+        return Err(fail(e));
+    }
+    let note = out
+        .lines()
+        .find_map(|l| l.strip_prefix("#ok\t"))
+        .unwrap_or("Accepted")
+        .to_owned();
+    Ok(Outcome::msg(note))
+}
+
 /// Puts text into the field the user was in (replacing a selection).
 pub fn type_here(target: &Target, text: &str) -> Result<Outcome, ActionError> {
     let mut env = target.env();

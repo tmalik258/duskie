@@ -76,7 +76,7 @@ export function MorningSetup({ onError }: { onError: (e: string) => void }) {
                         type="button"
                         onClick={() => remove(item)}
                         aria-label={`Remove ${name}`}
-                        className="chip group flex items-center gap-1.5 rounded-full bg-black/5 py-1 pr-2 pl-2.5 text-[12.5px] dark:bg-white/10"
+                        className="chip group flex items-center gap-1.5 rounded-full bg-(--surface) py-1 pr-2 pl-2.5 text-[12.5px]"
                       >
                         {name}
                         {item.kind === "site" && item.browser && (

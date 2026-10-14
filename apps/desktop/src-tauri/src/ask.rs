@@ -165,11 +165,17 @@ pub fn setup(app: &AppHandle, hotkey: &str) {
 /// Checks the Ask shortcut, then registers every shortcut again. Returns an
 /// error the settings UI can show when the Ask one cannot be used.
 pub fn register(app: &AppHandle, hotkey: &str) -> Result<(), String> {
-    hotkey
-        .parse::<Shortcut>()
-        .map_err(|e| format!("{hotkey} is not a valid shortcut: {e}"))?;
+    // Empty / leading `-` (Off) skips Ask; still re-register the rest.
+    let combo = crate::shortcuts::binding(hotkey);
+    if crate::shortcuts::is_enabled(hotkey) {
+        combo
+            .parse::<Shortcut>()
+            .map_err(|e| format!("{combo} is not a valid shortcut: {e}"))?;
+    }
     let failed = crate::shortcuts::register_all(app);
-    if let Some(f) = failed.iter().find(|f| f.starts_with(hotkey)) {
+    if crate::shortcuts::is_enabled(hotkey)
+        && let Some(f) = failed.iter().find(|f| f.starts_with(combo))
+    {
         return Err(format!("{f}; pick another"));
     }
     Ok(())

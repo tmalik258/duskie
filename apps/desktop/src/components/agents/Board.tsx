@@ -479,7 +479,16 @@ function plain(md: string): string {
     .trim();
 }
 
-export function Board({ sessions, maxHeight }: { sessions: Session[]; keys?: boolean; maxHeight: number }) {
+export function Board({
+  sessions,
+  maxHeight,
+  active = true,
+}: {
+  sessions: Session[];
+  maxHeight: number;
+  /** False while Ask is shown but Agents is kept warm — do not steal Ctrl N. */
+  active?: boolean;
+}) {
   const focus = useAgents((s) => s.focus);
   const live = sessions;
   const paused = sessions.filter((s) => s.restored && s.status === "ended");
@@ -522,6 +531,7 @@ export function Board({ sessions, maxHeight }: { sessions: Session[]; keys?: boo
 
   // Ctrl N: new session. Ctrl 1–9: focus a live session tile.
   useEffect(() => {
+    if (!active) return;
     const onKey = (e: KeyboardEvent) => {
       if (
         e.defaultPrevented ||
@@ -543,7 +553,7 @@ export function Board({ sessions, maxHeight }: { sessions: Session[]; keys?: boo
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [live]);
+  }, [live, active]);
 
   const measure = () => {
     const el = grid.current;
@@ -634,7 +644,6 @@ export function Board({ sessions, maxHeight }: { sessions: Session[]; keys?: boo
           setText={setText}
           onSend={send}
           onBlur={flushDraft}
-          keys={true}
           onClear={() =>
             void api.agentProject(target.id).then((path) => {
               setLayout("one");

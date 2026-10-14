@@ -6,15 +6,13 @@
 
 import { useEffect } from "react";
 import { create } from "zustand";
-import { answerQuestion, type Session, useAgents } from "@/lib/agents";
+import { answerQuestion, interruptSession, type Session, useAgents } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
 import type { InboxStatus } from "@/lib/types";
 import { limitNote } from "./agents/AgentsTab";
-import { Icon } from "./Icon";
 import { CardChips, CardHead, CardList, CardNote, type CardRow } from "./IslandCard";
-import { RoundButton } from "./IslandGlance";
 
 /** Away this long before the island shows what happened meanwhile. */
 const AWAY_MS = 3 * 60_000;
@@ -72,77 +70,115 @@ function useKeys(keys: Record<string, (() => void) | undefined>) {
   });
 }
 
-/** Agents at work, one row each; the one waiting for you first, answered
- * right here. */
-export function AgentsGlance({ sessions }: { sessions: Session[] }) {
-  const now = useNow(1000);
-  const active = [...sessions]
-    .filter((s) => s.status === "working" || s.status === "waiting")
-    .sort((a, b) => Number(!!b.question) - Number(!!a.question));
-  const waiting = active.find((s) => s.question);
-  const step = (s: Session) => {
-    const last = [...s.entries].reverse().find((e) => e.kind === "step");
-    return last?.kind === "step" ? last.step.label : "Working";
-  };
-  const wants = (s: Session) =>
-    s.question ? `Wants to ${s.question.label.toLowerCase()}${s.question.detail ? ` ${s.question.detail}` : ""}` : "";
-  const title = waiting
-    ? `${waiting.agent} needs you`
-    : active.length > 1
-      ? `${active.length} agents working`
-      : `${active[0]?.agent ?? "Agent"} is working`;
-  const lead = waiting ?? active[0];
-  const detail = lead ? `${lead.title} \u00b7 ${lead.project}` : "";
-  const rows: CardRow[] = active.map((s) => ({
+function liveSessions(sessions: Session[]) {
+  return sessions.filter((s) => s.status === "working" || s.status === "waiting");
+}
+
+function agentRow(s: Session, now: number): CardRow {
+  const last = [...s.entries].reverse().find((e) => e.kind === "step");
+  const step = last?.kind === "step" ? last.step.label : "Working";
+  return {
     key: s.id,
-    dot: s.question ? "wait" : undefined,
+    dot: s.question ? ("wait" as const) : undefined,
     title: s.title,
-    detail: s.question ? wants(s) : `${s.agent} \u00b7 ${step(s)}`,
+    detail: s.question ? `Wants to ${s.question.label.toLowerCase()}` : `${s.agent} \u00b7 ${step}`,
     right: s.question ? "Waiting" : clock(now - s.turnAt),
     onClick: () => openSession(s.id),
-  }));
-  const allow = waiting ? () => answerQuestion(waiting.id, "allow") : undefined;
-  const always = waiting ? () => answerQuestion(waiting.id, "always") : undefined;
-  const deny = waiting ? () => answerQuestion(waiting.id, "deny") : undefined;
-  const open = () => openSession(lead?.id ?? "");
-  useKeys({ Enter: allow, "Alt Y": always, "Alt N": deny, "Alt O": waiting ? open : undefined });
-  const others = active.filter((s) => s !== waiting);
-  const othersAsk = others.some((s) => s.question);
-  const limited = sessions.find((x) => x.limit);
-  return (
-    <div className="flex flex-col">
-      <CardHead
-        title={title}
-        detail={detail}
-        right={
-          <RoundButton label="Open Agents" onClick={open}>
-            <Icon name="terminal" size={15} />
-          </RoundButton>
-        }
-      />
-      <CardList rows={rows} />
-      {limited?.limit && <CardNote>{limitNote(limited.agent, limited.limit)}</CardNote>}
-      {waiting && others.length > 0 && (
-        <p className="px-3 pt-1 text-[12px] text-[rgb(235_235_245/0.45)]">
-          {others.length} more {othersAsk ? "running" : "working · nothing else needs you"}
-        </p>
-      )}
-      {waiting && allow && always && deny ? (
+  };
+}
+
+/** Agents on the glance: permission first, otherwise the working list. */
+export function NeedsYouSection({ sessions }: { sessions: Session[] }) {
+  const now = useNow(1000);
+  const live = liveSessions(sessions);
+  const waiting = sessions.find((s) => s.question);
+  const question = waiting?.question;
+  const allow = question ? () => answerQuestion(waiting.id, "allow") : undefined;
+  const always = question ? () => answerQuestion(waiting.id, "always") : undefined;
+  const deny = question ? () => answerQuestion(waiting.id, "deny") : undefined;
+  const lead = waiting ?? live[0];
+  const open = lead ? () => openSession(lead.id) : undefined;
+  const cancelAll = () => {
+    for (const s of live) interruptSession(s.id);
+  };
+  useKeys({
+    Enter: allow ?? open,
+    "Alt Y": always,
+    "Alt N": deny,
+    "Alt O": open,
+    "Alt X": live.length > 0 && !question ? cancelAll : undefined,
+  });
+  if (waiting && question) {
+    const others = live.filter((s) => s !== waiting);
+    const othersAsk = others.some((s) => s.question);
+    const limited = sessions.find((x) => x.limit);
+    const rows: CardRow[] = [
+      {
+        key: waiting.id,
+        dot: "wait",
+        title: waiting.title,
+        detail: `Wants to ${question.label.toLowerCase()}${question.detail ? ` ${question.detail}` : ""}`,
+        right: "Waiting",
+        onClick: () => openSession(waiting.id),
+      },
+      ...others.map((s) => agentRow(s, now)),
+    ];
+    return (
+      <div className="mt-3 flex flex-col">
+        <CardHead title={`${waiting.agent} needs you`} detail={`${waiting.title} \u00b7 ${waiting.project}`} />
+        <CardList rows={rows} />
+        {limited?.limit && <CardNote>{limitNote(limited.agent, limited.limit)}</CardNote>}
+        {others.length > 0 && (
+          <p
+            className="px-3 pt-1 text-[12px] text-[rgb(235_235_245/0.45)]"
+            style={{ marginLeft: "calc(var(--orb-indent, 0px) * -1)" }}
+          >
+            {others.length} more {othersAsk ? "running" : "working · nothing else needs you"}
+          </p>
+        )}
         <CardChips
           options={[
             {
-              label: `Allow ${waiting.question?.detail || waiting.question?.label.toLowerCase() || ""}`,
+              label: `Allow ${question.detail || question.label.toLowerCase()}`,
               keys: "Enter",
-              run: allow,
+              run: () => answerQuestion(waiting.id, "allow"),
             },
-            { label: "Allow this session", keys: "Alt Y", run: always },
-            { label: "Deny", keys: "Alt N", run: deny },
-            { label: "Open in Agents", keys: "Alt O", run: open },
+            { label: "Allow this session", keys: "Alt Y", run: () => answerQuestion(waiting.id, "always") },
+            { label: "Deny", keys: "Alt N", run: () => answerQuestion(waiting.id, "deny") },
+            { label: "Open in Agents", keys: "Alt O", run: () => openSession(waiting.id) },
           ]}
         />
-      ) : null}
+      </div>
+    );
+  }
+  const first = live[0];
+  if (!first) return null;
+  const limited = live.find((x) => x.limit);
+  const title = live.length === 1 ? `${first.agent} is working` : `${live.length} agents working`;
+  const detail =
+    live.length === 1 ? `${first.title} \u00b7 ${first.project}` : live.map((s) => s.agent).join(" \u00b7 ");
+  return (
+    <div className="mt-3 flex flex-col">
+      <CardHead title={title} detail={detail} />
+      <CardList label="Running" rows={live.map((s) => agentRow(s, now))} />
+      {limited?.limit && <CardNote>{limitNote(limited.agent, limited.limit)}</CardNote>}
+      <CardChips
+        options={[
+          {
+            label: live.length === 1 ? "Open in Agents" : "Open Agents",
+            keys: "Enter",
+            run: () => openSession(first.id),
+          },
+          { label: live.length === 1 ? "Cancel" : "Cancel all", keys: "Alt X", run: cancelAll },
+        ]}
+      />
     </div>
   );
+}
+
+/** @deprecated Prefer NeedsYouSection inside the unified glance. */
+export function AgentsGlance({ sessions }: { sessions: Session[] }) {
+  return <NeedsYouSection sessions={sessions} />;
 }
 
 /** What finished or started waiting since the user last looked. */
@@ -194,12 +230,15 @@ export function useAway(): {
   return { rows, reviewId, waitingId, agent };
 }
 
-/** "While you were away": what finished or waits, with the next step for each. */
-export function AwayCard() {
+/** "While you were away" — glance section; null when nothing to report. */
+export function AwaySection() {
   const { rows, reviewId, waitingId, agent } = useAway();
   const review = reviewId ? () => openSession(reviewId) : undefined;
   const answer = waitingId ? () => openSession(waitingId) : undefined;
-  useKeys({ "Alt 1": review ?? answer, "Alt 2": review ? answer : undefined, "Alt X": markSeen });
+  useKeys(
+    rows.length > 0 ? { "Alt 1": review ?? answer, "Alt 2": review ? answer : undefined, "Alt X": markSeen } : {},
+  );
+  if (rows.length === 0) return null;
   const done = rows.filter((r) => r.dot === "done").length;
   const waits = rows.filter((r) => r.dot === "wait").length;
   const parts = [
@@ -212,7 +251,7 @@ export function AwayCard() {
     answer && { label: `Answer ${agent}`, keys: review ? "Alt 2" : "Alt 1", run: answer },
   ].filter((o): o is { label: string; keys: string; run: () => void } => !!o);
   return (
-    <div className="flex flex-col">
+    <div className="mt-3 flex flex-col">
       <CardHead title="While you were away" detail={parts.join(" \u00b7 ")} />
       <CardList
         label="Since you last looked"
@@ -229,4 +268,9 @@ export function AwayCard() {
       {options.length > 0 && <CardChips options={options} />}
     </div>
   );
+}
+
+/** @deprecated Prefer AwaySection inside the unified glance. */
+export function AwayCard() {
+  return <AwaySection />;
 }

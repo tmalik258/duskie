@@ -5,6 +5,7 @@
 // attachable on request. Rendered inside the island shell; the island owns
 // the morph, this owns the content.
 
+import { motion, useReducedMotion } from "motion/react";
 import { type KeyboardEvent, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   type AskTab,
@@ -45,6 +46,7 @@ import {
   type ProviderStatus,
   type SearchHit,
 } from "@/lib/types";
+import { staggerChild, staggerChildReduced, staggerParent } from "@/lib/ui-motion";
 import { AgentsTab } from "./agents/AgentsTab";
 import { Repos } from "./agents/Repos";
 import { Chat, useAgentName } from "./ask/Chat";
@@ -146,6 +148,7 @@ export function AskPanel() {
   const hearing = useSidekick((s) => s.hearing);
   const voiceReady = useSidekick((s) => s.settings.voice.enabled && (s.voiceStatus?.listening ?? false));
   const settings = useSidekick((s) => s.settings);
+  const reducedMotion = useReducedMotion() ?? false;
   const [text, setText] = useState(ask?.prompt ?? "");
   const alt = useAltHeld();
   const tab = useAgents((s) => s.tab);
@@ -162,12 +165,20 @@ export function AskPanel() {
   // Alt shortcuts work wherever focus is in Ask. What they act on changes
   // every render, so they read it from here.
   const altKeys = useRef<Record<string, (back?: boolean) => void>>({});
+  const newChatRef = useRef<() => void>(() => undefined);
+  const askTabRef = useRef(false);
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       // Ctrl Tab / Ctrl Shift Tab move between Ask, Agents and History.
       if (e.ctrlKey && e.key === "Tab") {
         e.preventDefault();
         altKeys.current.tab?.(e.shiftKey);
+        return;
+      }
+      // Ctrl/Cmd N on Ask: new chat without aborting a stream. Agents keeps Ctrl N.
+      if (askTabRef.current && (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "n" && !e.repeat) {
+        e.preventDefault();
+        newChatRef.current();
         return;
       }
       if (!e.altKey || e.ctrlKey || e.metaKey || e.repeat) return;
@@ -329,9 +340,9 @@ export function AskPanel() {
       }),
     [ask?.context, chatPage, calendar, coder],
   );
-  const resetChat = useCallback(() => {
+  const resetChat = useCallback((opts?: { cancel?: boolean }) => {
     if (useSidekick.getState().hearing !== null) stopListening();
-    newChat();
+    newChat(opts);
     setChatName(null);
     setText("");
     setSelected(0);
@@ -342,6 +353,13 @@ export function AskPanel() {
     nearBottom.current = true;
     requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
   }, []);
+  // Ask tab only: Ctrl+N starts a fresh chat; leave streams running unbound.
+  askTabRef.current = tab === "ask";
+  newChatRef.current = () => {
+    if (tab !== "ask") return;
+    const streamingNow = useSidekick.getState().chatId !== null;
+    resetChat({ cancel: !streamingNow });
+  };
 
   const commands = useMemo<Command[]>(() => {
     const all: Command[] = [
@@ -790,7 +808,7 @@ export function AskPanel() {
     b: () => tab === "agents" && setLayout("board"),
     tab: (back) => pickTab(nextTab(tab, coder, !!back)),
     m: () => {
-      if (choices.length < 2) return;
+      if (streaming || choices.length < 2) return;
       // Auto, then each model that can answer now.
       const ids = [null, ...choices.map((c) => c.id)];
       setAskModel(ids[(ids.indexOf(pickedModel?.id ?? null) + 1) % ids.length]);
@@ -845,7 +863,12 @@ export function AskPanel() {
       requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
       return;
     }
-    if (current.turns.length > 0 || current.chatId !== null) {
+    // Streaming: cancel only — Ctrl+N starts a new chat without aborting.
+    if (current.chatId !== null) {
+      cancelChat();
+      return;
+    }
+    if (current.turns.length > 0) {
       resetChat();
     } else {
       void api.askClose();
@@ -917,39 +940,39 @@ export function AskPanel() {
                 ["board", "Board", "Alt B"],
               ] as const
             ).map(([id, label, key]) => (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={layout === id}
-                aria-label={label}
-                title={`${label} (${key})`}
-                onClick={() => setLayout(id)}
-                className="chip relative"
-              >
-                <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3.5">
-                  {id === "one" ? (
-                    <rect
-                      x="3"
-                      y="3"
-                      width="10"
-                      height="10"
-                      rx="2"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="1.4"
-                    />
-                  ) : (
-                    <path
-                      d="M3 3h4v4H3zM9 3h4v4H9zM3 9h4v4H3zM9 9h4v4H9z"
-                      fill="currentColor"
-                      stroke="currentColor"
-                      strokeWidth="0.6"
-                      strokeLinejoin="round"
-                    />
-                  )}
-                </svg>
-                <KeyHint show={alt}>{key}</KeyHint>
-              </button>
+              <Tip key={id} label={`${label} (${key})`}>
+                <button
+                  type="button"
+                  aria-pressed={layout === id}
+                  aria-label={label}
+                  onClick={() => setLayout(id)}
+                  className="chip relative"
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3.5">
+                    {id === "one" ? (
+                      <rect
+                        x="3"
+                        y="3"
+                        width="10"
+                        height="10"
+                        rx="2"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.4"
+                      />
+                    ) : (
+                      <path
+                        d="M3 3h4v4H3zM9 3h4v4H9zM3 9h4v4H3zM9 9h4v4H9z"
+                        fill="currentColor"
+                        stroke="currentColor"
+                        strokeWidth="0.6"
+                        strokeLinejoin="round"
+                      />
+                    )}
+                  </svg>
+                  <KeyHint show={alt}>{key}</KeyHint>
+                </button>
+              </Tip>
             ))}
           </fieldset>
         )
@@ -967,7 +990,7 @@ export function AskPanel() {
       aria-hidden={tab !== "agents"}
     >
       <div data-agents-tabs="">{tab === "agents" ? tabs : null}</div>
-      <AgentsTab keys={alt} maxHeight={scrollMax} active={tab === "agents"} />
+      <AgentsTab maxHeight={scrollMax} active={tab === "agents"} />
     </div>
   ) : null;
 
@@ -1036,8 +1059,13 @@ export function AskPanel() {
           <kbd>Ctrl Tab</kbd> switch tab
         </span>
         <span>
-          <kbd>Esc</kbd> {hearing !== null ? "stop mic" : inChat || streaming ? "new chat" : "close"}
+          <kbd>Esc</kbd> {hearing !== null ? "stop mic" : streaming ? "stop" : inChat ? "new chat" : "close"}
         </span>
+        {inChat && (
+          <span>
+            <kbd>Ctrl N</kbd> new chat
+          </span>
+        )}
       </div>
     ) : !inChat && !asking && !inHistory && EARLY_SESSIONS ? (
       // Only where you are about to type, for your first few sessions.
@@ -1108,19 +1136,18 @@ export function AskPanel() {
                 <Icon name="mic" size={14} />
               </IconButton>
             )}
+            {best && <ModelPicker choices={choices} best={best} picked={pickedModel} keys={alt} disabled={streaming} />}
             {streaming ? (
               <button type="button" onClick={cancelChat} className="ak-stop chip">
                 Stop <kbd>Esc</kbd>
               </button>
             ) : (
-              <>
-                {best && <ModelPicker choices={choices} best={best} picked={pickedModel} keys={alt} />}
-                {inChat && !showChat && (
-                  <IconButton label="New chat (Esc)" keys={alt} hint="Esc" onClick={resetChat}>
-                    <Icon name="plus" size={15} />
-                  </IconButton>
-                )}
-              </>
+              inChat &&
+              !showChat && (
+                <IconButton label="New chat (Ctrl N)" keys={alt} hint="Ctrl N" onClick={() => resetChat()}>
+                  <Icon name="plus" size={15} />
+                </IconButton>
+              )
             )}
           </>
         )}
@@ -1148,7 +1175,12 @@ export function AskPanel() {
               spellCheck={false}
               className="ak-title ak-cname"
             />
-            <IconButton label="New chat (Esc)" keys={alt} hint="Esc" onClick={resetChat}>
+            <IconButton
+              label="New chat (Ctrl N)"
+              keys={alt}
+              hint="Ctrl N"
+              onClick={() => resetChat({ cancel: !streaming })}
+            >
               <Icon name="plus" size={15} />
             </IconButton>
           </div>
@@ -1192,13 +1224,20 @@ export function AskPanel() {
           <FirstRun />
         ) : (
           rows > 0 && (
-            <ul
+            <motion.ul
               key={slash ? "slash" : asking ? "typing" : "start"}
               className="ak-list ak-scroll"
               style={{ maxHeight: scrollMax }}
+              initial="hidden"
+              animate="show"
+              variants={staggerParent}
             >
               {items.map((it, i) => (
-                <li key={it.id} ref={scrollIfActive(active === i)}>
+                <motion.li
+                  key={it.id}
+                  ref={scrollIfActive(active === i)}
+                  variants={reducedMotion ? staggerChildReduced : staggerChild}
+                >
                   {it.group && <p className="ak-group">{it.group}</p>}
                   <button
                     type="button"
@@ -1225,9 +1264,9 @@ export function AskPanel() {
                       ))
                     )}
                   </button>
-                </li>
+                </motion.li>
               ))}
-            </ul>
+            </motion.ul>
           )
         )}
 

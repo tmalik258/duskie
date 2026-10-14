@@ -54,7 +54,7 @@ export function ComposioApps({
             const chip = (
               <span
                 className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] transition-colors duration-300 ${
-                  justDone === `app:${a.slug}` ? "bg-[#30d158]/25" : "bg-black/5 dark:bg-white/10"
+                  justDone === `app:${a.slug}` ? "bg-[#30d158]/25" : "bg-(--surface)"
                 }`}
               >
                 <span className="size-1.5 rounded-full bg-[#30d158]" />

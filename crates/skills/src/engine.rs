@@ -739,7 +739,7 @@ suggestion:
                 serde_json::json!({ "id": id, "app": "Chrome", "title": "Google", "body": "x", "code": code }),
             )
         };
-        let mut e = Engine::new(vec![now]);
+        let mut e = Engine::new(vec![now.clone()]);
         let p = e
             .evaluate(&ev(1, serde_json::json!("482913")), &env(), Instant::now())
             .unwrap();
@@ -749,5 +749,23 @@ suggestion:
             .evaluate(&ev(2, serde_json::Value::Null), &env(), Instant::now())
             .unwrap();
         assert_eq!(p.options[0].label, "Open Chrome");
+        let share = Event::new(
+            "notification.now",
+            "notifications",
+            serde_json::json!({
+                "id": 3,
+                "app": "NearbyShare",
+                "source": "NearbyShare",
+                "title": "Talha's S24 Ultra wants to share a link",
+                "body": "PIN: 3490",
+                "code": "3490",
+                "share": true,
+            }),
+        );
+        let p = Engine::new(vec![now])
+            .evaluate(&share, &env(), Instant::now())
+            .unwrap();
+        assert_eq!(p.options[0].label, "Accept");
+        assert_eq!(p.options[0].action, "accept_prompt");
     }
 }

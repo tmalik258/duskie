@@ -141,9 +141,9 @@ pub async fn fix(app: &AppHandle, what: &str) -> Result<String, String> {
             if crate::setup::ollama_models(&base_url).await.is_some() {
                 return Ok("Ollama is running again".into());
             }
-            crate::setup::run(app, "ollama")
+            crate::setup::ensure_ollama(&base_url)
                 .await
-                .map(|()| "Opening Ollama".into())
+                .map(|()| "Ollama is running".into())
         }
         "composio" => crate::composio::sign_in(app)
             .await

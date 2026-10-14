@@ -41,8 +41,9 @@ export interface Settings {
   islandColor: IslandColor;
   soundKit: string;
   skills?: Record<string, { enabled?: boolean | null; auto?: boolean | null }>;
+  /** Ask shortcut. A leading `-` turns it off without clearing the combo. */
   paletteHotkey: string;
-  /** Global shortcuts by action; empty turns one off. */
+  /** Global shortcuts by action. A leading `-` turns one off without clearing. */
   shortcuts: Record<string, string>;
   codeFolders: string[];
   savedProjects: string[];
@@ -314,7 +315,7 @@ export interface BrowserInfo {
   port: number;
 }
 
-export const THEMES = ["pearl", "aurora", "chrome", "peach", "mint", "lilac", "onyx"] as const;
+export const THEMES = ["atelier", "pearl", "aurora", "chrome", "peach", "mint", "lilac", "onyx"] as const;
 export type Theme = (typeof THEMES)[number];
 export interface EditorList {
   editors: { id: string; name: string; minutes: number }[];
@@ -322,7 +323,15 @@ export interface EditorList {
   current: string | null;
 }
 
-export const ISLAND_COLORS = ["solid_black", "black_glass", "graphite", "midnight", "smoke", "warm_graphite"] as const;
+export const ISLAND_COLORS = [
+  "atelier",
+  "solid_black",
+  "black_glass",
+  "graphite",
+  "midnight",
+  "smoke",
+  "warm_graphite",
+] as const;
 export type IslandColor = (typeof ISLAND_COLORS)[number];
 
 export interface Suggestion {
@@ -384,9 +393,9 @@ export const DEFAULT_SETTINGS: Settings = {
   launchAtLogin: true,
   sensors: {},
   pause: { kind: "none" },
-  theme: "pearl",
+  theme: "atelier",
   codeEditor: "auto",
-  islandColor: "solid_black",
+  islandColor: "atelier",
   soundKit: "sidekick",
   paletteHotkey: "Ctrl+Space",
   shortcuts: {
@@ -396,6 +405,7 @@ export const DEFAULT_SETTINGS: Settings = {
     dismiss: "Ctrl+Alt+Backspace",
     screen: "Ctrl+Alt+S",
     clipboard: "Ctrl+Alt+V",
+    focus: "Ctrl+Alt+F",
     pause: "Ctrl+Alt+P",
     settings: "Ctrl+Alt+Comma",
   },
@@ -436,7 +446,7 @@ export const DEFAULT_SETTINGS: Settings = {
   denySites: [],
   routines: true,
   routinesAuto: false,
-  hideInFullscreen: false,
+  hideInFullscreen: true,
   tips: true,
   alive: true,
   crashReports: false,
@@ -459,7 +469,7 @@ export const DEFAULT_SETTINGS: Settings = {
     conversation: true,
     speakSuggestions: true,
     interrupt: true,
-    voice: "f5",
+    voice: "f4",
     speed: 1,
   },
 };

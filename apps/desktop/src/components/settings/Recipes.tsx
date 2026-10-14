@@ -88,7 +88,7 @@ function TriggerFields({ trigger, onChange }: { trigger: Trigger; onChange: (t: 
                     onChange({ ...trigger, days: on ? trigger.days.filter((x) => x !== d) : [...trigger.days, d] })
                   }
                   className={`chip rounded-full px-2.5 py-1 text-[12px] capitalize ${
-                    on ? "bg-white text-black" : "bg-white/[0.08] text-white/80 hover:bg-white/[0.14]"
+                    on ? "bg-(--text) text-(--bg)" : "bg-(--surface) text-(--text)/80 hover:bg-(--hover)"
                   }`}
                 >
                   {d}

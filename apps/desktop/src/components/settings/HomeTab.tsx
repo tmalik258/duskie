@@ -238,7 +238,7 @@ function LeftElsewhere({ onOpenTab }: { onOpenTab: (tab: string) => void }) {
           <button
             type="button"
             onClick={() => onOpenTab(t)}
-            className="chip rounded-full bg-white/[0.08] px-2.5 py-1 font-medium text-white/90 hover:bg-white/[0.14]"
+            className="chip rounded-full bg-(--surface) px-2.5 py-1 font-medium text-(--text) hover:bg-(--hover)"
           >
             {TAB_NAMES[t]} ({pending[t].length})
           </button>
@@ -386,7 +386,7 @@ function TimeToday() {
               </span>
               <span className="shrink-0 text-(--muted) tabular-nums">{formatDuration(r.secs)}</span>
             </div>
-            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-black/5 dark:bg-white/8">
+            <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-(--surface)">
               <div className="h-full rounded-full bg-(--accent)" style={{ width: `${(r.secs / top) * 100}%` }} />
             </div>
           </li>
@@ -501,9 +501,9 @@ const LEVELS: [NotifyLevel | "auto", string][] = [
 ];
 const LEVEL_TONE: Record<NotifyLevel, string> = {
   now: "bg-[#ff453a]/20 text-[#ff9f97]",
-  soon: "bg-[#0a84ff]/20 text-[#8cc3ff]",
-  digest: "bg-white/10 text-(--muted)",
-  never: "bg-white/5 text-(--muted)",
+  soon: "bg-(--accent)/20 text-(--accent)",
+  digest: "bg-(--surface) text-(--muted)",
+  never: "bg-(--surface)/50 text-(--muted)",
 };
 
 /** Windows' Do Not Disturb as a switch that shows the real state. */
@@ -637,7 +637,7 @@ function UpdateRow({ version, onError }: { version: string; onError: (e: string)
   return (
     <div className="flex items-center justify-between gap-3 text-[13px]">
       <div className="min-w-0 flex-1">
-        <span className="block text-white">
+        <span className="block text-(--text)">
           {update ? `Sidekick ${update.version} is available` : `Sidekick ${version}`}
         </span>
         {progress ? (

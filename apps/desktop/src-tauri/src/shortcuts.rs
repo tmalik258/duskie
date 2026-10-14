@@ -1,6 +1,9 @@
 //! Global shortcuts: Ask, plus talk, accept, dismiss, screen, clipboard
 //! history, pause and settings. All are registered here, so changing one
 //! re-registers the lot in one place.
+//!
+//! A leading `-` keeps the binding saved but turns the shortcut off
+//! (Settings → Off). Empty means no binding yet.
 
 use chrono::Utc;
 use tauri::{AppHandle, Manager};
@@ -8,6 +11,20 @@ use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 use crate::ask;
 use crate::state::{AppState, lock};
+
+/// True when the shortcut should be registered (has keys and is not Off).
+pub fn is_enabled(keys: &str) -> bool {
+    let t = keys.trim();
+    !t.is_empty() && !t.starts_with('-')
+}
+
+/// The key combo to show or parse, ignoring a leading Off marker.
+pub fn binding(keys: &str) -> &str {
+    keys.trim()
+        .strip_prefix('-')
+        .map(str::trim)
+        .unwrap_or(keys.trim())
+}
 
 /// Registers every shortcut from settings. Returns the ones that failed
 /// (another app may own them); the rest still work.
@@ -26,11 +43,12 @@ pub fn register_all(app: &AppHandle) -> Vec<String> {
             .map(|(a, k)| (a.clone(), k.clone())),
     );
     for (action, keys) in wanted {
-        if keys.trim().is_empty() {
+        if !is_enabled(&keys) {
             continue;
         }
-        let Ok(shortcut) = keys.parse::<Shortcut>() else {
-            failed.push(format!("{keys} ({action}) is not a valid shortcut"));
+        let combo = binding(&keys);
+        let Ok(shortcut) = combo.parse::<Shortcut>() else {
+            failed.push(format!("{combo} ({action}) is not a valid shortcut"));
             continue;
         };
         let result = gs.on_shortcut(shortcut, move |app, _shortcut, event| {
@@ -47,7 +65,7 @@ pub fn register_all(app: &AppHandle) -> Vec<String> {
             }
         });
         if result.is_err() {
-            failed.push(format!("{keys} is used by another app"));
+            failed.push(format!("{combo} is used by another app"));
         }
     }
     for f in &failed {
@@ -56,9 +74,11 @@ pub fn register_all(app: &AppHandle) -> Vec<String> {
     failed
 }
 
-/// Checks a shortcut parses, for the settings recorder.
+/// Checks a shortcut parses, for the settings recorder. Empty and Off
+/// (leading `-`) are allowed; the combo after `-` must still parse.
 pub fn valid(keys: &str) -> bool {
-    keys.trim().is_empty() || keys.parse::<Shortcut>().is_ok()
+    let combo = binding(keys);
+    combo.is_empty() || combo.parse::<Shortcut>().is_ok()
 }
 
 fn run(app: &AppHandle, action: &str) {
@@ -129,5 +149,21 @@ fn run(app: &AppHandle, action: &str) {
             let _ = crate::commands::set_pause(app, pause);
         }
         _ => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn off_prefix_keeps_binding() {
+        assert!(!is_enabled(""));
+        assert!(!is_enabled("-Ctrl+Space"));
+        assert!(is_enabled("Ctrl+Space"));
+        assert_eq!(binding("-Ctrl+Space"), "Ctrl+Space");
+        assert_eq!(binding("Ctrl+Space"), "Ctrl+Space");
+        assert!(valid("-Ctrl+Space"));
+        assert!(valid(""));
     }
 }

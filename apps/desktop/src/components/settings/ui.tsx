@@ -3,6 +3,7 @@
 // Building blocks shared by the settings tabs. Sections hide themselves when
 // the settings search does not match their title, hint or keywords.
 
+import { motion, useReducedMotion } from "motion/react";
 import {
   createContext,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -15,7 +16,9 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { setOverlayHit } from "@/lib/store";
+import { shortcutBinding, shortcutEnabled } from "@/lib/shortcuts";
+import { setOverlayHit, useSidekick } from "@/lib/store";
+import { EASE_OUT_STRONG } from "@/lib/ui-motion";
 import { Tip } from "../Tip";
 
 /** The settings search text; empty shows everything. */
@@ -47,6 +50,7 @@ export function Section({
 }) {
   const query = useContext(SettingsQuery);
   const [open, setOpen] = useState(false);
+  const reducedMotion = useReducedMotion() ?? false;
   if (query && !matches(query, title, hint, keywords)) return null;
   if (collapsible && !open && !query) {
     return (
@@ -54,10 +58,10 @@ export function Section({
         type="button"
         onClick={() => setOpen(true)}
         aria-expanded={false}
-        className="chip flex items-center gap-3 rounded-2xl bg-(--surface) px-4 py-3 text-left shadow-[0_0_0_0.5px_var(--border)] hover:bg-white/[0.06]"
+        className="chip flex items-center gap-3 rounded-2xl bg-(--surface) px-4 py-3 text-left shadow-[0_0_0_0.5px_var(--border)] hover:bg-(--hover)"
       >
         <span className="min-w-0 flex-1">
-          <span className="block text-[14px] font-medium text-white">{title}</span>
+          <span className="block text-[14px] font-medium text-(--text)">{title}</span>
           {summary && <span className="block truncate text-[12px] text-(--muted)">{summary}</span>}
         </span>
         <svg aria-hidden="true" viewBox="0 0 12 12" className="size-3 shrink-0 -rotate-90 text-(--muted)">
@@ -70,14 +74,19 @@ export function Section({
     );
   }
   return (
-    <section className="flex flex-col gap-2">
+    <motion.section
+      className="flex flex-col gap-2"
+      initial={reducedMotion ? { opacity: 0 } : { opacity: 0, transform: "translateY(8px)" }}
+      animate={reducedMotion ? { opacity: 1 } : { opacity: 1, transform: "translateY(0px)" }}
+      transition={{ duration: 0.2, ease: EASE_OUT_STRONG }}
+    >
       <div className="flex items-center px-4">
-        <h2 className="flex-1 text-[13px] font-semibold tracking-[-0.005em] text-[rgb(235_235_245/0.7)]">{title}</h2>
+        <h2 className="flex-1 text-[13px] font-semibold tracking-[-0.005em] text-(--muted)">{title}</h2>
         {collapsible && !query && (
           <button
             type="button"
             onClick={() => setOpen(false)}
-            className="chip text-[12px] text-(--muted) hover:text-white"
+            className="chip text-[12px] text-(--muted) hover:text-(--text)"
           >
             Close
           </button>
@@ -87,7 +96,7 @@ export function Section({
         {children}
       </div>
       {hint && <p className="px-4 text-[12px] text-(--muted)">{hint}</p>}
-    </section>
+    </motion.section>
   );
 }
 
@@ -98,6 +107,7 @@ export function Button({
   small,
   active,
   primary,
+  "aria-label": ariaLabel,
 }: {
   children: ReactNode;
   onClick: () => void;
@@ -105,15 +115,17 @@ export function Button({
   small?: boolean;
   active?: boolean;
   primary?: boolean;
+  "aria-label"?: string;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`chip shrink-0 rounded-full font-medium transition-[background-color,transform] duration-150 active:scale-[0.96] disabled:opacity-40 disabled:active:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff] ${
-        primary ? "bg-[#f5f5f7] text-black hover:bg-white" : "bg-white/[0.09] text-white hover:bg-white/[0.15]"
-      } ${small ? "px-2.5 py-[5px] text-[12px]" : "px-3 py-[7px] text-[13px]"} ${active ? "shadow-[inset_0_0_0_1.5px_#0a84ff]" : ""}`}
+      aria-label={ariaLabel}
+      className={`chip shrink-0 rounded-full font-medium transition-[background-color,transform] duration-150 active:scale-[0.96] disabled:opacity-40 disabled:active:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--accent) ${
+        primary ? "bg-(--text) text-(--bg) hover:opacity-90" : "bg-(--surface) text-(--text) hover:bg-(--hover)"
+      } ${small ? "px-2.5 py-[5px] text-[12px]" : "px-3 py-[7px] text-[13px]"} ${active ? "shadow-[inset_0_0_0_1.5px_var(--accent)]" : ""}`}
     >
       {children}
     </button>
@@ -136,7 +148,7 @@ export function Segmented<T extends string>({
   disabled?: boolean;
 }) {
   return (
-    <fieldset aria-label={label} className="flex shrink-0 gap-0.5 rounded-[10px] bg-white/[0.08] p-[3px]">
+    <fieldset aria-label={label} className="flex shrink-0 gap-0.5 rounded-[10px] bg-(--surface) p-[3px]">
       {options.map(([v, text]) => (
         <button
           key={v}
@@ -144,8 +156,8 @@ export function Segmented<T extends string>({
           aria-pressed={value === v}
           disabled={disabled}
           onClick={() => onChange(v)}
-          className={`chip rounded-[8px] px-2.5 py-[5px] text-[12.5px] leading-none transition-colors duration-150 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#0a84ff] ${
-            value === v ? "bg-[#f5f5f7] font-semibold text-black" : "text-[rgb(235_235_245/0.62)] hover:text-white"
+          className={`chip rounded-[8px] px-2.5 py-[5px] text-[12.5px] leading-none transition-colors duration-150 disabled:opacity-40 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-(--accent) ${
+            value === v ? "bg-(--text) font-semibold text-(--bg)" : "text-(--muted) hover:text-(--text)"
           }`}
         >
           {text}
@@ -301,7 +313,7 @@ export type SelectOption =
       value: string;
       label: string;
       sub?: string;
-      /** Full text for the native tooltip (e.g. a complete path). */
+      /** Full text for the Tip (e.g. a complete path). */
       title?: string;
       icon?: string;
       /** Picture instead of the letter icon (e.g. Claude Code's Clawd). */
@@ -371,6 +383,7 @@ export function Select({
     return [{ value, label: labelFor }, ...rows];
   })();
   const current = currentLabel ?? list.find((r) => r.value === value)?.label ?? (value || "Default");
+  const islandColor = useSidekick((s) => s.settings.islandColor);
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
@@ -403,7 +416,8 @@ export function Select({
     const spaceBelow = window.innerHeight - r.bottom;
     const spaceAbove = r.top;
     const above = spaceBelow < want && spaceAbove >= spaceBelow;
-    const width = menuWidth ?? Math.min(296, Math.max(rich ? 220 : r.width, r.width));
+    // Don't shrink to a short chip ("Male 3") when labels are longer.
+    const width = menuWidth ?? Math.min(296, Math.max(rich ? 220 : 200, r.width));
     const left = Math.min(Math.max(8, r.left), window.innerWidth - width - 8);
     const top = above ? r.top - 4 : r.bottom + 4;
     setUp(above);
@@ -552,61 +566,69 @@ export function Select({
     <>
       {shown.map((r, i) => {
         const selected = r.value === value;
+        const option = (
+          <div
+            role="option"
+            tabIndex={-1}
+            aria-selected={selected}
+            onMouseEnter={() => setActive(i)}
+            onClick={() => pick(r.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") pick(r.value);
+            }}
+            className={`grid w-full cursor-default items-center gap-2.5 rounded-[9px] px-[9px] py-1.5 text-left text-[13px] transition-colors duration-100 ${
+              r.icon || r.image ? "grid-cols-[24px_1fr_auto]" : "grid-cols-[1fr_auto]"
+            } ${i === active ? "bg-(--hover) text-(--text)" : "text-(--text)/85 hover:bg-(--surface)"}`}
+          >
+            {r.image ? (
+              <span className="grid size-6 place-items-center overflow-hidden rounded-[7px]" aria-hidden="true">
+                <img src={r.image} alt="" className="size-5 object-contain" draggable={false} />
+              </span>
+            ) : (
+              r.icon && (
+                <span
+                  className="grid size-6 place-items-center rounded-[7px] text-[10.5px] font-bold text-white shadow-[inset_0_0_0_0.5px_rgb(255_255_255/0.12)]"
+                  style={{ background: r.color ?? "#2b2b30" }}
+                  aria-hidden="true"
+                >
+                  {r.icon}
+                </span>
+              )
+            )}
+            <span className="grid min-w-0">
+              <span className={`truncate ${r.sub ? "font-medium" : ""}`}>{r.label}</span>
+              {r.sub && <span className="truncate text-[11.5px] text-(--muted)">{r.sub}</span>}
+            </span>
+            <svg
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+              className={`size-3.5 text-(--accent) transition-opacity duration-100 ${selected ? "opacity-100" : "opacity-0"}`}
+            >
+              <path
+                d="M3.5 8.5 6.5 11.5 12.5 4.5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </div>
+        );
         return (
           <div key={r.value || "__default"}>
-            {r.sepBefore && !q && <div className="mx-[9px] my-[5px] h-px scale-y-50 bg-white/12" />}
-            <div
-              role="option"
-              tabIndex={-1}
-              aria-selected={selected}
-              title={r.title}
-              onMouseEnter={() => setActive(i)}
-              onClick={() => pick(r.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") pick(r.value);
-              }}
-              className={`grid w-full cursor-default items-center gap-2.5 rounded-[9px] px-[9px] py-1.5 text-left text-[13px] transition-colors duration-100 ${
-                r.icon || r.image ? "grid-cols-[24px_1fr_auto]" : "grid-cols-[1fr_auto]"
-              } ${i === active ? "bg-white/[0.12] text-white" : "text-white/85 hover:bg-white/[0.06]"}`}
-            >
-              {r.image ? (
-                <span className="grid size-6 place-items-center overflow-hidden rounded-[7px]" aria-hidden="true">
-                  <img src={r.image} alt="" className="size-5 object-contain" draggable={false} />
-                </span>
-              ) : (
-                r.icon && (
-                  <span
-                    className="grid size-6 place-items-center rounded-[7px] text-[10.5px] font-bold text-white shadow-[inset_0_0_0_0.5px_rgb(255_255_255/0.12)]"
-                    style={{ background: r.color ?? "#2b2b30" }}
-                    aria-hidden="true"
-                  >
-                    {r.icon}
-                  </span>
-                )
-              )}
-              <span className="grid min-w-0">
-                <span className={`truncate ${r.sub ? "font-medium" : ""}`}>{r.label}</span>
-                {r.sub && <span className="truncate text-[11.5px] text-white/62">{r.sub}</span>}
-              </span>
-              <svg
-                viewBox="0 0 16 16"
-                aria-hidden="true"
-                className={`size-3.5 transition-opacity duration-100 ${selected ? "opacity-100" : "opacity-0"}`}
-              >
-                <path
-                  d="M3.5 8.5 6.5 11.5 12.5 4.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
+            {r.sepBefore && !q && <div className="mx-[9px] my-[5px] h-px scale-y-50 bg-(--border)" />}
+            {r.title ? (
+              <Tip label={r.title} className="block w-full">
+                {option}
+              </Tip>
+            ) : (
+              option
+            )}
           </div>
         );
       })}
-      {shown.length === 0 && <div className="px-[9px] py-2.5 text-[12.5px] text-white/45">No matches</div>}
+      {shown.length === 0 && <div className="px-[9px] py-2.5 text-[12.5px] text-(--muted)">No matches</div>}
     </>
   );
 
@@ -616,6 +638,7 @@ export function Select({
       role="listbox"
       aria-label={label}
       ref={menu}
+      data-color={islandColor}
       onKeyDown={onMenuKey}
       className={`menu z-30 flex max-h-72 flex-col rounded-[15px] p-1.5 ${
         overlay
@@ -645,11 +668,11 @@ export function Select({
           placeholder={`Search ${label.toLowerCase()}…`}
           spellCheck={false}
           aria-label={`Search ${label}`}
-          className="mb-1 w-full shrink-0 rounded-[9px] bg-white/[0.08] px-2.5 py-1.5 text-[12.5px] text-white outline-none placeholder:text-white/40 focus:bg-white/[0.11]"
+          className="mb-1 w-full shrink-0 rounded-[9px] bg-(--surface) px-2.5 py-1.5 text-[12.5px] text-(--text) outline-none placeholder:text-(--muted) focus:bg-(--hover)"
         />
       )}
       {group && (
-        <div className="shrink-0 px-[9px] pt-1 pb-[3px] text-[10.5px] tracking-[0.06em] text-white/45 uppercase">
+        <div className="shrink-0 px-[9px] pt-1 pb-[3px] text-[10.5px] tracking-[0.06em] text-(--muted) uppercase">
           {group}
         </div>
       )}
@@ -667,10 +690,10 @@ export function Select({
         aria-controls={listId}
         onClick={() => setOpen((o) => !o)}
         onKeyDown={onKey}
-        className={`chip flex w-full items-center gap-1.5 text-left whitespace-nowrap transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#0a84ff] ${
+        className={`chip flex w-full items-center gap-1.5 text-left whitespace-nowrap transition-colors duration-150 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-(--accent) ${
           variant === "plain"
-            ? `rounded-md px-1 py-0.5 text-[inherit] ${open ? "bg-white/[0.1]" : "hover:bg-white/[0.06]"}`
-            : `rounded-[10px] px-2.5 py-1.5 text-[13px] ${open ? "bg-white/[0.14]" : "bg-white/[0.08] hover:bg-white/[0.11]"}`
+            ? `rounded-md px-1 py-0.5 text-[inherit] ${open ? "bg-(--hover)" : "hover:bg-(--surface)"}`
+            : `rounded-[10px] px-2.5 py-1.5 text-[13px] ${open ? "bg-(--hover)" : "bg-(--surface) hover:bg-(--hover)"}`
         }`}
       >
         <span className="min-w-0 flex-1 truncate">{current}</span>
@@ -703,11 +726,7 @@ export function StatusDot({ state }: { state: "ok" | "off" | "checking" }) {
         role="img"
         aria-label={label}
         className={`size-2 shrink-0 rounded-full ${
-          state === "ok"
-            ? "bg-[#30d158]"
-            : state === "off"
-              ? "bg-black/20 dark:bg-white/25"
-              : "animate-pulse bg-amber-400"
+          state === "ok" ? "bg-[#30d158]" : state === "off" ? "bg-(--muted)/40" : "animate-pulse bg-amber-400"
         }`}
       />
     </Tip>
@@ -765,13 +784,13 @@ export function ChipList({
       <div className="flex flex-wrap gap-1.5">
         {items.map((i) => (
           <Tip key={i} label={i}>
-            <span className="flex items-center gap-1 rounded-full bg-black/5 py-0.5 pr-1 pl-2.5 text-[12px] dark:bg-white/10">
+            <span className="flex items-center gap-1 rounded-full bg-(--surface) py-0.5 pr-1 pl-2.5 text-[12px]">
               {format(i)}
               <button
                 type="button"
                 aria-label={`Remove ${format(i)}`}
                 onClick={() => onChange(items.filter((x) => x !== i))}
-                className="grid size-4 place-items-center rounded-full text-(--muted) hover:bg-black/10 hover:text-(--text) dark:hover:bg-white/15"
+                className="grid size-4 place-items-center rounded-full text-(--muted) hover:bg-(--hover) hover:text-(--text)"
               >
                 ×
               </button>
@@ -879,7 +898,8 @@ export function FolderPicker({
   );
 }
 
-/** Records a key combination: click, press the keys, done. */
+/** Records a key combination: click, press the keys, done. Off keeps the
+ * combo (prefixed with `-`) so turning it back on restores the same keys. */
 export function ShortcutRecorder({
   value,
   onChange,
@@ -890,6 +910,8 @@ export function ShortcutRecorder({
   label: string;
 }) {
   const [recording, setRecording] = useState(false);
+  const binding = shortcutBinding(value);
+  const on = shortcutEnabled(value);
   useEffect(() => {
     if (!recording) return;
     const onKey = (e: KeyboardEvent) => {
@@ -912,18 +934,22 @@ export function ShortcutRecorder({
         aria-label={`${label} shortcut`}
         onClick={() => setRecording(true)}
         className={`min-w-32 rounded-md border px-2 py-1 text-center font-mono text-[12px] ${
-          recording ? "border-[#0a84ff] text-[#0a84ff]" : "border-(--border)"
+          recording
+            ? "border-(--accent) text-(--accent)"
+            : on
+              ? "border-(--border)"
+              : "border-(--border) text-(--muted)"
         }`}
       >
-        {recording ? "Press keys..." : value || "Off"}
+        {recording ? "Press keys..." : binding || "Off"}
       </button>
-      {value && !recording && (
-        <Button small onClick={() => onChange("")}>
-          Off
+      {binding && !recording && (
+        <Button small onClick={() => onChange(on ? `-${binding}` : binding)}>
+          {on ? "Off" : "On"}
         </Button>
       )}
-      {reservedBy(value) && !recording && (
-        <span className="text-[11px] text-[#ff9f0a]">Also used by {reservedBy(value)}</span>
+      {reservedBy(binding) && !recording && (
+        <span className="text-[11px] text-[#ff9f0a]">Also used by {reservedBy(binding)}</span>
       )}
     </div>
   );

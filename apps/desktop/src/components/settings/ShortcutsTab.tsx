@@ -24,7 +24,8 @@ const ISLAND_KEYS: [string, string][] = [
   ["Ignore a suggestion", "Alt 0"],
   ["Switch tab", "Ctrl Tab"],
   ["Previous tab", "Ctrl Shift Tab"],
-  ["New agent session", "Ctrl N"],
+  ["New chat (Ask) / New agent session", "Ctrl N"],
+  ["Cycle agent mode", "Ctrl ."],
 ];
 
 export function ShortcutsTab({ onError }: { onError: (e: string) => void }) {
@@ -64,7 +65,7 @@ export function ShortcutsTab({ onError }: { onError: (e: string) => void }) {
             <span>{label}</span>
             <span className="flex gap-1">
               {keys.split(" ").map((k) => (
-                <kbd key={k} className="rounded-md bg-white/10 px-1.5 py-0.5 font-sans text-[11.5px] text-white">
+                <kbd key={k} className="rounded-md bg-(--surface) px-1.5 py-0.5 font-sans text-[11.5px] text-(--text)">
                   {k}
                 </kbd>
               ))}
