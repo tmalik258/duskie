@@ -55,7 +55,7 @@ const OFF: &[&str] = &[
 ];
 /// Words that may sit around a command without changing it.
 const FILLER: &[&str] = &[
-    "please", "the", "my", "can", "you", "could", "now", "hey", "sidekick", "for", "me", "and",
+    "please", "the", "my", "can", "you", "could", "now", "hey", "duskie", "for", "me", "and",
     "mode",
 ];
 const QUESTION: &[&str] = &[

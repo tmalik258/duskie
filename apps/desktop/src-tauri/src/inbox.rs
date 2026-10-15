@@ -588,6 +588,7 @@ pub fn start(app: &AppHandle) {
 /// Screenshot tools only exist to capture; their toasts ("copied to clipboard")
 /// are noise, and focusing them is not "the app you were in".
 const IGNORE_NOTIFY: &[&str] = &[
+    "duskie",
     "sidekick",
     "screensketch",
     "snippingtool",
