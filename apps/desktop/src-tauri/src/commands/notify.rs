@@ -29,7 +29,7 @@ pub async fn dnd_get() -> Option<bool> {
 }
 
 /// Switches Windows' Do Not Disturb, quietly: pop-ups stop while every
-/// notification still reaches Sidekick.
+/// notification still reaches Duskie.
 #[tauri::command]
 pub async fn dnd_set(on: bool) -> CmdResult<String> {
     tauri::async_runtime::spawn_blocking(move || sidekick_actions::pc::set_dnd(on))

@@ -1,6 +1,6 @@
 "use client";
 
-// Memory: who you are, what Sidekick remembers, and what it has learned
+// Memory: who you are, what Duskie remembers, and what it has learned
 // from your choices. Everything here stays on this PC and can be forgotten.
 
 import { useState } from "react";
@@ -108,7 +108,7 @@ function LearnedList({ onError }: { onError: (e: string) => void }) {
   return (
     <div className="flex flex-col gap-2.5 text-[13px]">
       {items.length === 0 ? (
-        <p className="text-(--muted)">Nothing yet. As you pick options, Sidekick learns what you usually do.</p>
+        <p className="text-(--muted)">Nothing yet. As you pick options, Duskie learns what you usually do.</p>
       ) : (
         items.map((l) => (
           <div key={`${l.kind}:${l.key}:${l.label}`} className="flex items-center gap-3">

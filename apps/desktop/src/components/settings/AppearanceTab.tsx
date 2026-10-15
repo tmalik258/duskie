@@ -79,8 +79,8 @@ export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
           <TextField
             label="Assistant name"
             value={settings.assistantName}
-            placeholder="Sidekick"
-            onCommit={(assistantName) => save({ assistantName: assistantName || "Sidekick" })}
+            placeholder="Duskie"
+            onCommit={(assistantName) => save({ assistantName: assistantName || "Duskie" })}
           />
         </Field>
       </Section>
@@ -133,7 +133,7 @@ export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
         </Field>
         <Toggle
           label="Alive mode"
-          hint="While nothing is happening, Sidekick glances around, blinks and smiles now and then. No sounds."
+          hint="While nothing is happening, Duskie glances around, blinks and smiles now and then. No sounds."
           checked={settings.alive}
           onChange={(alive) => save({ alive })}
         />
@@ -156,7 +156,7 @@ export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
 
 /** What saying the name does, and a warning for names that wake by mistake. */
 function nameHint(name: string): string {
-  const said = `Say "Hey ${name || "Sidekick"}" to talk. "Hey Sidekick" keeps working too.`;
+  const said = `Say "Hey ${name || "Duskie"}" to talk. "Hey Duskie" keeps working too.`;
   const vowels = (name.toLowerCase().match(/[aeiouy]+/g) ?? []).length;
   return name.length < 4 || vowels < 2
     ? `${said} Short names wake by mistake more often; two syllables or more work best.`

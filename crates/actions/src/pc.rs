@@ -365,7 +365,7 @@ pub fn read_state() -> PcState {
     state
 }
 
-/// Forgets the last reading (Sidekick just changed something).
+/// Forgets the last reading (Duskie just changed something).
 fn state_changed() {
     if let Ok(mut cache) = STATE_CACHE.lock() {
         *cache = None;

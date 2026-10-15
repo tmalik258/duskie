@@ -374,7 +374,7 @@ pub fn tool(app: &AppHandle, args: &Value) -> String {
     out.unwrap_or_else(|e| format!("Error: {e}"))
 }
 
-/// Things the user asked Sidekick to remember.
+/// Things the user asked Duskie to remember.
 pub fn remember(app: &AppHandle, fact: &str, forget: bool) -> Result<String, String> {
     let fact = fact.trim();
     if fact.is_empty() {

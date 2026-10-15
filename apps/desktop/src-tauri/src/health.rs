@@ -46,7 +46,7 @@ impl Check {
             ),
             Check::Hooks => (
                 "Claude Code hooks were removed",
-                "Sidekick no longer hears when Claude Code finishes or asks for permission.",
+                "Duskie no longer hears when Claude Code finishes or asks for permission.",
             ),
         }
     }

@@ -80,7 +80,7 @@ impl Sensor for PortsSensor {
 
     fn spawn(self: Box<Self>, bus: EventBus, gate: SensorGate) -> JoinHandle<()> {
         tokio::spawn(async move {
-            // Servers already running when Sidekick starts are not news.
+            // Servers already running when Duskie starts are not news.
             let mut known = tokio::task::spawn_blocking(snapshot)
                 .await
                 .unwrap_or_default();

@@ -21,8 +21,8 @@ async function details(page) {
 try {
   for (const query of ["orphan", "orphan&activity=download"]) {
     await preview(query, async (page) => {
-      await page.getByRole("img", { name: "Sidekick is idle", exact: true }).waitFor();
-      assert.equal(await page.getByRole("img", { name: "Sidekick is working", exact: true }).count(), 0);
+      await page.getByRole("img", { name: "Duskie is idle", exact: true }).waitFor();
+      assert.equal(await page.getByRole("img", { name: "Duskie is working", exact: true }).count(), 0);
     });
   }
   await preview("activity=action", async (page) => {

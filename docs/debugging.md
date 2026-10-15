@@ -23,7 +23,7 @@ Set-ItemProperty $reg -Name DumpCount -Value 5
 
 Or run [`scripts/enable-local-dumps.ps1`](../scripts/enable-local-dumps.ps1) as Administrator.
 
-Reproduce until Sidekick exits. Open the newest `.dmp` under `%USERPROFILE%\SidekickDumps`
+Reproduce until Duskie exits. Open the newest `.dmp` under `%USERPROFILE%\SidekickDumps`
 in Visual Studio or WinDbg and note the faulting stack (`tao` / `tauri_runtime` /
 WebView2 / `ntdll!RtlpHeap*`). Do not commit dump files.
 
@@ -42,7 +42,7 @@ on for normal development.
 
 ## UI thread holds
 
-Sidekick logs `UI thread held N ms by <name>` when the main thread is busy long
+Duskie logs `UI thread held N ms by <name>` when the main thread is busy long
 enough to hitch:
 
 - **by a command name** — a sync Tauri invoke; move that work off the UI thread.

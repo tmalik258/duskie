@@ -1,4 +1,4 @@
-//! The browser bridge. The Sidekick extension reports page
+//! The browser bridge. The Duskie extension reports page
 //! events (a long article, an Upwork job, many tabs) and picks
 //! up commands (close duplicate tabs, save session) over a localhost-only
 //! endpoint.
@@ -110,7 +110,7 @@ impl BrowserBridge {
                 _ => Ok(v),
             },
             _ => Err(
-                "the browser did not answer. Is the Sidekick extension installed and the browser open?"
+                "the browser did not answer. Is the Duskie extension installed and the browser open?"
                     .into(),
             ),
         }

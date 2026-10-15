@@ -1,5 +1,5 @@
 //! Coding agents: Claude Code and OpenAI's Codex CLI. Either one (or both)
-//! can finish what the local model cannot, get Sidekick's tools, and tell
+//! can finish what the local model cannot, get Duskie's tools, and tell
 //! the island when a turn is done. Settings > AI picks which one gets the
 //! handoff; "auto" prefers whichever of Claude Code / Codex appears higher
 //! in the AI provider list and is installed.
@@ -22,7 +22,7 @@ pub enum Agent {
     Copilot,
     /// Cursor's agent CLI (`cursor-agent`).
     Cursor,
-    /// A coding model on this PC through Ollama, run by Sidekick itself.
+    /// A coding model on this PC through Ollama, run by Duskie itself.
     Local,
 }
 
@@ -172,7 +172,7 @@ impl Agent {
             Agent::Codex => "npm install -g @openai/codex",
             Agent::Copilot => "npm install -g @github/copilot",
             Agent::Cursor => {
-                "Install the agent CLI from cursor.com/cli (Sidekick needs cursor-agent, not only the Cursor app)"
+                "Install the agent CLI from cursor.com/cli (Duskie needs cursor-agent, not only the Cursor app)"
             }
             Agent::Local => "Install Ollama from ollama.com",
         }
@@ -280,7 +280,7 @@ fn usable(claude: bool, codex: bool) -> bool {
 }
 
 pub const HANDOFF_PROMPT: &str =
-    "Read conversation.md in this folder. It is a conversation from Sidekick; continue it.";
+    "Read conversation.md in this folder. It is a conversation from Duskie; continue it.";
 
 /// Whether Codex already has a Composio server in its own settings.
 fn codex_has_composio() -> bool {
@@ -394,7 +394,7 @@ pub async fn hand_off(
         Agent::Copilot => args.push("-i".into()),
         Agent::Cursor => {}
         // Never picked for handoffs: it cannot finish what the local model could not.
-        Agent::Local => return Err("The local agent runs inside Sidekick.".into()),
+        Agent::Local => return Err("The local agent runs inside Duskie.".into()),
     }
     args.push(HANDOFF_PROMPT.into());
     launch(&dir, &exe, &args, &env)?;

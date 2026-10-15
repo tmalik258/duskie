@@ -254,7 +254,7 @@ export const api = {
       speak?: boolean;
       /** Asked by voice: answer in short spoken sentences. */
       voice?: boolean;
-      /** Provider picked in Ask mode; null lets Sidekick choose. */
+      /** Provider picked in Ask mode; null lets Duskie choose. */
       prefer?: string | null;
       /** Started early at a pause in speech: hidden until aiRelease. */
       hold?: boolean;

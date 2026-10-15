@@ -1,4 +1,4 @@
-//! Captures only output from setup commands Sidekick generated. The terminal
+//! Captures only output from setup commands Duskie generated. The terminal
 //! remains visible; a launched terminal is never reported as an installation.
 use crate::activity::{self, Phase};
 use crate::state::{AppState, lock};

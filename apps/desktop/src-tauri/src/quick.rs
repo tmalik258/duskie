@@ -245,7 +245,7 @@ mod tests {
     fn plain_commands_run_without_a_model() {
         assert_eq!(w("turn on hotspot"), Some("hotspot_on"));
         assert_eq!(w("turn on horsepot"), Some("hotspot_on"));
-        assert_eq!(w("Hey Sidekick, hotspot off please"), Some("hotspot_off"));
+        assert_eq!(w("Hey Duskie, hotspot off please"), Some("hotspot_off"));
         assert_eq!(w("wifi off"), Some("wifi_off"));
         assert_eq!(w("turn off the bluetooth"), Some("bluetooth_off"));
         assert_eq!(w("enable dark mode"), Some("dark_mode_on"));

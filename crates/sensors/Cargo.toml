@@ -1,6 +1,6 @@
 [package]
 name = "sidekick-sensors"
-description = "Sensors that turn OS signals into Sidekick events"
+description = "Sensors that turn OS signals into Duskie events"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

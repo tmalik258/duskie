@@ -218,8 +218,8 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
       tools: true,
     },
   ],
-  report_save: () => "C:\\Users\\you\\Downloads\\Sidekick report 2026-10-08 0930.txt",
-  diagnostics: () => "Sidekick 0.1.0 (browser mock)\nWindows 11 Pro 24H2\nModels in order: local, claude_code",
+  report_save: () => "C:\\Users\\you\\Downloads\\Duskie report 2026-10-08 0930.txt",
+  diagnostics: () => "Duskie 0.1.0 (browser mock)\nWindows 11 Pro 24H2\nModels in order: local, claude_code",
   crash_pending: () => (previewFlag("crash") ? "2026-10-07T09:12:00Z panicked at src/voice.rs:120:9" : null),
   crash_dismiss: () => undefined,
   settings_get: () => settings,
@@ -588,7 +588,7 @@ function mockChat(a: Record<string, unknown>) {
   const answer: string = formatted
     ? "Here is the plan for **Friday**:\n\n1. Send the invoice to **Ali** by 10:00\n2. Review the *Upwork* proposal\n3. Book the dentist\n\nCosts so far:\n\n| Item | Amount |\n| --- | --- |\n| Hosting | **$24** |\n| Domain | $12 |\n\n- Invoice is in [invoice-sept.pdf](C:\\Users\\you\\Downloads\\invoice-sept.pdf)\n- Notes are in [Projects](C:\\Users\\you\\Projects\\)\nOPTION: Draft the email to Ali"
     : /sidekick/i.test(last)
-      ? "Found it: [Sidekick's app folder](/C:/Users/you/AppData/Roaming/app.sidekick.desktop), changed today. Its settings are in [settings.json](C:\\Users\\you\\AppData\\Roaming\\app.sidekick.desktop\\settings.json).\nOPTION: Open the folder\nOPTION: Show settings.json"
+      ? "Found it: [Duskie's app folder](/C:/Users/you/AppData/Roaming/app.sidekick.desktop), changed today. Its settings are in [settings.json](C:\\Users\\you\\AppData\\Roaming\\app.sidekick.desktop\\settings.json).\nOPTION: Open the folder\nOPTION: Show settings.json"
       : `Found invoice-sept.pdf in Downloads, from Ali on Tuesday (preview, you asked "${last}").\nOPTION: Open invoice-sept.pdf\nOPTION: Show the folder\nOPTION: Find other invoices`;
   // Formatted answers arrive in bursts, like Claude Code's whole sentences.
   const words = formatted ? (answer.match(/[\s\S]{1,90}/g) ?? [answer]) : answer.split(/(?<=\s)/);
@@ -1101,7 +1101,7 @@ commands.extension_install = (a) => {
       "If the extensions page is not showing, paste its address into the address bar and press Enter (it is copied).",
       "Turn on Developer mode (top right), then click Load unpacked.",
       "Copy folder path below (or its Alt key), paste it into the folder box and press Enter, then Select Folder.",
-      "Press Allow on Sidekick's island when it asks.",
+      "Press Allow on Duskie's island when it asks.",
     ],
   };
 };
@@ -1159,8 +1159,8 @@ commands.chat_save = (a) => {
 commands.chat_delete = (a) => {
   chats.delete(a.id as string);
 };
-commands.ai_handoff = () => "C:/Users/you/AppData/Local/Sidekick/ai/handoff";
-commands.backup_export = () => "C:/Users/you/Documents/Sidekick backup.json";
+commands.ai_handoff = () => "C:/Users/you/AppData/Local/Duskie/ai/handoff";
+commands.backup_export = () => "C:/Users/you/Documents/Duskie backup.json";
 commands.backup_import = () => "Restored settings and 2 skills";
 commands.project_pick_folder = () => {
   if (previewFlag("foldercancel")) return null;
@@ -1252,11 +1252,11 @@ commands.voice_stop = () => {
 };
 // The welcome line as Rust would report it while it is spoken.
 const WELCOME_LINES = [
-  "Hey — I'm Sidekick. I live up here with you on this PC. I notice things, I help when you want, and I stay put: nothing leaves this machine, and I wait for your okay.",
+  "Hey — I'm Duskie. I live up here with you on this PC. I notice things, I help when you want, and I stay put: nothing leaves this machine, and I wait for your okay.",
   "First, how I think. If you want everything to stay on this PC, you can run a local model — only if your machine is up for it. Or use Claude Code or Codex with the plan you already have. You can use any of them, or all three, and set the order I try.",
   "Now, your world. Connect your calendar, your mail and the tools you use, and I'll start noticing what matters.",
   "A few small helpers make me sharper. Install the ones you want, and I'll wait while they finish.",
-  "Welcome aboard. Say Hey Sidekick whenever you need me. Do Not Disturb is on so Windows stays quiet and alerts show once up here. Launch on login is already on, so I'm here when you sit down.",
+  "Welcome aboard. Say Hey Duskie whenever you need me. Do Not Disturb is on so Windows stays quiet and alerts show once up here. Launch on login is already on, so I'm here when you sit down.",
 ];
 let welcome: WelcomeSpeech = {
   step: 0,

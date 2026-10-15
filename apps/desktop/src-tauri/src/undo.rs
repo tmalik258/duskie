@@ -117,7 +117,7 @@ pub fn undo(app: &AppHandle, id: i64) -> Result<String, String> {
         return Err("It was already moved or deleted".into());
     }
     if !safe_to_trash(path) {
-        return Err("Sidekick will not remove that path".into());
+        return Err("Duskie will not remove that path".into());
     }
     trash::delete(path).map_err(|e| format!("could not move it to the Recycle Bin: {e}"))?;
     lock(&state.storage)

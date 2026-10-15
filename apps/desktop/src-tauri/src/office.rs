@@ -45,7 +45,7 @@ pub async fn tool(app: &AppHandle, chat_id: &str, args: &Value) -> String {
             });
             match decide(&agent_settings(app), "excel", Risk::Outward) {
                 Gate::Refuse => {
-                    return "Error: the user keeps Sidekick out of Excel (Settings > Skills > Agent)."
+                    return "Error: the user keeps Duskie out of Excel (Settings > Skills > Agent)."
                         .into();
                 }
                 Gate::Tap => {

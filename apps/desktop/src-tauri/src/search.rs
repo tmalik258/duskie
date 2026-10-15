@@ -1,4 +1,4 @@
-//! Search over what Sidekick has seen:
+//! Search over what Duskie has seen:
 //! downloads, screenshots, clipboard text, web pages from the extension,
 //! Claude Code sessions, actions, Ask answers, and text files in folders
 //! the user opts into. Everything stays in the local SQLite FTS5 index.

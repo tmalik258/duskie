@@ -519,7 +519,7 @@ body {
 
 /* ---------- Ask ---------- */
 
-/* Scrollbars stay hidden everywhere in Sidekick; content still scrolls.
+/* Scrollbars stay hidden everywhere in Duskie; content still scrolls.
    Includes Plan mode (timeline + plan editor) and nested overflow (code, pre). */
 .ask-scroll,
 .island-scroll,
@@ -2474,7 +2474,7 @@ select.ak-mi option {
   align-items: center;
   padding: 0 4px;
 }
-/* First run: how Sidekick answers */
+/* First run: how Duskie answers */
 .ak-opt {
   display: grid;
   grid-template-columns: 30px 1fr auto;

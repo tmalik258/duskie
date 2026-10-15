@@ -1,6 +1,6 @@
 // How a tool call reads while it runs, for Ask's steps and the island pill.
 
-/** What a tool call looks like while it runs. Sidekick's own tools by name. */
+/** What a tool call looks like while it runs. Duskie's own tools by name. */
 export const LOCAL_TOOLS: Record<string, string> = {
   search: "Searching your PC...",
   web_search: "Searching the web...",

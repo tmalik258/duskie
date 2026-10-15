@@ -33,7 +33,7 @@ import { Button, ChipList, Field, FolderPicker, Section, Select, Slider, Toggle 
 const DAY_SUMMARY_SKILL = "system.day-summary";
 
 const SOUND_KITS: [string, string][] = [
-  [SYNTH_KIT, "Sidekick"],
+  [SYNTH_KIT, "Duskie"],
   ["01", "Classic"],
 ];
 
@@ -110,7 +110,7 @@ export function HomeTab({ onError, onOpenTab }: { onError: (e: string) => void; 
         title="Sound"
         hint={
           settings.soundKit === SYNTH_KIT
-            ? "Soft sounds made by Sidekick itself."
+            ? "Soft sounds made by Duskie itself."
             : "Sounds by SND (snd.dev), designed by Dentsu Inc. and Starryworks Inc."
         }
         keywords="volume mute audio cue kit voice"
@@ -148,7 +148,7 @@ export function HomeTab({ onError, onOpenTab }: { onError: (e: string) => void; 
           </div>
         </details>
       </Section>
-      <Section collapsible summary="What Sidekick did, with Undo" title="History" keywords="undo actions recent">
+      <Section collapsible summary="What Duskie did, with Undo" title="History" keywords="undo actions recent">
         <RecentActions onError={onError} />
       </Section>
       <Section collapsible summary="Export or restore your settings" title="Backup" keywords="export import restore">
@@ -169,7 +169,7 @@ export function HomeTab({ onError, onOpenTab }: { onError: (e: string) => void; 
           <CopyDiagnostics onError={onError} />
           <Toggle
             label="Offer to report crashes"
-            hint="After a crash, Sidekick shows the report and lets you send it. It holds the version, Windows version and the error, never your files or chats."
+            hint="After a crash, Duskie shows the report and lets you send it. It holds the version, Windows version and the error, never your files or chats."
             checked={settings.crashReports}
             onChange={(crashReports) => save({ crashReports })}
           />
@@ -254,7 +254,7 @@ function CodeFolders({ chosen, onChange }: { chosen: string[]; onChange: (next: 
   return (
     <>
       {chosen.length === 0 && found.length > 0 && (
-        <p className="text-[12px] text-(--muted)">None picked, so Sidekick looks in all the ones it found.</p>
+        <p className="text-[12px] text-(--muted)">None picked, so Duskie looks in all the ones it found.</p>
       )}
       <FolderPicker
         found={found}
@@ -290,7 +290,7 @@ function CloneRules({
   return (
     <Field
       label="Where clones go"
-      hint="Copy a repo link and Sidekick offers to clone it here. Learned from where you clone."
+      hint="Copy a repo link and Duskie offers to clone it here. Learned from where you clone."
       stack
     >
       <div className="flex flex-col gap-1.5">
@@ -493,7 +493,7 @@ function Backup({ onError }: { onError: (e: string) => void }) {
 }
 
 const LEVELS: [NotifyLevel | "auto", string][] = [
-  ["auto", "Sidekick decides"],
+  ["auto", "Duskie decides"],
   ["now", "Right away"],
   ["soon", "Gather for later"],
   ["digest", "Digest only"],
@@ -512,7 +512,7 @@ function DoNotDisturb({ onError }: { onError: (e: string) => void }) {
   return (
     <Toggle
       label="Do Not Disturb"
-      hint={dnd.busy ? "Switching..." : "Stops Windows pop-ups. Notifications still reach Sidekick."}
+      hint={dnd.busy ? "Switching..." : "Stops Windows pop-ups. Notifications still reach Duskie."}
       checked={dnd.on}
       onChange={dnd.set}
     />
@@ -638,7 +638,7 @@ function UpdateRow({ version, onError }: { version: string; onError: (e: string)
     <div className="flex items-center justify-between gap-3 text-[13px]">
       <div className="min-w-0 flex-1">
         <span className="block text-(--text)">
-          {update ? `Sidekick ${update.version} is available` : `Sidekick ${version}`}
+          {update ? `Duskie ${update.version} is available` : `Duskie ${version}`}
         </span>
         {progress ? (
           <div className="mt-2">
@@ -682,7 +682,7 @@ function CopyDiagnostics({ onError }: { onError: (e: string) => void }) {
       .then(async (path) => {
         setSaved("Saved to Downloads. Read it, then drag it into the issue.");
         await api.revealPath(path);
-        const body = "What happened:\n\nWhat I expected:\n\n(Drag the Sidekick report file from Downloads here.)\n";
+        const body = "What happened:\n\nWhat I expected:\n\n(Drag the Duskie report file from Downloads here.)\n";
         await api.aiOpenLink(`${ISSUES}?title=${encodeURIComponent("Bug report")}&body=${encodeURIComponent(body)}`);
       })
       .catch((e: unknown) => onError(String(e)));

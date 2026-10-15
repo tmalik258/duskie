@@ -105,7 +105,7 @@ export interface VoiceSettings {
   interrupt: boolean;
   voice: string;
   speed: number;
-  /** Words voice gets wrong: "horsepot = hotspot, sidekik = Sidekick". */
+  /** Words voice gets wrong: "horsepot = hotspot, sidekik = Duskie". */
   fixes?: string;
   /** Which voice model the voice was picked for (3 = Supertonic 3). */
   model?: number;
@@ -194,7 +194,7 @@ export const PROVIDER_LABELS: Record<string, string> = {
   semif: "SemIf",
 };
 
-/** Where Sidekick listens for Claude Code hooks (ClaudeCodeSensor::DEFAULT_PORT). */
+/** Where Duskie listens for Claude Code hooks (ClaudeCodeSensor::DEFAULT_PORT). */
 
 export interface ProviderStatus {
   id: string;
@@ -348,7 +348,7 @@ export interface Suggestion {
   why?: string;
 }
 
-/** A newer Sidekick release than the one running. */
+/** A newer Duskie release than the one running. */
 export interface UpdateInfo {
   version: string;
   current: string;
@@ -458,7 +458,7 @@ export const DEFAULT_SETTINGS: Settings = {
   projects: "",
   answerStyle: "",
   codes: null,
-  assistantName: "Sidekick",
+  assistantName: "Duskie",
   learning: true,
   agent: { ask: "outward", places: {} },
   voice: {
@@ -489,7 +489,7 @@ export const SENSOR_IDS = [
   {
     id: "browser",
     label: "Browser",
-    hint: "Hears the Sidekick extension: long reads, Upwork jobs, too many tabs.",
+    hint: "Hears the Duskie extension: long reads, Upwork jobs, too many tabs.",
   },
   { id: "system", label: "Disk and memory", hint: "Warns when a drive is almost full or memory stays high." },
   {
@@ -605,7 +605,7 @@ export interface ComposioSettings {
 export interface ComposioApp {
   slug: string;
   name: string;
-  /** What Sidekick uses it for; empty for other apps in the account. */
+  /** What Duskie uses it for; empty for other apps in the account. */
   why: string;
   connected: boolean;
 }
@@ -760,7 +760,7 @@ export interface AgentInfo {
   id: string;
   name: string;
   installed: boolean;
-  /** null when Sidekick cannot tell. */
+  /** null when Duskie cannot tell. */
   signedIn: boolean | null;
   /** Out of plan usage for now. */
   limited: boolean;
@@ -808,13 +808,13 @@ export type NotifyLevel = "now" | "soon" | "digest" | "never";
 
 export interface NotificationSettings {
   enabled: boolean;
-  /** The user's level per app; missing means Sidekick decides. */
+  /** The user's level per app; missing means Duskie decides. */
   apps: Record<string, NotifyLevel>;
   /** People whose messages always come through right away. */
   vip: string[];
 }
 
-/** One notification Sidekick read, and where it put it. */
+/** One notification Duskie read, and where it put it. */
 export interface InboxItem {
   id: number;
   app: string;
@@ -835,7 +835,7 @@ export interface InboxStatus {
   readable: boolean;
   error?: string | null;
   items: InboxItem[];
-  /** Apps seen so far, newest first, with Sidekick's level for each. */
+  /** Apps seen so far, newest first, with Duskie's level for each. */
   apps: { app: string; level: NotifyLevel | null; count: number }[];
 }
 
@@ -876,7 +876,7 @@ export interface InstantResults {
   calc?: string | null;
 }
 
-/** Something Sidekick learned, for Settings > Memory. */
+/** Something Duskie learned, for Settings > Memory. */
 export interface Learned {
   kind: "choice" | "quiet" | "routine";
   key: string;

@@ -1,10 +1,10 @@
-//! Voice in the app: "Hey Sidekick" opens Ask mode and shows what you say
+//! Voice in the app: "Hey Duskie" opens Ask mode and shows what you say
 //! as you say it; when you stop, the question goes to the AI and the answer
 //! is read aloud with Supertonic. Speech models are prefetched at build/dev into
 //! resources, copied into app data on launch, and only downloaded from GitHub
 //! when still missing (the voice first). The assistant stays on "Preparing voice"
 //! until the voice can speak; then welcome opens and greets. The microphone stops
-//! whenever voice is off or Sidekick is paused.
+//! whenever voice is off or Duskie is paused.
 
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -28,16 +28,16 @@ pub const DOWNLOAD_EVENT: &str = "voice://download";
 
 pub const WELCOME_EVENT: &str = "voice://welcome";
 
-/// What Sidekick says on each welcome step (Welcome, Your AI, Connect,
+/// What Duskie says on each welcome step (Welcome, Your AI, Connect,
 /// Tools, Extras), and what the step shows, word by word as it is heard.
 /// Punctuation is the direction: the voice lifts on "!" and "?" and
 /// breathes at commas.
 pub const WELCOME_LINES: [&str; 5] = [
-    "Hey — I'm Sidekick. I live up here with you on this PC. I notice things, I help when you want, and I stay put: nothing leaves this machine, and I wait for your okay.",
+    "Hey — I'm Duskie. I live up here with you on this PC. I notice things, I help when you want, and I stay put: nothing leaves this machine, and I wait for your okay.",
     "First, how I think. If you want everything to stay on this PC, you can run a local model — only if your machine is up for it. Or use Claude Code or Codex with the plan you already have. You can use any of them, or all three, and set the order I try.",
     "Now, your world. Connect your calendar, your mail and the tools you use, and I'll start noticing what matters.",
     "A few small helpers make me sharper. Install the ones you want, and I'll wait while they finish.",
-    "Welcome aboard. Say Hey Sidekick whenever you need me. Do Not Disturb is on so Windows stays quiet and alerts show once up here. Launch on login is already on, so I'm here when you sit down.",
+    "Welcome aboard. Say Hey Duskie whenever you need me. Do Not Disturb is on so Windows stays quiet and alerts show once up here. Launch on login is already on, so I'm here when you sit down.",
 ];
 
 /// When each sentence of the welcome line sounds, in Unix milliseconds, so
@@ -86,7 +86,7 @@ struct Key {
     /// The assistant's name: "hey <name>" wakes it, so a rename rebuilds.
     name: String,
     /// The microphone opens only once onboarding is done; until then
-    /// Sidekick speaks the welcome but never listens.
+    /// Duskie speaks the welcome but never listens.
     listen: bool,
 }
 
@@ -334,15 +334,15 @@ pub fn refresh(app: &AppHandle) {
     });
 }
 
-/// True while Sidekick's voice plays, false when it stops.
+/// True while Duskie's voice plays, false when it stops.
 pub const SPEAKING_EVENT: &str = "voice://speaking";
-/// How often the echo guard checks whether Sidekick is speaking.
+/// How often the echo guard checks whether Duskie is speaking.
 const ECHO_CHECK: std::time::Duration = std::time::Duration::from_millis(50);
 /// The room still rings a moment after the speakers go quiet.
 const ECHO_TAIL: std::time::Duration = std::time::Duration::from_millis(400);
 
-/// Keeps the microphone deaf while Sidekick's own voice plays, so a line
-/// like "just say Hey Sidekick" never wakes it. Runs for the whole process.
+/// Keeps the microphone deaf while Duskie's own voice plays, so a line
+/// like "just say Hey Duskie" never wakes it. Runs for the whole process.
 /// Only changes are sent (and the current state to a newly built listener):
 /// a push to talk right after speaking unmutes and must stay unmuted.
 pub fn start_echo_guard(app: &AppHandle) {
@@ -353,7 +353,7 @@ pub fn start_echo_guard(app: &AppHandle) {
             let mut quiet_since: Option<std::time::Instant> = None;
             // The listener told last, and what it was told.
             let mut told: Option<(usize, bool)> = None;
-            // What the island was told about Sidekick talking.
+            // What the island was told about Duskie talking.
             let mut said_speaking = false;
             loop {
                 std::thread::sleep(ECHO_CHECK);
@@ -1287,7 +1287,7 @@ mod tests {
 
     #[test]
     fn fixes_words_voice_gets_wrong() {
-        let fixes = "horsepot = hotspot, bad line\nsidekik = Sidekick";
+        let fixes = "horsepot = hotspot, bad line\nsidekik = Duskie";
         assert_eq!(
             apply_fixes("Turn on Horsepot please", fixes),
             "Turn on hotspot please"
@@ -1298,7 +1298,7 @@ mod tests {
             "whole words only"
         );
         assert_eq!(apply_fixes("no change", ""), "no change");
-        assert_eq!(apply_fixes("hey sidekik", fixes), "hey Sidekick");
+        assert_eq!(apply_fixes("hey sidekik", fixes), "hey Duskie");
     }
 
     use super::*;

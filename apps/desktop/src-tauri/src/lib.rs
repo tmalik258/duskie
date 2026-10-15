@@ -300,7 +300,7 @@ pub fn run() {
             commands::action_undo,
         ]))
         .run(tauri::generate_context!())
-        .expect("error while running Sidekick");
+        .expect("error while running Duskie");
 }
 
 fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
@@ -440,7 +440,7 @@ fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     if paused {
         mascot::dispatch(app, MascotEvent::Rest);
     }
-    log::info!("Sidekick started");
+    log::info!("Duskie started");
     // App and file lists for instant results, ready before Ask first opens.
     instant::refresh(app);
     freeze::watch(app);
@@ -459,9 +459,9 @@ pub(crate) fn repo_roots(settings: &Settings) -> Vec<std::path::PathBuf> {
     }
 }
 
-/// Starts everything Sidekick does on its own: briefs, moments, search,
+/// Starts everything Duskie does on its own: briefs, moments, search,
 /// updates and the rest. Runs once, at startup when onboarding is already
-/// done, or the moment it finishes; until then Sidekick only onboards.
+/// done, or the moment it finishes; until then Duskie only onboards.
 pub fn start_features(app: &AppHandle) {
     let state = app.state::<AppState>();
     if state

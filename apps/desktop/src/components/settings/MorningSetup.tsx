@@ -1,7 +1,7 @@
 "use client";
 
 // Morning setup: the apps and sites you open first on most mornings,
-// learned on this PC. Sidekick asks to open them (Ask first), opens them
+// learned on this PC. Duskie asks to open them (Ask first), opens them
 // by itself, or does nothing (Off). One click takes an item out.
 
 import { useEffect, useState } from "react";

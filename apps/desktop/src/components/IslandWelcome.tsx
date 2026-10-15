@@ -1,6 +1,6 @@
 "use client";
 
-// First run: short steps inside the island. What Sidekick
+// First run: short steps inside the island. What Duskie
 // does and what stays private, then a live checklist of the AI, connections
 // and tools to set up, each with the exact command to run, and a few extras.
 // Finishing on Start marks onboarding done; the same checklist stays in
@@ -59,7 +59,7 @@ export function IslandWelcome() {
     const n = clampStep(next);
     setStep(n);
     void updateSettings({ welcomeStep: n });
-    // Sidekick talks each step through once; a step already heard is shown
+    // Duskie talks each step through once; a step already heard is shown
     // whole and quiet. Either way the line being said is cut off.
     if (wasHeard(n)) void api.voiceStop();
     else void api.voiceWelcomeStep(n);
@@ -232,7 +232,7 @@ function FooterLink({ onClick, children }: { onClick: () => void; children: Reac
   );
 }
 
-/** Sidekick talks the step through (each word shown as it is heard), then
+/** Duskie talks the step through (each word shown as it is heard), then
  * the step's content appears. Step content mounts hidden during speech so
  * setup detect/status can load before the reveal. */
 function Spoken({ step, children, onReady }: { step: number; children: ReactNode; onReady?: () => void }) {

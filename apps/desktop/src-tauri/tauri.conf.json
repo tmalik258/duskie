@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Sidekick",
+  "productName": "Duskie",
   "version": "0.2.2",
   "identifier": "app.sidekick.desktop",
   "build": {
@@ -14,7 +14,7 @@
       {
         "label": "island",
         "url": "island/",
-        "title": "Sidekick",
+        "title": "Duskie",
         "width": 600,
         "height": 640,
         "decorations": false,

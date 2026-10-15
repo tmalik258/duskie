@@ -88,7 +88,7 @@ async fn handle(app: &AppHandle, mut event: Event) {
         let _ = app.emit("browsers://changed", ());
         return;
     }
-    // Before onboarding is done Sidekick only onboards: the island follows
+    // Before onboarding is done Duskie only onboards: the island follows
     // the window, and the extension can pair. Nothing is stored or suggested.
     if !lock(&app.state::<AppState>().settings).onboarded {
         if event.kind == WindowSensor::EVENT_KIND {

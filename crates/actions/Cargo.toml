@@ -1,6 +1,6 @@
 [package]
 name = "sidekick-actions"
-description = "Built-in actions Sidekick can run, and detection of installed browsers and tools"
+description = "Built-in actions Duskie can run, and detection of installed browsers and tools"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
