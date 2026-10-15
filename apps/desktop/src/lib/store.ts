@@ -73,7 +73,7 @@ interface SidekickState {
   chatPage: string | null;
   /** The conversation is about writing a new skill. */
   chatSkill: boolean;
-  /** The model picked in Ask mode; null lets Sidekick choose. */
+  /** The model picked in Ask mode; null lets Duskie choose. */
   askModel: string | null;
   /** A spoken question asked with Ask closed: the island stays compact
    * ("Thinking...") until the answer starts, then opens to show it. */
@@ -84,14 +84,14 @@ interface SidekickState {
   focusUntil: number | null;
   /** Where the conversation is saved, so it can be picked up later. */
   conversation: string;
-  /** Sidekick's voice is playing; the mascot talks along. */
+  /** Duskie's voice is playing; the mascot talks along. */
   speaking: boolean;
   /** Voice: what is being heard right now, while listening. */
   hearing: string | null;
   voiceStatus: VoiceStatus | null;
   /** Suggestions held while you were busy or in a meeting. */
   later: number;
-  /** A setup step finishing outside Sidekick (browser, PowerShell). */
+  /** A setup step finishing outside Duskie (browser, PowerShell). */
   waiting: Waiting | null;
   /** The step that just finished while waited for, shown highlighted. */
   justDone: string | null;
@@ -165,7 +165,7 @@ function savedModel(): string | null {
   }
 }
 
-/** Picks the model for Ask mode (null: Sidekick chooses), kept for next time. */
+/** Picks the model for Ask mode (null: Duskie chooses), kept for next time. */
 export function setAskModel(id: string | null) {
   useSidekick.setState({ askModel: id });
   try {
@@ -663,7 +663,7 @@ function thanked() {
   setTimeout(() => setMood("love", 2400, "mwah"), 1400);
 }
 
-/** The first time Sidekick is seen each day, it says hello. */
+/** The first time Duskie is seen each day, it says hello. */
 function helloOncePerDay() {
   if (firstToday()) setTimeout(() => setMood("hello", 2600, "hello"), 900);
 }
@@ -1345,5 +1345,5 @@ export function uiVolume(): number {
   return settings.muted ? 0 : settings.masterVolume * 0.7;
 }
 
-/** The assistant's name, "Sidekick" unless the user renamed it. */
-export const useAssistantName = () => useSidekick((s) => s.settings.assistantName || "Sidekick");
+/** The assistant's name, "Duskie" unless the user renamed it. */
+export const useAssistantName = () => useSidekick((s) => s.settings.assistantName || "Duskie");

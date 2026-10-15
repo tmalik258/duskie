@@ -310,7 +310,7 @@ async fn github_moved(http: &reqwest::Client, repo: &Path, token: &str) -> bool 
             "https://api.github.com/repos/{slug}/commits/{branch}"
         ))
         .header("Accept", "application/vnd.github.sha")
-        .header("User-Agent", "Sidekick")
+        .header("User-Agent", "Duskie")
         .bearer_auth(token);
     if let Some(tag) = with(|w| w.etags.get(&key).cloned()) {
         req = req.header("If-None-Match", tag);

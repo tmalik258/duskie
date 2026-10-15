@@ -1,6 +1,6 @@
 "use client";
 
-// Sidekick's face: a glass orb with a slowly turning halo and two eyes that
+// Duskie's face: a glass orb with a slowly turning halo and two eyes that
 // follow the cursor anywhere on screen. Near the cursor it is pulled toward
 // it like a magnet. Each state (and each short mood on top of it) has its own
 // expression; the motion lives in orb/engine.ts and runs on springs, so it can
@@ -234,7 +234,7 @@ export function Orb({
       className="orb"
       style={{ "--size": `${size}px`, width: size, height: size } as CSSProperties}
       role="img"
-      aria-label={`Sidekick is ${state}`}
+      aria-label={`Duskie is ${state}`}
     >
       {/* The glow sits behind the body and only slides with it: no tilt or
           squash, and always under the face. */}

@@ -1,4 +1,4 @@
-//! Core building blocks shared by the Sidekick desktop app and its sensors.
+//! Core building blocks shared by the Duskie desktop app and its sensors.
 //!
 //! - [`event`]: the event envelope every sensor emits.
 //! - [`bus`]: in-process fan-out of events to subscribers.

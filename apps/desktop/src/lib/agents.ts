@@ -122,7 +122,7 @@ function loadSessions(): Session[] {
     const raw = typeof localStorage === "undefined" ? null : localStorage.getItem(STORE_KEY);
     const saved = raw ? JSON.parse(raw) : [];
     const list: Session[] = Array.isArray(saved) ? saved : (saved.sessions ?? []);
-    // Whatever was running stopped with Sidekick; each can be resumed.
+    // Whatever was running stopped with Duskie; each can be resumed.
     return list.map((s) => ({
       ...s,
       status: s.status === "working" || s.status === "waiting" ? "ended" : s.status,
@@ -422,7 +422,7 @@ export function sendToSession(id: string, text: string) {
 }
 
 /** Starts the agent again in its own earlier session, after it ended or
- * Sidekick restarted. */
+ * Duskie restarted. */
 export async function resumeSession(id: string) {
   await api.agentResume(id);
   update(id, (s) => ({ ...s, status: "idle", restored: false, error: null }));
@@ -712,7 +712,7 @@ function noteUsage(agent: string, u: SeenUsage) {
   }
 }
 
-/** Every plan window Sidekick has seen for an agent (5-hour, weekly, …). */
+/** Every plan window Duskie has seen for an agent (5-hour, weekly, …). */
 export function seenWindows(agent: string): SeenUsage[] {
   const map = seenAll()[agent];
   if (!map) return [];

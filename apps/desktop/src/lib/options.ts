@@ -157,11 +157,11 @@ function splitChoiceList(raw: string): string[] {
   return parts.filter((p) => p.length > 0 && p.length < 140);
 }
 
-// Small models open with "Hi! I'm Sidekick, your assistant." and emojis.
+// Small models open with "Hi! I'm Duskie, your assistant." and emojis.
 const EMOJI = /(?:\p{Extended_Pictographic}|[\u{1F3FB}-\u{1F3FF}]|\u200d|\uFE0F)/gu;
 // Only at the start of the answer so mid-text strip never eats the space
 // before the next sentence (which produced "answered.The").
-const INTRO = /^(?:(?:hi|hello|hey)[!,.]?\s*)?i(?:'|\u2019)?m sidekick[^.!?\n]*[.!?]+\s*/gi;
+const INTRO = /^(?:(?:hi|hello|hey)[!,.]?\s*)?i(?:'|\u2019)?m (?:duskie|sidekick)[^.!?\n]*[.!?]+\s*/gi;
 const GLUED = /([.!?])([A-Z])/g;
 
 export function tidy(text: string): string {

@@ -73,7 +73,7 @@ pub async fn diagnostics(app: AppHandle) -> String {
         (lock(&state.settings).clone(), state.data_dir.clone())
     };
     let mut out = format!(
-        "Sidekick {}\n{}\nMemory: {} GB\n",
+        "Duskie {}\n{}\nMemory: {} GB\n",
         app.package_info().version,
         sysinfo::System::long_os_version().unwrap_or_else(|| "Unknown OS".into()),
         sysinfo::System::new_with_specifics(
@@ -151,7 +151,7 @@ pub async fn report_save(app: AppHandle) -> CmdResult<String> {
             ));
         }
         let name = format!(
-            "Sidekick report {}.txt",
+            "Duskie report {}.txt",
             chrono::Local::now().format("%Y-%m-%d %H%M")
         );
         let path = dir.join(name);

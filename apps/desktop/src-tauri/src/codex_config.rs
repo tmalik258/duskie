@@ -1,5 +1,5 @@
 //! "Add for me" for Codex: a `notify` program in `~/.codex/config.toml` so
-//! the island hears when a Codex turn is done, and Sidekick's MCP server
+//! the island hears when a Codex turn is done, and Duskie's MCP server
 //! so Codex can search your history. Only when the user presses the button;
 //! the file is backed up first and everything else in it is kept.
 
@@ -7,9 +7,9 @@ use std::path::{Path, PathBuf};
 
 use crate::setup::CODEX_HOOK_URL;
 
-/// The script Codex runs after each turn, next to Sidekick's data. Codex
+/// The script Codex runs after each turn, next to Duskie's data. Codex
 /// adds the turn as JSON at the end of the command; the script passes it
-/// on to Sidekick on this PC and never fails Codex.
+/// on to Duskie on this PC and never fails Codex.
 pub const NOTIFY_SCRIPT: &str = "codex-notify.ps1";
 
 pub fn config_path() -> Option<PathBuf> {
@@ -22,7 +22,7 @@ pub fn config_path() -> Option<PathBuf> {
 pub fn script_text() -> String {
     format!(
         "param([string]$json)\n\
-         # Sent by Codex after each turn; passed on to Sidekick on this PC.\n\
+         # Sent by Codex after each turn; passed on to Duskie on this PC.\n\
          try {{\n  \
            $body = [System.Text.Encoding]::UTF8.GetBytes($json)\n  \
            Invoke-RestMethod -Uri '{CODEX_HOOK_URL}' -Method Post -ContentType 'application/json' -Body $body -TimeoutSec 3 | Out-Null\n\
@@ -62,7 +62,7 @@ fn top_level_end(text: &str) -> usize {
     text.len()
 }
 
-/// The config with Sidekick's notify added. Another program already in
+/// The config with Duskie's notify added. Another program already in
 /// `notify` is left alone (Codex runs only one), and that is an error the
 /// user sees.
 pub fn merge_notify(text: &str, script: &Path) -> Result<String, String> {
@@ -76,12 +76,12 @@ pub fn merge_notify(text: &str, script: &Path) -> Result<String, String> {
             return Ok(text.to_owned());
         }
         return Err(
-            "Codex already runs another program after each turn (notify in ~/.codex/config.toml). Remove it to use Sidekick's."
+            "Codex already runs another program after each turn (notify in ~/.codex/config.toml). Remove it to use Duskie's."
                 .into(),
         );
     }
     let mut out = String::with_capacity(text.len() + 200);
-    out.push_str("# Sidekick: tell the island when a Codex turn is done.\n");
+    out.push_str("# Duskie: tell the island when a Codex turn is done.\n");
     out.push_str(&notify_line(script));
     out.push_str("\n\n");
     out.push_str(text);
@@ -176,11 +176,11 @@ mod tests {
 
     #[test]
     fn adds_notify_at_the_top_and_only_once() {
-        let script = Path::new(r"C:\Users\me\AppData\Roaming\Sidekick\codex-notify.ps1");
+        let script = Path::new(r"C:\Users\me\AppData\Roaming\Duskie\codex-notify.ps1");
         let old = "model = \"gpt-5\"\n\n[mcp_servers.other]\nurl = \"x\"\n";
         let new = merge_notify(old, script).unwrap();
-        assert!(new.starts_with("# Sidekick"));
-        assert!(new.contains(r"'C:\Users\me\AppData\Roaming\Sidekick\codex-notify.ps1'"));
+        assert!(new.starts_with("# Duskie"));
+        assert!(new.contains(r"'C:\Users\me\AppData\Roaming\Duskie\codex-notify.ps1'"));
         assert!(new.contains("[mcp_servers.other]"));
         assert!(has_notify(&new));
         assert_eq!(merge_notify(&new, script).unwrap(), new);

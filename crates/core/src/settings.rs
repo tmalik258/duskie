@@ -106,9 +106,9 @@ pub struct Settings {
     pub welcome_step: u32,
     /// Look for a newer release once a day.
     pub check_updates: bool,
-    /// Programs whose windows and copies Sidekick ignores.
+    /// Programs whose windows and copies Duskie ignores.
     pub deny_apps: Vec<String>,
-    /// Sites (and their subdomains) Sidekick ignores.
+    /// Sites (and their subdomains) Duskie ignores.
     pub deny_sites: Vec<String>,
     /// Learn what you open first each day and offer it as one card.
     pub routines: bool,
@@ -123,15 +123,15 @@ pub struct Settings {
     pub alive: bool,
     /// After a crash, offer a report to send (never sent on its own).
     pub crash_reports: bool,
-    /// The notification inbox: Sidekick reads Windows notifications and only
+    /// The notification inbox: Duskie reads Windows notifications and only
     /// brings up what matters.
     pub notifications: NotificationSettings,
     /// Saved tasks that run again on a trigger (or on request).
     pub recipes: Vec<Recipe>,
-    /// Things Sidekick knows about the user ("My manager is Sara"), given to
+    /// Things Duskie knows about the user ("My manager is Sara"), given to
     /// every model. Edited in Settings or learned when the user says so.
     pub memory: Vec<String>,
-    /// What Sidekick calls the user ("Sam"); empty until they say.
+    /// What Duskie calls the user ("Sam"); empty until they say.
     pub user_name: String,
     /// People the user works with ("Sara, my manager"), one per line.
     pub people: String,
@@ -142,12 +142,12 @@ pub struct Settings {
     /// The user works with code: technical answers and setup. None: not asked.
     pub codes: Option<bool>,
     /// What the assistant is called and answers to ("Hey Orbi"). The app
-    /// itself stays Sidekick.
+    /// itself stays Duskie.
     pub assistant_name: String,
     /// Learn from choices (links, files, suggestions, routines). Off: nothing
     /// new is learned; what is known stays until forgotten.
     pub learning: bool,
-    /// How much Sidekick asks before acting in apps and pages.
+    /// How much Duskie asks before acting in apps and pages.
     pub agent: AgentSettings,
 }
 
@@ -160,7 +160,7 @@ pub struct AgentSettings {
     pub ask: String,
     /// Per app or site ("whatsapp", "mail.google.com"): "allow", "ask" or
     /// "never". Allow skips the tap except for paying and deleting; never
-    /// keeps Sidekick out entirely.
+    /// keeps Duskie out entirely.
     pub places: BTreeMap<String, String>,
 }
 
@@ -229,7 +229,7 @@ pub struct NotificationSettings {
     /// Read and sort Windows notifications.
     pub enabled: bool,
     /// The user's level per app ("WhatsApp" -> "soon"), from [`NOTIFY_LEVELS`].
-    /// Missing means Sidekick decides.
+    /// Missing means Duskie decides.
     pub apps: BTreeMap<String, String>,
     /// People whose messages always come through right away.
     pub vip: Vec<String>,
@@ -314,13 +314,13 @@ pub struct ComposioSettings {
 }
 
 /// Voice: on by default. Speech models download on launch when
-/// missing. The microphone is open only while voice is on and Sidekick is not
+/// missing. The microphone is open only while voice is on and Duskie is not
 /// paused.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct VoiceSettings {
     pub enabled: bool,
-    /// Listen for "Hey Sidekick". Off leaves push to talk in Ask mode.
+    /// Listen for "Hey Duskie". Off leaves push to talk in Ask mode.
     pub wake_word: bool,
     /// Read answers aloud when the question was spoken.
     pub speak_answers: bool,
@@ -374,7 +374,7 @@ impl Default for VoiceSettings {
     }
 }
 
-/// AI providers (each can be switched off; Sidekick works without any).
+/// AI providers (each can be switched off; Duskie works without any).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct AiSettings {
@@ -693,7 +693,7 @@ impl Default for Settings {
             projects: String::new(),
             answer_style: String::new(),
             codes: None,
-            assistant_name: "Sidekick".into(),
+            assistant_name: "Duskie".into(),
             learning: true,
             agent: AgentSettings::default(),
         }
@@ -770,8 +770,9 @@ impl Settings {
         }
         self.collapse_after_secs = self.collapse_after_secs.clamp(2, 120);
         let name = self.assistant_name.trim();
-        self.assistant_name = if name.is_empty() {
-            "Sidekick".into()
+        // Sidekick was renamed Duskie; a name nobody chose follows it.
+        self.assistant_name = if name.is_empty() || name == "Sidekick" {
+            "Duskie".into()
         } else {
             name.chars().take(24).collect()
         };

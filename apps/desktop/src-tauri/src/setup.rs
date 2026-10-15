@@ -38,7 +38,7 @@ pub struct SetupItem {
     pub status: String,
     /// What to type, ready to copy. None when it is set in Settings.
     pub command: Option<String>,
-    /// The command can be run from Sidekick in a new terminal window.
+    /// The command can be run from Duskie in a new terminal window.
     pub runnable: bool,
     /// Button label for running it: "Install", "Download", "Sign in", "Start".
     pub action: &'static str,
@@ -148,7 +148,7 @@ pub fn hook_snippet() -> String {
     serde_json::to_string_pretty(&v).unwrap_or_default()
 }
 
-/// How far the user's Claude Code settings already point at Sidekick.
+/// How far the user's Claude Code settings already point at Duskie.
 #[derive(Debug, PartialEq, Eq)]
 pub enum HookState {
     Missing,
@@ -566,7 +566,7 @@ pub async fn status(app: &AppHandle) -> Vec<SetupItem> {
     // Ollama's defaults keep room for four answers at once, full-size
     // caches and a 4K context. One at a time, flash attention and an 8-bit
     // cache roughly halve the memory a model holds, which pays for the 8K
-    // context Sidekick's tools need.
+    // context Duskie's tools need.
     let short = context.is_some_and(|c| c < MIN_CONTEXT);
     let lighter = !short
         && OLLAMA_LIGHT
@@ -636,8 +636,8 @@ pub async fn status(app: &AppHandle) -> Vec<SetupItem> {
     let mut mcp = SetupItem::new(
         "claude_mcp",
         Group::Connect,
-        "Sidekick tools in Claude Code",
-        "Lets Claude Code use Sidekick's tools.",
+        "Duskie tools in Claude Code",
+        "Lets Claude Code use Duskie's tools.",
     )
     .done(
         mcp_added(&read(&home.join(".claude.json")), &mcp_url),
@@ -673,8 +673,8 @@ pub async fn status(app: &AppHandle) -> Vec<SetupItem> {
         SetupItem::new(
             "codex_mcp",
             Group::Connect,
-            "Sidekick tools in Codex",
-            "Lets Codex use Sidekick's tools.",
+            "Duskie tools in Codex",
+            "Lets Codex use Duskie's tools.",
         )
         .done(codex_mcp, "Added", "Not added")
         .tab("ai"),
@@ -739,7 +739,7 @@ pub async fn status(app: &AppHandle) -> Vec<SetupItem> {
             "voice",
             Group::Connect,
             "Voice",
-            "Say \"Hey Sidekick\" and hear answers. About 205 MB, all on this PC.",
+            "Say \"Hey Duskie\" and hear answers. About 205 MB, all on this PC.",
         )
         .done(
             voice_ready && settings.voice.enabled,
@@ -1121,7 +1121,7 @@ fn open_terminal_paste(command: &str) -> Result<(), String> {
         .and_then(|mut c| c.set_text(command.to_owned()))
         .map_err(|e| format!("could not copy the command: {e}"))?;
     open_terminal_window(&format!(
-        "Write-Host 'Command copied to the clipboard:' -ForegroundColor Cyan; Write-Host '  {}' -ForegroundColor Yellow; Write-Host ''; Write-Host 'Replace your-key with your real key, paste (Ctrl+V), press Enter, then come back to Sidekick.' -ForegroundColor White",
+        "Write-Host 'Command copied to the clipboard:' -ForegroundColor Cyan; Write-Host '  {}' -ForegroundColor Yellow; Write-Host ''; Write-Host 'Replace your-key with your real key, paste (Ctrl+V), press Enter, then come back to Duskie.' -ForegroundColor White",
         command.replace('\'', "''")
     ))
 }
@@ -1137,7 +1137,7 @@ fn open_tracked_terminal(command: &str) -> Result<(), String> {
 #[cfg(windows)]
 fn open_terminal(command: &str) -> Result<(), String> {
     open_terminal_window(&format!(
-        "Write-Host 'Sidekick setup' -ForegroundColor Cyan; {command}; Write-Host ''; Write-Host 'Setup commands finished. Check status in Sidekick.' -ForegroundColor Cyan"
+        "Write-Host 'Duskie setup' -ForegroundColor Cyan; {command}; Write-Host ''; Write-Host 'Setup commands finished. Check status in Duskie.' -ForegroundColor Cyan"
     ))
 }
 
@@ -1145,7 +1145,7 @@ fn open_terminal(command: &str) -> Result<(), String> {
 fn open_terminal_window(script: &str) -> Result<(), String> {
     use std::os::windows::process::CommandExt;
     use std::process::Stdio;
-    // Sidekick is a GUI process with no console. If we spawn PowerShell with
+    // Duskie is a GUI process with no console. If we spawn PowerShell with
     // inherited stdio, it gets invalid handles and tools like ollama print
     // "failed to get console mode for stderr". `cmd /c start` opens a real
     // console window; CREATE_NO_WINDOW only hides the brief cmd trampoline.
@@ -1169,7 +1169,7 @@ fn open_terminal_window(script: &str) -> Result<(), String> {
         .args([
             "/c",
             "start",
-            "Sidekick setup",
+            "Duskie setup",
             "powershell.exe",
             "-NoExit",
             "-NoLogo",

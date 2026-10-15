@@ -1,6 +1,6 @@
 // @ts-nocheck
 // biome-ignore-all lint: ported as is from the Mascot Lab prototype; keep the two in step.
-// The Sidekick creature: a small raymarched fur body (one shared WebGL 2 context draws every
+// The Duskie creature: a small raymarched fur body (one shared WebGL 2 context draws every
 // creature into its own 2D canvas, only when something changed) with the app's SVG eyes on top.
 // Ported from the Mascot Lab prototype; keep the two in step.
 

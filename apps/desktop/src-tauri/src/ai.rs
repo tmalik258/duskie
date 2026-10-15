@@ -24,7 +24,7 @@ const MAX_CLIP: usize = 8_000;
 const MAX_UIA: usize = 12_000;
 const SEMIF_TIMEOUT: Duration = Duration::from_secs(90);
 
-pub(crate) const SYSTEM: &str = "You are Sidekick, the assistant on the user's Windows PC. You help \
+pub(crate) const SYSTEM: &str = "You are Duskie, the assistant on the user's Windows PC. You help \
 with their own files, apps, day and whatever is on screen right now, and you get small \
 things done. Rules:
 - Lead with the result in the first sentence, then at most one short line of detail. No \
@@ -35,7 +35,7 @@ amounts, names) are **bold**; no headings in short answers; tables only for comp
 - Start working right away: never announce what you are about to do (\"I'll open...\", \"Let me check...\"). \
 The user sees each step as it runs; write only the result.
 - Never introduce yourself or say what you are.
-- Do it yourself with Sidekick's tools (also offered with a sidekick_ prefix): find a file, then open it or show it in its folder; search the \
+- Do it yourself with Duskie's tools (also offered with a sidekick_ prefix): find a file, then open it or show it in its folder; search the \
 web and read pages for anything current or not on this PC, and link your sources; change volume, brightness or dark \
 mode, Do Not Disturb, the sound output or the screens; switch to or start an app; draft Outlook \
 emails, read or fill Excel sheets and make Word files or PDFs with office. Check pc_status before suggesting a Windows setting, and never \
@@ -141,7 +141,7 @@ pub(crate) fn key_name(id: &str) -> String {
     format!("{id}_api_key")
 }
 
-/// Answers through the OpenAI-compatible path, with Sidekick's tools: the
+/// Answers through the OpenAI-compatible path, with Duskie's tools: the
 /// local model and the cloud models with a key.
 pub(crate) fn is_compat(id: &str) -> bool {
     id == "local" || sidekick_ai::CLOUD.iter().any(|(c, _, _)| *c == id)
@@ -158,7 +158,7 @@ pub(crate) fn compat_model(ai: &AiSettings, id: &str) -> Option<OpenAiCompat> {
     OpenAiCompat::cloud(id, &key, Some(pref.model.clone()))
 }
 
-/// The router for one Ask-mode chat: the local model always gets Sidekick's
+/// The router for one Ask-mode chat: the local model always gets Duskie's
 /// own tools, and Composio's when they are set up and the chat may leave
 /// the PC.
 async fn chat_router(
@@ -427,7 +427,7 @@ pub struct Attach {
     /// Text of the web page the conversation is about.
     #[serde(default)]
     pub page: Option<String>,
-    /// The user is describing a new skill for Sidekick to learn.
+    /// The user is describing a new skill for Duskie to learn.
     #[serde(default)]
     pub skill: bool,
     /// Send a screenshot of the window the user was in.
@@ -494,7 +494,7 @@ pub fn release(app: &AppHandle, id: &str) {
     }
 }
 
-/// What Sidekick can notice, for AI writing skills. Keep in sync with the
+/// What Duskie can notice, for AI writing skills. Keep in sync with the
 /// sensors.
 const EVENT_CATALOG: &str = "\
 file.download_completed: path, dir, name, ext, kind (image|video|audio|document|archive|installer|code|other), size, size_human, stem, duplicate_of, duplicate_name, signature (installers)
@@ -525,7 +525,7 @@ system.monitor_connected: monitors
 system.battery_low: percent, saver (on or off)
 user.idle / user.active: idle_secs / away_secs";
 
-const SKILL_SYSTEM: &str = "You write skills for Sidekick, a desktop assistant on Windows. \
+const SKILL_SYSTEM: &str = "You write skills for Duskie, a desktop assistant on Windows. \
 A skill is one YAML file that matches an event and offers the user a few one-click options. \
 Reply with one short sentence on what the skill does, then the complete skill in a single \
 ```yaml code block. Use only the events, fields and actions below. Do not set trust: auto. \
@@ -612,7 +612,7 @@ async fn system_prompt(app: &AppHandle, attach: &Attach) -> String {
             ],
         )
     };
-    if assistant != "Sidekick" {
+    if assistant != "Duskie" {
         system.push_str(&format!(
             "\nThe user calls you {assistant}. Use that name for yourself."
         ));
@@ -1040,7 +1040,7 @@ pub fn chat(
     });
 }
 
-/// Captures the window the user was in before Sidekick took focus.
+/// Captures the window the user was in before Duskie took focus.
 pub(crate) async fn screenshot(app: &AppHandle) -> Result<Vec<u8>, String> {
     let pid = lock(&app.state::<AppState>().last_window)
         .as_ref()

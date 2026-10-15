@@ -1,4 +1,4 @@
-//! Sidekick's everyday decisions against real requests, as tables: what
+//! Duskie's everyday decisions against real requests, as tables: what
 //! counts as a multi-step task, which steps wait for a tap, how a
 //! notification is sorted, what a copied text is, and when a recipe fires.
 //! Each table reports every wrong row at once, so a change in one rule shows

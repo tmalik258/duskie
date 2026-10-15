@@ -1,6 +1,6 @@
-//! "Add for me": puts Sidekick's hooks into `~/.claude/settings.json` and its
+//! "Add for me": puts Duskie's hooks into `~/.claude/settings.json` and its
 //! MCP server into Claude Code, only when the user presses the button. The
-//! settings file is backed up first and only Sidekick's entries are added;
+//! settings file is backed up first and only Duskie's entries are added;
 //! everything else in it is kept as it was.
 
 use std::path::{Path, PathBuf};
@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 
 use crate::setup::CLAUDE_HOOK_URL;
 
-/// Hook events Sidekick listens to, with each one's timeout in seconds.
+/// Hook events Duskie listens to, with each one's timeout in seconds.
 const HOOKS: &[(&str, u32)] = &[("Stop", 5), ("Notification", 5), ("PermissionRequest", 30)];
 
 fn points_here(groups: &Value) -> bool {
@@ -19,7 +19,7 @@ fn points_here(groups: &Value) -> bool {
     })
 }
 
-/// The settings text with Sidekick's hooks added where missing. Errors when
+/// The settings text with Duskie's hooks added where missing. Errors when
 /// the file is not a JSON object, so nothing is overwritten by mistake.
 pub fn merge_hooks(text: &str) -> Result<String, String> {
     let mut v: Value = if text.trim().is_empty() {
@@ -87,8 +87,8 @@ fn add_hooks_at(path: &Path) -> Result<Option<PathBuf>, String> {
     Ok(backup)
 }
 
-/// Adds Sidekick's MCP server to Claude Code with its own command, so
-/// Sidekick never edits `~/.claude.json`.
+/// Adds Duskie's MCP server to Claude Code with its own command, so
+/// Duskie never edits `~/.claude.json`.
 pub async fn add_mcp(claude: &Path, url: &str, token: &str) -> Result<(), String> {
     let mut cmd = tokio::process::Command::new(claude);
     cmd.args([

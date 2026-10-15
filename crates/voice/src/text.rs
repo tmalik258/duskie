@@ -1,22 +1,22 @@
 //! Text helpers: the wake phrase out of transcripts, and answers made fit to
 //! be read aloud, a sentence at a time.
 
-/// Phrases that wake Sidekick, as the wake word model spells them (BPE
+/// "Hey Sidekick", the old name, still wakes Duskie. As the wake word model spells them (BPE
 /// tokens of the gigaspeech KWS model), and how they appear in transcripts.
 pub const WAKE_KEYWORDS: &str = "▁HE Y ▁ SIDE K IC K @hey_sidekick\n▁HI ▁ SIDE K IC K @hey_sidekick\n▁O K ▁ SIDE K IC K @hey_sidekick\n";
 
 /// A name the user gave the assistant ("Orbi"), as lowercase words. Empty
-/// means only "Sidekick". The default name always keeps working too.
+/// means only "Duskie". The default name always keeps working too.
 static CUSTOM_NAME: std::sync::RwLock<Vec<String>> = std::sync::RwLock::new(Vec::new());
 
-/// Sets the assistant's name for wake matching. "Sidekick" or blank clears it.
+/// Sets the assistant's name for wake matching. "Duskie" or blank clears it.
 pub fn set_name(name: &str) {
     let words: Vec<String> = name
         .split(|c: char| !c.is_alphanumeric())
         .filter(|w| !w.is_empty())
         .map(str::to_lowercase)
         .collect();
-    let words = if words == ["sidekick"] {
+    let words = if words == ["sidekick"] || words == ["duskie"] {
         Vec::new()
     } else {
         words
@@ -150,10 +150,18 @@ fn spell_word(vocab: &Vocab, word: &str) -> Option<Vec<String>> {
     best.remove(&text.len()).map(|(_, p)| p)
 }
 
-/// The wake phrases for the keyword model: "hey Sidekick" always, plus
+/// The wake phrases for the keyword model: "hey Duskie" always, plus
 /// "hey <name>" when the user renamed the assistant.
 pub fn wake_keywords(vocab: Option<&Vocab>) -> String {
     let mut out = WAKE_KEYWORDS.to_owned();
+    // The app's own name, spelled from the model's vocabulary.
+    if let Some(vocab) = vocab {
+        for greeting in ["hey", "hi", "ok"] {
+            if let Some(spelled) = spell(vocab, &format!("{greeting} duskie")) {
+                out.push_str(&format!("{spelled} @hey_duskie\n"));
+            }
+        }
+    }
     let name = custom_name();
     if let (Some(vocab), false) = (vocab, name.is_empty()) {
         let name = name.join(" ");
@@ -172,6 +180,11 @@ const GREETINGS: &[&str] = &["hey", "hi", "ok", "okay", "a"];
 /// How the name comes out of speech to text, as one word or two: people
 /// (and voices) often soften the "d", so "cider kick" is common.
 const NAMES: &[&[&str]] = &[
+    &["duskie"],
+    &["dusky"],
+    &["duskey"],
+    &["dusk", "e"],
+    &["dusk", "ee"],
     &["sidekick"],
     &["sidekik"],
     &["side", "kick"],
@@ -182,7 +195,7 @@ const NAMES: &[&[&str]] = &[
 
 /// After a greeting, any word starting with one of these counts as the name,
 /// so accents and loose transcripts still work ("hey sidecaig", "hey sidekey").
-const NAME_STARTS: &[&str] = &["side", "sight", "syde"];
+const NAME_STARTS: &[&str] = &["dusk", "side", "sight", "syde"];
 
 /// Whether `word` could be the end of a split name ("side caig", "side kick"):
 /// a short fragment with a k, c, q or g sound up front.
@@ -599,7 +612,7 @@ mod tests {
         assert_eq!(strip_wake("hey orbi, open mail"), "open mail");
         assert_eq!(strip_wake("hey sidekick open mail"), "open mail");
         assert!(find_wake("so hey orbi what time is it").is_some());
-        set_name("Sidekick");
+        set_name("Duskie");
         assert_eq!(strip_wake("hey orbi open mail"), "hey orbi open mail");
     }
 
@@ -629,11 +642,8 @@ mod tests {
             strip_wake(" Hey sidekick, what time is it?"),
             "what time is it?"
         );
-        assert_eq!(
-            strip_wake("Sidekick. Open my downloads"),
-            "Open my downloads"
-        );
-        assert_eq!(strip_wake("Hey Sidekick"), "");
+        assert_eq!(strip_wake("Duskie. Open my downloads"), "Open my downloads");
+        assert_eq!(strip_wake("Hey Duskie"), "");
         assert_eq!(strip_wake("What is a sidekick?"), "What is a sidekick?");
         // Common mishearings of the name.
         assert_eq!(

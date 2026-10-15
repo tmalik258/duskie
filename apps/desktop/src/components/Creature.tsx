@@ -1,6 +1,6 @@
 "use client";
 
-// Sidekick's face: a small fur creature with the app's eyes, drawn by
+// Duskie's face: a small fur creature with the app's eyes, drawn by
 // creature/creature.ts. Same props as the Orb, which stays as the fallback
 // when this machine has no WebGL 2.
 
@@ -119,7 +119,7 @@ export function Creature(props: {
       className="creature"
       style={{ width: size, height: size }}
       role="img"
-      aria-label={`Sidekick is ${state}`}
+      aria-label={`Duskie is ${state}`}
     />
   );
 }

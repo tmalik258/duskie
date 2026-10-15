@@ -1,7 +1,7 @@
 "use client";
 
 // Ask mode: the island itself becomes the place to run a
-// command or ask Sidekick, with the app you were in and the clipboard
+// command or ask Duskie, with the app you were in and the clipboard
 // attachable on request. Rendered inside the island shell; the island owns
 // the morph, this owns the content.
 
@@ -364,7 +364,7 @@ export function AskPanel() {
   const commands = useMemo<Command[]>(() => {
     const all: Command[] = [
       paused
-        ? { id: "resume", label: "Resume Sidekick", icon: "play", run: () => void api.sensorsResume() }
+        ? { id: "resume", label: "Resume Duskie", icon: "play", run: () => void api.sensorsResume() }
         : { id: "pause15", label: "Pause for 15 minutes", icon: "pause", run: () => void api.sensorsPause(15) },
       ...(paused
         ? []
@@ -728,7 +728,7 @@ export function AskPanel() {
           {
             id: "skill",
             icon: <Icon name="settings" size={12} />,
-            label: "Teach Sidekick a skill",
+            label: "Teach Duskie a skill",
             run: () => {
               startSkill(text.trim());
               setText("");

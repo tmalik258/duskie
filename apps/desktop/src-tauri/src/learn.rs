@@ -62,7 +62,7 @@ const MUTE_FOR: Duration = Duration::hours(24);
 const ACCEPTS_TO_OFFER: i64 = 5;
 pub const OFFER_SKILL: &str = "learn.offer-auto";
 
-/// Skills that are Sidekick talking about itself, not habits to learn.
+/// Skills that are Duskie talking about itself, not habits to learn.
 pub fn tracked(skill_id: &str) -> bool {
     !skill_id.starts_with("learn.")
         && !skill_id.starts_with("mcp.")
@@ -188,7 +188,7 @@ fn offer_auto(skill_id: &str, label: &str) -> Proposal {
         skill_ids: vec![OFFER_SKILL.into()],
         title: format!("Always \"{label}\"?"),
         detail: format!(
-            "You picked it {ACCEPTS_TO_OFFER} times in a row. Sidekick can do it without asking."
+            "You picked it {ACCEPTS_TO_OFFER} times in a row. Duskie can do it without asking."
         ),
         options: vec![
             opt(

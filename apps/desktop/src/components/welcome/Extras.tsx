@@ -52,7 +52,7 @@ function Rename() {
   const saved = useSidekick((s) => s.settings.assistantName);
   const [draft, setDraft] = useState(saved);
   const save = () => {
-    const v = draft.trim() || "Sidekick";
+    const v = draft.trim() || "Duskie";
     if (v !== saved) void updateSettings({ assistantName: v });
   };
   return (

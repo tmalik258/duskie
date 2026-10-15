@@ -41,7 +41,7 @@ const OFFICE: &str = "office";
 const RECIPES: &str = "recipes";
 const REMEMBER: &str = "remember";
 
-/// The Ask chat answering right now, so tools called through Sidekick's
+/// The Ask chat answering right now, so tools called through Duskie's
 /// MCP server (by Claude Code or Codex) put their buttons in it.
 static CURRENT_CHAT: std::sync::Mutex<String> = std::sync::Mutex::new(String::new());
 
@@ -408,7 +408,7 @@ pub fn defs() -> Vec<ToolDef> {
         ToolDef {
             name: DOCTOR.into(),
             description: "Why an app crashes, freezes or will not start: reads the last 14 days \
-                of crash records, names the likely cause and the fix Sidekick can run. Offer \
+                of crash records, names the likely cause and the fix Duskie can run. Offer \
                 fixes with propose, never run them yourself. When no cause is clear, web_search \
                 the exact error code and module with Reddit, PCGamingWiki, Steam forums and the \
                 app's own forums, and say what people found worked. Never suggest crack, repack \
@@ -647,7 +647,7 @@ pub fn reads_only(name: &str) -> bool {
     )
 }
 
-/// One of Sidekick's own tools (not Composio's).
+/// One of Duskie's own tools (not Composio's).
 pub fn is_own(name: &str) -> bool {
     matches!(
         name,
@@ -1141,7 +1141,7 @@ fn button_text(action: &str, args: &Value) -> String {
     }
 }
 
-/// A button under the answer that runs `action` when tapped. Sidekick's own
+/// A button under the answer that runs `action` when tapped. Duskie's own
 /// code uses this for steps that need the user's yes (send, post, pay).
 const PROPOSALS_FILE: &str = "ask-buttons.json";
 /// Buttons kept for a tap; older ones are let go.

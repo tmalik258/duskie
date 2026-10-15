@@ -1,4 +1,4 @@
-//! The browser side of Sidekick: the pairing code the extension needs, and
+//! The browser side of Duskie: the pairing code the extension needs, and
 //! the actions that send it commands.
 
 use std::path::Path;
