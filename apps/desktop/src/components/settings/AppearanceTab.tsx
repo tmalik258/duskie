@@ -5,7 +5,8 @@
 
 import { updateSettings, useSidekick } from "@/lib/store";
 import { ISLAND_COLORS, type IslandColor, THEMES } from "@/lib/types";
-import { Orb, THEME_STYLES } from "../Orb";
+import { Creature } from "../Creature";
+import { THEME_STYLES } from "../Orb";
 import { Field, Section, Select, TextField, Toggle } from "./ui";
 
 const COLLAPSE_OPTIONS: [string, string][] = [
@@ -66,7 +67,7 @@ export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
               className={tile(settings.theme === t)}
             >
               <span className="orb-still">
-                <Orb state="idle" size={34} theme={t} magnetic={false} simple active={false} />
+                <Creature state="idle" size={34} theme={t} magnetic={false} simple active={false} />
               </span>
               {THEME_STYLES[t].label}
             </button>
@@ -112,7 +113,7 @@ export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
                 }}
               >
                 <span className="orb-still">
-                  <Orb state="idle" size={15} theme={settings.theme} magnetic={false} simple active={false} />
+                  <Creature state="idle" size={15} theme={settings.theme} magnetic={false} simple active={false} />
                 </span>
                 <span className="h-[4px] w-[26px] rounded-full bg-white/55" />
               </span>
