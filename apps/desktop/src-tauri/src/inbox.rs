@@ -1,4 +1,4 @@
-//! The notification inbox. With Windows silenced (Do Not Disturb), Sidekick
+//! The notification inbox. With Windows silenced (Do Not Disturb), Duskie
 //! reads each notification as it lands in Notification Center, sorts it,
 //! and only brings up what matters:
 //!
@@ -627,7 +627,7 @@ async fn take(app: &AppHandle, settings: &sidekick_core::Settings, t: Toast, thi
                 // The user's own pick for an app or a VIP keeps its level.
                 if !matches!(sorted.why, "your choice for this app" | "from a VIP") {
                     sorted.level = v.level;
-                    sorted.why = "Sidekick's judgement";
+                    sorted.why = "Duskie's judgement";
                 }
                 sorted.reason = Some(v.why);
             }
@@ -825,12 +825,12 @@ pub fn on_dismiss(app: &AppHandle, from: &str) -> Option<String> {
     set_level(app, from, current.lower()).ok()
 }
 
-/// Back to letting Sidekick decide for this app.
+/// Back to letting Duskie decide for this app.
 pub fn clear_level(app: &AppHandle, from: &str) -> Result<String, String> {
     let mut next = lock(&app.state::<AppState>().settings).clone();
     next.notifications.apps.remove(from);
     crate::commands::apply_settings(app, next)?;
-    Ok(format!("Sidekick decides for {from}"))
+    Ok(format!("Duskie decides for {from}"))
 }
 
 /// The user's level for one app, from a card ("Less from WhatsApp") or Settings.
@@ -854,7 +854,7 @@ pub fn set_level(app: &AppHandle, from: &str, level: Level) -> Result<String, St
 #[serde(rename_all = "camelCase")]
 pub struct AppLevel {
     pub app: String,
-    /// The user's pick; None lets Sidekick decide per notification.
+    /// The user's pick; None lets Duskie decide per notification.
     pub level: Option<Level>,
     pub count: usize,
 }

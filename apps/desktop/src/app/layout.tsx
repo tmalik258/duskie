@@ -4,7 +4,7 @@ import "./globals.css";
 import "@/components/creature/creature.css";
 
 export const metadata: Metadata = {
-  title: "Sidekick",
+  title: "Duskie",
   description: "Proactive desktop companion",
 };
 

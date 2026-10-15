@@ -116,7 +116,7 @@ fn router_models(v: &Value) -> Vec<RouterModel> {
             })
         })
         .collect();
-    // Models that can use Sidekick's tools first, then by name.
+    // Models that can use Duskie's tools first, then by name.
     out.sort_by(|a, b| b.tools.cmp(&a.tools).then_with(|| a.name.cmp(&b.name)));
     out
 }

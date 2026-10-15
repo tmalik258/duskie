@@ -317,7 +317,7 @@ export function ChatControls({
   const local = idOf(agent) === "local";
   const level = LEVELS.find(([v]) => v === effort);
 
-  // Plan windows: this session's warning plus every window Sidekick has seen.
+  // Plan windows: this session's warning plus every window Duskie has seen.
   const now = Date.now();
   const byWindow = new Map<string, { used: number; window: string; resetsAt: number | null; at: number }>();
   for (const u of seenWindows(agent)) {

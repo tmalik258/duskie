@@ -75,7 +75,7 @@ pub fn back_event(
     }
     let chat = chat.unwrap_or_default();
     if !chat.is_empty() {
-        recap.push(format!("Last Sidekick chat: {chat}"));
+        recap.push(format!("Last Duskie chat: {chat}"));
     }
     let short: String = title.chars().take(70).collect();
     Some(Event::new(
@@ -261,7 +261,7 @@ fn worklog_path() -> Option<PathBuf> {
     dirs::document_dir().map(|d| d.join("Sidekick").join("worklog.md"))
 }
 
-/// Appends a dated entry to Documents\Sidekick\worklog.md.
+/// Appends a dated entry to Documents\Sidekick\worklog.md (the folder keeps its old name so earlier entries stay).
 pub fn save_log(text: &str) -> Result<(String, String), String> {
     let path = worklog_path().ok_or("No Documents folder")?;
     if let Some(dir) = path.parent() {
@@ -304,7 +304,7 @@ mod tests {
         assert_eq!(e.payload["app"], "Chrome");
         let recap = e.payload["recap"].as_str().unwrap();
         assert!(recap.contains("- Code: main.rs - sidekick"));
-        assert!(recap.contains("Last Sidekick chat: Fix port 3000"));
+        assert!(recap.contains("Last Duskie chat: Fix port 3000"));
     }
 
     #[test]

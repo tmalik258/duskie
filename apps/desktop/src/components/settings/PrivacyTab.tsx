@@ -1,6 +1,6 @@
 "use client";
 
-// Privacy and data: pause, what Sidekick notices, what it ignores, and what
+// Privacy and data: pause, what Duskie notices, what it ignores, and what
 // it can search. Apps and folders are picked from what is on this PC.
 
 import { useCallback, useEffect, useState } from "react";
@@ -77,7 +77,7 @@ export function PrivacyTab({ onError }: { onError: (e: string) => void }) {
       >
         <SearchSettings onError={onError} />
       </Section>
-      <Section collapsible summary="Switch each one on or off" title="What Sidekick notices" keywords="sensors">
+      <Section collapsible summary="Switch each one on or off" title="What Duskie notices" keywords="sensors">
         {SENSOR_IDS.map(({ id, label, hint }) => (
           <Toggle
             key={id}
@@ -102,7 +102,7 @@ export function PrivacyTab({ onError }: { onError: (e: string) => void }) {
 
 function PauseStatus({ pause }: { pause: Pause }) {
   const now = useNow(10_000);
-  let text = "Sidekick is noticing things.";
+  let text = "Duskie is noticing things.";
   if (pause.kind === "indefinite") text = "Paused until you resume.";
   if (pause.kind === "until" && isPaused(pause, now)) {
     const minutes = Math.max(1, Math.round((Date.parse(pause.until) - now) / 60_000));
@@ -304,7 +304,7 @@ export function Memory({ onError }: { onError: (e: string) => void }) {
         </Button>
       </form>
       <div className="flex items-center gap-2 text-[12px] text-(--muted)">
-        <span className="flex-1">Sidekick also remembers which buttons worked in each app and site.</span>
+        <span className="flex-1">Duskie also remembers which buttons worked in each app and site.</span>
         <Button
           small
           onClick={() =>

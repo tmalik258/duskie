@@ -40,7 +40,7 @@ const LAUNCH_GAP: Duration = Duration::from_millis(700);
 /// Time for the windows to appear before the layout is put back.
 const SETTLE: Duration = Duration::from_secs(6);
 
-/// Shell windows, lock screens and Sidekick itself are not things you open.
+/// Shell windows, lock screens and Duskie itself are not things you open.
 const SKIP_EXES: &[&str] = &[
     "explorer.exe",
     "lockapp.exe",

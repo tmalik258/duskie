@@ -272,7 +272,7 @@ pub struct CapabilityInfo {
     skill_errors: Vec<String>,
 }
 
-/// What browsers and tools Sidekick found, optionally scanning again.
+/// What browsers and tools Duskie found, optionally scanning again.
 #[tauri::command]
 pub async fn capabilities_get(app: AppHandle, rescan: bool) -> CmdResult<CapabilityInfo> {
     let state = app.state::<AppState>();

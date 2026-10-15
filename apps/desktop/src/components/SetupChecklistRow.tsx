@@ -122,12 +122,12 @@ export const SetupRow = memo(function SetupRow({
     startWaiting(item.id, item.title, {
       resumeTab: item.tab ?? "home",
       steps: item.opensApp
-        ? [`Sidekick is starting ${item.title} in the background.`, "This finishes by itself when it is running."]
+        ? [`Duskie is starting ${item.title} in the background.`, "This finishes by itself when it is running."]
         : item.opensTerminal
           ? [
               "PowerShell is open. The command is already on the clipboard.",
               "Replace your-key with your API key, paste (Ctrl+V), press Enter.",
-              "Come back here — Sidekick notices when the key is set. No restart needed.",
+              "Come back here — Duskie notices when the key is set. No restart needed.",
             ]
           : [
               `A PowerShell window is running: ${item.action} ${item.title}.`,

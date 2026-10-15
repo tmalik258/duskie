@@ -1,6 +1,6 @@
 "use client";
 
-// What Sidekick found on this PC — pick rows, one tap to apply.
+// What Duskie found on this PC — pick rows, one tap to apply.
 
 import { useMemo, useState } from "react";
 import { api } from "@/lib/bridge";
@@ -42,7 +42,7 @@ function picksFrom(f: SetupFound, off: Set<string>, settings: Settings): Pick[] 
     list.push({ id: "hooks", title: "Claude hooks", hint: "Hear when it finishes or asks" });
   }
   if (f.claudeInstalled && !f.claudeMcp) {
-    list.push({ id: "mcp", title: "Claude tools", hint: "Let it use Sidekick" });
+    list.push({ id: "mcp", title: "Claude tools", hint: "Let it use Duskie" });
   }
   for (const item of f.installable.filter((i) => i.recommended && !i.done && i.runnable)) {
     list.push({ id: `install:${item.id}`, title: item.title, hint: item.why });

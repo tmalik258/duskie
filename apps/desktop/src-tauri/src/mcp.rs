@@ -1,4 +1,4 @@
-//! Sidekick as an MCP server for Claude Code, over
+//! Duskie as an MCP server for Claude Code, over
 //! Streamable HTTP on 127.0.0.1. Claude Code can search your history,
 //! show a note on the island, open a link, and read today's time.
 //!
@@ -19,7 +19,7 @@ pub const PORT: u16 = 47823;
 const PATH: &str = "/mcp";
 const VERSIONS: &[&str] = &["2025-06-18", "2025-03-26", "2024-11-05"];
 
-/// Config Ask-mode chats pass to Claude Code, so it can use Sidekick's
+/// Config Ask-mode chats pass to Claude Code, so it can use Duskie's
 /// tools too. Lives in the AI workdir, next to nothing else.
 pub const CONFIG_FILE: &str = "sidekick-mcp.json";
 
@@ -192,7 +192,7 @@ fn own_tools() -> Value {
         },
         {
             "name": "sidekick_notify",
-            "description": "Show a short note to the user on the Sidekick island at the top of their screen, for example when a long task finishes.",
+            "description": "Show a short note to the user on the Duskie island at the top of their screen, for example when a long task finishes.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -217,7 +217,7 @@ fn own_tools() -> Value {
         },
         {
             "name": "sidekick_permission",
-            "description": "Used by Claude Code itself to ask the user before a step in a Sidekick session. Never call it yourself.",
+            "description": "Used by Claude Code itself to ask the user before a step in a Duskie session. Never call it yourself.",
             "inputSchema": {
                 "type": "object",
                 "properties": {
@@ -255,7 +255,7 @@ async fn handle(app: &AppHandle, msg: &Value) -> Option<Value> {
                     "protocolVersion": version,
                     "capabilities": { "tools": {} },
                     "serverInfo": { "name": "sidekick", "version": app.package_info().version.to_string() },
-                    "instructions": "Sidekick is the user's desktop assistant on their Windows PC. Use these tools instead of a shell: sidekick_find_files to find files and folders by name, sidekick_search for their history and file contents, sidekick_open and sidekick_show_in_folder to open things, sidekick_screen_text for what is on screen, sidekick_propose to offer a change as a button, sidekick_notify to tell them something finished."
+                    "instructions": "Duskie is the user's desktop assistant on their Windows PC. Use these tools instead of a shell: sidekick_find_files to find files and folders by name, sidekick_search for their history and file contents, sidekick_open and sidekick_show_in_folder to open things, sidekick_screen_text for what is on screen, sidekick_propose to offer a change as a button, sidekick_notify to tell them something finished."
                 }),
             )
         }

@@ -29,7 +29,7 @@ export function ConnectionsTab({ onError }: { onError: (e: string) => void }) {
       </Section>
       <Section
         title="Browser"
-        hint="Talks only to Sidekick on this PC."
+        hint="Talks only to Duskie on this PC."
         keywords="extension chrome edge firefox zen brave pairing code tabs"
       >
         <BrowserCard />

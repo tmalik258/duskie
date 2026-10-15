@@ -45,7 +45,7 @@ function restoreSettings() {
 }
 mkdirSync(SHOTS, { recursive: true });
 
-/** The end of Sidekick's own log, for a failed start. */
+/** The end of Duskie's own log, for a failed start. */
 function appLog() {
   const dir = process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, "app.sidekick.desktop", "logs") : null;
   if (!dir || !existsSync(dir)) return "(no log)";
@@ -70,7 +70,7 @@ async function stop() {
 async function connect() {
   const started = Date.now();
   while (Date.now() - started < 60_000) {
-    if (app.exitCode !== null) throw new Error(`Sidekick exited with code ${app.exitCode}\n${appLog()}`);
+    if (app.exitCode !== null) throw new Error(`Duskie exited with code ${app.exitCode}\n${appLog()}`);
     try {
       browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`);
       for (let i = 0; i < 100; i++) {
@@ -86,7 +86,7 @@ async function connect() {
       await new Promise((r) => setTimeout(r, 500));
     }
   }
-  throw new Error(`could not connect to Sidekick's WebView2 on port ${PORT}\n${appLog()}`);
+  throw new Error(`could not connect to Duskie's WebView2 on port ${PORT}\n${appLog()}`);
 }
 
 let page;

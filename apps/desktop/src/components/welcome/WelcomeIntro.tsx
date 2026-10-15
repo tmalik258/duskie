@@ -1,6 +1,6 @@
 "use client";
 
-// The first welcome step: what Sidekick is, in three short points, then
+// The first welcome step: what Duskie is, in three short points, then
 // your name and whether you work with code (which sets the path ahead).
 
 import { type ReactNode, useEffect, useState } from "react";

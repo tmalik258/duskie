@@ -73,7 +73,7 @@ const hover = (p) => p.mouse.move(380, 25, { steps: 4 });
 const ask = async (p) => {
   await hover(p);
   await p.waitForTimeout(800);
-  await p.getByRole("button", { name: /Ask Sidekick/ }).click();
+  await p.getByRole("button", { name: /Ask Duskie/ }).click();
 };
 const agents = async (p) => {
   await ask(p);

@@ -95,7 +95,7 @@ export function activityLabel(a: Activity, now: number, opts?: { elapsed?: boole
           : "Setting up";
   const label = a.label
     .replace(/^Setting up/, phase)
-    .replace(/^Updating Sidekick$/, `${phase === "Setting up" ? "Updating" : phase} Sidekick`);
+    .replace(/^Updating Duskie$/, `${phase === "Setting up" ? "Updating" : phase} Duskie`);
   const idle = Math.max(0, now - a.lastProgressAt);
   if (a.phase === "unconfirmed" && idle < INACTIVITY_MS) return `${label} · progress unconfirmed`;
   if (idle >= INACTIVITY_MS || a.phase === "unconfirmed") {

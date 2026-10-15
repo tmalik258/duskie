@@ -19,12 +19,12 @@ pub fn create(app: &AppHandle) -> tauri::Result<()> {
             &PredefinedMenuItem::separator(app)?,
             &item(app, "settings", "Settings")?,
             &PredefinedMenuItem::separator(app)?,
-            &item(app, "quit", "Quit Sidekick")?,
+            &item(app, "quit", "Quit Duskie")?,
         ],
     )?;
 
     let mut builder = TrayIconBuilder::with_id("main")
-        .tooltip("Sidekick")
+        .tooltip("Duskie")
         .menu(&menu)
         .on_menu_event(on_menu_event);
     if let Some(icon) = app.default_window_icon() {

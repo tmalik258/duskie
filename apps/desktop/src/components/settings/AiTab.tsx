@@ -65,7 +65,7 @@ export function AiTab({ onError }: { onError: (e: string) => void }) {
       <Section
         title="Voice"
         hint="Runs on this PC. Audio is never saved or sent."
-        keywords="microphone speak talk wake word hey sidekick supertonic conversation"
+        keywords="microphone speak talk wake word hey duskie sidekick supertonic conversation"
       >
         <VoiceSection voice={voice} onError={onError} />
       </Section>
@@ -770,11 +770,11 @@ function VoiceSection({ voice, onError }: { voice: VoiceSettings; onError: (e: s
         checked={voice.interrupt}
         onChange={(interrupt) => void set({ interrupt })}
       />
-      <Field label="Words voice gets wrong" hint="Comma separated. Sidekick fixes them as you talk.">
+      <Field label="Words voice gets wrong" hint="Comma separated. Duskie fixes them as you talk.">
         <TextField
           label="Words voice gets wrong"
           value={voice.fixes ?? ""}
-          placeholder="horsepot = hotspot, sidekik = Sidekick"
+          placeholder="horsepot = hotspot, sidekik = Duskie"
           onCommit={(fixes) => void set({ fixes })}
         />
       </Field>
