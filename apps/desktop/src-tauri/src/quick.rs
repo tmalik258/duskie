@@ -279,7 +279,7 @@ mod tests {
         };
         assert_eq!(m("focus"), Some(None));
         assert_eq!(m("focus for 45 minutes"), Some(Some(45)));
-        assert_eq!(m("hey sidekick focus for an hour"), Some(Some(60)));
+        assert_eq!(m("hey duskie focus for an hour"), Some(Some(60)));
         assert_eq!(m("focus for half an hour"), Some(Some(30)));
         assert_eq!(m("start focus mode"), Some(None));
         assert_eq!(m("focus for 2 hours"), Some(Some(120)));
