@@ -31,6 +31,7 @@ import { type Activity as ActivityItem, isPaused, type MascotState, type Suggest
 import { updateBusy, updateLabel } from "@/lib/updates";
 import { Announcer } from "./Announcer";
 import { ASK_MASCOT, ASK_ORB, ASK_PAD, AskPanel, VoiceBars } from "./AskPanel";
+import { Creature } from "./Creature";
 import { Icon } from "./Icon";
 import { Glance, RoundButton } from "./IslandGlance";
 import { IslandGuide, useGuide } from "./IslandGuide";
@@ -38,7 +39,6 @@ import { IslandSettings } from "./IslandSettings";
 import { IslandWash } from "./IslandWash";
 import { IslandWelcome } from "./IslandWelcome";
 import { MergeCard } from "./MergeCard";
-import { Orb } from "./Orb";
 import { PreparingVoice } from "./PreparingVoice";
 import { Tip } from "./Tip";
 import { UpdateProgress } from "./UpdateProgress";
@@ -663,7 +663,7 @@ export function Island() {
           transition={transition}
           style={{ originX: 0, originY: 0 }}
         >
-          <Orb
+          <Creature
             state={chatting && mascot === "idle" ? "working" : mascot}
             face={chatting && mascot === "idle" ? null : face}
             size={ORB}
