@@ -225,7 +225,7 @@ pub enum Trigger {
 /// How much a notification interrupts.
 pub const NOTIFY_LEVELS: &[&str] = &["now", "soon", "digest", "never"];
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct NotificationSettings {
     /// Read and sort Windows notifications.
@@ -235,6 +235,10 @@ pub struct NotificationSettings {
     pub apps: BTreeMap<String, String>,
     /// People whose messages always come through right away.
     pub vip: Vec<String>,
+    /// Normal (soft sound for quieter things) or Calm (sound only for Urgent).
+    pub profile: crate::attention::Profile,
+    /// What Duskie learned from what you act on and ask for less of.
+    pub lessons: crate::attention::Lessons,
 }
 
 impl Default for NotificationSettings {
@@ -245,6 +249,8 @@ impl Default for NotificationSettings {
             enabled: true,
             apps: BTreeMap::new(),
             vip: Vec::new(),
+            profile: crate::attention::Profile::Normal,
+            lessons: crate::attention::Lessons::default(),
         }
     }
 }
