@@ -337,7 +337,6 @@ pub struct DirectMcpServer {
     pub args: Vec<String>,
 }
 
-
 /// Direct MCP connections the user added in Settings > Apps.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
