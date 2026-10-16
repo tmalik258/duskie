@@ -107,7 +107,7 @@ fn unbind_keys(app: &AppHandle) {
     bind_guide_keys(app);
 }
 
-/// Buttons on the guide card (the steps shown while Sidekick waits on
+/// Buttons on the guide card (the steps shown while Duskie waits on
 /// something you finish in another app). The island has no focus there, so
 /// like a suggestion's options they are global Alt keys: Alt+1..N press a
 /// button, Alt+0 cancels.
@@ -676,7 +676,7 @@ async fn execute(
                 },
             );
             return Ok(sidekick_actions::Outcome {
-                message: "Asking Sidekick".into(),
+                message: "Asking Duskie".into(),
                 path: None,
             });
         }
@@ -1009,7 +1009,7 @@ pub fn current(app: &AppHandle) -> Option<Suggestion> {
 }
 
 /// Shows the next queued proposal once the island is free again.
-/// How long a file Sidekick made is ignored by the downloads sensor.
+/// How long a file Duskie made is ignored by the downloads sensor.
 const OWN_FILE_FOR: Duration = Duration::from_secs(120);
 
 fn remember_own_file(app: &AppHandle, path: &str) {
@@ -1019,7 +1019,7 @@ fn remember_own_file(app: &AppHandle, path: &str) {
     own.insert(std::path::PathBuf::from(path), Instant::now());
 }
 
-/// True for a file one of Sidekick's own actions just created.
+/// True for a file one of Duskie's own actions just created.
 pub fn is_own_file(app: &AppHandle, path: &str) -> bool {
     lock(&app.state::<AppState>().own_files)
         .get(std::path::Path::new(path))

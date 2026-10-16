@@ -31,6 +31,7 @@ import { type Activity as ActivityItem, isPaused, type MascotState, type Suggest
 import { updateBusy, updateLabel } from "@/lib/updates";
 import { Announcer } from "./Announcer";
 import { ASK_MASCOT, ASK_ORB, ASK_PAD, AskPanel, VoiceBars } from "./AskPanel";
+import { Creature } from "./Creature";
 import { Icon } from "./Icon";
 import { Glance, RoundButton } from "./IslandGlance";
 import { IslandGuide, useGuide } from "./IslandGuide";
@@ -38,13 +39,12 @@ import { IslandSettings } from "./IslandSettings";
 import { IslandWash } from "./IslandWash";
 import { IslandWelcome } from "./IslandWelcome";
 import { MergeCard } from "./MergeCard";
-import { Orb } from "./Orb";
 import { PreparingVoice } from "./PreparingVoice";
 import { Tip } from "./Tip";
 import { UpdateProgress } from "./UpdateProgress";
 
 const TITLE: Record<MascotState, string> = {
-  idle: "Sidekick",
+  idle: "Duskie",
   sleeping: "Resting",
   noticing: "Something changed",
   suggesting: "Suggestion",
@@ -341,7 +341,7 @@ export function Island() {
     !needsAttention &&
     !waiting &&
     !(voiceStatus?.models.some((m) => m.id === "voice" && m.installed) ?? false);
-  // A guide stays open while Sidekick waits on something you finish elsewhere.
+  // A guide stays open while Duskie waits on something you finish elsewhere.
   const guiding = !!waiting && !waiting.minimized && (waiting.steps?.length ?? 0) > 0;
   // Voice / in-flight Ask with Ask closed: Listening / Thinking / Working pill.
   // Stay non-bare so the hit rect stays usable (Idle alone would shrink to a
@@ -616,7 +616,7 @@ export function Island() {
 
   // Number keys must not pick a suggestion while the user is typing.
   useSuggestionKeys(asking ? null : suggestion);
-  // WebView chrome: Ctrl+J is Downloads — not a Sidekick feature.
+  // WebView chrome: Ctrl+J is Downloads — not a Duskie feature.
   useBlockBrowserKeys();
 
   if (!ready) return null;
@@ -663,7 +663,7 @@ export function Island() {
           transition={transition}
           style={{ originX: 0, originY: 0 }}
         >
-          <Orb
+          <Creature
             state={chatting && mascot === "idle" ? "working" : mascot}
             face={chatting && mascot === "idle" ? null : face}
             size={ORB}

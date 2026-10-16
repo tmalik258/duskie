@@ -26,7 +26,7 @@ pub fn routines_remove(app: AppHandle, kind: String, key: String) -> CmdResult<u
     crate::routines::remove(&app, &kind, &key)
 }
 
-/// Everything Sidekick has learned, for Settings > Memory.
+/// Everything Duskie has learned, for Settings > Memory.
 #[tauri::command]
 pub async fn learned_list(app: AppHandle) -> Vec<crate::learned::Learned> {
     off_ui(move || crate::learned::list(&app))
@@ -353,7 +353,7 @@ fn write_backup(app: &AppHandle) -> CmdResult<String> {
     });
     let dir = dirs::document_dir().ok_or("no Documents folder")?;
     let path = dir.join(format!(
-        "Sidekick backup {}.json",
+        "Duskie backup {}.json",
         chrono::Local::now().format("%Y-%m-%d %H%M")
     ));
     let text = serde_json::to_string_pretty(&bundle).map_err(|e| e.to_string())?;
@@ -366,9 +366,9 @@ fn write_backup(app: &AppHandle) -> CmdResult<String> {
 #[tauri::command]
 pub fn backup_import(app: AppHandle, text: String) -> CmdResult<String> {
     let bundle: serde_json::Value =
-        serde_json::from_str(&text).map_err(|_| "This is not a Sidekick backup.".to_string())?;
+        serde_json::from_str(&text).map_err(|_| "This is not a Duskie backup.".to_string())?;
     if bundle["sidekickBackup"].as_u64().is_none() {
-        return Err("This is not a Sidekick backup.".into());
+        return Err("This is not a Duskie backup.".into());
     }
     let state = app.state::<AppState>();
     let mut installed = 0;

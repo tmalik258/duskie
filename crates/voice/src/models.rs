@@ -142,7 +142,7 @@ fn download(
     progress: &mut impl FnMut(u64, u64),
 ) -> Result<()> {
     let client = reqwest::blocking::Client::builder()
-        .user_agent("Sidekick")
+        .user_agent("Duskie")
         .timeout(None)
         .build()
         .map_err(|e| VoiceError::Download(e.to_string()))?;

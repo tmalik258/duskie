@@ -63,8 +63,8 @@ pub struct AppState {
     pub scratch_dir: PathBuf,
     /// Some AI provider is switched on and reachable (skills `requires: [ai]`).
     pub ai_ready: AtomicBool,
-    /// Files Sidekick's own actions just created, so the downloads sensor
-    /// seeing them does not trigger a suggestion about Sidekick's output.
+    /// Files Duskie's own actions just created, so the downloads sensor
+    /// seeing them does not trigger a suggestion about Duskie's output.
     pub own_files: Mutex<HashMap<PathBuf, Instant>>,
     /// Time per app and project.
     pub tracker: crate::timetrack::Tracker,
@@ -86,7 +86,7 @@ pub struct AppState {
     pub calendar: sidekick_sensors::Calendar,
     /// Claude Code permission requests waiting on the island.
     pub approvals: sidekick_sensors::Approvals,
-    /// Sidekick's app data folder.
+    /// Duskie's app data folder.
     pub data_dir: PathBuf,
     /// The background features (brief, moments, search, updates...) are
     /// running; they start once onboarding is done.
@@ -132,7 +132,7 @@ pub struct Suggestion {
     /// Which options can become "Always do this": safe to run on their own.
     pub always: Vec<bool>,
     /// Why this showed, from how often you took this kind before. Empty
-    /// for Sidekick's own notices.
+    /// for Duskie's own notices.
     pub why: String,
 }
 
@@ -168,7 +168,7 @@ pub fn executor(state: &AppState) -> Arc<Executor> {
         .clone()
 }
 
-/// Whether the user paused Sidekick: nothing shows or runs on its own.
+/// Whether the user paused Duskie: nothing shows or runs on its own.
 pub fn is_paused(app: &tauri::AppHandle) -> bool {
     use tauri::Manager;
     lock(&app.state::<AppState>().settings)

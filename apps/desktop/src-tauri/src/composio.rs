@@ -152,7 +152,7 @@ async fn access_token(force: bool) -> Result<String, String> {
     Ok(access)
 }
 
-/// Headers that sign Sidekick in: the consumer key, the OAuth token, or
+/// Headers that sign Duskie in: the consumer key, the OAuth token, or
 /// headers given by hand.
 async fn auth_headers(c: &ComposioSettings, force: bool) -> Result<Vec<(String, String)>, String> {
     if let Some(key) = crate::secrets::get(api::CONSUMER_KEY_NAME) {
@@ -257,7 +257,7 @@ async fn call(c: &ComposioSettings, tool: &str, args: Value) -> Result<Value, St
     api::parse_text(&text)
 }
 
-/// Runs one app tool for Sidekick itself (calendar, brief, notes).
+/// Runs one app tool for Duskie itself (calendar, brief, notes).
 /// When several accounts are connected, fans out with `account` and merges lists.
 pub async fn run_tool(c: &ComposioSettings, tool: &str, args: Value) -> Result<Value, String> {
     async fn once(c: &ComposioSettings, tool: &str, args: Value) -> Result<Value, String> {
@@ -364,7 +364,7 @@ pub fn blocked(name: &str, args: &Value) -> Option<String> {
 }
 
 /// Composio's own plumbing: connecting accounts, its sandbox, feedback.
-/// Sidekick handles connections in Settings, so the model never sees these.
+/// Duskie handles connections in Settings, so the model never sees these.
 fn plumbing(name: &str) -> bool {
     let upper = name.to_ascii_uppercase();
     [
@@ -499,7 +499,7 @@ impl ToolRunner for Runner {
                 .into();
         }
         if plumbing(name) {
-            return "Error: app connections are managed in Sidekick's Settings > Apps, not here."
+            return "Error: app connections are managed in Duskie's Settings > Apps, not here."
                 .into();
         }
         if let Some(what) = blocked(name, arguments) {
@@ -599,7 +599,7 @@ async fn inject_screen_ocr(app: &AppHandle, req: &mut ChatRequest, png: &[u8]) {
     }
 }
 
-/// The local model with Sidekick's own tools (search, today, recent, open),
+/// The local model with Duskie's own tools (search, today, recent, open),
 /// plus Composio's when they are set up and reachable.
 pub struct LocalWithTools {
     pub inner: OpenAiCompat,
@@ -803,7 +803,7 @@ async fn open_chat_client(
 }
 
 /// Connects to Composio for a chat, reusing the last connection. Unreachable
-/// is not an error: the chat goes on with Sidekick's own tools.
+/// is not an error: the chat goes on with Duskie's own tools.
 async fn connect(
     (url, headers): &(String, Vec<(String, String)>),
     cancel: &CancellationToken,
@@ -893,7 +893,7 @@ pub fn handoff_markdown(
     context: &crate::ai::Context,
 ) -> String {
     let mut md = String::from(
-        "# Continued from Sidekick\n\nThe user started this in Sidekick (a desktop assistant) \
+        "# Continued from Duskie\n\nThe user started this in Duskie (a desktop assistant) \
          with a small local model, which handed it over to you. Read the conversation, then \
          continue it: answer the latest request, using your tools (including Composio) \
          where needed. Ask before changing anything.\n",
@@ -915,7 +915,7 @@ pub fn handoff_markdown(
     for m in messages {
         let who = match m.role {
             sidekick_ai::Role::User => "User",
-            sidekick_ai::Role::Assistant => "Sidekick",
+            sidekick_ai::Role::Assistant => "Duskie",
         };
         md.push_str(&format!("\n**{who}:**\n\n{}\n", m.content.trim()));
     }
@@ -1072,7 +1072,7 @@ pub fn sign_out(app: &AppHandle) -> Result<(), String> {
     crate::commands::apply_settings(app, settings).map(|_| ())
 }
 
-/// Every app connected in the account: Sidekick's own (connected or not)
+/// Every app connected in the account: Duskie's own (connected or not)
 /// first, then the rest. The last good answer is kept, so Settings still
 /// shows it when Composio is slow.
 pub async fn apps(c: &ComposioSettings) -> Result<Vec<api::App>, String> {
@@ -1362,6 +1362,6 @@ mod tests {
         assert!(md.contains("ABC-1 to Done"));
         assert!(md.contains("JIRA_TRANSITION_ISSUE"));
         assert!(md.contains("Visual Studio Code"));
-        assert!(md.find("**User:**").unwrap() < md.find("**Sidekick:**").unwrap());
+        assert!(md.find("**User:**").unwrap() < md.find("**Duskie:**").unwrap());
     }
 }

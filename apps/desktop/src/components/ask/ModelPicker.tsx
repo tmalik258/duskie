@@ -26,7 +26,7 @@ const SHORT: Record<string, string> = {
   local: "Local",
 };
 
-/** The model that answers in Ask mode: Auto (Sidekick picks) or one of
+/** The model that answers in Ask mode: Auto (Duskie picks) or one of
  * those that can answer now. Kept for next time. */
 export function ModelPicker({
   choices,

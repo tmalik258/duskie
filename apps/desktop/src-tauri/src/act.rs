@@ -1,4 +1,4 @@
-//! Acting outside the PC's own files: on web pages (through the Sidekick
+//! Acting outside the PC's own files: on web pages (through the Duskie
 //! extension, in the user's signed-in browser) and in connected apps
 //! (through Composio).
 //!
@@ -109,7 +109,7 @@ pub(crate) fn agent_settings(app: &AppHandle) -> sidekick_core::AgentSettings {
     lock(&app.state::<AppState>().settings).agent.clone()
 }
 
-/// Sites the user keeps Sidekick out of: the ignore list and Never.
+/// Sites the user keeps Duskie out of: the ignore list and Never.
 fn never_sites(app: &AppHandle) -> Vec<String> {
     let state = app.state::<AppState>();
     let s = lock(&state.settings);
@@ -260,7 +260,7 @@ async fn ask(app: &AppHandle, mut cmd: Value) -> Result<Value, String> {
     let bridge = app.state::<AppState>().browser.clone();
     if !bridge.connected() {
         return Err(
-            "the Sidekick browser extension is not connected (Settings > Apps > Browser)".into(),
+            "the Duskie browser extension is not connected (Settings > Apps > Browser)".into(),
         );
     }
     cmd["deny"] = json!(never_sites(app));
@@ -386,9 +386,7 @@ async fn act(app: &AppHandle, chat_id: &str, args: &Value) -> String {
         risk(what, &kind, &label, text),
     );
     if gate == Gate::Refuse {
-        return format!(
-            "Error: the user keeps Sidekick out of {place} (Settings > Skills > Agent)."
-        );
+        return format!("Error: the user keeps Duskie out of {place} (Settings > Skills > Agent).");
     }
     if gate == Gate::Tap {
         let shown = if label.is_empty() {
@@ -426,7 +424,7 @@ async fn act(app: &AppHandle, chat_id: &str, args: &Value) -> String {
     }
 }
 
-/// The app the user was in before Sidekick (or one they named).
+/// The app the user was in before Duskie (or one they named).
 fn desktop_target(app: &AppHandle, args: &Value) -> sidekick_actions::uia::Target {
     let named = args["app"].as_str().filter(|a| !a.trim().is_empty());
     let pid = lock(&app.state::<AppState>().last_window)
@@ -472,7 +470,7 @@ pub async fn desktop(app: &AppHandle, chat_id: &str, args: &Value) -> String {
                     *w = place.clone();
                 }
                 if place_rule(&agent_settings(app), &place).as_deref() == Some("never") {
-                    return format!("The user keeps Sidekick out of {place}; do not use it.");
+                    return format!("The user keeps Duskie out of {place}; do not use it.");
                 }
                 format!("{}{}", s.describe(), know_how(app, &place))
             })
@@ -507,7 +505,7 @@ pub async fn desktop(app: &AppHandle, chat_id: &str, args: &Value) -> String {
             let gate = decide(&agent_settings(app), &place, risk(&what, &kind, &name, ""));
             if gate == Gate::Refuse {
                 return format!(
-                    "Error: the user keeps Sidekick out of {place} (Settings > Skills > Agent)."
+                    "Error: the user keeps Duskie out of {place} (Settings > Skills > Agent)."
                 );
             }
             if gate == Gate::Tap {
@@ -542,7 +540,7 @@ pub async fn desktop(app: &AppHandle, chat_id: &str, args: &Value) -> String {
             let gate = decide(&agent_settings(app), &place, level);
             if gate == Gate::Refuse {
                 return format!(
-                    "Error: the user keeps Sidekick out of {place} (Settings > Skills > Agent)."
+                    "Error: the user keeps Duskie out of {place} (Settings > Skills > Agent)."
                 );
             }
             if gate == Gate::Tap {
@@ -582,7 +580,7 @@ pub async fn desktop(app: &AppHandle, chat_id: &str, args: &Value) -> String {
             );
             if gate == Gate::Refuse {
                 return format!(
-                    "Error: the user keeps Sidekick out of {place} (Settings > Skills > Agent)."
+                    "Error: the user keeps Duskie out of {place} (Settings > Skills > Agent)."
                 );
             }
             match find_on_screen(app, &want).await {

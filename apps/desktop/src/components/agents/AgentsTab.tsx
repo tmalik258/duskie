@@ -538,7 +538,7 @@ function pickerNote(a: AgentInfo): string {
 
 function readyNote(a: AgentInfo): string {
   if (!a.installed) {
-    // Cursor app on PATH is not the agent CLI Sidekick runs.
+    // Cursor app on PATH is not the agent CLI Duskie runs.
     if (a.id === "cursor") return "Needs agent CLI";
     return "Not installed";
   }
@@ -1114,7 +1114,7 @@ function SessionView({
                   Resume
                 </button>
                 <span className="ak-note">
-                  {s.restored ? "Sidekick restarted since this ran." : "This session ended."} Resume carries on where it
+                  {s.restored ? "Duskie restarted since this ran." : "This session ended."} Resume carries on where it
                   stopped.
                 </span>
               </div>
@@ -1700,7 +1700,7 @@ export function Composer({
           limit={s.limit}
           onCompact={
             (s.agent === "Claude Code" || s.agent === "Codex") && !working
-              ? () => runCommand({ name: "/compact", description: "", group: "Sidekick", execution: "control" })
+              ? () => runCommand({ name: "/compact", description: "", group: "Duskie", execution: "control" })
               : undefined
           }
           keys={working ? "Esc interrupt" : "Enter send"}

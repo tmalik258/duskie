@@ -135,7 +135,7 @@ fn decision(id: &str, title: &str, updated: &str, user_turns: usize, excerpt: &s
         state: format!(
             "Past Ask chat titled \"{title}\". Last updated {age}. {user_turns} user message(s). {clip}"
         ),
-        question: "Should Sidekick keep this past Ask chat?".into(),
+        question: "Should Duskie keep this past Ask chat?".into(),
         options: vec![
             DecisionOption {
                 id: "keep".into(),

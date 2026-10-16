@@ -1,5 +1,5 @@
 //! The name index for every drive: built in the background once a day,
-//! on mains power and while Sidekick is not paused, then used by file
+//! on mains power and while Duskie is not paused, then used by file
 //! search in Ask and instant results. Searches read through their own
 //! connection, so a build never makes them wait.
 
@@ -67,7 +67,7 @@ fn build(app: &AppHandle) {
         return;
     };
     let started = std::time::Instant::now();
-    // Stops (keeping the old index) if the PC goes on battery or Sidekick is paused.
+    // Stops (keeping the old index) if the PC goes on battery or Duskie is paused.
     // Yields 2 ms every ~2 048 files so foreground disk I/O (SQLite, git) is not starved.
     let result = writer.rebuild(&drive_roots(), || {
         if !sidekick_sensors::on_mains() || crate::state::is_paused(app) {

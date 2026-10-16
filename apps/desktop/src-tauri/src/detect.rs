@@ -1,4 +1,4 @@
-//! First-run detection: what Sidekick can set up without asking the user
+//! First-run detection: what Duskie can set up without asking the user
 //! to type anything. Code folders come from the usual places and from VS
 //! Code's recent projects (WSL ones included); search folders are the
 //! standard ones that exist; models are whatever Ollama already has.

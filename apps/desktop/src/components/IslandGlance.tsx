@@ -676,14 +676,14 @@ function CrashCard({ note, onDone }: { note: string; onDone: () => void }) {
   const dismiss = () => void api.crashDismiss().then(onDone);
   const report = () =>
     void api.appInfo().then((info) => {
-      const body = `Sidekick ${info.version} closed unexpectedly.\n\n\`\`\`\n${note}\n\`\`\`\n\nWhat I was doing:\n`;
+      const body = `Duskie ${info.version} closed unexpectedly.\n\n\`\`\`\n${note}\n\`\`\`\n\nWhat I was doing:\n`;
       const url = `${ISSUES}?title=${encodeURIComponent("Crash report")}&body=${encodeURIComponent(body)}`;
       void api.aiOpenLink(url).then(dismiss);
     });
   return (
     <div className="flex flex-col">
       <CardHead
-        title="Sidekick closed unexpectedly"
+        title="Duskie closed unexpectedly"
         detail="The report has the version and the error, nothing else. You read it before it is sent."
       />
       <CardNote>

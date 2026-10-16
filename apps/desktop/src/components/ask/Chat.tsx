@@ -554,7 +554,7 @@ export function seconds(ms: number): string {
   return ms < 1000 ? `${Math.round(ms / 10) * 10} ms` : `${(ms / 1000).toFixed(1)} s`;
 }
 
-/** Before the first words: one shimmering line saying what Sidekick is
+/** Before the first words: one shimmering line saying what Duskie is
  * doing, with a timer. */
 export function LiveStep({ step, since }: { step: string | null; since?: number }) {
   const now = useNow(100);
@@ -599,7 +599,7 @@ function OfflineChips() {
     return () => window.removeEventListener("keydown", onKey);
   }, [online, waiting]);
   if (online) return null;
-  if (waiting) return <p className="ak-done">Sidekick asks again as soon as the internet is back.</p>;
+  if (waiting) return <p className="ak-done">Duskie asks again as soon as the internet is back.</p>;
   return (
     <div className="ak-chips">
       <button type="button" onClick={askWhenOnline} className="ak-chip primary chip">

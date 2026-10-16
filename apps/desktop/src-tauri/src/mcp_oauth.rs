@@ -1,6 +1,6 @@
 //! Signing in to a remote MCP server with OAuth, the way Claude Desktop's
 //! Connect button does: find the server's sign-in service, register
-//! Sidekick with it, open the browser, catch the answer on a local port
+//! Duskie with it, open the browser, catch the answer on a local port
 //! and keep the tokens. Works for any server that follows the MCP
 //! authorization spec (Composio Connect among them).
 //!
@@ -213,12 +213,12 @@ pub async fn discover(mcp_url: &str) -> Result<Discovery, String> {
     })
 }
 
-/// Registers Sidekick with the sign-in service (RFC 7591).
+/// Registers Duskie with the sign-in service (RFC 7591).
 async fn register(endpoint: &str, redirect: &str) -> Result<(String, String), String> {
     let resp = client()
         .post(endpoint)
         .json(&serde_json::json!({
-            "client_name": "Sidekick",
+            "client_name": "Duskie",
             "redirect_uris": [redirect],
             "grant_types": ["authorization_code", "refresh_token"],
             "response_types": ["code"],
@@ -231,7 +231,7 @@ async fn register(endpoint: &str, redirect: &str) -> Result<(String, String), St
     let v: Value = resp.json().await.unwrap_or(Value::Null);
     if !status.is_success() {
         return Err(format!(
-            "the sign-in service refused Sidekick ({status}): {}",
+            "the sign-in service refused Duskie ({status}): {}",
             v["error_description"].as_str().unwrap_or("no details")
         ));
     }
@@ -351,9 +351,9 @@ fn decode(s: &str) -> String {
     String::from_utf8_lossy(&out).into_owned()
 }
 
-const DONE_PAGE: &str = "<!doctype html><meta charset=utf-8><title>Sidekick</title>\
+const DONE_PAGE: &str = "<!doctype html><meta charset=utf-8><title>Duskie</title>\
 <body style=\"font-family:system-ui;background:#000;color:#fff;display:grid;place-items:center;height:100vh;margin:0\">\
-<div style=\"text-align:center\"><h2>Connected</h2><p style=\"color:#aaa\">You can close this tab and go back to Sidekick.</p></div>";
+<div style=\"text-align:center\"><h2>Connected</h2><p style=\"color:#aaa\">You can close this tab and go back to Duskie.</p></div>";
 
 /// Waits for the browser to come back with a code.
 async fn catch_code(listener: TcpListener, state: &str) -> Result<String, String> {
@@ -379,7 +379,7 @@ async fn catch_code(listener: TcpListener, state: &str) -> Result<String, String
         let (status, page, result) = match (code, error) {
             _ if got_state.as_deref() != Some(state) => (
                 "400 Bad Request",
-                "Sign-in did not match. Press Connect in Sidekick again.".to_owned(),
+                "Sign-in did not match. Press Connect in Duskie again.".to_owned(),
                 Err("The sign-in did not match. Press Connect again.".to_owned()),
             ),
             (Some(code), _) => ("200 OK", DONE_PAGE.to_owned(), Ok(code)),

@@ -55,7 +55,7 @@ async function connect() {
   while (Date.now() - started < 60_000) {
     if (app.exitCode !== null)
       throw new Error(
-        `the test build closed at once (code ${app.exitCode}). Is your normal Sidekick still running? Quit it from the tray and run this again.`,
+        `the test build closed at once (code ${app.exitCode}). Is your normal Duskie still running? Quit it from the tray and run this again.`,
       );
     try {
       browser = await chromium.connectOverCDP(`http://127.0.0.1:${PORT}`);
@@ -71,7 +71,7 @@ async function connect() {
       await new Promise((r) => setTimeout(r, 500));
     }
   }
-  throw new Error(`could not connect to Sidekick on port ${PORT}. Is the e2e build running elsewhere?`);
+  throw new Error(`could not connect to Duskie on port ${PORT}. Is the e2e build running elsewhere?`);
 }
 
 const page = await connect().catch(async (e) => {

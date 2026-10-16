@@ -34,7 +34,7 @@ pub struct Freeze {
     /// The command that held the thread, or "stall" from the heartbeat.
     pub what: String,
     pub ms: u64,
-    /// Seconds since Sidekick started.
+    /// Seconds since Duskie started.
     pub at: u64,
 }
 

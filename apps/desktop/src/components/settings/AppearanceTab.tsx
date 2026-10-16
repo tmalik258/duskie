@@ -5,7 +5,8 @@
 
 import { updateSettings, useSidekick } from "@/lib/store";
 import { ISLAND_COLORS, type IslandColor, THEMES } from "@/lib/types";
-import { Orb, THEME_STYLES } from "../Orb";
+import { Creature } from "../Creature";
+import { THEME_STYLES } from "../Orb";
 import { Field, Section, Select, TextField, Toggle } from "./ui";
 
 const COLLAPSE_OPTIONS: [string, string][] = [
@@ -66,7 +67,7 @@ export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
               className={tile(settings.theme === t)}
             >
               <span className="orb-still">
-                <Orb state="idle" size={34} theme={t} magnetic={false} simple active={false} />
+                <Creature state="idle" size={34} theme={t} magnetic={false} simple active={false} />
               </span>
               {THEME_STYLES[t].label}
             </button>
@@ -78,8 +79,8 @@ export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
           <TextField
             label="Assistant name"
             value={settings.assistantName}
-            placeholder="Sidekick"
-            onCommit={(assistantName) => save({ assistantName: assistantName || "Sidekick" })}
+            placeholder="Duskie"
+            onCommit={(assistantName) => save({ assistantName: assistantName || "Duskie" })}
           />
         </Field>
       </Section>
@@ -112,7 +113,7 @@ export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
                 }}
               >
                 <span className="orb-still">
-                  <Orb state="idle" size={15} theme={settings.theme} magnetic={false} simple active={false} />
+                  <Creature state="idle" size={15} theme={settings.theme} magnetic={false} simple active={false} />
                 </span>
                 <span className="h-[4px] w-[26px] rounded-full bg-white/55" />
               </span>
@@ -132,7 +133,7 @@ export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
         </Field>
         <Toggle
           label="Alive mode"
-          hint="While nothing is happening, Sidekick glances around, blinks and smiles now and then. No sounds."
+          hint="While nothing is happening, Duskie glances around, blinks and smiles now and then. No sounds."
           checked={settings.alive}
           onChange={(alive) => save({ alive })}
         />
@@ -155,7 +156,7 @@ export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
 
 /** What saying the name does, and a warning for names that wake by mistake. */
 function nameHint(name: string): string {
-  const said = `Say "Hey ${name || "Sidekick"}" to talk. "Hey Sidekick" keeps working too.`;
+  const said = `Say "Hey ${name || "Duskie"}" to talk. "Hey Duskie" keeps working too.`;
   const vowels = (name.toLowerCase().match(/[aeiouy]+/g) ?? []).length;
   return name.length < 4 || vowels < 2
     ? `${said} Short names wake by mistake more often; two syllables or more work best.`

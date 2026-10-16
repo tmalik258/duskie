@@ -1,4 +1,4 @@
-# Enable Windows Error Reporting local full dumps for Sidekick (debug only).
+# Enable Windows Error Reporting local full dumps for Duskie (debug only).
 # Run once in an elevated PowerShell from the repo root:
 #   powershell -ExecutionPolicy Bypass -File .\scripts\enable-local-dumps.ps1
 #
