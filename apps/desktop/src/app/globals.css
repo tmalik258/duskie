@@ -4629,3 +4629,25 @@ button.ak-cchip:hover,
   font-size: 13px;
   color: rgb(242 240 235 / 0.55);
 }
+
+/* Pill labels morph word by word instead of swapping. */
+.cmp-label .words span {
+  display: inline;
+}
+.cmp-label .words .new {
+  display: inline-block;
+  white-space: pre;
+  animation: wordin 0.26s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+@keyframes wordin {
+  from {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translateY(3px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cmp-label .words .new {
+    animation: none;
+  }
+}

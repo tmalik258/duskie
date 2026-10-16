@@ -5,7 +5,7 @@
 // shell fits it (the shell springs to whatever this measures).
 
 import { motion } from "motion/react";
-import { type ReactNode, useLayoutEffect, useRef } from "react";
+import { type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
 import { api } from "@/lib/bridge";
 import { useNow } from "@/lib/hooks";
 import { Ic, Icon } from "./Icon";
@@ -150,12 +150,33 @@ export function RedesignPill({ model, onWidth }: { model: PillModel; onWidth: (w
         <span
           className={`cmp-label${kind === "suggest" || kind === "notify" ? " nt" : ""}${kind === "listening" ? " words" : ""}`}
         >
-          {model.label}
+          <MorphLabel text={model.label} />
           {model.dim && <span className="dim"> {model.dim}</span>}
         </span>
         {trail && <span className="cmp-trail">{trail}</span>}
       </motion.div>
     </>
+  );
+}
+
+/** The label morphs word by word: words that changed blur in, the rest stay. */
+function MorphLabel({ text }: { text: string }) {
+  const prev = useRef<string[]>([]);
+  const words = text.split(" ");
+  const old = prev.current;
+  useEffect(() => {
+    prev.current = words;
+  });
+  return (
+    <span className="words">
+      {words.map((w, i) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: position is the identity of a word in the label
+        <span key={`${i}-${w}`} className={old.length && old[i] !== w ? "new" : undefined}>
+          {i ? " " : ""}
+          {w}
+        </span>
+      ))}
+    </span>
   );
 }
 
