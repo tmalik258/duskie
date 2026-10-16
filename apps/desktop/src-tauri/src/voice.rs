@@ -804,7 +804,7 @@ fn on_heard(app: &AppHandle, heard: Heard) {
                 // Clears what showed as heard; an empty answer asks nothing.
                 emit_heard(app, String::new(), true);
                 let result = match match_choice(&text, &labels) {
-                    Choice::Option(i) => crate::suggestions::choose(app, &id, i),
+                    Choice::Option(i) => crate::suggestions::choose_by_voice(app, &id, i),
                     Choice::Dismiss => crate::suggestions::dismiss(app, &id, "voice"),
                     Choice::Unclear => Ok(()),
                 };

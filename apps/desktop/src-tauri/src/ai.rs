@@ -825,6 +825,7 @@ pub fn chat(
             .map(|m| m.content.clone());
         if let Some(q) = question.as_deref() {
             log_ask_user(&id, q, &attach, local_only);
+            crate::ask_tools::begin_turn(&id, q);
         }
         let image = if attach.screen {
             match screenshot(&app).await {

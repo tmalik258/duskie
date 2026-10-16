@@ -578,6 +578,25 @@ pub fn choose(app: &AppHandle, id: &str, index: usize) -> Result<(), String> {
     run_choice(app, id, index, false)
 }
 
+/// A spoken pick: a destructive option stays on screen and waits for a tap,
+/// so voice alone never confirms it.
+pub fn choose_by_voice(app: &AppHandle, id: &str, index: usize) -> Result<(), String> {
+    let action = {
+        let state = app.state::<AppState>();
+        let current = lock(&state.active);
+        match current.as_ref() {
+            Some(a) if a.ui.id == id => a.proposal.options.get(index).map(|o| o.action.clone()),
+            _ => None,
+        }
+    }
+    .ok_or("suggestion is no longer active")?;
+    if !duskie_core::live::voice_may_choose(&action) {
+        crate::voice::say_now(app, "That one needs a tap on screen.");
+        return Ok(());
+    }
+    run_choice(app, id, index, false)
+}
+
 fn run_choice(app: &AppHandle, id: &str, index: usize, auto: bool) -> Result<(), String> {
     let active = take(app, id)?;
     let option = active

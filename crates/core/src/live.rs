@@ -222,6 +222,87 @@ pub fn risk_of(name: &str) -> Risk {
     tool(name).map_or(Risk::Destructive, |t| t.risk)
 }
 
+/// Suggestion actions that cannot be undone. Voice can never pick these;
+/// they need a tap.
+pub const DESTRUCTIVE_ACTIONS: &[&str] = &[
+    "clean_downloads",
+    "clean_installers",
+    "empty_recycle_bin",
+    "git_delete_branches",
+    "kill_port",
+    "close_app",
+    "trash_download",
+    "uninstall",
+    "delete_file",
+];
+
+pub fn voice_may_choose(action: &str) -> bool {
+    !DESTRUCTIVE_ACTIONS.contains(&action)
+}
+
+/// Words that ask Duskie to do something rather than tell something.
+const ACTION_WORDS: &[&str] = &[
+    "open",
+    "send",
+    "reply",
+    "draft",
+    "write",
+    "create",
+    "add",
+    "make",
+    "delete",
+    "remove",
+    "uninstall",
+    "install",
+    "move",
+    "rename",
+    "copy",
+    "turn",
+    "switch",
+    "set",
+    "close",
+    "click",
+    "type",
+    "fill",
+    "run",
+    "start",
+    "stop",
+    "play",
+    "pause",
+    "schedule",
+    "book",
+    "save",
+    "zip",
+    "convert",
+    "extract",
+    "clean",
+    "empty",
+    "kill",
+    "free",
+    "commit",
+    "push",
+    "pull",
+    "merge",
+    "archive",
+    "mark",
+    "forward",
+    "accept",
+    "decline",
+    "cancel",
+    "mute",
+    "unmute",
+    "launch",
+    "do",
+];
+
+/// Whether the user's own words ask for an action at all.
+pub fn asks_for_action(request: &str) -> bool {
+    request
+        .to_lowercase()
+        .split(|c: char| !c.is_alphanumeric())
+        .any(|w| ACTION_WORDS.contains(&w))
+}
+
 /// What the user has said and pressed for one pending action.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Consent {
@@ -503,6 +584,17 @@ mod tests {
         assert!(!asked.allows("delete_file"));
         assert!(!Turn::new("anything").allows("format_disk"));
         assert_eq!(risk_of("format_disk"), Risk::Destructive);
+    }
+
+    #[test]
+    fn voice_cannot_pick_destructive_actions() {
+        assert!(!voice_may_choose("empty_recycle_bin"));
+        assert!(!voice_may_choose("kill_port"));
+        assert!(voice_may_choose("open_path"));
+        assert!(asks_for_action("Please delete the old builds"));
+        assert!(asks_for_action("open my downloads"));
+        assert!(!asks_for_action("summarize my unread mail"));
+        assert!(!asks_for_action("what does this page say"));
     }
 
     #[test]
