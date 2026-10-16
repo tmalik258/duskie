@@ -4318,7 +4318,9 @@ button.ak-cchip:hover,
   place-items: center;
   color: var(--ink-3);
   opacity: 0;
-  transition: opacity 0.15s ease, background-color 0.15s ease;
+  transition:
+    opacity 0.15s ease,
+    background-color 0.15s ease;
 }
 .rd-list-row .rx:hover {
   background: var(--fill-3);

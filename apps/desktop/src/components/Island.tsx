@@ -287,10 +287,12 @@ export function Island() {
   const [peek, setPeek] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [altHeld, setAltHeld] = useState(false);
-  useEffect(() => {
+  const [peekFor, setPeekFor] = useState(suggestionId);
+  if (peekFor !== suggestionId) {
+    setPeekFor(suggestionId);
     setPeek(false);
     setPinned(false);
-  }, [suggestionId]);
+  }
   useEffect(() => {
     if (!redesign || !suggestionId) return;
     const id = setTimeout(() => setPeek(rawHover), rawHover ? 220 : 450);
