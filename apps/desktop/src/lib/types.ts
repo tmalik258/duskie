@@ -11,6 +11,7 @@ export const MASCOT_STATES = [
   "working",
   "success",
   "error",
+  "focus",
 ] as const;
 
 export type MascotState = (typeof MASCOT_STATES)[number];

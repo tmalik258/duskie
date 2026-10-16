@@ -243,4 +243,5 @@ export const FOR_STATE: Record<MascotState, Expression> = {
   working: "think",
   success: "happy",
   error: "oops",
+  focus: "focus",
 };
