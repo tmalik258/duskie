@@ -596,6 +596,39 @@ export interface SkillInfo {
   mutedUntil: string | null;
 }
 
+export type SkillOrigin = "claude" | "claude_plugin" | "codex" | "duskie" | "url";
+export type SkillTarget = "claude" | "codex" | "local";
+
+/** A skill found on this PC that is not in the library yet. */
+export interface FoundSkill {
+  name: string;
+  description: string;
+  origin: SkillOrigin;
+  dir: string;
+  hash: string;
+  files: string[];
+  hasScripts: boolean;
+}
+
+/** A skill in the library and where it is written. */
+export interface LibrarySkill {
+  name: string;
+  description: string;
+  origin: SkillOrigin;
+  hash: string;
+  hasScripts: boolean;
+  targets: Partial<Record<SkillTarget, boolean>>;
+  synced: Partial<Record<SkillTarget, string>>;
+  url: string | null;
+  commit: string | null;
+}
+
+export interface SyncReport {
+  written: string[];
+  conflicts: string[];
+  backups: string[];
+}
+
 export interface CapabilityInfo {
   found: string[];
   skillsDir: string;

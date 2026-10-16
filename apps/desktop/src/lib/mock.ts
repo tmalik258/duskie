@@ -1,7 +1,7 @@
 // Browser-only stand-in for the Rust core, used when the UI runs outside
 // Tauri. It mimics the app loosely; the real rules live in Rust.
 
-import type { DirectServer, MailStatus } from "./types";
+import type { DirectServer, LibrarySkill, MailStatus, SkillTarget } from "./types";
 import {
   type ActivitySnapshot,
   type CloudId,
@@ -20,6 +20,7 @@ type Handler = (payload: unknown) => void;
 const handlers = new Map<string, Set<Handler>>();
 let settings: Settings = structuredClone(DEFAULT_SETTINGS);
 let mailStatus: MailStatus = { state: "disconnected", configured: true, lastOk: null, error: null, provider: null };
+let library: LibrarySkill[] = [];
 if (typeof localStorage !== "undefined") {
   try {
     Object.assign(settings, JSON.parse(localStorage.getItem("sidekick.mock.savedFolders") ?? "{}"));
@@ -325,6 +326,47 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     go("idle");
   },
   events_recent: () => [],
+  library_review: () =>
+    library.some((l) => l.name === "pdf")
+      ? []
+      : [
+          {
+            name: "pdf",
+            description: "Read and fill PDF forms.",
+            origin: "claude",
+            dir: "~/.claude/skills/pdf",
+            hash: "a1",
+            files: ["SKILL.md"],
+            hasScripts: false,
+          },
+        ],
+  library_list: () => library,
+  library_import: (a) => {
+    for (const name of (a as { names: string[] }).names)
+      if (name === "pdf" && !library.some((l) => l.name === name))
+        library.push({
+          name,
+          description: "Read and fill PDF forms.",
+          origin: "claude",
+          hash: "a1",
+          hasScripts: false,
+          targets: { claude: true, codex: true, local: true },
+          synced: { claude: "a1" },
+          url: null,
+          commit: null,
+        });
+    return library;
+  },
+  library_set_target: (a) => {
+    const { name, target, on } = a as { name: string; target: SkillTarget; on: boolean };
+    library = library.map((l) => (l.name === name ? { ...l, targets: { ...l.targets, [target]: on } } : l));
+    return library;
+  },
+  library_remove: (a) => {
+    library = library.filter((l) => l.name !== (a as { name: string }).name);
+    return library;
+  },
+  library_sync: () => ({ written: library.map((l) => l.name), conflicts: [], backups: [] }),
   skills_list: () => [
     {
       id: "dev.open-in-browser",
