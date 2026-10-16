@@ -501,6 +501,28 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
   },
   recipe_run: () => "Running",
   know_how_clear: () => null,
+  attention_lessons: () =>
+    Object.entries(settings.notifications.lessons.entries).map(([key, l]) => ({
+      key,
+      shift: Math.max(-45, Math.min(20, Math.round(l.acted * 6 - l.showLess * 14))),
+      updated: l.updated,
+    })),
+  attention_acted: () => null,
+  attention_show_less: () => null,
+  attention_reset: (args) => {
+    const entries = { ...settings.notifications.lessons.entries };
+    const scope = String(args.scope);
+    for (const k of Object.keys(entries)) {
+      if (scope === "all" || k === scope || (scope.startsWith("group:") && k.startsWith(scope.slice(6))))
+        delete entries[k];
+    }
+    settings = { ...settings, notifications: { ...settings.notifications, lessons: { entries } } };
+    return null;
+  },
+  attention_set_profile: (args) => {
+    settings = { ...settings, notifications: { ...settings.notifications, profile: args.profile as never } };
+    return null;
+  },
   notifications_set_level: (args) => {
     const from = String(args.from);
     const level = String(args.level);

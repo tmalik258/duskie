@@ -17,6 +17,7 @@ use crate::state::{AppState, HitRect, Suggestion, executor, gate_state, lock};
 use crate::suggestions;
 use crate::windows;
 
+mod attention;
 mod chat;
 mod cloud;
 mod data;
@@ -24,6 +25,7 @@ mod diag;
 mod notify;
 mod setup;
 mod voice;
+pub use attention::*;
 pub use chat::*;
 pub use cloud::*;
 pub use data::*;

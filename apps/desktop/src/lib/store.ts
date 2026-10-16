@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Expression } from "@/components/orb/expressions";
+import type { Expression } from "@/components/creature/expressions";
 import { acceptActivities, beginActivity, finishActivity, ownsWorking, useActivities } from "./activities";
 import { setTab, startHere } from "./agents";
 import { api, EVENTS, listen } from "./bridge";

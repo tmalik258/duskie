@@ -7,7 +7,7 @@
 //! sound. [`Lessons`] move a sender's or source's score a little when the
 //! user acts on, or asks for less of, what they send.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 
 use serde::{Deserialize, Serialize};
 
@@ -202,6 +202,7 @@ const HALF_LIFE: i64 = 30 * DAY;
 const MAX_ENTRIES: usize = 200;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Lesson {
     pub acted: f32,
     pub show_less: f32,
@@ -212,7 +213,7 @@ pub struct Lesson {
 /// nothing: only acting and "Show less" teach anything.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Lessons {
-    entries: HashMap<String, Lesson>,
+    entries: BTreeMap<String, Lesson>,
 }
 
 impl Lessons {

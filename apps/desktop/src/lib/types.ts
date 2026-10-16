@@ -454,7 +454,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tips: true,
   alive: true,
   crashReports: false,
-  notifications: { enabled: true, apps: {}, vip: [] },
+  notifications: { enabled: true, apps: {}, vip: [], profile: "normal", lessons: { entries: {} } },
   recipes: [],
   memory: [],
   userName: "",
@@ -816,6 +816,20 @@ export interface NotificationSettings {
   apps: Record<string, NotifyLevel>;
   /** People whose messages always come through right away. */
   vip: string[];
+  /** Normal (soft sound for quieter things) or Calm (sound only for Urgent). */
+  profile: AttentionProfile;
+  /** What Duskie learned from what you act on and ask for less of. */
+  lessons: { entries: Record<string, { acted: number; showLess: number; updated: number }> };
+}
+
+export type AttentionProfile = "normal" | "calm";
+
+/** One learned sender or source, as Settings lists it. */
+export interface LessonRow {
+  key: string;
+  /** Points added to or taken from the score; negative means less. */
+  shift: number;
+  updated: number;
 }
 
 /** One notification Duskie read, and where it put it. */
