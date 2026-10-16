@@ -132,8 +132,10 @@ body {
   --c2: #f2f0eb;
   --c3: #7a8f7e;
   --c4: #95a89a;
-  --isl-bg: rgb(from var(--c1) r g b / 0.98);
-  --isl-rim: transparent;
+  --ink: var(--c2);
+  --ink-2: rgb(from var(--c2) r g b / 0.66);
+  --isl-bg: rgb(from var(--c1) r g b / 0.985);
+  --isl-rim: rgb(from var(--c2) r g b / 0.06);
   --isl-sheen: none;
   --accent: var(--c3);
   --surface: rgb(from var(--c2) r g b / 0.14);
@@ -141,8 +143,14 @@ body {
   --muted: rgb(from var(--c2) r g b / 0.62);
   --hover: rgb(from var(--c4) r g b / 0.16);
   box-shadow:
-    0 10px 30px -6px rgb(0 0 0 / 0.55),
-    0 2px 6px rgb(0 0 0 / 0.3);
+    inset 0 0 0 1px var(--isl-rim),
+    0 18px 44px -14px rgb(0 0 0 / 0.8),
+    0 2px 6px rgb(0 0 0 / 0.4);
+}
+/* Redesign path: same Atelier plate; bare idle drops the shadow. */
+[data-redesign] .island-shell[data-color="atelier"][data-bare="true"] {
+  box-shadow: none;
+  background-color: transparent;
 }
 .island-shell__wash {
   position: absolute;
@@ -198,6 +206,167 @@ body {
 }
 .island-shell[data-bare="true"]::before {
   opacity: 0;
+}
+
+/* Redesign path: Atelier glance / list rows match the prototype recipe. */
+[data-redesign] .island-shell {
+  --muted: rgb(from var(--c2) r g b / 0.55);
+  --ink: var(--c2);
+  --ink-2: rgb(from var(--c2) r g b / 0.66);
+}
+[data-redesign] .ak-rrow {
+  padding: 5px 9px;
+  font-size: 12.5px;
+  border-radius: 9px;
+}
+
+/* Prototype glance card (Phase 3). */
+.rd-glance {
+  color: var(--ink, var(--c2));
+}
+.rd-card-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.rd-eyebrow {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-2, rgb(242 240 235 / 0.55));
+}
+.rd-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.28;
+  letter-spacing: -0.015em;
+  color: var(--ink, var(--c2));
+}
+.rd-detail {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--ink-2, rgb(242 240 235 / 0.66));
+}
+.rd-list-row {
+  padding: 5px 9px;
+  font-size: 12.5px;
+  border-radius: 9px;
+  background: var(--fill, rgb(242 240 235 / 0.045));
+  color: var(--ink, var(--c2));
+}
+.rd-list-row:hover {
+  background: var(--fill-2, rgb(242 240 235 / 0.08));
+}
+.rd-gfoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+.rd-gfoot-btn {
+  border: 0;
+  background: transparent;
+  color: var(--sage-ink, #b9c9bb);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 4px 2px;
+}
+.rd-gfoot-btn:hover {
+  color: var(--c2);
+}
+.rd-qb {
+  border-radius: 10px;
+  background: var(--fill-2, rgb(242 240 235 / 0.08));
+  color: rgb(from var(--c2) r g b / 0.9);
+}
+.rd-qb:hover {
+  background: var(--fill-3, rgb(242 240 235 / 0.13));
+}
+.rd-qb:focus-visible {
+  outline: 2px solid var(--c4);
+  outline-offset: 2px;
+}
+.rd-qb-on {
+  background: var(--c2);
+  color: var(--c1);
+}
+.rd-qb-on:hover {
+  opacity: 0.92;
+  background: var(--c2);
+}
+
+/* Prototype Ask tabs + composer under redesign (Phase 4). */
+[data-redesign] .ak-tabs {
+  gap: 4px;
+}
+[data-redesign] .ak-tab {
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+}
+[data-redesign] .ak-tab[aria-selected="true"] {
+  background: var(--fill-2, rgb(242 240 235 / 0.08));
+  color: var(--c2);
+}
+[data-redesign] .ak-tab.ak-tabi {
+  border-radius: 8px;
+}
+[data-redesign] .ak-composer {
+  padding: 5px 5px 5px 12px;
+  border-radius: 12px;
+  background: var(--fill, rgb(242 240 235 / 0.045));
+  box-shadow: inset 0 0 0 1px var(--line, rgb(149 168 154 / 0.15));
+}
+[data-redesign] .ak-composer:focus-within {
+  box-shadow:
+    inset 0 0 0 1px var(--line-2, rgb(149 168 154 / 0.28)),
+    0 0 0 3px rgb(149 168 154 / 0.12);
+}
+[data-redesign] .ak-composer input,
+[data-redesign] .ak-composer textarea {
+  font-size: 13.5px;
+  min-height: 28px;
+}
+[data-redesign] .ak-opt,
+[data-redesign] .rd-opt {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 0;
+  background: var(--fill, rgb(242 240 235 / 0.045));
+  box-shadow: inset 0 0 0 1px var(--line, rgb(149 168 154 / 0.15));
+  color: var(--c2);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+[data-redesign] .rd-opt:hover {
+  background: var(--fill-2, rgb(242 240 235 / 0.08));
+}
+[data-redesign] .rd-opt-primary {
+  background: var(--c2);
+  color: var(--c1);
+  box-shadow: none;
+}
+[data-redesign] .rd-opt-primary:hover {
+  opacity: 0.92;
+  background: var(--c2);
+}
+[data-redesign] .ak-head {
+  padding-left: 40px;
 }
 
 .chip {
@@ -532,11 +701,30 @@ body {
   transition: none !important;
 }
 
-/* No WebGL 2: a still silhouette in place of the creature. */
+/* No WebGL 2: charcoal egg + warm eye pills (prototype still Duskie). */
 .creature-still {
-  border-radius: 50%;
-  background: radial-gradient(circle at 50% 38%, var(--c4), var(--c3) 70%, var(--c1));
-  opacity: 0.85;
+  position: relative;
+  border-radius: 50% 50% 46% 46% / 56% 56% 42% 42%;
+  background: #2a2622;
+  box-shadow: inset 0 -6px 12px rgb(0 0 0 / 0.35);
+  opacity: 1;
+}
+.creature-still::before,
+.creature-still::after {
+  content: "";
+  position: absolute;
+  top: 40%;
+  width: 18%;
+  height: 14%;
+  border-radius: 999px;
+  background: #ffe7b8;
+}
+.creature-still::before {
+  left: 32%;
+}
+.creature-still::after {
+  right: 32%;
+  left: auto;
 }
 
 /* ---------- Ask: key badges, menus, voice ---------- */

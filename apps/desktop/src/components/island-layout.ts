@@ -1,4 +1,5 @@
 import { ISLAND_TOP, PANEL_PAD } from "@/lib/islandSize";
+import { SPRINGS, spring } from "@/lib/spring";
 import type { MascotState } from "@/lib/types";
 
 export const TITLE: Record<MascotState, string> = {
@@ -68,14 +69,14 @@ export const HOVER_IN_ACTIONS_MS = 450;
 export const HOVER_OUT_MS = 320;
 
 /** Opening settles rather than wobbles: overshoot belongs after a fling,
- * not a hover. */
-export const morphOpen = { type: "spring", bounce: 0.15, duration: 0.45 } as const;
-export const morphClose = { type: "spring", bounce: 0.12, duration: 0.42 } as const;
+ * not a hover. Stiffness form — Motion rejects some bounce/duration springs. */
+export const morphOpen = spring(SPRINGS.morph);
+export const morphClose = spring({ response: 0.42, damping: 0.9 });
 /** Growing or shrinking while already open (an answer streaming in, New):
  * no bounce, so the panel never overshoots and settles back. */
-export const resize = { type: "spring", bounce: 0, duration: 0.34 } as const;
+export const resize = spring(SPRINGS.settle);
 /** Ctrl+Space is a keyboard action used many times a day: Ask opens in one
  * quick, calm move, with no bounce and no blur. */
 export const askOpen = { duration: 0.2, ease: [0.23, 1, 0.32, 1] } as const;
 /** Agents is a richer surface: a short Dynamic Island spring, still snappy. */
-export const agentsOpen = { type: "spring", bounce: 0.14, duration: 0.42 } as const;
+export const agentsOpen = spring({ response: 0.42, damping: 0.86 });

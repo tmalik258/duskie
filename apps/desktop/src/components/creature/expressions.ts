@@ -37,7 +37,8 @@ export const FOR_STATE: Record<MascotState, Expression> = {
   idle: "idle",
   sleeping: "sleep",
   noticing: "curious",
-  suggesting: "suggest",
+  // Prototype FACE: suggestion / notice → curious (big eyes), not suggest arms-out.
+  suggesting: "curious",
   listening: "listen",
   working: "think",
   success: "happy",

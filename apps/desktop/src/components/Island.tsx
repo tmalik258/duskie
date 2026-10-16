@@ -20,12 +20,18 @@ import {
 import { interruptSession, listenToAgents, useAgents, wideScreen } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { useNow, useSystemLook } from "@/lib/hooks";
+import { PILL_FRESH_MS } from "@/lib/peek";
+import { REDESIGN_HOVER_IN_MS, REDESIGN_HOVER_OUT_MS } from "@/lib/redesign-layout";
+import { resolveIslandState } from "@/lib/resolve-island-state";
 import { connect, setHovered, useDuskie, watchWaiting } from "@/lib/store";
 import { isPaused } from "@/lib/types";
 import { updateBusy, updateLabel } from "@/lib/updates";
+import { useRedesign } from "@/lib/use-redesign";
 import { Announcer } from "./Announcer";
 import { ASK_MASCOT, ASK_ORB, ASK_PAD, AskPanel } from "./AskPanel";
 import { Creature } from "./Creature";
+import { IslandBubbles } from "./IslandBubbles";
+import { IslandGrain } from "./IslandGrain";
 import { IslandGuide, useGuide } from "./IslandGuide";
 import { CompactTrailing, ExpandedContent } from "./IslandParts";
 import { IslandSettings } from "./IslandSettings";
@@ -57,8 +63,10 @@ import {
   WELCOME_WIDTH,
 } from "./island-layout";
 import { PreparingVoice } from "./PreparingVoice";
+import { redesignShell } from "./use-island-shell";
 
 export function Island() {
+  const redesign = useRedesign();
   const { mascot, settings, suggestion, hovered: rawHover, visible, ready } = useDuskie();
   const asking = useDuskie((s) => s.ask !== null);
   const askTab = useAgents((s) => s.tab);
@@ -244,15 +252,34 @@ export function Island() {
     // instead of opening tall and shrinking to the new measure.
     if (asking) setContentHeight(0);
   }
+  const hoverOutMs = redesign ? REDESIGN_HOVER_OUT_MS : HOVER_OUT_MS;
+  const hoverInMs = redesign ? REDESIGN_HOVER_IN_MS : HOVER_IN_MS;
   // Cleared only once the cursor has been away as long as hover intent takes
   // to fall; clearing at once let a stale intent reopen a just-hidden welcome.
   useEffect(() => {
     if (!quiet || rawHover) return;
-    const id = setTimeout(() => setQuiet(false), HOVER_OUT_MS);
+    const id = setTimeout(() => setQuiet(false), hoverOutMs);
     return () => clearTimeout(id);
-  }, [quiet, rawHover]);
+  }, [quiet, rawHover, hoverOutMs]);
   const pillActions = !!displayedActivity;
-  const intent = useIntent(rawHover && !quiet, pillActions ? HOVER_IN_ACTIONS_MS : HOVER_IN_MS);
+  const intent = useIntent(
+    rawHover && !quiet,
+    pillActions ? (redesign ? REDESIGN_HOVER_IN_MS : HOVER_IN_ACTIONS_MS) : hoverInMs,
+  );
+
+  // Fresh notification pill → unread count after PILL_FRESH_MS (redesign).
+  const [notifyAt, setNotifyAt] = useState<number | null>(null);
+  const suggestionId = suggestion?.id ?? null;
+  useEffect(() => {
+    if (!suggestionId) {
+      setNotifyAt(null);
+      return;
+    }
+    setNotifyAt(Date.now());
+    const id = setTimeout(() => setNotifyAt(null), PILL_FRESH_MS);
+    return () => clearTimeout(id);
+  }, [suggestionId]);
+  const notifyFresh = redesign && !!suggestion && notifyAt !== null;
   // Until onboarding is done, hover shows the steps being waited on, or else
   // brings the welcome back; the idle card ("watching for moments") would
   // just flash on the way.
@@ -390,10 +417,13 @@ export function Island() {
     mood?.id ??
     (asksYou && !voiceQuestion && hearing === null ? "curious" : null) ??
     (focusLeft !== null && !voiceQuestion && hearing === null && mascot !== "listening" ? "focus" : null) ??
+    (redesign && paused && !voiceQuestion && hearing === null ? "sleepy" : null) ??
     (speaking && mascot !== "listening"
       ? "speak"
       : !online && (mascot === "idle" || mascot === "sleeping")
-        ? "offline"
+        ? redesign
+          ? "oops"
+          : "offline"
         : null);
   const contentEl = useRef<HTMLDivElement | null>(null);
 
@@ -452,7 +482,35 @@ export function Island() {
     questionId === null &&
     !updateProgress &&
     (mascot === "idle" || mascot === "sleeping");
-  const width = asking
+  const pillWidth = voicePill
+    ? voiceShellWidth(voicePill.text, voicePill.thinking, {
+        status: !!(
+          voicePill.working ||
+          voicePill.done ||
+          voicePill.waiting ||
+          voicePill.failed ||
+          voicePill.focus ||
+          voicePill.asks
+        ),
+        cancel: agentsOnly || !!voicePill.focus,
+        indicator: !!(
+          voicePill.working ||
+          voicePill.thinking ||
+          voicePill.done ||
+          voicePill.waiting ||
+          voicePill.failed ||
+          voicePill.asks ||
+          (voicePill.dots && voicePill.dots.length > 0)
+        ),
+      })
+    : waiting
+      ? COMPACT.waitWidth
+      : busy
+        ? COMPACT.busyWidth
+        : !online
+          ? COMPACT.offlineWidth
+          : COMPACT.width;
+  const legacyWidth = asking
     ? view === "welcome"
       ? WELCOME_WIDTH
       : askPanel && askTab === "agents"
@@ -471,52 +529,24 @@ export function Island() {
         : showGuide
           ? GUIDE_WIDTH
           : EXPANDED.width
-      : voicePill
-        ? voiceShellWidth(voicePill.text, voicePill.thinking, {
-            status: !!(
-              voicePill.working ||
-              voicePill.done ||
-              voicePill.waiting ||
-              voicePill.failed ||
-              voicePill.focus ||
-              voicePill.asks
-            ),
-            cancel: agentsOnly || !!voicePill.focus,
-            // Focus is label + cancel only; do not reserve spinner/dot chrome.
-            indicator: !!(
-              voicePill.working ||
-              voicePill.thinking ||
-              voicePill.done ||
-              voicePill.waiting ||
-              voicePill.failed ||
-              voicePill.asks ||
-              (voicePill.dots && voicePill.dots.length > 0)
-            ),
-          })
-        : waiting
-          ? COMPACT.waitWidth
-          : busy
-            ? COMPACT.busyWidth
-            : !online
-              ? COMPACT.offlineWidth
-              : COMPACT.width;
+      : pillWidth;
   // The island window is already fixed (~640 tall); do not re-cap against
   // innerHeight or Settings/Welcome get clipped by the shell spring.
-  const height = expanded
+  const legacyHeight = expanded
     ? Math.max(EXPANDED.minHeight, contentHeight + (askPanel ? ASK_PAD.bottom : EXPANDED.pad))
     : COMPACT.height;
-  const radius = askPanel ? ASK_RADIUS : expanded ? EXPANDED.radius : COMPACT.radius;
+  const legacyRadius = askPanel ? ASK_RADIUS : expanded ? EXPANDED.radius : COMPACT.radius;
   // The bounce is for opening only; once open, size changes are calm.
   const [settled, setSettled] = useState(false);
   useEffect(() => {
-    if (!expanded) {
+    if (!expanded && !asking) {
       setSettled(false);
       return;
     }
     const id = setTimeout(() => setSettled(true), 600);
     return () => clearTimeout(id);
-  }, [expanded]);
-  const transition = reduced
+  }, [expanded, asking]);
+  const legacyTransition = reduced
     ? { duration: 0 }
     : expanded
       ? settled
@@ -527,6 +557,58 @@ export function Island() {
             : askOpen
           : morphOpen
       : morphClose;
+
+  const registryId = redesign
+    ? resolveIslandState({
+        asking,
+        askTab: view === "settings" ? "settings" : asking ? askTab : null,
+        settingsView: view === "settings",
+        welcome: view === "welcome",
+        guiding,
+        expanded,
+        bare,
+        fullVoice,
+        voicePill: voicePill !== null,
+        suggestion: !!suggestion && !notifyFresh,
+        waitingForYou: !!waiting && !waiting.minimized && !guiding,
+        merging,
+        updateCard: updateProgress?.phase === "failed",
+        offline: !online,
+        netCard: !!netNotice && !voicePill,
+        focus: focusLeft !== null,
+        paused,
+        notifyFresh: !!notifyFresh && !busy && !expanded,
+        unread: suggestion ? 1 : 0,
+        activitiesOpen: expanded && liveActivities.length > 0 && !suggestion,
+        mascot,
+        quietGlance:
+          expanded &&
+          !suggestion &&
+          !merging &&
+          questionId === null &&
+          liveActivities.length === 0 &&
+          (mascot === "idle" || mascot === "sleeping"),
+      })
+    : null;
+  const redesignLayout =
+    redesign && registryId
+      ? redesignShell({
+          id: registryId,
+          contentHeight,
+          pillWidth,
+          askTab,
+          agentsWide: agentCurrent !== null,
+          boardWide: agentsLayout === "board" && wideScreen(),
+          settingsHeight: view === "settings" ? Math.max(460, contentHeight + 18) : undefined,
+          reduced,
+          settled: settled || (!expanded && !asking),
+        })
+      : null;
+  const width = redesignLayout?.geom.width ?? legacyWidth;
+  const height = redesignLayout?.geom.height ?? legacyHeight;
+  const radius = redesignLayout?.geom.radius ?? legacyRadius;
+  const transition = redesignLayout?.transition ?? legacyTransition;
+  const redesignBare = redesignLayout ? redesignLayout.geom.bare : bare;
 
   const overlayHit = useDuskie((s) => s.overlayHit);
   // Report the target shape as the interactive area; outside it the window
@@ -568,8 +650,26 @@ export function Island() {
   const orbScale = askPanel ? ASK_MASCOT.size / ORB : asking ? ASK_ORB / ORB : expanded ? 1 : COMPACT.orb / ORB;
   const orbX = askPanel ? ASK_MASCOT.x : expanded ? EXPANDED.pad : (COMPACT.height - COMPACT.orb) / 2 + 1;
   const orbY = askPanel ? ASK_MASCOT.y : expanded ? EXPANDED.pad : (COMPACT.height - COMPACT.orb) / 2;
+  const mascotX = redesignLayout?.geom.mascotX ?? orbX;
+  const mascotY = redesignLayout?.geom.mascotY ?? orbY;
+  const mascotSize = redesignLayout?.geom.mascotSize ?? ORB;
+  // Redesign: size stays 48; Take A / Ask scale via CSS (prototype orbAt).
+  const mascotScale = redesignLayout?.geom.mascotScale ?? orbScale;
   // Hidden for a fullscreen app, the island still comes back under the cursor.
   const shown = visible || rawHover;
+  const shellColor = redesign ? "atelier" : settings.islandColor;
+  const washEvent =
+    redesign && (mascot === "success" || donePill || mascot === "error")
+      ? mascot === "error"
+        ? ("error" as const)
+        : ("success" as const)
+      : null;
+  const bubbleItems =
+    redesign && busy && suggestion
+      ? [{ id: suggestion.id, label: suggestion.title || "Suggestion" }]
+      : redesign && busy
+        ? liveActivities.slice(0, 5).map((a) => ({ id: a.id, label: a.label || a.source }))
+        : [];
 
   return (
     <motion.div
@@ -578,12 +678,13 @@ export function Island() {
       initial={false}
       animate={shown ? { opacity: 1, scale: 1, filter: "blur(0px)" } : { opacity: 0, scale: 0.92, filter: "blur(4px)" }}
       transition={reduced ? { duration: 0 } : { duration: shown ? 0.32 : 0.2, ease: [0.23, 1, 0.32, 1] }}
+      data-redesign={redesign || undefined}
     >
       <div className="relative">
         <motion.div
           className="island-shell relative overflow-hidden text-white"
-          data-bare={bare}
-          data-color={settings.islandColor}
+          data-bare={redesignBare}
+          data-color={shellColor}
           data-solid={look.solid || undefined}
           data-simple={look.simple || undefined}
           initial={false}
@@ -598,8 +699,12 @@ export function Island() {
           onPointerEnter={() => setHovered(true)}
           onPointerLeave={() => setHovered(false)}
         >
-          <IslandWash simple={look.simple} mascot={mascot} donePill={donePill} />
-          <Announcer />
+          {redesign && redesignLayout ? (
+            <IslandGrain base={redesignLayout.geom.wash} event={washEvent} />
+          ) : (
+            <IslandWash simple={look.simple} mascot={mascot} donePill={donePill} />
+          )}
+          <Announcer registryId={registryId} />
 
           <AnimatePresence initial={false}>
             {!expanded && voicePill && (
@@ -640,8 +745,16 @@ export function Island() {
                 className="absolute top-0 right-0"
                 style={
                   askPanel
-                    ? { left: ASK_PAD.x, paddingTop: ASK_PAD.top, paddingRight: ASK_PAD.x }
-                    : { left: EXPANDED.pad, paddingTop: EXPANDED.pad, paddingRight: EXPANDED.pad }
+                    ? {
+                        left: redesign ? (redesignLayout?.geom.contentPadLeft ?? ASK_PAD.x) : ASK_PAD.x,
+                        paddingTop: ASK_PAD.top,
+                        paddingRight: ASK_PAD.x,
+                      }
+                    : {
+                        left: redesign ? (redesignLayout?.geom.contentPadLeft ?? EXPANDED.pad) : EXPANDED.pad,
+                        paddingTop: EXPANDED.pad,
+                        paddingRight: EXPANDED.pad,
+                      }
                 }
                 initial={
                   reduced
@@ -688,11 +801,13 @@ export function Island() {
                   className="absolute top-0 right-0"
                   style={
                     {
-                      left: EXPANDED.pad + ORB + 14,
+                      left: redesign
+                        ? (redesignLayout?.geom.contentPadLeft ?? EXPANDED.pad + ORB + 14)
+                        : EXPANDED.pad + ORB + 14,
                       paddingTop: EXPANDED.pad,
                       paddingRight: EXPANDED.pad,
                       // Lists below the orb (You missed) reach back under it.
-                      "--orb-indent": `${ORB + 14}px`,
+                      "--orb-indent": `${redesign ? (redesignLayout?.geom.mascotSize ?? ORB) + 14 : ORB + 14}px`,
                     } as CSSProperties
                   }
                   initial={reduced ? { opacity: 0 } : { opacity: 0, filter: "blur(6px)", y: 4 }}
@@ -712,22 +827,24 @@ export function Island() {
             )}
           </AnimatePresence>
         </motion.div>
+        {bubbleItems.length > 0 && <IslandBubbles items={bubbleItems} />}
         {/* Outside the shell, so its clipping never cuts Duskie's arms or hops. */}
         <motion.div
           className="pointer-events-none absolute top-0 left-0 z-2"
           initial={false}
-          animate={{ x: orbX, y: orbY, scale: orbScale }}
+          animate={{ x: mascotX, y: mascotY, scale: mascotScale }}
           transition={transition}
           style={{ originX: 0, originY: 0 }}
         >
           <Creature
             state={chatting && mascot === "idle" ? "working" : mascot}
             face={chatting && mascot === "idle" ? null : face}
-            size={ORB}
-            theme={settings.theme}
+            size={mascotSize}
+            theme={redesign ? "atelier" : settings.theme}
             alive={settings.alive && visible && !look.simple}
             simple={look.simple}
-            active={shown && !bare}
+            active={shown && !(redesign ? redesignBare : bare)}
+            bust={redesign ? false : undefined}
           />
         </motion.div>
       </div>

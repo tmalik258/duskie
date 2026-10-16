@@ -16,11 +16,13 @@ import type {
   ExtensionGuide,
 } from "@/lib/types";
 import { ComposioApps } from "./ComposioApps";
+import { DirectMcpCard } from "./DirectMcp";
 import { Button, CopyButton, Field, Section, Select, type SelectOption, TextField, Toggle } from "./ui";
 
 export function ConnectionsTab({ onError }: { onError: (e: string) => void }) {
   return (
     <>
+      <DirectMcpCard onError={onError} />
       <Section
         title="Composio"
         keywords="apps accounts calendar meetings reminders join google outlook jira slack gmail notion trello github linear fathom login sign in"

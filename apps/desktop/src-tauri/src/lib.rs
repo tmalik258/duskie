@@ -213,6 +213,7 @@ pub fn run() {
             commands::attention_show_less,
             commands::attention_reset,
             commands::attention_set_profile,
+            commands::mcp_validate_stdio,
             commands::git_status,
             commands::git_stage,
             commands::git_unstage,

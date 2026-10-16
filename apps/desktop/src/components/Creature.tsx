@@ -38,8 +38,23 @@ export function Creature(props: {
   simple?: boolean;
   /** False while nothing is on screen: the creature stops drawing. */
   active?: boolean;
+  /**
+   * Full-body vs bust crop. Prototype island always uses full body and CSS
+   * scale; pass false on the redesign path so Ask (small scale) keeps eyes.
+   */
+  bust?: boolean;
 }) {
-  const { state, face, size, theme = "atelier", magnetic = true, alive = false, simple = false, active = true } = props;
+  const {
+    state,
+    face,
+    size,
+    theme = "atelier",
+    magnetic = true,
+    alive = false,
+    simple = false,
+    active = true,
+    bust,
+  } = props;
   // Decided after mount, so the server's markup and the first client
   // render match; null means not decided yet.
   const [supported, setSupported] = useState<boolean | null>(null);
@@ -61,13 +76,14 @@ export function Creature(props: {
       alive: now.alive,
       active: now.active,
       blink: !reduced,
+      ...(bust !== undefined ? { bust } : {}),
     }) as Live | null;
     live.current = c;
     return () => {
       c?.destroy();
       live.current = null;
     };
-  }, [supported, size, reduced]);
+  }, [supported, size, reduced, bust]);
 
   useEffect(() => {
     const c = live.current;
