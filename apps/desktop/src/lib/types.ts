@@ -490,7 +490,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   calendar: { remindMinutes: 5 },
   semanticSearch: { enabled: true, model: "nomic-embed-text" },
-  redesign: { enabled: false },
+  redesign: { enabled: true },
   directMcp: { servers: [] },
   onboarded: false,
   welcomeStep: 0,

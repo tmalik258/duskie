@@ -319,11 +319,18 @@ pub const DEFAULT_DENY_APPS: &[&str] = &[
     "screenclippinghost.exe",
 ];
 
-/// Switches for the new island look. Off until it is ready for everyone.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+/// Switches for the new island look. On by default; Settings > Appearance
+/// turns it off for anyone who wants the old look for one more release.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct Redesign {
     pub enabled: bool,
+}
+
+impl Default for Redesign {
+    fn default() -> Self {
+        Self { enabled: true }
+    }
 }
 
 /// One MCP server started as a program on this PC (no shell).
@@ -968,10 +975,12 @@ impl Settings {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn redesign_is_off_by_default_and_old_files_still_load() {
-        assert!(!Settings::default().redesign.enabled);
+    fn redesign_is_on_by_default_and_a_switch_off_is_kept() {
+        assert!(Settings::default().redesign.enabled);
         let old: Settings = serde_json::from_str("{\"muted\":true}").unwrap();
-        assert!(!old.redesign.enabled);
+        assert!(old.redesign.enabled);
+        let off: Settings = serde_json::from_str("{\"redesign\":{\"enabled\":false}}").unwrap();
+        assert!(!off.redesign.enabled);
     }
 
     use super::*;

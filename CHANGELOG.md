@@ -6,6 +6,8 @@ All notable changes to Sidekick are listed here. The format follows [Keep a Chan
 
 ### Look and feel
 
+- The new island look is now on by default. Settings > Appearance turns it off for one more release.
+- The editor and terminal use Duskie's own colours, glass panels and tabs.
 - Duskie, a small furry creature, replaces the orb. The island grows into compact pills and cards for suggestions, meetings, agents, updates and offline, with a word by word label morph.
 - Settings have a grouped sidebar; the welcome and setup guide are cards with one step at a time.
 - The island turns solid when Windows transparency is off or reduced transparency is asked for.
@@ -26,6 +28,8 @@ All notable changes to Sidekick are listed here. The format follows [Keep a Chan
 - Live answers (Settings > AI > Voice, off by default): Duskie starts answering when you pause.
 - Spoken choices cannot pick an option that deletes or closes; those need a tap.
 - Instructions found in mail, web pages or files cannot start a change on their own.
+- A local audit log keeps which tool ran and how it ended, never what it read or wrote.
+- A test makes sure the voice code writes no files, so audio is never saved.
 
 ### Git and editor
 

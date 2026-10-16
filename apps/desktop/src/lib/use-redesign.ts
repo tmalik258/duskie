@@ -1,5 +1,5 @@
-// Whether the island uses the redesign look from the prototype. Off by
-// default until Live mode (ADR-08). One place so every surface agrees.
+// Whether the island uses the redesign look. On by default; Settings >
+// Appearance turns it off. One place so every surface agrees.
 
 import { useDuskie } from "./store";
 
