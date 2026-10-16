@@ -473,6 +473,8 @@ fn show(app: &AppHandle, proposal: Proposal) {
         } else {
             String::new()
         },
+        compact: proposal.compact,
+        silent: proposal.silent,
     };
     let priority = proposal.priority;
     let auto = proposal.trust == Trust::Auto

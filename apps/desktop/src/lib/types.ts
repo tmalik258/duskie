@@ -376,6 +376,10 @@ export interface Suggestion {
   always?: boolean[];
   /** Why this showed, from how often you took this kind before. */
   why?: string;
+  /** A small pill that opens into the card on hover or while Alt is held. */
+  compact?: boolean;
+  /** Shows without a sound. */
+  silent?: boolean;
 }
 
 /** A newer Duskie release than the one running. */

@@ -168,10 +168,15 @@ async fn handle(app: &AppHandle, mut event: Event) {
 fn propose(app: &AppHandle, event: &Event) {
     // "Do you work with code?" No: no repo or agent cards.
     let coder = lock(&app.state::<AppState>().settings).codes != Some(false);
-    if let Some(proposal) = evaluate(app, event)
+    if let Some(mut proposal) = evaluate(app, event)
         && !crate::learn::is_muted(app, &proposal.skill_id)
         && (coder || !proposal.skill_id.starts_with("dev."))
     {
+        // The attention profile decided how a notification shows.
+        if event.kind == crate::inbox::NOW_EVENT {
+            proposal.compact = event.payload["compact"].as_bool().unwrap_or(false);
+            proposal.silent = event.payload["sound"].as_bool() == Some(false);
+        }
         // Ranking may ask a model, so it runs beside the event loop.
         let app = app.clone();
         tauri::async_runtime::spawn(async move {

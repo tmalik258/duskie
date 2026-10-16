@@ -1067,8 +1067,11 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
         useDuskie.setState({ mascot: t.state });
         const { settings } = useDuskie.getState();
         const suggestionCue = t.cue === "chirp" || t.cue === "pop";
-        const skipCue = suggestionCue && muteSuggestionCue(t.state, t.previous);
-        if (sounds && t.cue && !skipCue) playCue(t.cue, cueVolume(settings, t.cue), settings.soundKit);
+        const shown = useDuskie.getState().suggestion;
+        const skipCue = suggestionCue && (muteSuggestionCue(t.state, t.previous) || !!shown?.silent);
+        // A compact notification gets the soft version of the cue.
+        const soft = suggestionCue && shown?.compact ? 0.45 : 1;
+        if (sounds && t.cue && !skipCue) playCue(t.cue, cueVolume(settings, t.cue) * soft, settings.soundKit);
         if (sounds && t.previous === "sleeping" && t.state === "idle") helloOncePerDay();
       }),
       listen(EVENTS.settingsChanged, (settings) => {

@@ -369,7 +369,25 @@ export function Island() {
       window.removeEventListener("blur", blur);
     };
   }, [redesign, suggestionId]);
-  const suggestOpen = !redesign || peek || pinned || altHeld;
+  // Keyboard users get the peek through focus: tabbing into the island opens it.
+  const [keyFocus, setKeyFocus] = useState(false);
+  useEffect(() => {
+    if (!redesign) return;
+    const into = (e: FocusEvent) =>
+      setKeyFocus(
+        e.target instanceof HTMLElement &&
+          e.target.matches(":focus-visible") &&
+          !e.target.matches("input, textarea, [contenteditable]"),
+      );
+    const out = () => setKeyFocus(false);
+    window.addEventListener("focusin", into);
+    window.addEventListener("focusout", out);
+    return () => {
+      window.removeEventListener("focusin", into);
+      window.removeEventListener("focusout", out);
+    };
+  }, [redesign]);
+  const suggestOpen = !redesign || peek || pinned || altHeld || keyFocus;
   // Until onboarding is done, hover shows the steps being waited on, or else
   // brings the welcome back; the idle card ("watching for moments") would
   // just flash on the way.
@@ -656,11 +674,15 @@ export function Island() {
       ? peeking
         ? {
             kind: "suggest",
-            ...(sourceApp(peeking)
-              ? { label: sourceApp(peeking) as string, dim: peeking.title }
-              : { label: peeking.title }),
-            chip: peeking.options[0],
-            onChip: () => void api.suggestionChoose(peeking.id, 0),
+            // Compact (lower priority): the source or title only, no chip.
+            ...(peeking.compact
+              ? { label: sourceApp(peeking) ?? peeking.title }
+              : sourceApp(peeking)
+                ? { label: sourceApp(peeking) as string, dim: peeking.title }
+                : { label: peeking.title }),
+            ...(peeking.compact
+              ? {}
+              : { chip: peeking.options[0], onChip: () => void api.suggestionChoose(peeking.id, 0) }),
           }
         : hearing !== null || mascot === "listening"
           ? { kind: "listening", label: hearing?.trim() ? hearing : "", dim: hearing?.trim() ? undefined : "Listening" }

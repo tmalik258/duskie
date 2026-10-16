@@ -698,17 +698,7 @@ fn handle(app: &AppHandle, mail: &Mail) {
         focus: crate::focus::active(),
         ..Default::default()
     };
-    let delivery = {
-        let mut guard = ATTENTION.lock().unwrap_or_else(|e| e.into_inner());
-        route(
-            guard.get_or_insert_with(Default::default),
-            &signal.key,
-            scored.level,
-            n.profile,
-            ctx,
-            now,
-        )
-    };
+    let delivery = routed(&signal.key, scored.level, n.profile, ctx, now);
     let Some(delivery) = delivery else {
         return;
     };
@@ -746,6 +736,26 @@ fn route(
         state.metrics.delivered(delivery);
     }
     (batch == Batch::Show && delivery.shape != Shape::Held).then_some(delivery)
+}
+
+/// `route` through the batcher and counters shared by mail and app
+/// notifications, so a burst from anywhere counts against the same budget.
+pub(crate) fn routed(
+    key: &str,
+    level: duskie_core::attention::Level,
+    profile: duskie_core::attention::Profile,
+    ctx: duskie_core::attention::Context,
+    now: i64,
+) -> Option<duskie_core::attention::Delivery> {
+    let mut guard = ATTENTION.lock().unwrap_or_else(|e| e.into_inner());
+    route(
+        guard.get_or_insert_with(Default::default),
+        key,
+        level,
+        profile,
+        ctx,
+        now,
+    )
 }
 
 /// What the batcher and counters remember between messages.
