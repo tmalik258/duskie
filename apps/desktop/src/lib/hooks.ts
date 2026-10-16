@@ -187,5 +187,20 @@ export function useSystemLook(): { solid: boolean; simple: boolean } {
     const id = setInterval(check, 60_000);
     return () => clearInterval(id);
   }, []);
-  return look;
+  const reduced = useMedia("(prefers-reduced-transparency: reduce)");
+  return reduced && !look.solid ? { ...look, solid: true } : look;
+}
+
+/** Whether a media query matches, kept up to date. */
+function useMedia(query: string): boolean {
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return;
+    const m = window.matchMedia(query);
+    setOn(m.matches);
+    const change = () => setOn(m.matches);
+    m.addEventListener("change", change);
+    return () => m.removeEventListener("change", change);
+  }, [query]);
+  return on;
 }
