@@ -6,13 +6,13 @@
 import { useState } from "react";
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
-import { updateSettings, useSidekick } from "@/lib/store";
+import { updateSettings, useDuskie } from "@/lib/store";
 import type { Learned, Settings, SuggestionRate } from "@/lib/types";
 import { Memory } from "./PrivacyTab";
 import { Button, Field, Section, Segmented, TextField, Toggle } from "./ui";
 
 export function MemoryTab({ onError }: { onError: (e: string) => void }) {
-  const settings = useSidekick((s) => s.settings);
+  const settings = useDuskie((s) => s.settings);
   const save = (patch: Partial<Settings>) => void updateSettings(patch).catch((e: unknown) => onError(String(e)));
   return (
     <>

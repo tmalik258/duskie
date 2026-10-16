@@ -16,7 +16,8 @@
     "e2e": "node scripts/e2e.mjs",
     "ask-eval": "node scripts/ask-eval.mjs",
     "ask-check": "node scripts/ask-check.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "check:name": "node scripts/check-name.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.1",

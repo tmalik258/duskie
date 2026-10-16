@@ -27,7 +27,7 @@ pnpm typecheck
 pnpm --filter desktop build
 ```
 
-Voice tests that need the speech models run when `SIDEKICK_VOICE_MODELS` points at a folder holding them.
+Voice tests that need the speech models run when `DUSKIE_VOICE_MODELS` points at a folder holding them.
 
 ### End-to-end tests (Windows)
 

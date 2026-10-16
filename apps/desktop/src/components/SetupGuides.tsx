@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { api, EVENTS, listen } from "@/lib/bridge";
-import { startWaiting, updateSettings, useSidekick } from "@/lib/store";
+import { startWaiting, updateSettings, useDuskie } from "@/lib/store";
 import { BrowserInstallPanel } from "./SetupBrowser";
 
 export function ItemGuide({ id, onDone }: { id: string; onDone: () => void }) {
@@ -135,7 +135,7 @@ function FoldersGuide({
   detectKey: "codeFolders" | "searchFolders";
   onDone: () => void;
 }) {
-  const settings = useSidekick((s) => s.settings);
+  const settings = useDuskie((s) => s.settings);
   const current = settings[valueKey].join("\n");
   const [draft, setDraft] = useState(current);
   const [busy, setBusy] = useState(false);
@@ -184,7 +184,7 @@ function FoldersGuide({
 }
 
 function VoiceGuide({ onDone }: { onDone: () => void }) {
-  const settings = useSidekick((s) => s.settings);
+  const settings = useDuskie((s) => s.settings);
   const enable = () => {
     void updateSettings({ voice: { ...settings.voice, enabled: true } }).then(() => {
       void api.voiceDownload();

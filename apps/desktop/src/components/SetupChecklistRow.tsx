@@ -5,7 +5,7 @@
 import { memo, type ReactNode, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/bridge";
 import { friendlyError } from "@/lib/friendly";
-import { startWaiting, stopWaiting, useSidekick } from "@/lib/store";
+import { startWaiting, stopWaiting, useDuskie } from "@/lib/store";
 import type { SetupItem } from "@/lib/types";
 import { ItemGuide } from "./SetupGuides";
 import { Tip } from "./Tip";
@@ -64,9 +64,9 @@ export const SetupRow = memo(function SetupRow({
   children?: ReactNode;
 }) {
   const [busy, setBusy] = useState(false);
-  const waiting = useSidekick((s) => s.waiting);
+  const waiting = useDuskie((s) => s.waiting);
   // App connects (app:notion) highlight the Composio row — that is the island done ring.
-  const justDone = useSidekick(
+  const justDone = useDuskie(
     (s) => s.justDone === item.id || (item.id === "composio" && (s.justDone?.startsWith("app:") ?? false)),
   );
   // When Settings reopens after a step finished, show that step.

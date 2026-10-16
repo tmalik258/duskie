@@ -258,10 +258,10 @@ pub fn start(app: &AppHandle) {
 }
 
 fn worklog_path() -> Option<PathBuf> {
-    dirs::document_dir().map(|d| d.join("Sidekick").join("worklog.md"))
+    dirs::document_dir().map(|d| d.join("Duskie").join("worklog.md"))
 }
 
-/// Appends a dated entry to Documents\Sidekick\worklog.md (the folder keeps its old name so earlier entries stay).
+/// Appends a dated entry to Documents\Duskie\worklog.md.
 pub fn save_log(text: &str) -> Result<(String, String), String> {
     let path = worklog_path().ok_or("No Documents folder")?;
     if let Some(dir) = path.parent() {

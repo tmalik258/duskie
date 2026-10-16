@@ -6,7 +6,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useAgents } from "@/lib/agents";
-import { useSidekick } from "@/lib/store";
+import { useDuskie } from "@/lib/store";
 import type { MascotState } from "@/lib/types";
 
 const STATE_WORDS: Partial<Record<MascotState, string>> = {
@@ -36,9 +36,9 @@ const plain = (t: string) => t.replace(/[*_`#>|]+/g, "").replace(/\[([^\]]+)\]\(
 export function Announcer() {
   const [line, setLine] = useState("");
   const said = useRef({ id: "", n: 0 });
-  const mascot = useSidekick((s) => s.mascot);
-  const last = useSidekick((s) => s.turns[s.turns.length - 1]);
-  const turns = useSidekick((s) => s.turns.length);
+  const mascot = useDuskie((s) => s.mascot);
+  const last = useDuskie((s) => s.turns[s.turns.length - 1]);
+  const turns = useDuskie((s) => s.turns.length);
   const waiting = useAgents((s) => s.sessions.find((x) => x.question));
 
   useEffect(() => {

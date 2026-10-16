@@ -1357,7 +1357,7 @@ async fn today(app: &AppHandle) -> String {
             })
             .collect::<Vec<_>>()
     };
-    let time = crate::mcp::call_text(app, "sidekick_time_today", &json!({})).await;
+    let time = crate::mcp::call_text(app, "duskie_time_today", &json!({})).await;
     let meetings = if meetings.is_empty() {
         "No meetings today.".to_owned()
     } else {

@@ -4,7 +4,7 @@
 // Duskie may act there on its own, should ask, or stays out.
 
 import { useState } from "react";
-import { updateSettings, useSidekick } from "@/lib/store";
+import { updateSettings, useDuskie } from "@/lib/store";
 import type { AgentAsk, PlaceRule } from "@/lib/types";
 import { Button, Field, Segmented, Select } from "./ui";
 
@@ -21,7 +21,7 @@ const RULES: [PlaceRule, string][] = [
 ];
 
 export function Agent({ onError }: { onError: (e: string) => void }) {
-  const agent = useSidekick((s) => s.settings.agent);
+  const agent = useDuskie((s) => s.settings.agent);
   const [place, setPlace] = useState("");
   const save = (patch: Partial<typeof agent>) =>
     void updateSettings({ agent: { ...agent, ...patch } }).catch((e) => onError(String(e)));

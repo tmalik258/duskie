@@ -53,6 +53,7 @@ mod projects;
 mod promises;
 mod quick;
 mod recipes;
+mod rename;
 mod review;
 mod routines;
 mod screen;
@@ -102,6 +103,11 @@ fn log_panics(file: std::path::PathBuf) {
 }
 
 pub fn run() {
+    let context = tauri::generate_context!();
+    rename::move_data(
+        &context.config().identifier,
+        context.config().product_name.as_deref().unwrap_or("Duskie"),
+    );
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
             if let Err(err) = windows::open_settings(app) {
@@ -300,7 +306,7 @@ pub fn run() {
             commands::open_reference,
             commands::action_undo,
         ]))
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running Duskie");
 }
 
@@ -311,6 +317,8 @@ fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         .as_deref()
         .ok_or("productName is missing from tauri.conf.json")?;
     secrets::init(product_name);
+    rename::move_secrets(app);
+    rename::move_autostart(app);
     let config_dir = app.path().app_config_dir()?;
     let settings_path = config_dir.join("settings.json");
     let skills_dir = config_dir.join("skills");
@@ -324,7 +332,7 @@ fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     log::info!("found: {}", caps.summary().join(", "));
     let data_dir = app.path().app_data_dir()?;
     log_panics(data_dir.join("last-crash.txt"));
-    let db_path = data_dir.join("sidekick.db");
+    let db_path = data_dir.join(rename::DB);
     let scratch_dir = app.path().app_cache_dir()?;
 
     let settings = Settings::load(&settings_path);
@@ -489,6 +497,9 @@ pub fn start_features(app: &AppHandle) {
     learned::start_weekly(app, state.data_dir.join("last-learned-week"));
     layout::start(app);
     mcp::start(app, state.mcp_token.clone());
+    if let Some(moved) = rename::moved() {
+        rename::fix_integrations(app, moved, &state.mcp_token);
+    }
     meetings::start(app);
     health::start(app);
     log::info!("features started");

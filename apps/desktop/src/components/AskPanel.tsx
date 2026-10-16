@@ -35,7 +35,7 @@ import {
   stopListening,
   updateSettings,
   useAssistantName,
-  useSidekick,
+  useDuskie,
 } from "@/lib/store";
 import {
   type CalendarToday,
@@ -142,12 +142,12 @@ const WINDOWS_PAGES: { page: string; label: string; words: string[]; switch?: st
 
 export function AskPanel() {
   const assistant = useAssistantName();
-  const ask = useSidekick((s) => s.ask);
-  const turns = useSidekick((s) => s.turns);
-  const chatId = useSidekick((s) => s.chatId);
-  const hearing = useSidekick((s) => s.hearing);
-  const voiceReady = useSidekick((s) => s.settings.voice.enabled && (s.voiceStatus?.listening ?? false));
-  const settings = useSidekick((s) => s.settings);
+  const ask = useDuskie((s) => s.ask);
+  const turns = useDuskie((s) => s.turns);
+  const chatId = useDuskie((s) => s.chatId);
+  const hearing = useDuskie((s) => s.hearing);
+  const voiceReady = useDuskie((s) => s.settings.voice.enabled && (s.voiceStatus?.listening ?? false));
+  const settings = useDuskie((s) => s.settings);
   const reducedMotion = useReducedMotion() ?? false;
   const [text, setText] = useState(ask?.prompt ?? "");
   const alt = useAltHeld();
@@ -155,11 +155,11 @@ export function AskPanel() {
   const layout = useAgents((s) => s.layout);
   const working = useAgents((s) => activeCount(s.sessions));
   // "Do you work with code?" No hides Agents and Repos; unanswered counts as yes.
-  const coder = useSidekick((s) => s.settings.codes !== false);
+  const coder = useDuskie((s) => s.settings.codes !== false);
   useEffect(listenToAgents, []);
-  const speak = useSidekick((s) => s.settings.voice.speakAnswers);
+  const speak = useDuskie((s) => s.settings.voice.speakAnswers);
   const toggleSpeak = useCallback(() => {
-    const voice = useSidekick.getState().settings.voice;
+    const voice = useDuskie.getState().settings.voice;
     void updateSettings({ voice: { ...voice, speakAnswers: !voice.speakAnswers } });
   }, []);
   // Alt shortcuts work wherever focus is in Ask. What they act on changes
@@ -233,7 +233,7 @@ export function AskPanel() {
   const [instant, setInstant] = useState<InstantResults>({ apps: [], files: [] });
   useEffect(() => {
     const q = text.trim();
-    if (q.length < 2 || q.startsWith("/") || useSidekick.getState().turns.length > 0) {
+    if (q.length < 2 || q.startsWith("/") || useDuskie.getState().turns.length > 0) {
       setInstant({ apps: [], files: [] });
       return;
     }
@@ -266,7 +266,7 @@ export function AskPanel() {
   // Every open: focus the input and refresh which AI is reachable.
   useEffect(() => {
     if (seq === undefined) return;
-    setText(useSidekick.getState().ask?.prompt ?? "");
+    setText(useDuskie.getState().ask?.prompt ?? "");
     markSeen();
     setSelected(0);
     setClips(null);
@@ -279,7 +279,7 @@ export function AskPanel() {
       .then(setChats)
       .catch(() => setChats([]));
     // A shortcut can open Ask mode straight into a tool.
-    const tool = useSidekick.getState().ask?.tool;
+    const tool = useDuskie.getState().ask?.tool;
     if (tool) setAsk({ tool: null });
     if (tool === "clipboard") void api.clipboardHistory().then(setClips);
     if (tool === "screen") {
@@ -320,10 +320,10 @@ export function AskPanel() {
   }, [chatEl]);
 
   const paused = isPaused(settings.pause);
-  const chatPage = useSidekick((s) => s.chatPage);
+  const chatPage = useDuskie((s) => s.chatPage);
   const { data: calendar } = useCached<CalendarToday>("calendar-today", api.calendarToday);
   const agent = useAgentName();
-  const askModel = useSidekick((s) => s.askModel);
+  const askModel = useDuskie((s) => s.askModel);
   const starters = useMemo(
     () =>
       contextStarters({
@@ -341,7 +341,7 @@ export function AskPanel() {
     [ask?.context, chatPage, calendar, coder],
   );
   const resetChat = useCallback((opts?: { cancel?: boolean }) => {
-    if (useSidekick.getState().hearing !== null) stopListening();
+    if (useDuskie.getState().hearing !== null) stopListening();
     newChat(opts);
     setChatName(null);
     setText("");
@@ -357,7 +357,7 @@ export function AskPanel() {
   askTabRef.current = tab === "ask";
   newChatRef.current = () => {
     if (tab !== "ask") return;
-    const streamingNow = useSidekick.getState().chatId !== null;
+    const streamingNow = useDuskie.getState().chatId !== null;
     resetChat({ cancel: !streamingNow });
   };
 
@@ -670,7 +670,7 @@ export function AskPanel() {
               run: () => {
                 const asked = `Turn ${p.label} ${on ? "on" : "off"}`;
                 const say = (content: string, error?: string) =>
-                  useSidekick.setState((st) => ({
+                  useDuskie.setState((st) => ({
                     turns: [...st.turns, { role: "user", content: asked }, { role: "assistant", content, error }],
                   }));
                 void api.pcSwitch(name, on).then(
@@ -856,7 +856,7 @@ export function AskPanel() {
       setText("");
       return;
     }
-    const current = useSidekick.getState();
+    const current = useDuskie.getState();
     // Listening: Esc only stops the mic and leaves the box ready to type in.
     if (current.hearing !== null || current.mascot === "listening") {
       stopListening();

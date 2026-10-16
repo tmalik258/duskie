@@ -7,7 +7,7 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { CLAUDE_MODELS, CODEX_MODELS, explicitModel, FAST_CLAUDE_MODEL, FAST_CODEX_MODEL } from "@/lib/ai-models";
 import { api, EVENTS, listen, type RouterModel } from "@/lib/bridge";
 import { SETUP_STATUS_CACHE_KEY, useCached } from "@/lib/cache";
-import { updateSettings, useAssistantName, useSidekick } from "@/lib/store";
+import { updateSettings, useAssistantName, useDuskie } from "@/lib/store";
 import {
   AI_PROVIDERS,
   type AiProviderId,
@@ -37,8 +37,8 @@ const NOT_READY: Record<AiProviderId, string> = {
 };
 
 export function AiTab({ onError }: { onError: (e: string) => void }) {
-  const ai = useSidekick((s) => s.settings.ai);
-  const voice = useSidekick((s) => s.settings.voice);
+  const ai = useDuskie((s) => s.settings.ai);
+  const voice = useDuskie((s) => s.settings.voice);
   return (
     <>
       <Section
@@ -669,10 +669,10 @@ function Ranking({ ai, onError }: { ai: AiSettings; onError: (e: string) => void
 
 function VoiceSection({ voice, onError }: { voice: VoiceSettings; onError: (e: string) => void }) {
   const name = useAssistantName();
-  const status = useSidekick((s) => s.voiceStatus);
+  const status = useDuskie((s) => s.voiceStatus);
   const [progress, setProgress] = useState<VoiceDownload | null>(null);
   useEffect(() => {
-    void api.voiceStatus().then((voiceStatus) => useSidekick.setState({ voiceStatus }));
+    void api.voiceStatus().then((voiceStatus) => useDuskie.setState({ voiceStatus }));
     const off = listen(EVENTS.voiceDownload, (p) => {
       setProgress(p.finished ? null : p);
       if (p.error) onError(`Voice download: ${p.error}`);
@@ -874,7 +874,7 @@ function DragRow({
 
 /** Speaker → spinner while the voice prepares → stop while audio plays. */
 function VoiceTest({ onError }: { onError: (e: string) => void }) {
-  const speaking = useSidekick((s) => s.speaking);
+  const speaking = useDuskie((s) => s.speaking);
   const [phase, setPhase] = useState<"idle" | "loading" | "playing">("idle");
   const gen = useRef(0);
 

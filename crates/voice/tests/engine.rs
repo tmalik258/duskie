@@ -1,6 +1,6 @@
 //! Runs the real models end to end: the voice says the wake phrase and a
 //! question, the engine must wake and transcribe it. Needs the models, so it
-//! only runs when SIDEKICK_VOICE_MODELS points at a folder holding them.
+//! only runs when DUSKIE_VOICE_MODELS points at a folder holding them.
 
 use sherpa_onnx::OfflineTts;
 use sidekick_voice::audio::Resampler;
@@ -12,8 +12,8 @@ use sidekick_voice::{
 
 #[test]
 fn wakes_and_transcribes_spoken_audio() {
-    let Ok(root) = std::env::var("SIDEKICK_VOICE_MODELS") else {
-        eprintln!("skipped: set SIDEKICK_VOICE_MODELS to run");
+    let Ok(root) = std::env::var("DUSKIE_VOICE_MODELS") else {
+        eprintln!("skipped: set DUSKIE_VOICE_MODELS to run");
         return;
     };
     let root = std::path::PathBuf::from(root);
@@ -57,8 +57,8 @@ fn wakes_and_transcribes_spoken_audio() {
 /// wake it; once unmuted, the same audio does.
 #[test]
 fn muted_engine_never_wakes() {
-    let Ok(root) = std::env::var("SIDEKICK_VOICE_MODELS") else {
-        eprintln!("skipped: set SIDEKICK_VOICE_MODELS to run");
+    let Ok(root) = std::env::var("DUSKIE_VOICE_MODELS") else {
+        eprintln!("skipped: set DUSKIE_VOICE_MODELS to run");
         return;
     };
     let root = std::path::PathBuf::from(root);
@@ -91,8 +91,8 @@ fn muted_engine_never_wakes() {
 /// the question that follows is what gets transcribed.
 #[test]
 fn waits_for_the_question_after_a_pause() {
-    let Ok(root) = std::env::var("SIDEKICK_VOICE_MODELS") else {
-        eprintln!("skipped: set SIDEKICK_VOICE_MODELS to run");
+    let Ok(root) = std::env::var("DUSKIE_VOICE_MODELS") else {
+        eprintln!("skipped: set DUSKIE_VOICE_MODELS to run");
         return;
     };
     let root = std::path::PathBuf::from(root);
@@ -138,14 +138,14 @@ fn waits_for_the_question_after_a_pause() {
 
 /// How often each way of waking catches "Hey Duskie" across voices and
 /// speeds, and how often everyday speech wakes it by mistake. Prints a
-/// table; run with SIDEKICK_WAKE_BENCH=1 in release mode.
+/// table; run with DUSKIE_WAKE_BENCH=1 in release mode.
 #[test]
 fn wake_bench() {
     let (Ok(root), Ok(_)) = (
-        std::env::var("SIDEKICK_VOICE_MODELS"),
-        std::env::var("SIDEKICK_WAKE_BENCH"),
+        std::env::var("DUSKIE_VOICE_MODELS"),
+        std::env::var("DUSKIE_WAKE_BENCH"),
     ) else {
-        eprintln!("skipped: set SIDEKICK_VOICE_MODELS and SIDEKICK_WAKE_BENCH to run");
+        eprintln!("skipped: set DUSKIE_VOICE_MODELS and DUSKIE_WAKE_BENCH to run");
         return;
     };
     let root = std::path::PathBuf::from(root);

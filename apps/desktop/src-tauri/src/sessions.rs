@@ -1397,10 +1397,7 @@ async fn run_claude(
     if mcp_config.is_file() {
         cmd.arg("--mcp-config").arg(mcp_config);
         if mode != Mode::Full {
-            cmd.args([
-                "--permission-prompt-tool",
-                "mcp__sidekick__sidekick_permission",
-            ]);
+            cmd.args(["--permission-prompt-tool", "mcp__duskie__duskie_permission"]);
         }
     }
     cmd.current_dir(path)
@@ -1660,7 +1657,7 @@ async fn codex_initialize<W: tokio::io::AsyncWrite + Unpin, R: tokio::io::AsyncB
     lines: &mut tokio::io::Lines<R>,
 ) -> Result<(), String> {
     write_line(stdin, json!({"id":1,"method":"initialize","params":{
-        "clientInfo":{"name":"sidekick","version":env!("CARGO_PKG_VERSION")},"capabilities":{"experimentalApi":true}}})).await?;
+        "clientInfo":{"name":"duskie","version":env!("CARGO_PKG_VERSION")},"capabilities":{"experimentalApi":true}}})).await?;
     tokio::time::timeout(Duration::from_secs(30), async {
         loop {
             let line = lines
@@ -2753,8 +2750,8 @@ mod tests {
             ("Run a command".into(), "npm test".into())
         );
         assert_eq!(
-            describe_tool("mcp__sidekick__sidekick_search", &json!({})).0,
-            "sidekick sidekick search"
+            describe_tool("mcp__duskie__duskie_search", &json!({})).0,
+            "duskie duskie search"
         );
     }
 

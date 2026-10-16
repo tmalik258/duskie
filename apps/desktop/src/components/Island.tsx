@@ -26,7 +26,7 @@ import { useNow, useSystemLook } from "@/lib/hooks";
 import { ISLAND_TOP, PANEL_PAD } from "@/lib/islandSize";
 import type { NetNotice } from "@/lib/net";
 import { playSound } from "@/lib/sound";
-import { connect, installUpdate, notePick, setHovered, uiVolume, useSidekick, watchWaiting } from "@/lib/store";
+import { connect, installUpdate, notePick, setHovered, uiVolume, useDuskie, watchWaiting } from "@/lib/store";
 import { type Activity as ActivityItem, isPaused, type MascotState, type Suggestion } from "@/lib/types";
 import { updateBusy, updateLabel } from "@/lib/updates";
 import { Announcer } from "./Announcer";
@@ -121,21 +121,21 @@ const askOpen = { duration: 0.2, ease: [0.23, 1, 0.32, 1] } as const;
 const agentsOpen = { type: "spring", bounce: 0.14, duration: 0.42 } as const;
 
 export function Island() {
-  const { mascot, settings, suggestion, hovered: rawHover, visible, ready } = useSidekick();
-  const asking = useSidekick((s) => s.ask !== null);
+  const { mascot, settings, suggestion, hovered: rawHover, visible, ready } = useDuskie();
+  const asking = useDuskie((s) => s.ask !== null);
   const askTab = useAgents((s) => s.tab);
   const agentsLayout = useAgents((s) => s.layout);
   const agentCurrent = useAgents((s) => s.current);
   useEffect(listenToAgents, []);
-  const view = useSidekick((s) => s.ask?.view);
+  const view = useDuskie((s) => s.ask?.view);
   // The Ask panel itself (not Settings or the welcome shown in its place).
   const askPanel = asking && view !== "welcome";
-  const chatting = useSidekick((s) => s.chatId !== null);
-  const voiceStatus = useSidekick((s) => s.voiceStatus);
-  const online = useSidekick((s) => s.online);
-  const netNotice = useSidekick((s) => s.netNotice);
-  const merging = useSidekick((s) => s.merge !== null);
-  const updateProgress = useSidekick((s) => s.updateProgress);
+  const chatting = useDuskie((s) => s.chatId !== null);
+  const voiceStatus = useDuskie((s) => s.voiceStatus);
+  const online = useDuskie((s) => s.online);
+  const netNotice = useDuskie((s) => s.netNotice);
+  const merging = useDuskie((s) => s.merge !== null);
+  const updateProgress = useDuskie((s) => s.updateProgress);
   const updateActivity = useActivities((s) => latestActivity(s.activities, "update"));
   const updateSuppressed = updateActivity?.dismissed;
   const updateNow = useNow(1000);
@@ -145,10 +145,10 @@ export function Island() {
         ? activityLabel(updateActivity, updateNow)
         : updateLabel(updateProgress)
       : null;
-  const waiting = useSidekick((s) => (s.ask ? null : s.waiting));
-  const justDone = useSidekick((s) => s.justDone);
+  const waiting = useDuskie((s) => (s.ask ? null : s.waiting));
+  const justDone = useDuskie((s) => s.justDone);
   // A task still running after Ask closed: its current step, small.
-  const chatWorking = useSidekick((s) => {
+  const chatWorking = useDuskie((s) => {
     const last = s.turns[s.turns.length - 1];
     if (!s.chatId || !last?.streaming) return null;
     return last.tool ? `${last.tool}...` : "Working...";
@@ -174,7 +174,7 @@ export function Island() {
   // fullscreen app or a pause says to stay small; it shrinks back once
   // answered.
   const questionId = useAgents((s) => s.sessions.find((x) => x.question)?.question?.id ?? null);
-  const fullscreen = useSidekick((s) => s.fullscreen);
+  const fullscreen = useDuskie((s) => s.fullscreen);
   const [dndOn, setDndOn] = useState(false);
   useEffect(() => {
     if (!questionId) return;
@@ -223,11 +223,11 @@ export function Island() {
       const current = useActivities.getState();
       if (
         [...current.activities, ...current.local].some(ownsWorking) ||
-        useSidekick.getState().chatId ||
+        useDuskie.getState().chatId ||
         useAgents.getState().sessions.some((s) => s.status === "working" || s.status === "waiting")
       )
         return;
-      useSidekick.setState((s) => (s.mascot === "working" ? { mascot: "idle", running: null } : {}));
+      useDuskie.setState((s) => (s.mascot === "working" ? { mascot: "idle", running: null } : {}));
       void api.activityReconcile().catch(() => {});
     }, 1000);
     return () => clearTimeout(timer);
@@ -261,12 +261,12 @@ export function Island() {
   const guide = useGuide(waiting);
   // Voice with Ask closed: a compact pill while listening and thinking; the
   // island opens only when the answer starts.
-  const hearing = useSidekick((s) => (s.ask ? null : s.hearing));
-  const voiceQuestion = useSidekick((s) => (s.ask ? null : s.voiceQuestion));
+  const hearing = useDuskie((s) => (s.ask ? null : s.hearing));
+  const voiceQuestion = useDuskie((s) => (s.ask ? null : s.voiceQuestion));
   // Something finished that needs nothing more: a short done pill.
   // Also covers mascot success without Undo / Open (e.g. "Switched to Claude"
   // after Settings closed — showDone was skipped while Ask was open).
-  const donePill = useSidekick((s) => {
+  const donePill = useDuskie((s) => {
     if (s.ask || updateBusy(s.updateProgress)) return null;
     if (s.donePill) return s.donePill;
     if (s.mascot !== "success") return null;
@@ -275,13 +275,13 @@ export function Island() {
     return r?.message ?? "Done";
   });
   // Success that still needs Undo or Open folder: keep the expanded card.
-  const successCard = useSidekick((s) => {
+  const successCard = useDuskie((s) => {
     if (s.ask || s.mascot !== "success") return false;
     const r = s.lastResult;
     return !!(r && (r.undoId != null || r.path));
   });
   // Focus mode: a compact pill with the focus face and the time left.
-  const focusUntil = useSidekick((s) => (s.ask ? null : s.focusUntil));
+  const focusUntil = useDuskie((s) => (s.ask ? null : s.focusUntil));
   const focusLeft = useFocusLeft(focusUntil);
   const reduced = useReducedMotion() ?? false;
   const look = useSystemLook();
@@ -441,8 +441,8 @@ export function Island() {
   const bump = useMotionValue(1);
   // A mood (thanks, Claude finished) shows for a moment; offline and at
   // rest, the mascot looks a little lost.
-  const mood = useSidekick((s) => s.mood);
-  const speaking = useSidekick((s) => s.speaking);
+  const mood = useDuskie((s) => s.mood);
+  const speaking = useDuskie((s) => s.speaking);
   const face =
     mood?.id ??
     (asksYou && !voiceQuestion && hearing === null ? "curious" : null) ??
@@ -484,8 +484,8 @@ export function Island() {
 
   // Remeasure after paint when Ask content swaps (New, stream, view change),
   // so a stale tall height does not stick after the chat clears.
-  const turnsLen = useSidekick((s) => s.turns.length);
-  const chatId = useSidekick((s) => s.chatId);
+  const turnsLen = useDuskie((s) => s.turns.length);
+  const chatId = useDuskie((s) => s.chatId);
   // biome-ignore lint/correctness/useExhaustiveDependencies: triggers only — remeasure when Agents body changes size
   useEffect(() => {
     if (!asking) return;
@@ -585,7 +585,7 @@ export function Island() {
           : morphOpen
       : morphClose;
 
-  const overlayHit = useSidekick((s) => s.overlayHit);
+  const overlayHit = useDuskie((s) => s.overlayHit);
   // Report the target shape as the interactive area; outside it the window
   // stays click-through. A floating menu expands the rect so it stays usable.
   // Debounced: during spring animations width/height change every frame, so
@@ -1131,7 +1131,7 @@ function CompactTrailing({
   offline: boolean;
   waiting: string | null;
 }) {
-  const later = useSidekick((s) => s.later);
+  const later = useDuskie((s) => s.later);
   if (waiting) {
     return (
       <motion.div
@@ -1204,11 +1204,11 @@ function ExpandedContent({
   suggestion: Suggestion | null;
 }) {
   const activityState = useActivities();
-  const result = useSidekick((s) => s.lastResult);
-  const running = useSidekick((s) => s.running);
-  const netNotice = useSidekick((s) => s.netNotice);
-  const merge = useSidekick((s) => s.merge);
-  const progress = useSidekick((s) => s.updateProgress);
+  const result = useDuskie((s) => s.lastResult);
+  const running = useDuskie((s) => s.running);
+  const netNotice = useDuskie((s) => s.netNotice);
+  const merge = useDuskie((s) => s.merge);
+  const progress = useDuskie((s) => s.updateProgress);
   const reporting = (mascot === "success" || mascot === "error" || mascot === "working") && !suggestion;
   if (merge && !suggestion) return <MergeCard path={merge.path} />;
   if (netNotice && !suggestion) return <NetNoticeCard notice={netNotice} />;
@@ -1228,7 +1228,7 @@ function ExpandedContent({
             <button
               type="button"
               className="chip text-white/60"
-              onClick={() => useSidekick.setState({ updateProgress: null })}
+              onClick={() => useDuskie.setState({ updateProgress: null })}
             >
               Dismiss
             </button>
@@ -1315,12 +1315,12 @@ function NetNoticeCard({ notice }: { notice: NetNotice }) {
 
 function UndoButton({ id }: { id: number }) {
   const undo = async () => {
-    const result = useSidekick.getState().lastResult;
+    const result = useDuskie.getState().lastResult;
     try {
       const message = await api.actionUndo(id);
-      useSidekick.setState({ lastResult: result && { ...result, message, path: null, undoId: null } });
+      useDuskie.setState({ lastResult: result && { ...result, message, path: null, undoId: null } });
     } catch (err) {
-      useSidekick.setState({ lastResult: result && { ...result, ok: false, message: String(err), undoId: null } });
+      useDuskie.setState({ lastResult: result && { ...result, ok: false, message: String(err), undoId: null } });
     }
   };
   return (
@@ -1333,7 +1333,7 @@ function UndoButton({ id }: { id: number }) {
 function Options({ suggestion }: { suggestion: Suggestion }) {
   const alwaysAt = suggestion.always?.findIndex(Boolean) ?? -1;
   // Shift while hovered, or Shift+Alt anywhere — Rust polls; no hover required.
-  const priv = useSidekick((s) => s.shiftHeld);
+  const priv = useDuskie((s) => s.shiftHeld);
   return (
     <div className="mt-3 flex flex-wrap items-center gap-1.5">
       {suggestion.options.map((option, i) => {
@@ -1389,7 +1389,7 @@ function Options({ suggestion }: { suggestion: Suggestion }) {
         <span
           className="ak-ignore-fill"
           aria-hidden="true"
-          style={{ animationDuration: `${useSidekick.getState().settings.collapseAfterSecs}s` }}
+          style={{ animationDuration: `${useDuskie.getState().settings.collapseAfterSecs}s` }}
         />
         <span className="relative">Ignore</span>
         <kbd className="relative ml-1.5 font-sans text-[11px] text-white/45">
@@ -1441,20 +1441,20 @@ function runningLabel(suggestion: Suggestion, index: number): string {
 
 /** Shift+click or Shift+Alt+N opens a link in a private window. */
 function choose(suggestion: Suggestion, index: number, priv = false) {
-  playSound("select", uiVolume(), useSidekick.getState().settings.soundKit);
-  useSidekick.setState({ running: runningLabel(suggestion, index) });
+  playSound("select", uiVolume(), useDuskie.getState().settings.soundKit);
+  useDuskie.setState({ running: runningLabel(suggestion, index) });
   notePick(suggestion.skillId, suggestion.options[index] ?? "");
   void api.suggestionChoose(suggestion.id, index, priv);
 }
 
 function always(suggestion: Suggestion, index: number) {
-  playSound("select", uiVolume(), useSidekick.getState().settings.soundKit);
-  useSidekick.setState({ running: runningLabel(suggestion, index) });
+  playSound("select", uiVolume(), useDuskie.getState().settings.soundKit);
+  useDuskie.setState({ running: runningLabel(suggestion, index) });
   void api.suggestionAlways(suggestion.id, index);
 }
 
 function dismiss(suggestion: Suggestion) {
-  playSound("toggle_off", uiVolume(), useSidekick.getState().settings.soundKit);
+  playSound("toggle_off", uiVolume(), useDuskie.getState().settings.soundKit);
   void api.suggestionDismiss(suggestion.id, "user");
 }
 
