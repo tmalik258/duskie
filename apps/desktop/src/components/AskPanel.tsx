@@ -806,7 +806,8 @@ export function AskPanel() {
     }
   };
 
-  const pickTab = (next: PanelTab) => (next === "settings" ? setAsk({ view: "settings" }) : goTab(next));
+  const pickTab = (next: PanelTab) =>
+    next === "settings" ? setAsk({ view: "settings" }) : next === "repos" && tab !== "repos" ? openGit() : goTab(next);
 
   altKeys.current = {
     s: toggleSpeak,

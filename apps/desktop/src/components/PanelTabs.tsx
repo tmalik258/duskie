@@ -43,7 +43,7 @@ export function PanelTabs({
     [
       ["ask", "Ask", "spark"],
       ["agents", "Agents", "cpu"],
-      ["repos", "Repos", "branch"],
+      ["repos", "Git", "branch"],
     ] as const
   ).filter(([id]) => coder || id === "ask");
   return (
