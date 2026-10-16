@@ -4,6 +4,7 @@ mod agents;
 mod ai;
 mod ask;
 mod ask_tools;
+mod audit;
 mod brief;
 mod browser;
 mod chat_prune;
