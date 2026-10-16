@@ -4,7 +4,7 @@
 
 import { sendChat, setAsk, useDuskie } from "@/lib/store";
 import type { AskContext, CalendarToday } from "@/lib/types";
-import { type IcName, Icon } from "../Icon";
+import { Ic, type IcName, Icon } from "../Icon";
 import { Tip } from "../Tip";
 import { pendingCount, useAltDigits } from "./Proposals";
 import { KeyHint } from "./parts";
@@ -77,7 +77,7 @@ export function ContextLine({ keys }: { keys: boolean }) {
               onClick={it.toggle}
               className={`ak-ctx-i chip ${it.id === "clip" ? "cpy" : ""}`}
             >
-              <Icon name={it.on ? "check" : "plus"} size={10} />
+              <Ic name={it.id === "clip" ? "copy" : "file"} size={12} />
               <span className="truncate">{it.label}</span>
             </button>
           </Tip>
