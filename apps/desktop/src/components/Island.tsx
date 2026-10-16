@@ -192,6 +192,8 @@ export function Island() {
     return () => clearTimeout(timer);
   }, [mascot, chatWorking, agentWorking, activityState]);
   const agentAsks = useAgents((s) => s.sessions.some((x) => x.status === "waiting"));
+  const askingTitle = useAgents((s) => s.sessions.find((x) => x.status === "waiting")?.title ?? null);
+  const askingCount = useAgents((s) => s.sessions.filter((x) => x.status === "waiting").length);
   const working = asking
     ? null
     : ((agentAsks ? agentWorking : null) ??
@@ -622,33 +624,41 @@ export function Island() {
             ? { kind: "error", label: shortError(lastError) }
             : donePill !== null
               ? { kind: "done", label: donePill }
-              : working !== null || voiceQuestion !== null
+              : asksYou && askingTitle && voiceQuestion === null
                 ? {
-                    kind: "working",
-                    label: displayedActivity
-                      ? activityLabel(displayedActivity, activityNow, { elapsed: false }).replace(/(\.\.\.|…)$/, "")
-                      : (voiceQuestion ?? working ?? "").replace(/(\.\.\.|…)$/, ""),
-                    startedAt: displayedActivity?.startedAt,
+                    kind: "waiting",
+                    label: askingTitle,
+                    dim: "waiting for you",
+                    count: askingCount,
+                    onOpen: () => void api.askOpen(),
                   }
-                : focusLeft !== null
+                : working !== null || voiceQuestion !== null
                   ? {
-                      kind: "focus",
-                      label: "Focus",
-                      dim: focusUntil ? `until ${clockTime(focusUntil)}` : undefined,
-                      left: focusLeft,
+                      kind: "working",
+                      label: displayedActivity
+                        ? activityLabel(displayedActivity, activityNow, { elapsed: false }).replace(/(\.\.\.|…)$/, "")
+                        : (voiceQuestion ?? working ?? "").replace(/(\.\.\.|…)$/, ""),
+                      startedAt: displayedActivity?.startedAt,
                     }
-                  : paused
-                    ? { kind: "paused", label: "Paused", dim: pauseDim(settings.pause) }
-                    : !online
-                      ? {
-                          kind: "offline",
-                          label: "Offline",
-                          dim: "catching up when back",
-                          onOpen: () => setNetOpen(true),
-                        }
-                      : mascot === "noticing"
-                        ? { kind: "noticing", label: "Taking a look" }
-                        : null
+                  : focusLeft !== null
+                    ? {
+                        kind: "focus",
+                        label: "Focus",
+                        dim: focusUntil ? `until ${clockTime(focusUntil)}` : undefined,
+                        left: focusLeft,
+                      }
+                    : paused
+                      ? { kind: "paused", label: "Paused", dim: pauseDim(settings.pause) }
+                      : !online
+                        ? {
+                            kind: "offline",
+                            label: "Offline",
+                            dim: "catching up when back",
+                            onOpen: () => setNetOpen(true),
+                          }
+                        : mascot === "noticing"
+                          ? { kind: "noticing", label: "Taking a look" }
+                          : null
       : null;
   const [pillMeasured, setPillMeasured] = useState(0);
 
