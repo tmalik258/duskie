@@ -40,7 +40,10 @@ export function Creature(props: {
   active?: boolean;
 }) {
   const { state, face, size, theme = "atelier", magnetic = true, alive = false, simple = false, active = true } = props;
-  const [supported] = useState(() => creatureSupported());
+  // Decided after mount, so the server's markup and the first client
+  // render match; null means not decided yet.
+  const [supported, setSupported] = useState<boolean | null>(null);
+  useEffect(() => setSupported(creatureSupported()), []);
   const reduced = (useReducedMotion() ?? false) || simple;
   const expression = face ?? FOR_STATE[state];
   const root = useRef<HTMLDivElement>(null);
@@ -49,7 +52,7 @@ export function Creature(props: {
   latest.current = { expression, theme, alive, active };
 
   useEffect(() => {
-    if (!supported || !root.current) return;
+    if (supported !== true || !root.current) return;
     const now = latest.current;
     const c = createCreature(root.current, {
       size,
@@ -82,7 +85,7 @@ export function Creature(props: {
 
   // Cursor: gaze anywhere on screen, magnetic pull only nearby.
   useEffect(() => {
-    if (!supported) return;
+    if (supported !== true) return;
     let release: ReturnType<typeof setTimeout> | undefined;
     const unsubscribe = subscribeCursor((x, y) => {
       const el = root.current;
@@ -111,7 +114,7 @@ export function Creature(props: {
   }, [supported, size, magnetic, reduced]);
 
   // No WebGL 2 on this machine: a still silhouette, no animation.
-  if (!supported) {
+  if (supported === false) {
     return (
       <div
         className="creature-still"
