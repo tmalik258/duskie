@@ -272,6 +272,7 @@ pub fn run() {
             commands::library_set_target,
             commands::library_remove,
             commands::library_sync,
+            commands::library_install_url,
             commands::capabilities_get,
             commands::choices_reset,
             commands::routines_today,

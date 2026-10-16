@@ -366,6 +366,21 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     library = library.filter((l) => l.name !== (a as { name: string }).name);
     return library;
   },
+  library_install_url: (a) => {
+    const name = (a as { url: string }).url.split("/").pop() || "skill";
+    library.push({
+      name,
+      description: "Added from a link.",
+      origin: "url",
+      hash: "u1",
+      hasScripts: false,
+      targets: { claude: true, codex: true, local: true },
+      synced: {},
+      url: (a as { url: string }).url,
+      commit: "abc1234",
+    });
+    return library;
+  },
   library_sync: () => ({ written: library.map((l) => l.name), conflicts: [], backups: [] }),
   skills_list: () => [
     {

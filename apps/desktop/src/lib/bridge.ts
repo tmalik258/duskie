@@ -249,6 +249,7 @@ export const api = {
     invoke<LibrarySkill[]>("library_set_target", { name, target, on }),
   libraryRemove: (name: string) => invoke<LibrarySkill[]>("library_remove", { name }),
   librarySync: () => invoke<SyncReport>("library_sync"),
+  libraryInstallUrl: (url: string) => invoke<LibrarySkill[]>("library_install_url", { url }),
   capabilitiesGet: (rescan = false) => invoke<CapabilityInfo>("capabilities_get", { rescan }),
   choicesReset: () => invoke<number>("choices_reset"),
   routinesToday: () => invoke<RoutineItem[]>("routines_today"),

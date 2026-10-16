@@ -31,11 +31,63 @@ pub enum Target {
     Local,
 }
 
+/// A skill folder on GitHub: owner, repo, ref and the path inside.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GithubSkill {
+    pub owner: String,
+    pub repo: String,
+    pub reference: String,
+    pub path: String,
+}
+
+/// Reads `https://github.com/o/r/tree/<ref>/<path>` (or a repo link, which
+/// means the default branch at the root).
+pub fn parse_github(url: &str) -> Option<GithubSkill> {
+    let rest = url
+        .trim()
+        .trim_end_matches('/')
+        .strip_prefix("https://github.com/")?;
+    let parts: Vec<&str> = rest.split('/').collect();
+    let ok = |p: &str| {
+        !p.is_empty()
+            && p != ".."
+            && p.chars()
+                .all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c))
+    };
+    let (owner, repo) = (parts.first()?, parts.get(1)?.trim_end_matches(".git"));
+    if !ok(owner) || !ok(repo) {
+        return None;
+    }
+    let (reference, path) = match parts.get(2) {
+        None => ("HEAD".to_owned(), String::new()),
+        Some(&"tree") | Some(&"blob") => {
+            let r = parts.get(3)?;
+            let path = parts[4..].join("/");
+            if !ok(r) || parts[4..].iter().any(|p| !ok(p)) {
+                return None;
+            }
+            (
+                r.to_string(),
+                path.trim_end_matches("/SKILL.md")
+                    .trim_end_matches("SKILL.md")
+                    .to_owned(),
+            )
+        }
+        _ => return None,
+    };
+    Some(GithubSkill {
+        owner: owner.to_string(),
+        repo: repo.to_owned(),
+        reference,
+        path,
+    })
+}
+
 pub const TARGETS: [Target; 3] = [Target::Claude, Target::Codex, Target::Local];
 
 /// Most files and bytes one skill may have.
-const MAX_FILES: usize = 200;
-const MAX_BYTES: u64 = 5 * 1024 * 1024;
+pub const MAX_FILES: usize = 200;
+pub const MAX_BYTES: u64 = 5 * 1024 * 1024;
 const SCRIPT_EXT: [&str; 9] = ["sh", "bash", "ps1", "py", "js", "ts", "bat", "cmd", "exe"];
 
 /// A skill folder as found on disk.
@@ -352,6 +404,16 @@ impl Library {
         self.save(&m)
     }
 
+    /// Records where a skill came from, so it can be updated later.
+    pub fn set_source(&self, name: &str, url: &str, commit: &str) -> io::Result<()> {
+        let mut m = self.load();
+        if let Some(e) = m.skills.get_mut(name) {
+            e.url = Some(url.to_owned());
+            e.commit = Some(commit.to_owned());
+        }
+        self.save(&m)
+    }
+
     /// Removes a skill from the library (copies already written stay).
     pub fn remove(&self, name: &str) -> io::Result<()> {
         let mut m = self.load();
@@ -589,6 +651,31 @@ mod tests {
                 .unwrap()
                 .contains("v2")
         );
+    }
+
+    #[test]
+    fn reads_github_links_and_refuses_odd_ones() {
+        let g = parse_github("https://github.com/acme/skills/tree/main/pdf").unwrap();
+        assert_eq!(
+            (
+                g.owner.as_str(),
+                g.repo.as_str(),
+                g.reference.as_str(),
+                g.path.as_str()
+            ),
+            ("acme", "skills", "main", "pdf")
+        );
+        let g = parse_github("https://github.com/acme/skills/blob/v1/a/b/SKILL.md").unwrap();
+        assert_eq!(g.path, "a/b");
+        assert_eq!(
+            parse_github("https://github.com/acme/skills")
+                .unwrap()
+                .reference,
+            "HEAD"
+        );
+        assert!(parse_github("https://github.com/acme/skills/tree/main/../x").is_none());
+        assert!(parse_github("http://github.com/acme/skills").is_none());
+        assert!(parse_github("https://evil.com/acme/skills").is_none());
     }
 
     #[test]

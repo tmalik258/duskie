@@ -182,3 +182,91 @@ mod tests {
         assert_eq!(fresh(&[found("pdf", "b")], &mut told), ["pdf"]);
     }
 }
+
+/// Adds a skill from a GitHub folder link, pinned to the commit the link
+/// points at now. Files are only downloaded; nothing in them runs.
+#[tauri::command]
+pub async fn library_install_url(app: AppHandle, url: String) -> CmdResult<Vec<Entry>> {
+    let g = library::parse_github(&url).ok_or("Paste a GitHub link to a skill folder.")?;
+    let lib = library_of(&app)?;
+    let client = reqwest::Client::builder()
+        .user_agent("duskie")
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| e.to_string())?;
+    let api = format!("https://api.github.com/repos/{}/{}", g.owner, g.repo);
+    let get = |u: String| {
+        let client = client.clone();
+        async move {
+            let r = client.get(&u).send().await.map_err(|e| e.to_string())?;
+            if !r.status().is_success() {
+                return Err(format!("GitHub answered {}.", r.status()));
+            }
+            r.bytes().await.map_err(|e| e.to_string())
+        }
+    };
+    let commit: serde_json::Value =
+        serde_json::from_slice(&get(format!("{api}/commits/{}", g.reference)).await?)
+            .map_err(|e| e.to_string())?;
+    let sha = commit["sha"]
+        .as_str()
+        .ok_or("No such branch or commit.")?
+        .to_owned();
+    let tree: serde_json::Value =
+        serde_json::from_slice(&get(format!("{api}/git/trees/{sha}?recursive=1")).await?)
+            .map_err(|e| e.to_string())?;
+    let prefix = if g.path.is_empty() {
+        String::new()
+    } else {
+        format!("{}/", g.path)
+    };
+    let files: Vec<String> = tree["tree"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter(|t| t["type"] == "blob")
+        .filter_map(|t| t["path"].as_str())
+        .filter(|p| p.starts_with(&prefix) && !p[prefix.len()..].split('/').any(|s| s == ".."))
+        .map(str::to_owned)
+        .collect();
+    if files.len() > library::MAX_FILES {
+        return Err("That folder has too many files for a skill.".into());
+    }
+    if !files.iter().any(|f| f[prefix.len()..] == *"SKILL.md") {
+        return Err("No SKILL.md in that folder.".into());
+    }
+    let tmp = std::env::temp_dir().join(format!("duskie-skill-{sha}"));
+    let _ = std::fs::remove_dir_all(&tmp);
+    let mut total = 0u64;
+    for f in &files {
+        let body = get(format!(
+            "https://raw.githubusercontent.com/{}/{}/{sha}/{f}",
+            g.owner, g.repo
+        ))
+        .await?;
+        total += body.len() as u64;
+        if total > library::MAX_BYTES {
+            let _ = std::fs::remove_dir_all(&tmp);
+            return Err("That skill is too large.".into());
+        }
+        let dest = tmp.join(&f[prefix.len()..]);
+        if let Some(parent) = dest.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        std::fs::write(&dest, &body).map_err(|e| e.to_string())?;
+    }
+    off_ui(move || {
+        let found = library::read_skill(&tmp, Origin::Url);
+        let out = match found {
+            Some(f) => lib
+                .import(&f)
+                .and_then(|_| lib.set_source(&f.name, &url, &sha))
+                .map(|_| entries(&lib))
+                .map_err(|e| e.to_string()),
+            None => Err("That SKILL.md has no valid name.".into()),
+        };
+        let _ = std::fs::remove_dir_all(&tmp);
+        out
+    })
+    .await?
+}

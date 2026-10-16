@@ -30,6 +30,8 @@ export function SkillLibrary({ onError }: { onError: (e: string) => void }) {
   const [found, setFound] = useState<FoundSkill[]>([]);
   const [lib, setLib] = useState<LibrarySkill[]>([]);
   const [note, setNote] = useState("");
+  const [link, setLink] = useState("");
+  const [busy, setBusy] = useState(false);
   const fail = useCallback((e: unknown) => onError(String(e)), [onError]);
   const refresh = useCallback(() => {
     api.libraryList().then(setLib).catch(fail);
@@ -56,8 +58,38 @@ export function SkillLibrary({ onError }: { onError: (e: string) => void }) {
       })
       .catch(fail);
 
+  const install = () => {
+    setBusy(true);
+    api
+      .libraryInstallUrl(link.trim())
+      .then((l) => {
+        setLib(l);
+        setLink("");
+      })
+      .catch(fail)
+      .finally(() => setBusy(false));
+  };
+
   return (
     <div className="flex flex-col gap-3">
+      <form
+        className="flex items-center gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (link.trim()) install();
+        }}
+      >
+        <input
+          aria-label="GitHub link to a skill folder"
+          className="min-w-0 flex-1 rounded-md border border-(--border) bg-transparent px-2 py-1 text-[13px]"
+          placeholder="Paste a GitHub link to a skill folder"
+          value={link}
+          onChange={(e) => setLink(e.target.value)}
+        />
+        <Button small disabled={busy || !link.trim()} onClick={install}>
+          {busy ? "Adding" : "Add from link"}
+        </Button>
+      </form>
       {found.length > 0 && (
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
@@ -98,7 +130,10 @@ export function SkillLibrary({ onError }: { onError: (e: string) => void }) {
                     {s.name} <Badge>{ORIGIN[s.origin]}</Badge>
                     {s.hasScripts && <Badge>Has scripts</Badge>}
                   </span>
-                  <span className="block truncate text-[12px] text-(--muted)">{s.description}</span>
+                  <span className="block truncate text-[12px] text-(--muted)">
+                    {s.description}
+                    {s.commit ? ` (pinned at ${s.commit.slice(0, 7)})` : ""}
+                  </span>
                 </span>
                 <Button small onClick={() => api.libraryRemove(s.name).then(setLib).catch(fail)}>
                   Remove
