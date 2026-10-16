@@ -9,7 +9,7 @@ import type * as MonacoNs from "monaco-editor";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api } from "@/lib/bridge";
 import { lineMarks } from "@/lib/linediff";
-import { languageOf, loadMonaco } from "@/lib/monaco";
+import { DUSKIE_THEME, languageOf, loadMonaco } from "@/lib/monaco";
 import type { EditorHit, TreeEntry } from "@/lib/types";
 import { Ic } from "../Icon";
 import { Terminal } from "./Terminal";
@@ -88,11 +88,25 @@ export function Editor({
         if (gone || !host.current) return;
         monaco.current = m;
         const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        m.editor.defineTheme("duskie", DUSKIE_THEME);
         editor.current = m.editor.create(host.current, {
-          theme: "vs-dark",
+          theme: "duskie",
           automaticLayout: true,
           minimap: { enabled: false },
           fontSize: 13,
+          fontFamily: '"JetBrains Mono", "Cascadia Code", ui-monospace, Consolas, monospace',
+          fontLigatures: true,
+          lineHeight: 21,
+          padding: { top: 12, bottom: 12 },
+          renderLineHighlight: "line",
+          lineNumbersMinChars: 3,
+          glyphMargin: false,
+          folding: false,
+          overviewRulerLanes: 0,
+          hideCursorInOverviewRuler: true,
+          guides: { indentation: true },
+          scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6, useShadows: false },
+          cursorBlinking: reduced ? "solid" : "smooth",
           smoothScrolling: !reduced,
           cursorSmoothCaretAnimation: reduced ? "off" : "on",
           scrollBeyondLastLine: false,
@@ -294,6 +308,7 @@ export function Editor({
       </div>
       <div className="ed-main min-h-0 flex-1">
         <nav className="ed-tree" aria-label="Files">
+          <span className="ed-head">Files</span>
           {tree.map((e) => (
             <button
               key={e.path}
@@ -310,7 +325,7 @@ export function Editor({
             </button>
           ))}
         </nav>
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="ed-pane flex min-w-0 flex-1 flex-col">
           <nav className="ed-tabs" aria-label="Open files">
             {tabs.map((t) => (
               <span key={t.path} className="ed-tab" data-active={t.path === active}>
@@ -319,8 +334,9 @@ export function Editor({
                   aria-current={t.path === active ? "page" : undefined}
                   onClick={() => setActive(t.path)}
                 >
+                  <Ic name="file" size={11} />
                   {t.path.split("/").pop()}
-                  {t.dirty ? " *" : ""}
+                  {t.dirty && <span className="ed-dot" role="img" aria-label="unsaved" />}
                 </button>
                 <button type="button" aria-label={`Close ${t.path}`} onClick={() => close(t.path)}>
                   <Ic name="x" size={10} />
@@ -368,6 +384,7 @@ export function Editor({
             // biome-ignore lint/a11y/noAutofocus: the picker opens for typing.
             autoFocus
             aria-label="File name"
+            placeholder="Go to file"
             value={quick}
             onChange={(e) => setQuick(e.target.value)}
             onKeyDown={(e) => {
@@ -400,6 +417,7 @@ export function Editor({
             // biome-ignore lint/a11y/noAutofocus: the search opens for typing.
             autoFocus
             aria-label="Search text"
+            placeholder="Search in files"
             value={find}
             onChange={(e) => setFind(e.target.value)}
           />

@@ -5,9 +5,10 @@
 
 import { useEffect, useRef } from "react";
 import { api, EVENTS, listen } from "@/lib/bridge";
+import { DUSKIE_TERM } from "@/lib/monaco";
 
 export function Terminal({ root }: { root: string }) {
-  const host = useRef<HTMLElement>(null);
+  const host = useRef<HTMLDivElement>(null);
   useEffect(() => {
     let gone = false;
     let id: number | null = null;
@@ -21,8 +22,10 @@ export function Terminal({ root }: { root: string }) {
       if (gone || !host.current) return;
       const term = new Xterm({
         fontSize: 12,
-        fontFamily: '"JetBrains Mono", ui-monospace, Consolas, monospace',
-        theme: { background: "#141418" },
+        lineHeight: 1.35,
+        fontFamily: '"JetBrains Mono", "Cascadia Code", ui-monospace, Consolas, monospace',
+        theme: DUSKIE_TERM,
+        cursorStyle: "bar",
         cursorBlink: !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
       });
       const fit = new FitAddon();
@@ -57,5 +60,10 @@ export function Terminal({ root }: { root: string }) {
       for (const c of cleanup.reverse()) c();
     };
   }, [root]);
-  return <section ref={host} className="ed-term" aria-label="Terminal" />;
+  return (
+    <section className="ed-term" aria-label="Terminal">
+      <span className="ed-head">Terminal</span>
+      <div ref={host} className="ed-term-host" />
+    </section>
+  );
 }

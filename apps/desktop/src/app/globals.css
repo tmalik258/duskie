@@ -4775,20 +4775,35 @@ button.ak-cchip:hover,
   background: rgb(255 255 255 / 0.06);
 }
 
-/* Full editor in the dock */
+/* Full editor in the dock: one glass panel, tree on the left, the code in
+   a darker well, the terminal as a drawer under it. */
 .ed-main {
   display: flex;
+  gap: 8px;
   min-height: 0;
+  margin-top: 8px;
+}
+.ed-head {
+  display: block;
+  padding: 6px 10px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
 }
 .ed-tree {
   display: flex;
   flex-direction: column;
-  width: 200px;
+  gap: 1px;
+  width: 210px;
   flex-shrink: 0;
   overflow-y: auto;
   scrollbar-width: none;
-  border-right: 1px solid rgb(255 255 255 / 0.06);
-  padding: 4px 0;
+  padding: 2px 6px 8px;
+  border-radius: var(--r-md);
+  background: var(--fill);
+  border: 1px solid var(--line);
 }
 .ed-tree::-webkit-scrollbar,
 .ed-pop::-webkit-scrollbar {
@@ -4797,87 +4812,168 @@ button.ak-cchip:hover,
 .ed-node {
   display: flex;
   align-items: center;
-  gap: 6px;
-  border-radius: 6px;
+  gap: 7px;
+  min-height: 26px;
+  border-radius: var(--r-sm);
   text-align: left;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--ink-2);
-  padding: 2px 8px;
+  padding: 0 8px;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
+  transition:
+    background 120ms var(--ease-out-strong),
+    color 120ms var(--ease-out-strong);
 }
 .ed-node[data-dir="true"] {
   color: var(--ink-3);
+  font-weight: 500;
 }
 .ed-node svg {
   flex: none;
-  opacity: 0.7;
+  opacity: 0.55;
 }
-.ed-node[data-active="true"],
+.ed-node[data-dir="true"] svg {
+  color: var(--c4);
+  opacity: 0.8;
+}
 .ed-node:hover:not(:disabled) {
   color: var(--ink);
-  background: rgb(255 255 255 / 0.06);
+  background: var(--fill-2);
+}
+.ed-node[data-active="true"] {
+  color: var(--ink);
+  background: rgb(149 168 154 / 0.16);
+  box-shadow: inset 2px 0 0 var(--c4);
+}
+.ed-pane {
+  overflow: hidden;
+  border-radius: var(--r-md);
+  background: #0e0e0d;
+  border: 1px solid var(--line);
 }
 .ed-tabs {
   display: flex;
-  gap: 2px;
-  padding: 4px;
+  gap: 4px;
+  padding: 6px 6px 0;
   overflow-x: auto;
   scrollbar-width: none;
+  border-bottom: 1px solid var(--line);
+  background: var(--fill);
+}
+.ed-tabs::-webkit-scrollbar {
+  display: none;
 }
 .ed-tab {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 2px;
   font-size: 12px;
-  padding: 2px 6px;
+  padding: 0 4px 0 2px;
+  height: 28px;
+  border-radius: var(--r-sm) var(--r-sm) 0 0;
+  color: var(--ink-3);
+  transition:
+    color 120ms var(--ease-out-strong),
+    background 120ms var(--ease-out-strong);
+}
+.ed-tab > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+  height: 22px;
   border-radius: 6px;
+}
+.ed-tab > button:last-child {
+  padding: 0 4px;
+  opacity: 0;
+}
+.ed-tab:hover > button:last-child,
+.ed-tab[data-active="true"] > button:last-child,
+.ed-tab > button:focus-visible {
+  opacity: 0.7;
+}
+.ed-tab > button:last-child:hover {
+  opacity: 1;
+  background: var(--fill-2);
+}
+.ed-tab:hover {
   color: var(--ink-2);
 }
 .ed-tab[data-active="true"] {
   color: var(--ink);
-  background: rgb(255 255 255 / 0.08);
+  background: #0e0e0d;
+  box-shadow: inset 0 2px 0 var(--c4);
+}
+.ed-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--warn);
 }
 .ed-note {
   display: flex;
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  padding: 6px 8px;
+  padding: 8px 12px;
   color: var(--ink);
-  background: rgb(255 200 80 / 0.12);
+  background: rgb(217 165 91 / 0.12);
+  border-bottom: 1px solid rgb(217 165 91 / 0.25);
 }
 .ed-pop {
   position: absolute;
-  top: 48px;
+  top: 52px;
   left: 50%;
   transform: translateX(-50%);
-  width: min(520px, 90%);
+  width: min(540px, 90%);
   max-height: 60%;
   overflow-y: auto;
   scrollbar-width: none;
   display: flex;
   flex-direction: column;
-  padding: 6px;
-  border-radius: 10px;
-  background: rgb(24 24 28 / 0.98);
-  box-shadow: 0 12px 40px rgb(0 0 0 / 0.5);
+  gap: 1px;
+  padding: 8px;
+  border-radius: var(--r-lg);
+  background: rgb(20 20 19 / 0.96);
+  border: 1px solid var(--line-2);
+  backdrop-filter: blur(24px) saturate(1.4);
+  box-shadow:
+    0 24px 60px rgb(0 0 0 / 0.55),
+    inset 0 1px 0 rgb(255 255 255 / 0.05);
   z-index: 20;
+  animation: ed-pop-in 160ms var(--ease-out-strong);
+}
+@keyframes ed-pop-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-4px) scale(0.98);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ed-pop {
+    animation: none;
+  }
 }
 .ed-pop input {
-  font-size: 13px;
-  padding: 6px 8px;
-  margin-bottom: 4px;
-  border-radius: 6px;
-  background: rgb(255 255 255 / 0.06);
+  font-size: 13.5px;
+  padding: 9px 12px;
+  margin-bottom: 6px;
+  border-radius: var(--r-md);
+  background: var(--fill-2);
+  border: 1px solid var(--line);
   color: var(--ink);
+  outline: none;
+}
+.ed-pop input:focus {
+  border-color: var(--line-2);
 }
 .ed-pop button {
   text-align: left;
-  font-size: 12px;
-  padding: 4px 8px;
-  border-radius: 6px;
+  font-size: 12.5px;
+  padding: 6px 10px;
+  border-radius: var(--r-sm);
   color: var(--ink-2);
   white-space: nowrap;
   overflow: hidden;
@@ -4886,29 +4982,36 @@ button.ak-cchip:hover,
 .ed-pop button:hover,
 .ed-pop button:focus-visible {
   color: var(--ink);
-  background: rgb(255 255 255 / 0.08);
+  background: rgb(149 168 154 / 0.16);
 }
 .ed {
   position: relative;
 }
 .ed-add {
-  border-left: 3px solid #4caf7d;
+  border-left: 2px solid var(--ok);
 }
 .ed-chg {
-  border-left: 3px solid #4a90d9;
+  border-left: 2px solid var(--listen);
 }
 .ed-del {
-  border-left: 3px solid #d9534f;
+  border-left: 2px solid var(--err);
 }
 .ed-term {
+  display: flex;
+  flex-direction: column;
   height: 220px;
   flex-shrink: 0;
-  padding: 4px 6px;
-  background: #141418;
-  border-top: 1px solid rgb(255 255 255 / 0.06);
+  background: #0e0e0d;
+  border-top: 1px solid var(--line);
+}
+.ed-term-host {
+  flex: 1;
+  min-height: 0;
+  padding: 0 10px 8px;
 }
 .ed-term .xterm-viewport {
   scrollbar-width: none;
+  background: transparent !important;
 }
 .ed-term .xterm-viewport::-webkit-scrollbar {
   display: none;
