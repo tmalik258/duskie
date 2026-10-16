@@ -214,6 +214,7 @@ pub fn run() {
             commands::voice_download,
             commands::voice_cancel_download,
             commands::voice_listen,
+            commands::voice_typing,
             commands::voice_stop,
             commands::voice_test,
             commands::voice_welcome,

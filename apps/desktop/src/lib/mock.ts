@@ -1239,6 +1239,7 @@ commands.voice_download = () => {
   tick();
 };
 commands.voice_cancel_download = () => undefined;
+commands.voice_typing = () => undefined;
 commands.voice_listen = () => {
   const words = ["What", "What time", "What time is it", "What time is it in London?"];
   for (const [i, w] of words.entries()) {

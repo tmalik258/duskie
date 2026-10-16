@@ -8,7 +8,7 @@
 
 use std::path::PathBuf;
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use chrono::Utc;
 use serde::Serialize;
@@ -119,6 +119,12 @@ pub struct Voice {
     speaking: Mutex<Option<(String, u64)>>,
     /// The chat whose question was spoken. Only its answer reopens the mic.
     asked_by_voice: Mutex<Option<String>>,
+    /// When a key was last pressed in Ask (ms since the epoch), and whether
+    /// its input has text. Either keeps the mic closed after an answer.
+    typed_at: AtomicU64,
+    input_has_text: AtomicBool,
+    /// Counts partial words heard, so a follow-up that hears nothing ends.
+    words_heard: AtomicU64,
     /// The first-run welcome line as it is being heard.
     welcome: Mutex<WelcomeSpeech>,
     /// A suggestion read aloud, waiting for a spoken choice: its id and
@@ -142,6 +148,9 @@ impl Voice {
             pending_welcome_greet: AtomicBool::new(false),
             speaking: Mutex::default(),
             asked_by_voice: Mutex::default(),
+            typed_at: AtomicU64::new(0),
+            input_has_text: AtomicBool::new(false),
+            words_heard: AtomicU64::new(0),
             welcome: Mutex::new(WelcomeSpeech {
                 lines: WELCOME_LINES,
                 script: WELCOME_LINES[0],
@@ -772,7 +781,13 @@ fn on_heard(app: &AppHandle, heard: Heard) {
             mascot::dispatch(app, MascotEvent::ListenStart);
             emit_heard(app, String::new(), false);
         }
-        Heard::Partial(text) => emit_heard(app, fixed(app, strip_wake(&text)), false),
+        Heard::Partial(text) => {
+            let text = fixed(app, strip_wake(&text));
+            if !text.trim().is_empty() {
+                v.words_heard.fetch_add(1, Ordering::SeqCst);
+            }
+            emit_heard(app, text, false);
+        }
         // A choice ("open", "not now") is taken when it is final.
         Heard::Pause(text) if lock(&v.choosing).is_none() => {
             let text = fixed(app, strip_wake(&text));
@@ -941,12 +956,17 @@ pub fn answer_done(app: &AppHandle, id: &str, error: Option<&str>) {
         let (app, id) = (app.clone(), id.to_owned());
         // Listen for a reply once the answer has been read out, unless the
         // user moved on (closed Ask, or another answer started).
-        listen_after_speaking(&app, move |app| {
-            ask::is_open(app)
-                && lock(&voice(app).speaking)
-                    .as_ref()
-                    .is_some_and(|(chat, _)| *chat == id)
-        });
+        listen_after_speaking(
+            &app,
+            move |app| {
+                ask::is_open(app)
+                    && !user_typing(app)
+                    && lock(&voice(app).speaking)
+                        .as_ref()
+                        .is_some_and(|(chat, _)| *chat == id)
+            },
+            Some(REPLY_WAIT),
+        );
     }
 }
 
@@ -955,6 +975,7 @@ pub fn answer_done(app: &AppHandle, id: &str, error: Option<&str>) {
 fn listen_after_speaking(
     app: &AppHandle,
     still_wanted: impl Fn(&AppHandle) -> bool + Send + 'static,
+    give_up: Option<std::time::Duration>,
 ) {
     let app = app.clone();
     std::thread::spawn(move || {
@@ -965,10 +986,47 @@ fn listen_after_speaking(
                 .is_some_and(Speaker::busy)
         };
         wait_until_quiet(busy, QUIET_HOLD, MAX_SPEECH);
-        if still_wanted(&app) {
-            let _ = listen(&app);
+        if !still_wanted(&app) {
+            return;
+        }
+        let v = voice(&app);
+        let before = v.words_heard.load(Ordering::SeqCst);
+        if listen(&app).is_err() {
+            return;
+        }
+        let Some(wait) = give_up else { return };
+        std::thread::sleep(wait);
+        // Nothing said: stop listening instead of leaving the mic open.
+        let silent = voice(&app).words_heard.load(Ordering::SeqCst) == before;
+        if silent && mascot::current(&app) == sidekick_core::MascotState::Listening {
+            stop(&app);
         }
     });
+}
+
+/// How long the mic waits for a spoken reply after an answer.
+const REPLY_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+/// A key pressed in Ask this recently counts as typing.
+const TYPING_GRACE_MS: u64 = 3000;
+
+/// Ask's input changed. Typing keeps the mic closed after an answer.
+pub fn note_typing(app: &AppHandle, has_text: bool) {
+    let v = voice(app);
+    v.typed_at.store(now_ms(), Ordering::SeqCst);
+    v.input_has_text.store(has_text, Ordering::SeqCst);
+}
+
+fn user_typing(app: &AppHandle) -> bool {
+    let v = voice(app);
+    is_typing(
+        v.input_has_text.load(Ordering::SeqCst),
+        v.typed_at.load(Ordering::SeqCst),
+        now_ms(),
+    )
+}
+
+fn is_typing(has_text: bool, typed_at: u64, now: u64) -> bool {
+    has_text || (typed_at > 0 && now.saturating_sub(typed_at) < TYPING_GRACE_MS)
 }
 
 const MAX_SPEECH: std::time::Duration = std::time::Duration::from_secs(90);
@@ -1036,10 +1094,14 @@ pub fn offer_spoken(app: &AppHandle, ui: &crate::state::Suggestion, priority: i3
     let (id, labels) = (ui.id.clone(), ui.options.clone());
     *lock(&v.choosing) = Some((id.clone(), labels));
     let wanted_id = id.clone();
-    listen_after_speaking(app, move |app| {
-        crate::suggestions::current(app).is_some_and(|s| s.id == wanted_id)
-            && lock(&voice(app).choosing).is_some()
-    });
+    listen_after_speaking(
+        app,
+        move |app| {
+            crate::suggestions::current(app).is_some_and(|s| s.id == wanted_id)
+                && lock(&voice(app).choosing).is_some()
+        },
+        None,
+    );
     // Nobody answered: stop listening and leave the suggestion on screen.
     let app = app.clone();
     std::thread::spawn(move || {
@@ -1325,6 +1387,14 @@ mod tests {
             Duration::from_secs(2)
         ));
         assert!(start.elapsed() >= Duration::from_millis(380));
+    }
+
+    #[test]
+    fn typing_keeps_the_mic_closed() {
+        assert!(super::is_typing(true, 0, 10_000));
+        assert!(super::is_typing(false, 9_000, 10_000));
+        assert!(!super::is_typing(false, 5_000, 10_000));
+        assert!(!super::is_typing(false, 0, 10_000));
     }
 
     #[test]
