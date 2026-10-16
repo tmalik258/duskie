@@ -85,6 +85,7 @@ export function Island() {
   const voiceStatus = useDuskie((s) => s.voiceStatus);
   const online = useDuskie((s) => s.online);
   const netNotice = useDuskie((s) => s.netNotice);
+  const later = useDuskie((s) => s.later);
   // Design: losing the connection only changes the pill; the card opens on a click.
   const [netOpen, setNetOpen] = useState(false);
   if (netOpen && online) setNetOpen(false);
@@ -658,18 +659,25 @@ export function Island() {
                           chip: meetingSoon.join ? "Join the call" : undefined,
                           onChip: () => meetingSoon.join && void api.openReference("page", meetingSoon.join),
                         }
-                      : paused
-                        ? { kind: "paused", label: "Paused", dim: pauseDim(settings.pause) }
-                        : !online
-                          ? {
-                              kind: "offline",
-                              label: "Offline",
-                              dim: "catching up when back",
-                              onOpen: () => setNetOpen(true),
-                            }
-                          : mascot === "noticing"
-                            ? { kind: "noticing", label: "Taking a look" }
-                            : null
+                      : redesign && later > 0 && !paused
+                        ? {
+                            kind: "waiting",
+                            label: later === 1 ? "1 suggestion" : `${later} suggestions`,
+                            dim: "held while you were busy",
+                            count: later,
+                          }
+                        : paused
+                          ? { kind: "paused", label: "Paused", dim: pauseDim(settings.pause) }
+                          : !online
+                            ? {
+                                kind: "offline",
+                                label: "Offline",
+                                dim: "catching up when back",
+                                onOpen: () => setNetOpen(true),
+                              }
+                            : mascot === "noticing"
+                              ? { kind: "noticing", label: "Taking a look" }
+                              : null
       : null;
   const [pillMeasured, setPillMeasured] = useState(0);
 
@@ -694,7 +702,7 @@ export function Island() {
         focus: focusLeft !== null,
         paused,
         notifyFresh: !!notifyFresh && !busy && !expanded,
-        unread: suggestion ? 1 : 0,
+        unread: redesign ? later : suggestion ? 1 : 0,
         activitiesOpen: expanded && liveActivities.length > 0 && !suggestion,
         mascot,
         quietGlance:
