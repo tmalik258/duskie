@@ -137,6 +137,8 @@ export interface VoiceSettings {
   model?: number;
   /** Start answering at a pause in speech. Off by default. */
   live?: boolean;
+  /** Keep Live conversations in Ask history, as text. */
+  liveHistory?: boolean;
 }
 
 export interface VoiceStatus {
@@ -532,6 +534,7 @@ export const DEFAULT_SETTINGS: Settings = {
     speakSuggestions: true,
     interrupt: true,
     live: false,
+    liveHistory: true,
     voice: "f4",
     speed: 1,
   },

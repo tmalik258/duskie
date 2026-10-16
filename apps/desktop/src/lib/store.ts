@@ -1354,7 +1354,8 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
         }));
         if (useDuskie.getState().chatId === id) {
           useDuskie.setState({ chatId: null });
-          if (sounds && !useDuskie.getState().chatSkill) saveChat();
+          const keep = !wasLive || useDuskie.getState().settings.voice.liveHistory !== false;
+          if (sounds && keep && !useDuskie.getState().chatSkill) saveChat();
           // Ask was closed while the answer came in: bring it back with the answer.
           if (sounds && !wasLive && !useDuskie.getState().ask && useDuskie.getState().turns.length > 0) {
             void api.askOpen();

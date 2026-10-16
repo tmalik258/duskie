@@ -811,6 +811,14 @@ function VoiceSection({ voice, onError }: { voice: VoiceSettings; onError: (e: s
         checked={voice.live ?? false}
         onChange={(live) => void set({ live })}
       />
+      {voice.live && (
+        <Toggle
+          label="Keep Live in history"
+          hint="Saved as text in Ask history. Audio is never kept."
+          checked={voice.liveHistory ?? true}
+          onChange={(liveHistory) => void set({ liveHistory })}
+        />
+      )}
       <Field label="Voice">
         <div className="flex items-center gap-2">
           <Select
