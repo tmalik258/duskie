@@ -305,7 +305,8 @@ export function Editor({
               disabled={e.dir}
               onClick={() => void open(e.path)}
             >
-              {e.path.split("/").pop()}
+              <Ic name={e.dir ? "folder" : "file"} size={12} />
+              <span className="truncate">{e.path.split("/").pop()}</span>
             </button>
           ))}
         </nav>

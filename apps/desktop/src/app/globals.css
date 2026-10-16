@@ -4795,6 +4795,10 @@ button.ak-cchip:hover,
   display: none;
 }
 .ed-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 6px;
   text-align: left;
   font-size: 12px;
   color: var(--ink-2);
@@ -4805,6 +4809,10 @@ button.ak-cchip:hover,
 }
 .ed-node[data-dir="true"] {
   color: var(--ink-3);
+}
+.ed-node svg {
+  flex: none;
+  opacity: 0.7;
 }
 .ed-node[data-active="true"],
 .ed-node:hover:not(:disabled) {

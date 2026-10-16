@@ -6,8 +6,10 @@ import { SkillLibrary } from "@/components/settings/SkillLibrary";
 
 export default function SkillsDev() {
   return (
-    <main className="island-settings mx-auto min-h-screen max-w-xl bg-black p-6">
-      <SkillLibrary onError={(e) => console.error(e)} />
+    <main className="island-settings min-h-screen bg-black p-6">
+      <div className="mx-auto max-w-xl">
+        <SkillLibrary onError={(e) => console.error(e)} />
+      </div>
     </main>
   );
 }
