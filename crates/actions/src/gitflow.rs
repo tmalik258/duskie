@@ -791,7 +791,13 @@ mod tests {
         assert_eq!(list.len(), 1);
         assert!(list[0].message.contains("wip"));
         stash_apply(&dir, "stash@{0}", false).unwrap();
-        assert_eq!(std::fs::read_to_string(dir.join("a.txt")).unwrap(), "two\n");
+        // Git for Windows may check the file out with CRLF.
+        assert_eq!(
+            std::fs::read_to_string(dir.join("a.txt"))
+                .unwrap()
+                .trim_end(),
+            "two"
+        );
         assert_eq!(stashes(&dir).unwrap().len(), 1);
         run(&dir, &["checkout", "-q", "--", "a.txt"]);
         stash_apply(&dir, "stash@{0}", true).unwrap();
