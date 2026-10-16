@@ -20,6 +20,7 @@ import { SpokenLine, wasHeard } from "./SpokenLine";
 import { Extras } from "./welcome/Extras";
 import { FoundCard } from "./welcome/FoundCard";
 import { FreeAi } from "./welcome/FreeAi";
+import { WelcomeCard } from "./welcome/WelcomeCard";
 import { WelcomeIntro } from "./welcome/WelcomeIntro";
 
 const STEPS = ["Welcome", "Your AI", "Connect", "Tools", "Extras"] as const;
@@ -39,6 +40,11 @@ function stepsFor(codes: boolean | null): number[] {
 }
 
 export function IslandWelcome() {
+  const redesign = useDuskie((s) => s.settings?.redesign?.enabled ?? false);
+  return redesign ? <WelcomeCard /> : <WelcomeSteps />;
+}
+
+function WelcomeSteps() {
   const saved = useDuskie((s) => s.settings.welcomeStep);
   const codes = useDuskie((s) => s.settings.codes);
   const order = stepsFor(codes);

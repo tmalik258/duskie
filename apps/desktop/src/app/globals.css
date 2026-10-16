@@ -4521,3 +4521,19 @@ button.ak-cchip:hover,
 .rd-steps i[data-s="now"] {
   background: #95a89a;
 }
+.rd-field {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: rgb(242 240 235 / 0.06);
+  border: 1px solid rgb(242 240 235 / 0.1);
+  color: #f2f0eb;
+  font-size: 13px;
+  outline: none;
+}
+.rd-field::placeholder {
+  color: rgb(242 240 235 / 0.4);
+}
+.rd-field:focus-visible {
+  border-color: rgb(242 240 235 / 0.3);
+}
