@@ -57,10 +57,10 @@ export function redesignShell(opts: {
   const compact = def.size === "compact" || def.size === "pill";
   const bare = opts.id === "idle";
 
-  let width = REDESIGN_IDLE.width;
-  let height = REDESIGN_IDLE.height;
-  let radius = REDESIGN_IDLE.radius;
-  let take = TAKE_A;
+  let width: number = REDESIGN_IDLE.width;
+  let height: number = REDESIGN_IDLE.height;
+  let radius: number = REDESIGN_IDLE.radius;
+  let take: { readonly x: number; readonly y: number; readonly scale: number } = TAKE_A;
 
   if (opts.id === "settings") {
     width = REDESIGN_SETTINGS.width;
