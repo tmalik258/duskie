@@ -77,6 +77,7 @@ mod updates;
 mod voice;
 mod web;
 mod windows;
+mod workspace;
 
 use std::error::Error;
 use std::sync::{Arc, Mutex, RwLock};
@@ -273,6 +274,12 @@ pub fn run() {
             commands::library_remove,
             commands::library_sync,
             commands::library_install_url,
+            commands::editor_tree,
+            commands::editor_read,
+            commands::editor_write,
+            commands::editor_changed,
+            commands::editor_head,
+            commands::editor_search,
             commands::capabilities_get,
             commands::choices_reset,
             commands::routines_today,

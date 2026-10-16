@@ -629,6 +629,24 @@ export interface SyncReport {
   backups: string[];
 }
 
+/** One file or folder in the editor's project tree. */
+export interface TreeEntry {
+  path: string;
+  dir: boolean;
+}
+
+export interface OpenFile {
+  text: string;
+  /** What was on disk when opened; a save sends it back. */
+  stamp: string;
+}
+
+export interface EditorHit {
+  path: string;
+  line: number;
+  text: string;
+}
+
 export interface CapabilityInfo {
   found: string[];
   skillsDir: string;

@@ -21,6 +21,10 @@ const handlers = new Map<string, Set<Handler>>();
 let settings: Settings = structuredClone(DEFAULT_SETTINGS);
 let mailStatus: MailStatus = { state: "disconnected", configured: true, lastOk: null, error: null, provider: null };
 let library: LibrarySkill[] = [];
+const mockFiles: Record<string, string> = {
+  "src/main.ts": 'console.log("hello");\nexport {};\n',
+  "README.md": "# Demo\n",
+};
 if (typeof localStorage !== "undefined") {
   try {
     Object.assign(settings, JSON.parse(localStorage.getItem("sidekick.mock.savedFolders") ?? "{}"));
@@ -326,6 +330,26 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     go("idle");
   },
   events_recent: () => [],
+  editor_tree: () => [
+    { path: "src", dir: true },
+    { path: "src/main.ts", dir: false },
+    { path: "README.md", dir: false },
+  ],
+  editor_read: (a) => ({ text: mockFiles[(a as { path: string }).path] ?? "", stamp: "s1" }),
+  editor_write: (a) => {
+    const { path, text } = a as { path: string; text: string };
+    mockFiles[path] = text;
+    return "s2";
+  },
+  editor_changed: () => false,
+  editor_head: (a) => ((a as { path: string }).path === "src/main.ts" ? 'console.log("hi");\n' : ""),
+  editor_search: (a) =>
+    Object.entries(mockFiles).flatMap(([path, text]) =>
+      text
+        .split("\n")
+        .map((line, i) => ({ path, line: i + 1, text: line }))
+        .filter((h) => h.text.toLowerCase().includes((a as { query: string }).query.toLowerCase())),
+    ),
   library_review: () =>
     library.some((l) => l.name === "pdf")
       ? []
