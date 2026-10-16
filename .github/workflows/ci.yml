@@ -22,6 +22,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm typecheck
+      - run: pnpm --filter desktop test
       - run: pnpm --filter desktop check:contrast
       - run: pnpm --filter desktop check:keys
       - run: pnpm --filter desktop build

@@ -78,6 +78,8 @@ export function splitOptions(text: string, streaming = false): Choices {
 export function extractChoices(text: string, streaming = false): Choices {
   const explicit = splitOptions(text, streaming);
   if (explicit.options.length > 0 || streaming) return explicit;
+  // A numbered list is only a set of choices when the message asks something.
+  if (!asksQuestion(text)) return explicit;
   const options: string[] = [];
   const body: string[] = [];
   for (const line of text.split("\n")) {
@@ -107,6 +109,15 @@ export function extractChoices(text: string, streaming = false): Choices {
     stats: explicit.stats,
     multi: MULTI_HINT.test(joined) || MULTI_HINT.test(text),
   };
+}
+
+/** The message ends with a question (ignoring trailing list lines). */
+function asksQuestion(text: string): boolean {
+  const lines = text
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  return lines.slice(-3).some((l) => /\?\s*\**$/.test(l));
 }
 
 function cleanOpt(raw: string): string {

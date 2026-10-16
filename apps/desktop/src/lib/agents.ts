@@ -5,7 +5,7 @@
 import { create } from "zustand";
 import { api, EVENTS, listen } from "./bridge";
 import { mask } from "./mask";
-import { parsePlanDocument, parsePlanFromText } from "./plan";
+import { claimsPlanReady, parsePlanDocument } from "./plan";
 import type { AgentMode, AgentStarted } from "./types";
 
 export interface Step {
@@ -606,19 +606,16 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
         // Plan mode often answers in prose without turn/plan/updated — lift the doc.
         let plan = s.plan;
         let planDoc = s.planDoc;
+        // Only the newest answer of this turn, and only when it says the plan
+        // is ready. Older entries are never scanned, so an old plan is not
+        // lifted again on a later turn.
         if ((s.mode === "plan" || s.activeMode === "plan") && (plan.length === 0 || !planDoc)) {
-          for (let i = entries.length - 1; i >= 0; i--) {
-            const row = entries[i];
-            if (row?.kind !== "text") continue;
-            const doc = parsePlanDocument(row.text);
+          const last = entries.at(-1);
+          if (last?.kind === "text" && claimsPlanReady(last.text)) {
+            const doc = parsePlanDocument(last.text);
             if (doc && doc.items.length > 0) {
               plan = doc.items;
               planDoc = doc;
-              break;
-            }
-            if (plan.length === 0) {
-              const parsed = parsePlanFromText(row.text);
-              if (parsed.length > 0) plan = parsed;
             }
           }
         }
