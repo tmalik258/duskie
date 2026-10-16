@@ -141,6 +141,7 @@ const WINDOWS_PAGES: { page: string; label: string; words: string[]; switch?: st
 ];
 
 export function AskPanel() {
+  const redesignOn = useDuskie((st) => st.settings.redesign.enabled);
   const assistant = useAssistantName();
   const ask = useDuskie((s) => s.ask);
   const turns = useDuskie((s) => s.turns);
@@ -1156,6 +1157,7 @@ export function AskPanel() {
     </div>
   );
 
+  const fieldLast = redesignOn && !showChat;
   return (
     <>
       {agentsHost}
@@ -1189,10 +1191,15 @@ export function AskPanel() {
         {/* In a chat the field is a box at the bottom: what goes with the
           question on top, then the field, then the model and voice. The
           same wrapper either way, so the input keeps focus on send. */}
-        <div className={showChat ? "ak-askc" : "contents"}>
-          {field}
-          {!inHistory && <ContextLine keys={alt} />}
-        </div>
+        {/* Redesign, outside a chat: context on top, the field at the bottom. */}
+        {fieldLast ? (
+          !inHistory && <ContextLine keys={alt} />
+        ) : (
+          <div className={showChat ? "ak-askc" : "contents"}>
+            {field}
+            {!inHistory && <ContextLine keys={alt} />}
+          </div>
+        )}
 
         {showClips && clips ? (
           <div key="clips" className="ak-scroll ak-in" style={{ maxHeight: scrollMax }}>
@@ -1239,7 +1246,9 @@ export function AskPanel() {
                   ref={scrollIfActive(active === i)}
                   variants={reducedMotion ? staggerChildReduced : staggerChild}
                 >
-                  {it.group && <p className="ak-group">{it.group}</p>}
+                  {(it.group ?? (fieldLast && !asking && !slash && i === 0 ? "Try" : undefined)) && (
+                    <p className="ak-group">{it.group ?? "Try"}</p>
+                  )}
                   <button
                     type="button"
                     data-sel={active === i}
@@ -1248,8 +1257,17 @@ export function AskPanel() {
                     className="ak-row"
                   >
                     <span className="ak-ico">{it.icon}</span>
-                    <span className="min-w-0 flex-1 truncate">{it.label}</span>
-                    {it.hint && <span className="ak-hint">{it.hint}</span>}
+                    {fieldLast && !asking ? (
+                      <span className="ak-two min-w-0 flex-1">
+                        <span className="block truncate">{it.label}</span>
+                        {it.hint && <span className="ak-sub block truncate">{it.hint}</span>}
+                      </span>
+                    ) : (
+                      <>
+                        <span className="min-w-0 flex-1 truncate">{it.label}</span>
+                        {it.hint && <span className="ak-hint">{it.hint}</span>}
+                      </>
+                    )}
                     {it.key ? (
                       <kbd className="ak-key">{it.key}</kbd>
                     ) : (
@@ -1272,6 +1290,7 @@ export function AskPanel() {
         )}
 
         {handoffError && <p className="ak-err">{handoffError}</p>}
+        {fieldLast && <div className="contents">{field}</div>}
         {footer}
         <Timings />
       </div>

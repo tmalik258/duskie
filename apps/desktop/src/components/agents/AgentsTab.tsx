@@ -53,7 +53,7 @@ import { useNow } from "@/lib/hooks";
 import { Markdown } from "@/lib/markdown";
 import { extractChoices } from "@/lib/options";
 import { parsePlanDocument } from "@/lib/plan";
-import { setAsk, setOverlayHit } from "@/lib/store";
+import { setAsk, setOverlayHit, useDuskie } from "@/lib/store";
 import type { AgentInfo, AgentMode, Agents, CursorChat, EditorList } from "@/lib/types";
 import { scrollIfActive } from "../ask/parts";
 import { Icon } from "../Icon";
@@ -288,6 +288,7 @@ function SessionChips({
 }
 
 function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorChat[] }) {
+  const redesign = useDuskie((st) => st.settings.redesign.enabled);
   const { data: agents, refreshing, refresh } = useCached<Agents>("agents", api.agentsStatus);
   const { data: projects } = useCached<{ name: string; path: string }[]>("projects", api.projectsList, 30_000);
   const prefs = useRef(readNewPrefs()).current;
@@ -378,10 +379,16 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
   };
   return (
     <>
-      <div className="ak-head">
-        <span className="ak-title">New session</span>
-      </div>
-      <SessionChips sessions={sessions} current={null} cursor={cursor} />
+      {redesign && sessions.length > 0 ? (
+        <SessionList sessions={sessions} />
+      ) : (
+        <>
+          <div className="ak-head">
+            <span className="ak-title">New session</span>
+          </div>
+          <SessionChips sessions={sessions} current={null} cursor={cursor} />
+        </>
+      )}
       {!agents || (refreshing && choices.length === 0) ? (
         <NewSessionLoading />
       ) : choices.length === 0 ? (
@@ -1796,5 +1803,76 @@ function ChoiceCard({ open, agent, onAnswer }: { open: OpenChoice; agent: string
         )}
       </div>
     </section>
+  );
+}
+
+type Group = "Needs you" | "Running" | "Ready to review" | "Done" | "Stopped";
+const GROUPS: Group[] = ["Needs you", "Running", "Ready to review", "Done", "Stopped"];
+
+function groupOf(s: Session): Group {
+  if (s.status === "waiting" || s.question || s.choose) return "Needs you";
+  if (s.status === "working") return "Running";
+  if (s.status === "failed") return "Stopped";
+  if (!s.finished && s.changes > 0) return "Ready to review";
+  return "Done";
+}
+
+const MODE_WORD: Record<string, string> = { plan: "Plan", ask: "Ask", edit: "Edit", full: "Full" };
+
+function ago(ms: number): string {
+  const m = Math.max(0, Math.round(ms / 60_000));
+  if (m < 60) return `${m} min`;
+  const h = Math.round(m / 60);
+  return h < 24 ? `${h} h` : `${Math.round(h / 24)} d`;
+}
+
+/** Agents home: every session grouped by what it needs, newest first. */
+function SessionList({ sessions }: { sessions: Session[] }) {
+  const now = useNow(30_000);
+  const running = sessions.filter((s) => s.status === "working").length;
+  const need = sessions.filter((s) => groupOf(s) === "Needs you").length;
+  return (
+    <div className="ag-home">
+      <p className="ag-count">
+        {running} of {sessions.length} running
+        {need > 0 && <span className="ag-need"> · {need} need you</span>}
+      </p>
+      {GROUPS.map((g) => {
+        const list = sessions.filter((s) => groupOf(s) === g).sort((a, b) => b.turnAt - a.turnAt);
+        if (list.length === 0) return null;
+        return (
+          <div key={g} className="ag-group">
+            <p className="ak-group">
+              {g} <span className="ag-n">{list.length}</span>
+            </p>
+            {list.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                className="ag-row chip"
+                onClick={() => useAgents.setState({ current: s.id })}
+              >
+                <AgentMark agent={s.agent} />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{s.title}</span>
+                  <span className="ag-sub block truncate">
+                    {s.project} · {MODE_WORD[s.mode] ?? s.mode} · {ago(now - s.turnAt)}
+                  </span>
+                </span>
+                <span className="ag-st" data-g={g}>
+                  {g === "Needs you"
+                    ? "Needs you"
+                    : g === "Running"
+                      ? "Working"
+                      : g === "Ready to review"
+                        ? "Ready to review"
+                        : g}
+                </span>
+              </button>
+            ))}
+          </div>
+        );
+      })}
+    </div>
   );
 }

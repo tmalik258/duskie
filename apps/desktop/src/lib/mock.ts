@@ -1508,6 +1508,53 @@ if (typeof window !== "undefined") {
     __mockEmit: emit,
     __mockGo: go,
     __mockCall: (name: string, args: Record<string, unknown> = {}) => commands[name]?.(args),
+    __mockAgents: async () => {
+      const { useAgents } = await import("./agents");
+      const now = Date.now();
+      const mk = (
+        id: string,
+        agent: string,
+        project: string,
+        title: string,
+        status: string,
+        mode: string,
+        mins: number,
+        extra = {},
+      ) => ({
+        id,
+        agent,
+        project,
+        branch: null,
+        reviewable: true,
+        mode,
+        title,
+        status,
+        entries: [],
+        plan: [],
+        usage: null,
+        question: null,
+        error: null,
+        startedAt: now - mins * 60_000,
+        turnAt: now - mins * 60_000,
+        tookMs: null,
+        changes: 0,
+        ...extra,
+      });
+      useAgents.setState({
+        sessions: [
+          mk("a1", "Codex", "duskie", "Migrate tests to Vitest", "idle", "full", 22, { finished: true }),
+          mk("a2", "Claude Code", "duskie", "Compact label wraps on narrow screens", "idle", "edit", 10, {
+            changes: 3,
+          }),
+          mk("a3", "Claude Code", "falconxoft-portal", "Add CSV export to invoices", "idle", "edit", 14, {
+            changes: 5,
+          }),
+          mk("a4", "Codex", "api-gateway", "Fix missing rate limit headers", "waiting", "ask", 3),
+          mk("a5", "Claude Code", "duskie", "Voice settings: rate slider", "working", "edit", 1),
+        ] as never,
+        current: null,
+      });
+    },
     __mockWork: async (label: string) => {
       const { beginActivity } = await import("./activities");
       beginActivity(label);
