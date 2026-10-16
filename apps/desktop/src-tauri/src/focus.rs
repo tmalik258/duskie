@@ -122,6 +122,7 @@ pub fn start(app: &AppHandle, minutes: u32) -> String {
         }
     });
     emit(app);
+    crate::mascot::dispatch(app, duskie_core::MascotEvent::FocusStart);
     format!("Focusing for {}", plain_minutes(minutes))
 }
 
@@ -135,6 +136,9 @@ pub fn stop(app: &AppHandle) -> String {
         std::thread::spawn(|| {
             let _ = duskie_actions::pc::set_dnd(false);
         });
+    }
+    if crate::mascot::dispatch(app, duskie_core::MascotEvent::FocusEnd).is_some() {
+        crate::suggestions::resume(app);
     }
     let _ = app.emit(
         EVENT,

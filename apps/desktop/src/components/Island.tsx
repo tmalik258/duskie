@@ -52,6 +52,7 @@ const TITLE: Record<MascotState, string> = {
   working: "Checking activity status",
   success: "Done",
   error: "That did not work",
+  focus: "Focusing",
 };
 
 const DETAIL: Record<MascotState, string> = {
@@ -63,6 +64,7 @@ const DETAIL: Record<MascotState, string> = {
   working: "Waiting for an activity report.",
   success: "All set.",
   error: "Details are in the log.",
+  focus: "Held for later.",
 };
 
 /** States that hold the island open without hover. Working and plain Done stay a compact pill. */
