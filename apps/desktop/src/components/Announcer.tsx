@@ -14,6 +14,7 @@ const STATE_WORDS: Partial<Record<MascotState, string>> = {
   working: "Working",
   success: "Done",
   error: "Something went wrong",
+  focus: "Focus on",
 };
 
 /** The next part of a streaming answer worth reading out: up to the last

@@ -43,10 +43,13 @@ export function Glance({ paused }: { paused: boolean }) {
   const { data: crash, refresh: refreshCrash } = useCached<string | null>("crash", api.crashPending);
   const activityState = useActivities();
   const activityNow = useNow(1000);
+  const keepProblems = useDuskie((s) => s.settings.redesign.enabled);
   // Agent/chat rows belong in the agents list, not the flat activity line.
-  const otherActivities = visibleActivities([...activityState.activities, ...activityState.local], activityNow).filter(
-    (a) => !(agentsLive && (a.source === "agent" || a.source === "chat")),
-  );
+  const otherActivities = visibleActivities(
+    [...activityState.activities, ...activityState.local],
+    activityNow,
+    keepProblems,
+  ).filter((a) => !(agentsLive && (a.source === "agent" || a.source === "chat")));
   const now = useNow(30_000);
   const { data: calendar } = useCached<CalendarToday>("calendar-today", api.calendarToday);
   const { data: time } = useCached<AppTime[]>("time-today", api.timeToday);
