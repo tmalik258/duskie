@@ -318,7 +318,7 @@ function Changes({
       <div className="flex items-center justify-between">
         <span className="font-medium">
           Changes{" "}
-          <span className="text-white/55">
+          <span className="text-white/65">
             {counts.staged} of {counts.total} staged
           </span>
         </span>
@@ -333,11 +333,11 @@ function Changes({
       </div>
 
       {files.length === 0 ? (
-        <p className="text-white/55">Nothing has changed.</p>
+        <p className="text-white/65">Nothing has changed.</p>
       ) : (
         groupByFolder(files).map((g) => (
           <div key={g.folder}>
-            <p className="mono text-[11px] text-white/45">{g.folder}</p>
+            <p className="mono text-[11px] text-white/65">{g.folder}</p>
             {g.files.map((f) => (
               <label key={f.path} className="flex cursor-pointer items-center gap-2 py-0.5">
                 <input
@@ -348,7 +348,7 @@ function Changes({
                   aria-label={`Stage ${f.path}`}
                 />
                 <span className="min-w-0 flex-1 truncate">{baseName(f.path)}</span>
-                <span className="text-[11px] text-white/45">{KIND[f.kind] ?? f.kind}</span>
+                <span className="text-[11px] text-white/65">{KIND[f.kind] ?? f.kind}</span>
                 {f.kind !== "D" && (
                   <button
                     type="button"

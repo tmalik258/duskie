@@ -310,10 +310,14 @@ export function Editor({
           ))}
         </nav>
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="ed-tabs" role="tablist" aria-label="Open files">
+          <nav className="ed-tabs" aria-label="Open files">
             {tabs.map((t) => (
               <span key={t.path} className="ed-tab" data-active={t.path === active}>
-                <button type="button" role="tab" aria-selected={t.path === active} onClick={() => setActive(t.path)}>
+                <button
+                  type="button"
+                  aria-current={t.path === active ? "page" : undefined}
+                  onClick={() => setActive(t.path)}
+                >
                   {t.path.split("/").pop()}
                   {t.dirty ? " *" : ""}
                 </button>
@@ -322,7 +326,7 @@ export function Editor({
                 </button>
               </span>
             ))}
-          </div>
+          </nav>
           {current?.stale && (
             <div className="ed-note" role="alert">
               <span>This file changed on disk while you edited it.</span>
