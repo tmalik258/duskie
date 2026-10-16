@@ -148,7 +148,7 @@ body {
     0 2px 6px rgb(0 0 0 / 0.4);
 }
 /* Redesign path: same Atelier plate; bare idle drops the shadow. */
-[data-redesign] .island-shell[data-color="atelier"][data-bare="true"] {
+.island-shell[data-color="atelier"][data-bare="true"] {
   box-shadow: none;
   background-color: transparent;
 }
@@ -207,14 +207,19 @@ body {
 .island-shell[data-bare="true"]::before {
   opacity: 0;
 }
+/* Compact Take A: carve the left stadium so fur owns the edge; plate starts mid-body. */
+.island-shell[data-perch="true"] {
+  -webkit-mask-image: linear-gradient(90deg, transparent 0, transparent 16px, #000 38px, #000 100%);
+  mask-image: linear-gradient(90deg, transparent 0, transparent 16px, #000 38px, #000 100%);
+}
 
 /* Redesign path: Atelier glance / list rows match the prototype recipe. */
-[data-redesign] .island-shell {
+.island-shell {
   --muted: rgb(from var(--c2) r g b / 0.55);
   --ink: var(--c2);
   --ink-2: rgb(from var(--c2) r g b / 0.66);
 }
-[data-redesign] .ak-rrow {
+.ak-rrow {
   padding: 5px 9px;
   font-size: 12.5px;
   border-radius: 9px;
@@ -308,41 +313,41 @@ body {
 }
 
 /* Prototype Ask tabs + composer under redesign (Phase 4). */
-[data-redesign] .ak-tabs {
+.ak-tabs {
   gap: 4px;
 }
-[data-redesign] .ak-tab {
+.ak-tab {
   height: 26px;
   padding: 0 8px;
   border-radius: 8px;
   font-size: 12.5px;
   font-weight: 500;
 }
-[data-redesign] .ak-tab[aria-selected="true"] {
+.ak-tab[aria-selected="true"] {
   background: var(--fill-2, rgb(242 240 235 / 0.08));
   color: var(--c2);
 }
-[data-redesign] .ak-tab.ak-tabi {
+.ak-tab.ak-tabi {
   border-radius: 8px;
 }
-[data-redesign] .ak-composer {
+.ak-composer {
   padding: 5px 5px 5px 12px;
   border-radius: 12px;
   background: var(--fill, rgb(242 240 235 / 0.045));
   box-shadow: inset 0 0 0 1px var(--line, rgb(149 168 154 / 0.15));
 }
-[data-redesign] .ak-composer:focus-within {
+.ak-composer:focus-within {
   box-shadow:
     inset 0 0 0 1px var(--line-2, rgb(149 168 154 / 0.28)),
     0 0 0 3px rgb(149 168 154 / 0.12);
 }
-[data-redesign] .ak-composer input,
-[data-redesign] .ak-composer textarea {
+.ak-composer input,
+.ak-composer textarea {
   font-size: 13.5px;
   min-height: 28px;
 }
-[data-redesign] .ak-opt,
-[data-redesign] .rd-opt {
+.ak-opt,
+.rd-opt {
   display: flex;
   align-items: center;
   width: 100%;
@@ -357,19 +362,19 @@ body {
   text-align: left;
   cursor: pointer;
 }
-[data-redesign] .rd-opt:hover {
+.rd-opt:hover {
   background: var(--fill-2, rgb(242 240 235 / 0.08));
 }
-[data-redesign] .rd-opt-primary {
+.rd-opt-primary {
   background: var(--c2);
   color: var(--c1);
   box-shadow: none;
 }
-[data-redesign] .rd-opt-primary:hover {
+.rd-opt-primary:hover {
   opacity: 0.92;
   background: var(--c2);
 }
-[data-redesign] .ak-head {
+.ak-head {
   padding-left: 40px;
 }
 
@@ -4046,7 +4051,7 @@ button.ak-cchip:hover,
 }
 
 /* Redesign island: tint wash with grain, halo glow behind Duskie. */
-[data-redesign] .island-shell {
+.island-shell {
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   color: #f2f0eb;
   transition: box-shadow 0.3s ease;
@@ -4124,7 +4129,7 @@ button.ak-cchip:hover,
 }
 
 /* Redesign compact line (design .cmp). */
-[data-redesign] .island-shell {
+.island-shell {
   --ink-2: rgb(242 240 235 / 0.66);
   --ink-3: rgb(242 240 235 / 0.44);
   --fill-2: rgb(242 240 235 / 0.08);
@@ -4344,28 +4349,28 @@ button.ak-cchip:hover,
 }
 
 /* Redesign Ask: two-line starters, quiet group label, icons in the tabs. */
-[data-redesign] .ak-tab-ic {
+.ak-tab-ic {
   display: inline-flex;
   margin-right: 5px;
   opacity: 0.8;
 }
-[data-redesign] .ak-two {
+.ak-two {
   display: flex;
   flex-direction: column;
   line-height: 1.3;
 }
-[data-redesign] .ak-sub {
+.ak-sub {
   font-size: 12px;
   color: rgb(242 240 235 / 0.44);
 }
-[data-redesign] .ak-group {
+.ak-group {
   font-size: 10.5px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: rgb(242 240 235 / 0.44);
   margin: 6px 4px 4px;
 }
-[data-redesign] .ak > .ak-tabs {
+.ak > .ak-tabs {
   margin-left: var(--ak-indent, 0px);
   margin-bottom: 8px;
 }

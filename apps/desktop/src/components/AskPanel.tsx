@@ -142,7 +142,6 @@ const WINDOWS_PAGES: { page: string; label: string; words: string[]; switch?: st
 ];
 
 export function AskPanel() {
-  const redesignOn = useDuskie((st) => st.settings.redesign.enabled);
   const assistant = useAssistantName();
   const ask = useDuskie((s) => s.ask);
   const turns = useDuskie((s) => s.turns);
@@ -1166,7 +1165,7 @@ export function AskPanel() {
     </div>
   );
 
-  const fieldLast = redesignOn && !showChat;
+  const fieldLast = !showChat;
   return (
     <>
       {agentsHost}

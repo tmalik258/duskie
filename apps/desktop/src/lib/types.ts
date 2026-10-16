@@ -68,8 +68,6 @@ export interface Settings {
   voice: VoiceSettings;
   calendar: { remindMinutes: number };
   semanticSearch: { enabled: boolean; model: string };
-  /** The new island look; off by default. */
-  redesign: { enabled: boolean };
   /** MCP servers connected directly (stdio), preferred over Composio. */
   directMcp: DirectMcp;
   onboarded: boolean;
@@ -492,7 +490,6 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   calendar: { remindMinutes: 5 },
   semanticSearch: { enabled: true, model: "nomic-embed-text" },
-  redesign: { enabled: true },
   directMcp: { servers: [] },
   onboarded: false,
   welcomeStep: 0,

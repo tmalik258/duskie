@@ -38,7 +38,6 @@ const previewFlag = (name: string) => typeof location !== "undefined" && new URL
 if (typeof location !== "undefined") {
   const q = new URLSearchParams(location.search);
   if (q.has("onboarded")) settings.onboarded = true;
-  if (q.has("redesign")) settings.redesign = { enabled: true };
   settings.islandColor = (q.get("color") as Settings["islandColor"] | null) ?? settings.islandColor;
   settings.theme = (q.get("theme") as Settings["theme"] | null) ?? settings.theme;
   if (q.get("voice") === "full") settings.voice.listeningStyle = "full";

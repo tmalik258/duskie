@@ -107,7 +107,6 @@ function recent() {
 
 /** Settings, shown inside the island: tabs and a search over all of them. */
 export function SettingsPanel() {
-  const redesign = useDuskie((s) => s.settings?.redesign?.enabled ?? false);
   const ready = useDuskie((s) => s.ready);
   const [tab, setTab] = useState<SettingsTab>(() => recent()?.tab ?? "home");
   const [query, setQuery] = useState("");
@@ -213,91 +212,51 @@ export function SettingsPanel() {
     </p>
   );
 
-  if (redesign) {
-    const current = GROUPS.flatMap((g) => g.items).find((i) => i.id === tab);
-    return (
-      <div className="island-settings st-split flex min-h-0 flex-auto">
-        <nav aria-label="Settings sections" className="st-side">
-          <label className="st-search">
-            <Ic name="search" size={14} />
-            <input
-              type="search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search settings"
-              aria-label="Search settings"
-              spellCheck={false}
-            />
-            <kbd>/</kbd>
-          </label>
-          {GROUPS.map((g) => (
-            <div key={g.label} className="flex flex-col">
-              <p className="st-group">{g.label}</p>
-              {g.items.map((i) => (
-                <button
-                  key={i.id}
-                  type="button"
-                  className="st-item"
-                  aria-current={!searching && tab === i.id ? "page" : undefined}
-                  onClick={() => {
-                    setQuery("");
-                    pick(i.id);
-                  }}
-                >
-                  <Ic name={i.icon} size={14} />
-                  {i.label}
-                </button>
-              ))}
-            </div>
-          ))}
-        </nav>
-        <div className="flex min-h-0 min-w-0 flex-auto flex-col">
-          <div className="shrink-0 pb-3">
-            <p className="st-title">{searching ? "Search" : current?.label}</p>
-            <p className="st-blurb">{searching ? `Settings matching "${query.trim()}"` : current?.blurb}</p>
-          </div>
-          {alert}
-          {body}
-        </div>
-      </div>
-    );
-  }
-
+  const current = GROUPS.flatMap((g) => g.items).find((i) => i.id === tab);
   return (
-    <div className="island-settings flex min-h-0 flex-auto flex-col">
-      <div className="flex shrink-0 flex-col gap-2 pb-2.5">
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search settings"
-          aria-label="Search settings"
-          spellCheck={false}
-          className="w-full rounded-lg bg-(--surface) px-3 py-1.5 text-[13px] text-(--text) placeholder:text-(--muted) outline-none focus:bg-(--hover)"
-        />
-        {!searching && (
-          <nav aria-label="Settings sections" className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto px-1">
-            {SETTINGS_TABS.map((t) => (
+    <div className="island-settings st-split flex min-h-0 flex-auto">
+      <nav aria-label="Settings sections" className="st-side">
+        <label className="st-search">
+          <Ic name="search" size={14} />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search settings"
+            aria-label="Search settings"
+            spellCheck={false}
+          />
+          <kbd>/</kbd>
+        </label>
+        {GROUPS.map((g) => (
+          <div key={g.label} className="flex flex-col">
+            <p className="st-group">{g.label}</p>
+            {g.items.map((i) => (
               <button
-                key={t.id}
+                key={i.id}
                 type="button"
-                aria-pressed={tab === t.id}
-                onClick={() => pick(t.id)}
-                className={`chip shrink-0 rounded-full px-3 py-1 text-[12.5px] font-medium ${
-                  tab === t.id
-                    ? "bg-(--text) text-(--bg)"
-                    : "bg-(--surface) text-(--muted) hover:bg-(--hover) hover:text-(--text)"
-                }`}
+                className="st-item"
+                aria-current={!searching && tab === i.id ? "page" : undefined}
+                onClick={() => {
+                  setQuery("");
+                  pick(i.id);
+                }}
               >
-                {t.label}
+                <Ic name={i.icon} size={14} />
+                {i.label}
               </button>
             ))}
-          </nav>
-        )}
+          </div>
+        ))}
+      </nav>
+      <div className="flex min-h-0 min-w-0 flex-auto flex-col">
+        <div className="shrink-0 pb-3">
+          <p className="st-title">{searching ? "Search" : current?.label}</p>
+          <p className="st-blurb">{searching ? `Settings matching "${query.trim()}"` : current?.blurb}</p>
+        </div>
+        {alert}
+        {body}
       </div>
-
-      {alert}
-      {body}
     </div>
   );
 }

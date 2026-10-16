@@ -53,7 +53,7 @@ import { useNow } from "@/lib/hooks";
 import { Markdown } from "@/lib/markdown";
 import { extractChoices } from "@/lib/options";
 import { parsePlanDocument } from "@/lib/plan";
-import { setAsk, setOverlayHit, useDuskie } from "@/lib/store";
+import { setAsk, setOverlayHit } from "@/lib/store";
 import type { AgentInfo, AgentMode, Agents, CursorChat, EditorList } from "@/lib/types";
 import { scrollIfActive } from "../ask/parts";
 import { Ic, Icon } from "../Icon";
@@ -288,7 +288,6 @@ function SessionChips({
 }
 
 function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorChat[] }) {
-  const redesign = useDuskie((st) => st.settings.redesign.enabled);
   const { data: agents, refreshing, refresh } = useCached<Agents>("agents", api.agentsStatus);
   const { data: projects } = useCached<{ name: string; path: string }[]>("projects", api.projectsList, 30_000);
   const prefs = useRef(readNewPrefs()).current;
@@ -379,7 +378,7 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
   };
   return (
     <>
-      {redesign && sessions.length > 0 ? (
+      {sessions.length > 0 ? (
         <SessionList sessions={sessions} />
       ) : (
         <>

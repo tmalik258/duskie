@@ -4,17 +4,8 @@
 /// Topic words, then where it lives and what to do.
 const GUIDE: &[(&[&str], &str)] = &[
     (
-        &[
-            "look",
-            "colour",
-            "color",
-            "theme",
-            "redesign",
-            "old look",
-            "glass",
-            "transparen",
-        ],
-        "Look and colours: Settings > Appearance (island colour, mascot colour, the new island look switch).",
+        &["look", "colour", "color", "theme", "glass", "transparen"],
+        "Look and colours: Settings > Appearance (island colour, mascot colour).",
     ),
     (
         &[

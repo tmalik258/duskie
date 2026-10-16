@@ -1,14 +1,14 @@
 "use client";
 
-// Compact island for the redesign: one line with a label, a dim detail and a
-// trailing chip, as in the island design. It reports its own width so the
-// shell fits it (the shell springs to whatever this measures).
+// Compact island: one line with a label, a dim detail and a trailing chip.
+// It reports its own width so the shell fits it (the shell springs to whatever
+// this measures).
 
 import { motion } from "motion/react";
 import { type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
 import { api } from "@/lib/bridge";
 import { useNow } from "@/lib/hooks";
-import { Ic, Icon } from "./Icon";
+import { Ic } from "./Icon";
 
 export type PillKind =
   | "working"
@@ -48,7 +48,7 @@ const clock = (ms: number) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 };
 
-export function RedesignPill({ model, onWidth }: { model: PillModel; onWidth: (w: number) => void }) {
+export function IslandPill({ model, onWidth }: { model: PillModel; onWidth: (w: number) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const now = useNow(1000);
   const { kind } = model;

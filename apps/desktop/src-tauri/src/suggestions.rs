@@ -628,13 +628,11 @@ fn run_choice(app: &AppHandle, id: &str, index: usize, auto: bool) -> Result<(),
         // Acting counts for the app it came from (a human pick, not Auto).
         if !auto && let Some(from) = option.args["app"].as_str().or(option.args["name"].as_str()) {
             let mut next = lock(&app.state::<AppState>().settings).clone();
-            if next.redesign.enabled {
-                next.notifications
-                    .lessons
-                    .acted(&format!("app:{from}"), chrono::Utc::now().timestamp());
-                if let Err(err) = crate::commands::apply_settings(app, next) {
-                    log::warn!("could not save what was learned: {err}");
-                }
+            next.notifications
+                .lessons
+                .acted(&format!("app:{from}"), chrono::Utc::now().timestamp());
+            if let Err(err) = crate::commands::apply_settings(app, next) {
+                log::warn!("could not save what was learned: {err}");
             }
         }
     }
@@ -995,24 +993,7 @@ pub fn dismiss(app: &AppHandle, id: &str, reason: &str) -> Result<(), String> {
         "suggestion from {} dismissed: {reason}",
         active.proposal.skill_id
     );
-    // With the redesign on, Dismiss is neutral: only acting and Show less teach.
-    let neutral = lock(&app.state::<AppState>().settings).redesign.enabled;
-    if !neutral {
-        crate::learn::on_dismiss(app, &active.proposal.skill_id, reason);
-    }
-    if !neutral && reason == "user" && active.proposal.skill_id.starts_with("notify.") {
-        let from = active
-            .proposal
-            .options
-            .iter()
-            .find_map(|o| o.args["app"].as_str().or(o.args["name"].as_str()))
-            .unwrap_or_default()
-            .to_owned();
-        crate::inbox::lesson(format!("Dismissed: {}", active.proposal.title));
-        if let Some(note) = crate::inbox::on_dismiss(app, &from) {
-            log::info!("notifications: {note}");
-        }
-    }
+    // Dismiss is neutral: only acting and Show less teach.
     // Shown while nobody was looking: keep it, so hovering the island
     // later still finds it.
     if reason == "timeout" {

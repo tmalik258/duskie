@@ -101,8 +101,6 @@ pub struct Settings {
     /// Apps connected directly over MCP, preferred over Composio.
     pub direct_servers: Vec<DirectServer>,
     pub semantic_search: SemanticSearch,
-    /// The new island look; off by default.
-    pub redesign: Redesign,
     /// MCP servers the user connected directly (stdio), preferred over Composio.
     pub direct_mcp: DirectMcp,
     /// The first-run welcome was finished or skipped.
@@ -318,20 +316,6 @@ pub const DEFAULT_DENY_APPS: &[&str] = &[
     "snippingtool.exe",
     "screenclippinghost.exe",
 ];
-
-/// Switches for the new island look. On by default; Settings > Appearance
-/// turns it off for anyone who wants the old look for one more release.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase", default)]
-pub struct Redesign {
-    pub enabled: bool,
-}
-
-impl Default for Redesign {
-    fn default() -> Self {
-        Self { enabled: true }
-    }
-}
 
 /// One MCP server started as a program on this PC (no shell).
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -779,7 +763,6 @@ impl Default for Settings {
             composio: ComposioSettings::default(),
             direct_servers: Vec::new(),
             semantic_search: SemanticSearch::default(),
-            redesign: Redesign::default(),
             direct_mcp: DirectMcp::default(),
             onboarded: false,
             welcome_step: 0,
@@ -977,15 +960,6 @@ impl Settings {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn redesign_is_on_by_default_and_a_switch_off_is_kept() {
-        assert!(Settings::default().redesign.enabled);
-        let old: Settings = serde_json::from_str("{\"muted\":true}").unwrap();
-        assert!(old.redesign.enabled);
-        let off: Settings = serde_json::from_str("{\"redesign\":{\"enabled\":false}}").unwrap();
-        assert!(!off.redesign.enabled);
-    }
-
     use super::*;
 
     #[test]
