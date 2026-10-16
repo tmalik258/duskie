@@ -13,6 +13,7 @@ import { Ic, Icon } from "./Icon";
 export type PillKind =
   | "working"
   | "listening"
+  | "caption"
   | "done"
   | "error"
   | "focus"
@@ -65,6 +66,23 @@ export function RedesignPill({ model, onWidth }: { model: PillModel; onWidth: (w
   let trail: ReactNode = null;
   if (kind === "working") trail = <span className="tnum">{clock(now - (model.startedAt ?? now))}</span>;
   else if (kind === "listening") trail = <Bars />;
+  else if (kind === "caption")
+    trail = (
+      <>
+        {model.chip && <span className="chip-s cap-tool">{model.chip}</span>}
+        <button
+          type="button"
+          className="chip-s ic-only"
+          aria-label="Stop"
+          onClick={(e) => {
+            e.stopPropagation();
+            model.onChip?.();
+          }}
+        >
+          <Ic name="x" size={12} />
+        </button>
+      </>
+    );
   else if (kind === "done" && model.onOpen)
     trail = (
       <button
@@ -148,7 +166,7 @@ export function RedesignPill({ model, onWidth }: { model: PillModel; onWidth: (w
         )}
         {kind === "suggest" && <span className="dot" style={{ background: "#95a89a" }} />}
         <span
-          className={`cmp-label${kind === "suggest" || kind === "notify" ? " nt" : ""}${kind === "listening" ? " words" : ""}`}
+          className={`cmp-label${kind === "suggest" || kind === "notify" ? " nt" : ""}${kind === "listening" ? " words" : ""}${kind === "caption" ? " cap" : ""}`}
         >
           <MorphLabel text={model.label} />
           {model.dim && <span className="dim"> {model.dim}</span>}

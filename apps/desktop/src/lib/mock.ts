@@ -42,6 +42,7 @@ if (typeof location !== "undefined") {
   settings.islandColor = (q.get("color") as Settings["islandColor"] | null) ?? settings.islandColor;
   settings.theme = (q.get("theme") as Settings["theme"] | null) ?? settings.theme;
   if (q.get("voice") === "full") settings.voice.listeningStyle = "full";
+  if (q.has("live")) settings.voice.live = true;
 }
 let mascot: MascotState = previewFlag("orphan") ? "working" : "idle";
 let suggestion: Suggestion | null = null;

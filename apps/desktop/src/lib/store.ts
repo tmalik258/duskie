@@ -4,6 +4,7 @@ import { acceptActivities, beginActivity, finishActivity, ownsWorking, useActivi
 import { setTab, startHere } from "./agents";
 import { api, EVENTS, listen } from "./bridge";
 import { putCached, revalidate, SETUP_STATUS_CACHE_KEY } from "./cache";
+import { captionOf } from "./live";
 import { firstToday, isThanks, type Mood, moodForSkill, SUGGESTION_MOOD_MS } from "./mood";
 import { type NetNotice, watchNet } from "./net";
 import { cueVolume, playCue, playMood, playSound, preloadSounds } from "./sound";
@@ -88,6 +89,9 @@ interface DuskieState {
   speaking: boolean;
   /** Voice: what is being heard right now, while listening. */
   hearing: string | null;
+  /** Live: the spoken answer as a caption in the compact island, and the
+   * step it is on ("Checking Gmail"). Ask stays closed. */
+  live: { caption: string; tool: string | null; done: boolean } | null;
   voiceStatus: VoiceStatus | null;
   /** Suggestions held while you were busy or in a meeting. */
   later: number;
@@ -207,6 +211,7 @@ export const useDuskie = create<DuskieState>(() => ({
   focusUntil: null,
   conversation: crypto.randomUUID(),
   hearing: null,
+  live: null,
   speaking: false,
   voiceStatus: null,
   later: 0,
@@ -877,6 +882,23 @@ let voiceTimer: ReturnType<typeof setTimeout> | null = null;
  * waiting for an answer, stays the same too long, the pill clears and
  * listening stops, so the island never stays stuck.
  */
+/** Chats asked by voice with Live on: answered as captions, Ask closed. */
+const liveIds = new Set<string>();
+const liveText = new Map<string, string>();
+/** How long the last caption stays after the answer ends. */
+const LIVE_LINGER_MS = 6000;
+function liveAnswer(id: string): boolean {
+  return liveIds.has(id) && !useDuskie.getState().ask;
+}
+
+/** Stops a Live answer: speech, the model and the caption. */
+export function stopLive() {
+  const { chatId } = useDuskie.getState();
+  if (chatId && liveIds.has(chatId)) void api.aiCancel(chatId);
+  void api.voiceStop();
+  useDuskie.setState({ live: null });
+}
+
 function watchVoice() {
   if (voiceTimer) clearTimeout(voiceTimer);
   const { hearing, voiceQuestion } = useDuskie.getState();
@@ -1226,6 +1248,8 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
           }
           const started = sendChat(q, { speak: settings.voice.speakAnswers, voice: true });
           if (!started && !ask) useDuskie.setState({ voiceQuestion: null });
+          const live = useDuskie.getState().chatId;
+          if (started && !ask && settings.voice.live && live) liveIds.add(live);
         } else {
           useDuskie.setState({ hearing: null });
           if (byVoice && turns.length === 0 && ask) void api.askClose();
@@ -1242,6 +1266,14 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
         pendingText.set(id, (pendingText.get(id) ?? "") + text);
         scheduleText();
         timings.firstWord(id);
+        // Live: the answer stays a caption in the island; Ask stays closed.
+        if (liveAnswer(id)) {
+          liveText.set(id, (liveText.get(id) ?? "") + text);
+          const caption = captionOf(liveText.get(id) ?? "");
+          const prev = useDuskie.getState().live;
+          useDuskie.setState({ voiceQuestion: null, live: { caption, tool: prev?.tool ?? null, done: false } });
+          return;
+        }
         // The first words of a spoken question's answer: open to show it.
         if (sounds && useDuskie.getState().voiceQuestion !== null) {
           useDuskie.setState({ voiceQuestion: null });
@@ -1262,6 +1294,12 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
         if (early?.id === id) {
           early.tools.push({ name, label, source });
           return;
+        }
+        if (liveAnswer(id)) {
+          const prev = useDuskie.getState().live;
+          useDuskie.setState({
+            live: { caption: prev?.caption ?? "", tool: label || toolStatus(name).replace(/\.\.\.$/, ""), done: false },
+          });
         }
         flushText();
         // A line written before a tool call is narration ("I'll check your
@@ -1291,6 +1329,18 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
       listen(EVENTS.aiDone, ({ id, provider, error, handoff, cost }) => {
         flushText();
         timings.done(id);
+        const wasLive = liveAnswer(id);
+        if (wasLive) {
+          liveIds.delete(id);
+          liveText.delete(id);
+          const prev = useDuskie.getState().live;
+          if (prev) {
+            useDuskie.setState({ live: { ...prev, tool: null, done: true } });
+            setTimeout(() => {
+              if (useDuskie.getState().live?.done) useDuskie.setState({ live: null });
+            }, LIVE_LINGER_MS);
+          }
+        }
         if (useDuskie.getState().voiceQuestion !== null) useDuskie.setState({ voiceQuestion: null });
         updateLastTurn(id, (t) => ({
           ...t,
@@ -1306,7 +1356,7 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
           useDuskie.setState({ chatId: null });
           if (sounds && !useDuskie.getState().chatSkill) saveChat();
           // Ask was closed while the answer came in: bring it back with the answer.
-          if (sounds && !useDuskie.getState().ask && useDuskie.getState().turns.length > 0) {
+          if (sounds && !wasLive && !useDuskie.getState().ask && useDuskie.getState().turns.length > 0) {
             void api.askOpen();
           }
         }
