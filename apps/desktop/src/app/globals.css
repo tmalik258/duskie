@@ -14,7 +14,7 @@
   --c3: #7a8f7e;
   --c4: #95a89a;
   --ink-2: rgb(242 240 235 / 0.66);
-  --ink-3: rgb(242 240 235 / 0.5);
+  --ink-3: rgb(242 240 235 / 0.6);
   --ink-4: rgb(242 240 235 / 0.3);
   --line: rgb(149 168 154 / 0.15);
   --line-2: rgb(149 168 154 / 0.28);
@@ -4583,7 +4583,7 @@ button.ak-cchip:hover,
   padding: 0 5px;
   border-radius: 4px;
   background: rgb(242 240 235 / 0.08);
-  color: rgb(242 240 235 / 0.5);
+  color: rgb(242 240 235 / 0.6);
 }
 .st-search input::placeholder {
   color: rgb(242 240 235 / 0.4);
@@ -4594,7 +4594,7 @@ button.ak-cchip:hover,
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: rgb(242 240 235 / 0.38);
+  color: rgb(242 240 235 / 0.46);
 }
 .st-item {
   display: flex;
@@ -4627,7 +4627,7 @@ button.ak-cchip:hover,
 .st-blurb {
   margin-top: 2px;
   font-size: 13px;
-  color: rgb(242 240 235 / 0.55);
+  color: rgb(242 240 235 / 0.62);
 }
 
 /* Pill labels morph word by word instead of swapping. */
