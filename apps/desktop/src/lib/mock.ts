@@ -1500,3 +1500,16 @@ export const mock = {
 if (typeof window !== "undefined") {
   (window as unknown as { sidekickMock: unknown }).sidekickMock = { go, cues: CUES, invoke: mock.invoke, emit };
 }
+
+// Preview only (browser mock, never in the app): lets the parity script put
+// the island in any state.
+if (typeof window !== "undefined") {
+  Object.assign(window, {
+    __mockEmit: emit,
+    __mockGo: go,
+    __mockSuggest: (s: Suggestion) => {
+      suggestion = s;
+      emit("suggestion://new", s);
+    },
+  });
+}

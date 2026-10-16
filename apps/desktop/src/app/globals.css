@@ -4040,3 +4040,81 @@ button.ak-cchip:hover,
   margin-left: 44px;
   width: calc(100% - 44px);
 }
+
+/* Redesign island: tint wash with grain, halo glow behind Duskie. */
+[data-redesign] .island-shell {
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  color: #f2f0eb;
+  transition: box-shadow 0.3s ease;
+}
+.isl-tint {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  border-radius: inherit;
+  background: radial-gradient(120% 160% at 0% 0%, rgb(var(--tint, 122 143 126) / 0.34), transparent 62%);
+  opacity: 1;
+  transition:
+    opacity 0.5s ease,
+    background 0.6s ease;
+  pointer-events: none;
+}
+.isl-tint::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: var(--grain);
+  background-size: 140px;
+  opacity: 0.09;
+  mix-blend-mode: overlay;
+}
+.island-shell[data-bare="true"] .isl-tint {
+  opacity: 0;
+}
+.dk-orb {
+  --os: 48px;
+  position: relative;
+  display: block;
+  width: var(--os);
+  height: var(--os);
+  isolation: isolate;
+}
+.dk-orb > .dk-halo {
+  position: absolute;
+  inset: -55%;
+  z-index: -1;
+  border-radius: 50%;
+  background: conic-gradient(from 0turn, #7a8f7e, #95a89a, #a8b5a8, #c9d3c4, #7a8f7e);
+  filter: blur(calc(var(--os) * 0.45));
+  opacity: 0.2;
+  transition: opacity 0.4s ease;
+  -webkit-mask-image: radial-gradient(closest-side, #000 20%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 20%, transparent 100%);
+  pointer-events: none;
+}
+.dk-orb[data-face="listen"] > .dk-halo {
+  opacity: 0.38;
+  background: conic-gradient(from 0turn, #a8c0cc, #95a89a, #d6e2e6, #a8c0cc);
+}
+.dk-orb[data-face="happy"] > .dk-halo {
+  opacity: 0.38;
+}
+.dk-orb[data-face="sleep"] > .dk-halo {
+  opacity: 0.12;
+}
+.dk-orb[data-face="work"] > .dk-halo {
+  animation: dk-spin 4s linear infinite;
+}
+.dk-orb[data-face="sad"] > .dk-halo {
+  background: conic-gradient(from 0turn, #de8676, #b98f7c, #d9a55b, #de8676);
+}
+@keyframes dk-spin {
+  to {
+    rotate: 1turn;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dk-orb > .dk-halo {
+    animation: none !important;
+  }
+}

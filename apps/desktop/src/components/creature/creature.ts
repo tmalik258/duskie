@@ -940,7 +940,12 @@ function boot() {
       this.eyeKey = "";
       const c = el.querySelector("canvas");
       this.canvas = c;
-      if (this.bleed > 1) c.style.inset = `${(-(this.bleed - 1) / 2) * 100}%`;
+      if (this.bleed > 1) {
+        // The stylesheet pins the canvas to the box; widen it and pull it back to center.
+        const o = `${(-(this.bleed - 1) / 2) * 100}%`;
+        const w = `${this.bleed * 100}%`;
+        Object.assign(c.style, { inset: "auto", left: o, top: o, width: w, height: w });
+      }
       this.ctx = c.getContext("2d");
       // Below 40 px only the upper body shows; it fades out at the bottom.
       if (this.bust) c.style.maskImage = c.style.webkitMaskImage = "linear-gradient(180deg, #000 66%, transparent 97%)";
