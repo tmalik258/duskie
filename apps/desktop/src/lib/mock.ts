@@ -521,6 +521,16 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     settings = { ...settings, notifications: { ...settings.notifications, lessons: { entries } } };
     return null;
   },
+  git_status: () => [
+    { path: "src/app.ts", kind: "M", staged: true, unstaged: false },
+    { path: "src/util.ts", kind: "M", staged: false, unstaged: true },
+    { path: "README.md", kind: "?", staged: false, unstaged: true },
+  ],
+  git_stage: () => "Staged",
+  git_unstage: () => "Unstaged",
+  git_amend: () => "Amended the last commit",
+  git_last_commit_pushed: () => false,
+  git_message_diff: () => ({ text: "diff --git a/src/app.ts b/src/app.ts", covered: 1, total: 1 }),
   mail_status: () => mailStatus,
   mail_connect: () => {
     mailStatus = {

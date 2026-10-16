@@ -849,6 +849,23 @@ export interface MailStatus {
   provider: "gmail" | "imap" | null;
 }
 
+/** One changed file in the Git dock. */
+export interface GitFile {
+  path: string;
+  /** M changed, A added, D deleted, R renamed, ? new, U conflict. */
+  kind: string;
+  staged: boolean;
+  unstaged: boolean;
+}
+
+/** The capped diff a model reads to write a commit message. */
+export interface MessageDiff {
+  text: string;
+  /** Files the text covers, and how many changed in all. */
+  covered: number;
+  total: number;
+}
+
 /** One learned sender or source, as Settings lists it. */
 export interface LessonRow {
   key: string;
