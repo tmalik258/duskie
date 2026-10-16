@@ -44,6 +44,19 @@ export function UpdateCard({ activityId, startedAt }: { activityId: string | nul
         <div className="mt-1 flex items-center gap-1.5">
           <button
             type="button"
+            className="rd-btn primary"
+            disabled={progress.phase !== "opening" && progress.phase !== "failed"}
+            onClick={() => void api.updateInstall().catch(() => {})}
+          >
+            {progress.phase === "failed" ? "Try again" : "Restart to update"}
+          </button>
+          {info?.url && (
+            <button type="button" className="rd-btn ghost" onClick={() => void api.aiOpenLink(info.url)}>
+              What is new
+            </button>
+          )}
+          <button
+            type="button"
             className="rd-btn ghost ml-auto chip-s ic-only"
             aria-label="Hide"
             disabled={!activityId}

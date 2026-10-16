@@ -55,7 +55,7 @@ export function CompactTrailing({
       ) : offline ? (
         <Tip label="Offline">
           <span role="img" aria-label="Offline" className={redesign ? "text-(--warn)" : "text-[#ff9f0a]"}>
-            <Icon name="wifiOff" size={14} />
+            <Ic name="wifi" size={14} />
           </span>
         </Tip>
       ) : paused ? (
@@ -212,7 +212,7 @@ export function NetNoticeCard({ notice }: { notice: NetNotice }) {
         }`}
         aria-hidden="true"
       >
-        <Icon name={notice.online ? "wifi" : "wifiOff"} size={16} />
+        <Ic name="wifi" size={16} />
       </span>
     </div>
   );

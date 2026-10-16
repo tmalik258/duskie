@@ -56,6 +56,8 @@ export interface Session extends AgentStarted {
   usage: { used: number; window: number; total?: number; at?: number } | null;
   /** The plan's usage limit, when the agent says it is close or reached. */
   limit?: { status: string; window: string; resetsAt: number | null; used: number | null } | null;
+  /** Paused from its card: stopped after the current step, resumes on request. */
+  paused?: boolean;
   /** "Not now" on the compact offer, until the context is compacted. */
   compactDismissed?: boolean;
   /** The agent's own multiple-choice question, waiting for an answer. */
@@ -415,6 +417,7 @@ export function sendToSession(id: string, text: string) {
     // Sending anything answers or replaces the agent's open question.
     choose: null,
     status: "working",
+    paused: false,
     stuck: false,
     activeMode: s.status === "working" || s.status === "waiting" ? s.activeMode : s.mode,
     turnAt: Date.now(),
@@ -749,6 +752,18 @@ export function usageLine(agent: string, now = Date.now()): string | null {
   const mins = Math.round((now - u.at) / 60_000);
   const ago = mins < 1 ? "just now" : mins < 60 ? `${mins} min ago` : `${Math.round(mins / 60)} h ago`;
   return `${pct(u)}% of ${span}, ${ago}`;
+}
+
+/** Pause: stop the turn but keep the session ready to pick up where it was. */
+export function pauseSession(id: string) {
+  interruptSession(id);
+  update(id, (s) => ({ ...s, paused: true }));
+}
+
+/** Resume a paused session by asking it to carry on. */
+export function resumePaused(id: string) {
+  update(id, (s) => ({ ...s, paused: false }));
+  sendToSession(id, "Continue where you left off.");
 }
 
 /** Esc / Stop: leave the session idle right away; Rust keeps it resumable on the next send. */

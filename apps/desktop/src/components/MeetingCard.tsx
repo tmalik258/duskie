@@ -11,6 +11,7 @@ export interface SoonMeeting {
   title: string;
   mins: number;
   join: string | null | undefined;
+  notes?: { title: string; source: string; reference: string } | null;
 }
 
 export function MeetingCard({ meeting }: { meeting: SoonMeeting }) {
@@ -35,6 +36,19 @@ export function MeetingCard({ meeting }: { meeting: SoonMeeting }) {
               onClick={() => void api.openReference("page", meeting.join ?? "")}
             >
               Join the call
+            </button>
+          )}
+          {meeting.notes && (
+            <button
+              type="button"
+              className="rd-btn"
+              title={meeting.notes.title}
+              onClick={() => {
+                const n = meeting.notes;
+                if (n) void api.openReference(n.source, n.reference);
+              }}
+            >
+              Open notes
             </button>
           )}
         </div>

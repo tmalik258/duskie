@@ -1305,6 +1305,7 @@ const soon = () => {
     start: hm(d),
     end: hm(new Date(d.getTime() + 45 * 60_000)),
     joinUrl: "https://meet.google.com/abc-defg-hij",
+    notes: { title: "Design review notes", source: "page", reference: "https://docs.example.com/review" },
   };
 };
 commands.calendar_today = () => ({

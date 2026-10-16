@@ -99,7 +99,7 @@ export function RedesignPill({ model, onWidth }: { model: PillModel; onWidth: (w
           model.onOpen?.();
         }}
       >
-        <Icon name="wifiOff" size={13} />
+        <Ic name="wifi" size={13} />
       </button>
     );
   else if (kind === "waiting") trail = <span className="badge tnum">{model.count ?? 1}</span>;

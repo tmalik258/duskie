@@ -4,7 +4,7 @@
 // is on, how far along the plan, its latest steps, and a way to open, pause
 // or stop it.
 
-import { interruptSession, type Session, type Step, useAgents } from "@/lib/agents";
+import { interruptSession, pauseSession, resumePaused, type Session, type Step, useAgents } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { Ic } from "./Icon";
 
@@ -53,6 +53,17 @@ export function AgentCard({ id }: { id: string }) {
           <button type="button" className="rd-btn primary" onClick={open}>
             Open session
           </button>
+          {(s.status === "working" || s.paused) && (
+            <button
+              type="button"
+              className="rd-btn ghost chip-s ic-only"
+              aria-label={s.paused ? "Resume" : "Pause"}
+              title={s.paused ? "Resume" : "Pause"}
+              onClick={() => (s.paused ? resumePaused(s.id) : pauseSession(s.id))}
+            >
+              <Ic name={s.paused ? "play" : "pause"} size={12} />
+            </button>
+          )}
           {s.status === "working" && (
             <button
               type="button"

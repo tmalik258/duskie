@@ -104,7 +104,14 @@ export interface Settings {
 }
 
 export interface CalendarToday {
-  meetings: { title: string; start: string; end: string; joinUrl: string | null }[];
+  meetings: {
+    title: string;
+    start: string;
+    end: string;
+    joinUrl: string | null;
+    /** The page or file used last time for this meeting, from history. */
+    notes?: { title: string; source: string; reference: string } | null;
+  }[];
   error: string | null;
   /** Calendars read through Composio, e.g. "Google Calendar". */
   sources: string[];

@@ -69,6 +69,8 @@ export function Icon({ name, size = 16, className }: { name: IconName; size?: nu
 
 /** The design's small 16px line icons, for tabs, nav rows and chips. */
 const SMALL = {
+  dl: '<path d="M8 2.5v7M5 7l3 3 3-3M3 12.5h10"/>',
+  restart: '<path d="M13 8a5 5 0 11-1.6-3.7M13 2.8v3h-3"/>',
   info: '<circle cx="8" cy="8" r="6"/><path d="M8 7.2v3.6"/><circle cx="8" cy="5" r=".4" fill="currentColor"/>',
   diff: '<path d="M5 2.5v5M2.5 5h5M2.5 11.5h5"/><path d="M11 2v12"/><path d="M13.5 9.5 11 12l-2.5-2.5" opacity=".55"/>',
   check: '<path d="M3.5 8.5l3 3 6-7"/>',

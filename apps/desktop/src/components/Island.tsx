@@ -1120,7 +1120,8 @@ function soonMeeting(now: number, cal: CalendarToday | null | undefined) {
     const d = new Date(now);
     d.setHours(h ?? 0, mm ?? 0, 0, 0);
     const mins = Math.round((d.getTime() - now) / 60_000);
-    if (mins >= -2 && mins <= 10) return { title: m.title, mins: Math.max(0, mins), join: m.joinUrl };
+    if (mins >= -2 && mins <= 10)
+      return { title: m.title, mins: Math.max(0, mins), join: m.joinUrl, notes: m.notes ?? null };
   }
   return null;
 }

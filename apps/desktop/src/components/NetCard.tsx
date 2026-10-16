@@ -5,7 +5,7 @@
 
 import { useState } from "react";
 import { api } from "@/lib/bridge";
-import { Icon } from "./Icon";
+import { Ic } from "./Icon";
 
 const ROWS: [string, string, string][] = [
   ["Clipboard, files, voice notes", "working", "var(--ok)"],
@@ -27,7 +27,7 @@ export function NetCard({ onClose }: { onClose: () => void }) {
       <div className="rd-card-head">
         <p className="rd-eyebrow flex items-center gap-1.5">
           <span style={{ color: "var(--warn)", display: "inline-flex" }}>
-            <Icon name="wifiOff" size={13} />
+            <Ic name="wifi" size={13} />
           </span>
           No connection
         </p>
