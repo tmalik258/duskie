@@ -17,6 +17,8 @@ export interface IslandContext {
   /** Compact voice / working / focus pill. */
   voicePill: boolean;
   suggestion: boolean;
+  /** A suggestion shown small first; hover or Alt opens it. */
+  suggestPeek?: boolean;
   waitingForYou: boolean;
   merging: boolean;
   updateCard: boolean;
@@ -46,7 +48,8 @@ export function resolveIslandState(c: IslandContext): IslandStateId {
   if (c.updateCard) return "update";
   if (c.waitingForYou) return "waiting";
   if (c.suggestion) return "suggestion";
-  if (c.netCard) return "offline";
+  if (c.suggestPeek) return "suggest-peek";
+  if (c.netCard) return "net-card";
   if (c.activitiesOpen) return "activities";
   if (c.mascot === "error") return "error";
   if (c.mascot === "success") return "done";
