@@ -24,6 +24,8 @@ export interface IslandContext {
   updateCard: boolean;
   offline: boolean;
   netCard: boolean;
+  /** Hovering a notification pill opens its card. */
+  notifyCard?: boolean;
   focus: boolean;
   paused: boolean;
   /** Fresh idle notification (pill), else unread count when unread > 0. */
@@ -49,6 +51,7 @@ export function resolveIslandState(c: IslandContext): IslandStateId {
   if (c.waitingForYou) return "waiting";
   if (c.suggestion) return "suggestion";
   if (c.suggestPeek) return "suggest-peek";
+  if (c.notifyCard) return "notify-card";
   if (c.netCard) return "net-card";
   if (c.activitiesOpen) return "activities";
   if (c.mascot === "error") return "error";

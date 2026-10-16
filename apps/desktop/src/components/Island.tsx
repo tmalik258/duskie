@@ -64,6 +64,7 @@ import {
   TOP,
   WELCOME_WIDTH,
 } from "./island-layout";
+import { MeetingCard } from "./MeetingCard";
 import { NetCard } from "./NetCard";
 import { PreparingVoice } from "./PreparingVoice";
 import { type PillModel, RedesignPill } from "./RedesignPill";
@@ -699,6 +700,7 @@ export function Island() {
         updateCard: updateProgress?.phase === "failed" || (redesign && hovered && updateWorking !== null),
         offline: !online,
         netCard: netShown && !voicePill,
+        notifyCard: redesign && hovered && meetingSoon !== null && !paused,
         focus: focusLeft !== null,
         paused,
         notifyFresh: !!notifyFresh && !busy && !expanded,
@@ -964,6 +966,8 @@ export function Island() {
                     <ActivitiesCard />
                   ) : redesign && registryId === "update" && updateWorking !== null ? (
                     <UpdateCard activityId={updateActivity?.id ?? null} startedAt={updateActivity?.startedAt ?? null} />
+                  ) : redesign && registryId === "notify-card" && meetingSoon ? (
+                    <MeetingCard meeting={meetingSoon} />
                   ) : redesign && registryId === "net-card" ? (
                     <NetCard onClose={() => setNetOpen(false)} />
                   ) : (
