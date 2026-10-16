@@ -4456,3 +4456,48 @@ button.ak-cchip:hover,
   background: #a8c0cc;
   transition: width 0.4s ease;
 }
+.mg-row .t {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 12px;
+}
+.mg-row .r {
+  opacity: 1;
+}
+.chip-s[aria-pressed="true"] {
+  background: #f2f0eb;
+  color: #141412;
+}
+.rd-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  flex: none;
+}
+.rd-btn {
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #f2f0eb;
+  white-space: nowrap;
+  transition:
+    background 0.15s ease,
+    opacity 0.15s ease;
+}
+.rd-btn.primary {
+  background: #f2f0eb;
+  color: #141412;
+}
+.rd-btn.ghost:hover {
+  background: rgb(242 240 235 / 0.08);
+}
+.rd-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.mg-row {
+  gap: 8px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
