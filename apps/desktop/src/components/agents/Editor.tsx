@@ -30,7 +30,7 @@ export function Editor({
   onClose,
 }: {
   root: string;
-  initial?: { path: string; line?: number } | null;
+  initial?: { path: string; line?: number; atChange?: boolean } | null;
   onClose: () => void;
 }) {
   const host = useRef<HTMLDivElement>(null);
@@ -108,7 +108,7 @@ export function Editor({
   }, []);
 
   const open = useCallback(
-    async (path: string, line?: number) => {
+    async (path: string, line?: number, atChange = false) => {
       const m = monaco.current;
       const ed = editor.current;
       if (!m || !ed) return;
@@ -129,6 +129,12 @@ export function Editor({
         const model = models.current.get(path);
         if (model) ed.setModel(model);
         setActive(path);
+        if (!line && atChange && model) {
+          const head =
+            tabsRef.current.find((t) => t.path === path)?.head ?? (await api.editorHead(root, path).catch(() => ""));
+          const m2 = lineMarks(head, model.getValue());
+          line = [...m2.changed, ...m2.added, ...m2.removed.map((l) => Math.max(1, l))].sort((a, b) => a - b)[0];
+        }
         if (line) {
           ed.revealLineInCenter(line);
           ed.setPosition({ lineNumber: line, column: 1 });
@@ -142,7 +148,7 @@ export function Editor({
   );
 
   useEffect(() => {
-    if (ready && initial?.path) void open(initial.path, initial.line);
+    if (ready && initial?.path) void open(initial.path, initial.line, initial.atChange);
   }, [ready, initial, open]);
 
   useEffect(() => {

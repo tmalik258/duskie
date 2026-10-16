@@ -28,6 +28,7 @@ export function GitDock({ path, repo, onClose }: { path: string; repo?: RepoRow 
   const [stashes, setStashes] = useState<StashRow[]>([]);
   const [changed, setChanged] = useState(0);
   const [full, setFull] = useState(false);
+  const [at, setAt] = useState<{ path: string; atChange?: boolean } | null>(null);
   const loadStashes = useCallback(
     () =>
       void api
@@ -55,7 +56,17 @@ export function GitDock({ path, repo, onClose }: { path: string; repo?: RepoRow 
     ["pr", "Pull request", null],
     ["stashes", "Stashes", stashes.length],
   ];
-  if (full) return <Editor root={path} onClose={() => setFull(false)} />;
+  if (full)
+    return (
+      <Editor
+        root={path}
+        initial={at}
+        onClose={() => {
+          setFull(false);
+          setAt(null);
+        }}
+      />
+    );
   return (
     <section className="gd flex min-h-0 flex-1 flex-col" aria-label="Git">
       <div className="gd-bar">
@@ -69,7 +80,14 @@ export function GitDock({ path, repo, onClose }: { path: string; repo?: RepoRow 
             <span className="truncate mono">{repo.branch}</span>
           </span>
         )}
-        <button type="button" className="rd-btn ghost chip-s ml-auto" onClick={() => setFull(true)}>
+        <button
+          type="button"
+          className="rd-btn ghost chip-s ml-auto"
+          onClick={() => {
+            setAt(null);
+            setFull(true);
+          }}
+        >
           Full screen
         </button>
         <button type="button" className="rd-btn ghost chip-s ic-only" aria-label="Close Git" onClick={onClose}>
@@ -92,7 +110,16 @@ export function GitDock({ path, repo, onClose }: { path: string; repo?: RepoRow 
         ))}
       </div>
       <div className="gd-body min-h-0 flex-1">
-        {tab === "changes" && <Changes path={path} onCount={setChanged} />}
+        {tab === "changes" && (
+          <Changes
+            path={path}
+            onCount={setChanged}
+            onOpen={(file) => {
+              setAt({ path: file, atChange: true });
+              setFull(true);
+            }}
+          />
+        )}
         {tab === "history" && <History path={path} />}
         {tab === "pr" && <PullRequest pr={pr} branch={repo?.branch ?? null} />}
         {tab === "stashes" && <Stashes path={path} stashes={stashes} reload={loadStashes} />}
@@ -230,7 +257,15 @@ function Stashes({ path, stashes, reload }: { path: string; stashes: StashRow[];
   );
 }
 
-function Changes({ path, onCount }: { path: string; onCount: (n: number) => void }) {
+function Changes({
+  path,
+  onCount,
+  onOpen,
+}: {
+  path: string;
+  onCount: (n: number) => void;
+  onOpen: (file: string) => void;
+}) {
   const [files, setFiles] = useState<GitFile[]>([]);
   const [message, setMessage] = useState("");
   const [note, setNote] = useState<string | null>(null);
@@ -314,6 +349,19 @@ function Changes({ path, onCount }: { path: string; onCount: (n: number) => void
                 />
                 <span className="min-w-0 flex-1 truncate">{baseName(f.path)}</span>
                 <span className="text-[11px] text-white/45">{KIND[f.kind] ?? f.kind}</span>
+                {f.kind !== "D" && (
+                  <button
+                    type="button"
+                    className="rd-btn ghost chip-s"
+                    aria-label={`Open ${f.path} at the change`}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onOpen(f.path);
+                    }}
+                  >
+                    Open
+                  </button>
+                )}
               </label>
             ))}
           </div>
