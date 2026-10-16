@@ -19,7 +19,7 @@ type Handler = (payload: unknown) => void;
 
 const handlers = new Map<string, Set<Handler>>();
 let settings: Settings = structuredClone(DEFAULT_SETTINGS);
-let mailStatus: MailStatus = { state: "disconnected", configured: true, lastOk: null, error: null };
+let mailStatus: MailStatus = { state: "disconnected", configured: true, lastOk: null, error: null, provider: null };
 if (typeof localStorage !== "undefined") {
   try {
     Object.assign(settings, JSON.parse(localStorage.getItem("sidekick.mock.savedFolders") ?? "{}"));
@@ -523,11 +523,27 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
   },
   mail_status: () => mailStatus,
   mail_connect: () => {
-    mailStatus = { state: "connected", configured: true, lastOk: Math.floor(Date.now() / 1000), error: null };
+    mailStatus = {
+      state: "connected",
+      configured: true,
+      lastOk: Math.floor(Date.now() / 1000),
+      error: null,
+      provider: "gmail",
+    };
+    return mailStatus;
+  },
+  mail_connect_imap: () => {
+    mailStatus = {
+      state: "connected",
+      configured: true,
+      lastOk: Math.floor(Date.now() / 1000),
+      error: null,
+      provider: "imap",
+    };
     return mailStatus;
   },
   mail_disconnect: () => {
-    mailStatus = { state: "disconnected", configured: true, lastOk: null, error: null };
+    mailStatus = { state: "disconnected", configured: true, lastOk: null, error: null, provider: null };
     return mailStatus;
   },
   attention_set_profile: (args) => {

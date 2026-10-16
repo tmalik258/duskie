@@ -467,10 +467,12 @@ pub struct Status {
     pub configured: bool,
     pub last_ok: Option<i64>,
     pub error: Option<String>,
+    pub provider: Option<&'static str>,
 }
 
 /// State, last success (seconds), last error.
 type Known = (MailState, Option<i64>, Option<String>);
+static PROVIDER: Mutex<Option<&'static str>> = Mutex::new(None);
 static STATUS: Mutex<Option<Known>> = Mutex::new(None);
 /// Set when the user connects or disconnects, so the loop reacts at once.
 static WAKE: tokio::sync::Notify = tokio::sync::Notify::const_new();
@@ -500,6 +502,10 @@ pub fn status() -> Status {
         configured: client_id().is_some(),
         last_ok,
         error,
+        provider: PROVIDER
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .to_owned(),
     }
 }
 
@@ -540,18 +546,52 @@ fn handle(app: &AppHandle, mail: &Mail) {
     ));
 }
 
+/// Whichever account is connected.
+enum Account {
+    Gmail(Gmail),
+    Imap(crate::imap::Imap),
+}
+
+impl Account {
+    async fn poll(&mut self) -> Result<Vec<Mail>, MailError> {
+        match self {
+            Account::Gmail(g) => g.poll().await,
+            Account::Imap(i) => i.poll().await,
+        }
+    }
+}
+
+fn set_provider(p: Option<&'static str>) {
+    *PROVIDER.lock().unwrap_or_else(|e| e.into_inner()) = p;
+}
+
 /// The loop that checks for new mail while the account is connected.
 pub fn start(app: &AppHandle) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        let mut source: Option<Gmail> = None;
+        let mut source: Option<Account> = None;
         let mut failures = 0u32;
         let mut active = false;
         loop {
             if source.is_none() {
-                match saved_grant() {
-                    Some(g) => source = Some(Gmail::new(g)),
-                    None => {
+                let imap = {
+                    let n = lock(&app.state::<AppState>().settings)
+                        .notifications
+                        .imap
+                        .clone();
+                    crate::imap::saved(&n)
+                };
+                match (saved_grant(), imap) {
+                    (Some(g), _) => {
+                        set_provider(Some("gmail"));
+                        source = Some(Account::Gmail(Gmail::new(g)));
+                    }
+                    (None, Some(i)) => {
+                        set_provider(Some("imap"));
+                        source = Some(Account::Imap(i));
+                    }
+                    (None, None) => {
+                        set_provider(None);
                         set_status(MailState::Disconnected, false, None);
                         // Nothing to do until the user connects.
                         WAKE.notified().await;
@@ -559,10 +599,10 @@ pub fn start(app: &AppHandle) {
                     }
                 }
             }
-            let Some(gmail) = source.as_mut() else {
+            let Some(account) = source.as_mut() else {
                 continue;
             };
-            match gmail.poll().await {
+            match account.poll().await {
                 Ok(new) => {
                     failures = 0;
                     active = !new.is_empty();
@@ -571,7 +611,9 @@ pub fn start(app: &AppHandle) {
                         handle(&app, mail);
                     }
                     // Tokens may have rotated: keep the newest grant.
-                    if gmail.grant() != &saved_grant().unwrap_or_default() {
+                    if let Account::Gmail(gmail) = account
+                        && gmail.grant() != &saved_grant().unwrap_or_default()
+                    {
                         let _ = save_grant(gmail.grant());
                     }
                 }
@@ -602,17 +644,52 @@ pub async fn connect(app: &AppHandle) -> Result<(), String> {
     let grant =
         sign_in(move |url| async move { crate::composio::open_url(&opener, &url).await }).await?;
     save_grant(&grant)?;
+    set_provider(Some("gmail"));
+    set_status(MailState::Connected, false, None);
+    WAKE.notify_one();
+    Ok(())
+}
+
+/// Checks an IMAP login once, then keeps the account. The password goes to
+/// the keychain; only the host and user are in settings.
+pub async fn connect_imap(
+    app: &AppHandle,
+    account: crate::imap::ImapAccount,
+    password: String,
+) -> Result<(), String> {
+    let mut probe = crate::imap::Imap::new(account.clone(), password.clone());
+    probe.poll().await.map_err(|e| match e {
+        MailError::AuthExpired => {
+            "The server did not accept that user and password. Many providers need an app password."
+                .to_owned()
+        }
+        other => other.to_string(),
+    })?;
+    crate::secrets::set(crate::imap::SECRET, &password)?;
+    let mut next = lock(&app.state::<AppState>().settings).clone();
+    next.notifications.imap = duskie_core::MailAccountSettings {
+        host: account.host,
+        port: account.port,
+        user: account.user,
+    };
+    crate::commands::apply_settings(app, next)?;
+    set_provider(Some("imap"));
     set_status(MailState::Connected, false, None);
     WAKE.notify_one();
     Ok(())
 }
 
 /// Signs out of Google, deletes the saved sign-in, and stops checking.
-pub async fn disconnect_account() {
+pub async fn disconnect_account(app: &AppHandle) {
     if let Some(g) = saved_grant() {
         Gmail::new(g).disconnect().await;
     }
     crate::secrets::delete(SECRET);
+    crate::secrets::delete(crate::imap::SECRET);
+    let mut next = lock(&app.state::<AppState>().settings).clone();
+    next.notifications.imap = Default::default();
+    let _ = crate::commands::apply_settings(app, next);
+    set_provider(None);
     set_status(MailState::Disconnected, false, None);
     WAKE.notify_one();
 }

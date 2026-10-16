@@ -33,6 +33,7 @@ mod freeze;
 mod git_watch;
 mod github;
 mod health;
+mod imap;
 mod inbox;
 mod instant;
 mod island;
@@ -215,6 +216,7 @@ pub fn run() {
             commands::mail_status,
             commands::mail_connect,
             commands::mail_disconnect,
+            commands::mail_connect_imap,
             commands::dnd_get,
             commands::dnd_set,
             commands::setup_run,

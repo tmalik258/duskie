@@ -239,6 +239,28 @@ pub struct NotificationSettings {
     pub profile: crate::attention::Profile,
     /// What Duskie learned from what you act on and ask for less of.
     pub lessons: crate::attention::Lessons,
+    /// A mail account reached over IMAP (Advanced). The password is in the
+    /// keychain, never here.
+    pub imap: MailAccountSettings,
+}
+
+/// Where an IMAP account lives and who signs in. No password.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct MailAccountSettings {
+    pub host: String,
+    pub port: u16,
+    pub user: String,
+}
+
+impl Default for MailAccountSettings {
+    fn default() -> Self {
+        Self {
+            host: String::new(),
+            port: 993,
+            user: String::new(),
+        }
+    }
 }
 
 impl Default for NotificationSettings {
@@ -251,6 +273,7 @@ impl Default for NotificationSettings {
             vip: Vec::new(),
             profile: crate::attention::Profile::Normal,
             lessons: crate::attention::Lessons::default(),
+            imap: MailAccountSettings::default(),
         }
     }
 }

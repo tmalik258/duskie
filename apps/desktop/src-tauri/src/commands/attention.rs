@@ -95,7 +95,26 @@ pub async fn mail_connect(app: AppHandle) -> CmdResult<crate::mail::Status> {
 
 /// Signs out and deletes the saved sign-in.
 #[tauri::command]
-pub async fn mail_disconnect() -> crate::mail::Status {
-    crate::mail::disconnect_account().await;
+pub async fn mail_disconnect(app: AppHandle) -> crate::mail::Status {
+    crate::mail::disconnect_account(&app).await;
     crate::mail::status()
+}
+
+/// Connects a mail account over IMAP (Advanced). The password is checked,
+/// then kept in the keychain.
+#[tauri::command]
+pub async fn mail_connect_imap(
+    app: AppHandle,
+    host: String,
+    port: u16,
+    user: String,
+    password: String,
+) -> CmdResult<crate::mail::Status> {
+    let (host, user) = (host.trim().to_owned(), user.trim().to_owned());
+    if host.is_empty() || user.is_empty() || password.is_empty() {
+        return Err("Fill in the server, user and password.".into());
+    }
+    let account = crate::imap::ImapAccount { host, port, user };
+    crate::mail::connect_imap(&app, account, password).await?;
+    Ok(crate::mail::status())
 }
