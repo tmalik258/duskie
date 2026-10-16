@@ -441,7 +441,9 @@ function boot() {
   // A software renderer draws the fur on the CPU and stalls the whole app; the orb is lighter.
   const info = R.gl.getExtension("WEBGL_debug_renderer_info");
   const gpu = String(info ? R.gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : R.gl.getParameter(R.gl.RENDERER));
-  if (/swiftshader|llvmpipe|softpipe|basic render|microsoft basic/i.test(gpu)) {
+  // Screenshot and test runs set this to draw on a software renderer.
+  const forced = (window as unknown as { __creatureForce?: boolean }).__creatureForce === true;
+  if (!forced && /swiftshader|llvmpipe|softpipe|basic render|microsoft basic/i.test(gpu)) {
     R.gl.getExtension("WEBGL_lose_context")?.loseContext();
     failed = true;
     return null;
