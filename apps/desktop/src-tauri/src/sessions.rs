@@ -1515,6 +1515,14 @@ pub fn claude_events(v: &Value) -> Vec<Value> {
                     out.push(json!({ "kind": "plan", "items": items }));
                     continue;
                 }
+                // The agent's own signal that its plan is ready: no need to
+                // guess from the wording of the answer.
+                if name == "ExitPlanMode"
+                    && let Some(plan) = b["input"]["plan"].as_str()
+                {
+                    out.push(json!({ "kind": "plan_doc", "text": plan }));
+                    continue;
+                }
                 let (label, detail) = describe_tool(name, &b["input"]);
                 out.push(json!({
                     "kind": "step", "id": b["id"], "tool": name, "label": label,
@@ -2675,6 +2683,15 @@ mod tests {
         )
         .unwrap();
         assert_eq!(claude_events(&todo)[0]["items"][0]["text"], "Add retries");
+
+        let plan: Value = serde_json::from_str(
+            r##"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t3","name":"ExitPlanMode","input":{"plan":"# Plan\n1. Add retries"}}]}}"##,
+        )
+        .unwrap();
+        let ev = claude_events(&plan);
+        assert_eq!(ev.len(), 1, "the plan is not also a step");
+        assert_eq!(ev[0]["kind"], "plan_doc");
+        assert!(ev[0]["text"].as_str().unwrap().contains("Add retries"));
 
         let result: Value = serde_json::from_str(
             r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","is_error":true}]}}"#,
