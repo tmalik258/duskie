@@ -117,6 +117,8 @@ pub struct Voice {
     pending_welcome_greet: AtomicBool,
     /// The chat being read aloud and its utterance.
     speaking: Mutex<Option<(String, u64)>>,
+    /// The chat whose question was spoken. Only its answer reopens the mic.
+    asked_by_voice: Mutex<Option<String>>,
     /// The first-run welcome line as it is being heard.
     welcome: Mutex<WelcomeSpeech>,
     /// A suggestion read aloud, waiting for a spoken choice: its id and
@@ -139,6 +141,7 @@ impl Voice {
             welcome_greeted: AtomicBool::new(false),
             pending_welcome_greet: AtomicBool::new(false),
             speaking: Mutex::default(),
+            asked_by_voice: Mutex::default(),
             welcome: Mutex::new(WelcomeSpeech {
                 lines: WELCOME_LINES,
                 script: WELCOME_LINES[0],
@@ -894,7 +897,7 @@ fn stop_speaking(app: &AppHandle) {
 }
 
 /// Reads chat `id`'s answer aloud as it streams. False when voice is off.
-pub fn begin_answer(app: &AppHandle, id: &str) -> bool {
+pub fn begin_answer(app: &AppHandle, id: &str, by_voice: bool) -> bool {
     let v = voice(app);
     let Some(utterance) = lock(&v.runtime)
         .as_ref()
@@ -904,6 +907,7 @@ pub fn begin_answer(app: &AppHandle, id: &str) -> bool {
         return false;
     };
     *lock(&v.speaking) = Some((id.to_owned(), utterance));
+    *lock(&v.asked_by_voice) = by_voice.then(|| id.to_owned());
     true
 }
 
@@ -931,7 +935,9 @@ pub fn answer_done(app: &AppHandle, id: &str, error: Option<&str>) {
         spoke = true;
     });
     let conversation = lock(&app.state::<AppState>().settings).voice.conversation;
-    if spoke && conversation && error.is_none() {
+    // Keep listening only after a question that was spoken, never a typed one.
+    let asked_by_voice = lock(&voice(app).asked_by_voice).as_deref() == Some(id);
+    if spoke && conversation && asked_by_voice && error.is_none() {
         let (app, id) = (app.clone(), id.to_owned());
         // Listen for a reply once the answer has been read out, unless the
         // user moved on (closed Ask, or another answer started).
@@ -952,20 +958,13 @@ fn listen_after_speaking(
 ) {
     let app = app.clone();
     std::thread::spawn(move || {
-        let started = std::time::Instant::now();
-        // Give the speaker a moment to start, then wait until it is quiet.
-        std::thread::sleep(std::time::Duration::from_millis(300));
-        while started.elapsed() < MAX_SPEECH {
-            let busy = lock(&voice(&app).runtime)
+        let busy = || {
+            lock(&voice(&app).runtime)
                 .as_ref()
                 .and_then(|r| r.speaker.as_ref())
-                .is_some_and(Speaker::busy);
-            if !busy {
-                break;
-            }
-            std::thread::sleep(std::time::Duration::from_millis(100));
-        }
-        std::thread::sleep(std::time::Duration::from_millis(250));
+                .is_some_and(Speaker::busy)
+        };
+        wait_until_quiet(busy, QUIET_HOLD, MAX_SPEECH);
         if still_wanted(&app) {
             let _ = listen(&app);
         }
@@ -973,6 +972,33 @@ fn listen_after_speaking(
 }
 
 const MAX_SPEECH: std::time::Duration = std::time::Duration::from_secs(90);
+/// The speaker must stay silent this long before the mic opens, so a pause
+/// between two sentences of one answer does not count as the end.
+const QUIET_HOLD: std::time::Duration = std::time::Duration::from_millis(600);
+
+/// Blocks until `busy` has been false for `hold` without a break, or `max`
+/// passes. Returns whether it ended quiet.
+fn wait_until_quiet(
+    mut busy: impl FnMut() -> bool,
+    hold: std::time::Duration,
+    max: std::time::Duration,
+) -> bool {
+    let started = std::time::Instant::now();
+    let step = (hold / 6).max(std::time::Duration::from_millis(5));
+    let mut quiet_since: Option<std::time::Instant> = None;
+    while started.elapsed() < max {
+        if busy() {
+            quiet_since = None;
+        } else {
+            let since = *quiet_since.get_or_insert_with(std::time::Instant::now);
+            if since.elapsed() >= hold {
+                return true;
+            }
+        }
+        std::thread::sleep(step);
+    }
+    false
+}
 /// How long a spoken suggestion waits for an answer.
 const CHOICE_WAIT: std::time::Duration = std::time::Duration::from_secs(6);
 /// Suggestions below this priority are not read aloud.
@@ -1284,6 +1310,32 @@ pub fn cancel_download(app: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_pause_between_sentences_is_not_the_end() {
+        use std::time::Duration;
+        let start = std::time::Instant::now();
+        let busy = || {
+            let t = start.elapsed();
+            t < Duration::from_millis(100)
+                || (t >= Duration::from_millis(160) && t < Duration::from_millis(260))
+        };
+        assert!(super::wait_until_quiet(
+            busy,
+            Duration::from_millis(120),
+            Duration::from_secs(2)
+        ));
+        assert!(start.elapsed() >= Duration::from_millis(380));
+    }
+
+    #[test]
+    fn waiting_gives_up_after_the_limit() {
+        use std::time::Duration;
+        assert!(!super::wait_until_quiet(
+            || true,
+            Duration::from_millis(30),
+            Duration::from_millis(100)
+        ));
+    }
 
     #[test]
     fn fixes_words_voice_gets_wrong() {
