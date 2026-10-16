@@ -10,7 +10,7 @@ import {
 import { api } from "@/lib/bridge";
 import { useNow } from "@/lib/hooks";
 import { useDuskie } from "@/lib/store";
-import { Icon } from "./Icon";
+import { Ic } from "./Icon";
 import { Tip } from "./Tip";
 
 export function ActivityProgress({ sources }: { sources?: string[] } = {}) {
@@ -47,7 +47,7 @@ export function ActivityProgress({ sources }: { sources?: string[] } = {}) {
                       .catch(() => {})
                   }
                 >
-                  <Icon name="refresh" size={12} />
+                  <Ic name="refresh" size={12} />
                 </button>
               </Tip>
               <Tip label="Dismiss">
@@ -60,7 +60,7 @@ export function ActivityProgress({ sources }: { sources?: string[] } = {}) {
                     void api.activityDismiss(a.id).catch(() => {});
                   }}
                 >
-                  <Icon name="close" size={12} />
+                  <Ic name="x" size={12} />
                 </button>
               </Tip>
             </span>

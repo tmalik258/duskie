@@ -17,7 +17,7 @@ import { type AppTime, type CalendarToday, formatDuration, type LaterItem } from
 import { updateBusy, updateLabel } from "@/lib/updates";
 import { useRedesign } from "@/lib/use-redesign";
 import { ActivityProgress } from "./ActivityProgress";
-import { Icon } from "./Icon";
+import { Ic, Icon } from "./Icon";
 import { AwaySection, NeedsYouSection } from "./IslandAgents";
 import { CardChips, CardHead, CardNote } from "./IslandCard";
 import { Tip } from "./Tip";
@@ -94,7 +94,7 @@ export function Glance({ paused }: { paused: boolean }) {
           <div className="flex shrink-0 items-center gap-1.5">
             {head.join && (
               <RoundButton label="Join meeting" onClick={() => void api.openReference("page", head.join ?? "")}>
-                <Icon name="play" size={14} />
+                <Ic name="play" size={14} />
               </RoundButton>
             )}
             <QuickActions paused={paused} focusOpen={focusOpen} onFocusOpenChange={setFocusOpen} />
@@ -367,7 +367,7 @@ function LaterList() {
                   void api.laterDismiss(l.id);
                 }}
               >
-                <Icon name="close" size={12} />
+                <Ic name="x" size={12} />
               </button>
             </div>
           ) : (
@@ -394,7 +394,7 @@ function LaterList() {
                   onClick={() => void api.laterDismiss(l.id)}
                   className={dismissBtn}
                 >
-                  <Icon name="close" size={12} />
+                  <Ic name="x" size={12} />
                 </button>
               </Tip>
             </div>
@@ -503,7 +503,7 @@ function SettingsShiftHistoryButton({ shift }: { shift: boolean }) {
             exit={reduced ? undefined : { opacity: 0, scale: 0.7, rotate: history ? 20 : -20 }}
             transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
           >
-            <Icon name={history ? "history" : "settings"} size={15} />
+            <Ic name={history ? "clock" : "gear"} size={15} />
           </motion.span>
         </AnimatePresence>
       </button>
@@ -541,7 +541,7 @@ function AskShiftAgentsButton({ shift }: { shift: boolean }) {
             exit={reduced ? undefined : { opacity: 0, scale: 0.7, rotate: agents ? 20 : -20 }}
             transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
           >
-            <Icon name={agents ? "terminal" : "ask"} size={15} />
+            <Ic name={agents ? "term" : "ask"} size={15} />
           </motion.span>
         </AnimatePresence>
       </button>
@@ -773,7 +773,7 @@ function FocusPicker({ onDone }: { onDone: () => void }) {
               : "chip flex min-h-9 flex-1 items-center justify-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.01em] text-black hover:bg-white/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff]"
           }
         >
-          <Icon name="focus" size={14} />
+          <Ic name="focus" size={14} />
           Start {minutes} minutes
           <kbd className={`ml-0.5 font-sans text-[11px] font-medium ${redesign ? "text-(--c1)/40" : "text-black/35"}`}>
             Enter
@@ -817,7 +817,7 @@ function UpdateButton() {
             className="size-4 animate-spin rounded-full border-2 border-white/25 border-t-white motion-reduce:animate-none"
           />
         ) : (
-          <Icon name="update" size={15} />
+          <Ic name="update" size={15} />
         )}
       </RoundButton>
       <span

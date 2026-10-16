@@ -6,7 +6,7 @@
 import { api } from "@/lib/bridge";
 import { useDuskie } from "@/lib/store";
 import { updateDetail, updateLabel, updatePercent } from "@/lib/updates";
-import { Icon } from "./Icon";
+import { Ic } from "./Icon";
 
 export function UpdateCard({ activityId, startedAt }: { activityId: string | null; startedAt: number | null }) {
   const progress = useDuskie((s) => s.updateProgress);
@@ -49,7 +49,7 @@ export function UpdateCard({ activityId, startedAt }: { activityId: string | nul
             disabled={!activityId}
             onClick={() => activityId && void api.activityDismiss(activityId).catch(() => {})}
           >
-            <Icon name="close" size={12} />
+            <Ic name="x" size={12} />
           </button>
         </div>
       </div>

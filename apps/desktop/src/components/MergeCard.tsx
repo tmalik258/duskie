@@ -9,7 +9,7 @@ import { useState } from "react";
 import { setTab, startSession } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { openMerge, useDuskie } from "@/lib/store";
-import { Icon } from "./Icon";
+import { Ic } from "./Icon";
 
 type Side = "mine" | "theirs" | "both";
 
@@ -97,7 +97,7 @@ function MergeList({ path }: { path: string }) {
                 aria-label="Open in review"
                 onClick={() => void api.repoOpen(`${path}/${f.file}`)}
               >
-                <Icon name="file" size={12} />
+                <Ic name="file" size={12} />
               </button>
             </span>
           </div>

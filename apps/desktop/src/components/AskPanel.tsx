@@ -487,7 +487,7 @@ export function AskPanel() {
       items.push({
         id: "open-editor",
         group,
-        icon: <Icon name="file" size={12} />,
+        icon: <Ic name="file" size={12} />,
         label: `Open in ${editorName}`,
         hint: "No default app",
         run: () => openFile(path, "editor"),
@@ -499,7 +499,7 @@ export function AskPanel() {
       {
         id: "open-reveal",
         group: editorName ? undefined : group,
-        icon: <Icon name="folder" size={12} />,
+        icon: <Ic name="folder" size={12} />,
         label: "Show in folder",
         hint: editorName ? undefined : "No default app",
         run: () => openFile(path, "reveal"),
@@ -508,7 +508,7 @@ export function AskPanel() {
       },
       {
         id: "open-default",
-        icon: <Icon name="file" size={12} />,
+        icon: <Ic name="file" size={12} />,
         label: "Open with…",
         hint: "Windows",
         run: () => openFile(path, "default"),
@@ -620,7 +620,7 @@ export function AskPanel() {
           items.push({
             id: `file:${f.path}`,
             group: n === 0 ? "Files" : undefined,
-            icon: <Icon name={f.folder ? "folder" : "file"} size={12} />,
+            icon: <Ic name={f.folder ? "folder" : "file"} size={12} />,
             label: f.name,
             hint: f.place,
             // Enter opens; for files, Ctrl Enter shows the parent folder.
@@ -728,7 +728,7 @@ export function AskPanel() {
           },
           {
             id: "skill",
-            icon: <Icon name="settings" size={12} />,
+            icon: <Ic name="gear" size={12} />,
             label: "Teach Duskie a skill",
             run: () => {
               startSkill(text.trim());
@@ -1135,7 +1135,7 @@ export function AskPanel() {
                 hint="Alt V"
                 onClick={startListening}
               >
-                <Icon name="mic" size={14} />
+                <Ic name="mic" size={14} />
               </IconButton>
             )}
             {best && <ModelPicker choices={choices} best={best} picked={pickedModel} keys={alt} disabled={streaming} />}
@@ -1147,7 +1147,7 @@ export function AskPanel() {
               inChat &&
               !showChat && (
                 <IconButton label="New chat (Ctrl N)" keys={alt} hint="Ctrl N" onClick={() => resetChat()}>
-                  <Icon name="plus" size={15} />
+                  <Ic name="plus" size={15} />
                 </IconButton>
               )
             )}
@@ -1184,7 +1184,7 @@ export function AskPanel() {
               hint="Ctrl N"
               onClick={() => resetChat({ cancel: !streaming })}
             >
-              <Icon name="plus" size={15} />
+              <Ic name="plus" size={15} />
             </IconButton>
           </div>
         )}

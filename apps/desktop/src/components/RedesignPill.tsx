@@ -8,7 +8,7 @@ import { motion } from "motion/react";
 import { type ReactNode, useLayoutEffect, useRef } from "react";
 import { api } from "@/lib/bridge";
 import { useNow } from "@/lib/hooks";
-import { Icon } from "./Icon";
+import { Ic, Icon } from "./Icon";
 
 export type PillKind =
   | "working"
@@ -76,7 +76,7 @@ export function RedesignPill({ model, onWidth }: { model: PillModel; onWidth: (w
           model.onOpen?.();
         }}
       >
-        <Icon name="folder" size={12} />
+        <Ic name="folder" size={12} />
       </button>
     );
   else if (kind === "focus")
@@ -143,7 +143,7 @@ export function RedesignPill({ model, onWidth }: { model: PillModel; onWidth: (w
       >
         {kind === "done" && (
           <span style={{ color: "var(--ok)", display: "inline-flex" }}>
-            <Icon name="check" size={15} />
+            <Ic name="check" size={15} />
           </span>
         )}
         {kind === "suggest" && <span className="dot" style={{ background: "#95a89a" }} />}

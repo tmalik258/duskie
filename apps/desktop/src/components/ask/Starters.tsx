@@ -99,7 +99,7 @@ export function ContextLine({ keys }: { keys: boolean }) {
             onClick={() => setAsk({ localOnly: !ask.localOnly })}
             className="ak-pc chip"
           >
-            <Icon name={ask.localOnly ? "check" : "lock"} size={10} />
+            <Ic name={ask.localOnly ? "check" : "lock"} size={10} />
             {ask.localOnly && "This PC only"}
           </button>
         </Tip>

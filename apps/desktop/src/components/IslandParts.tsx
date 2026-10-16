@@ -7,7 +7,7 @@ import type { NetNotice } from "@/lib/net";
 import { playSound } from "@/lib/sound";
 import { installUpdate, notePick, uiVolume, useDuskie } from "@/lib/store";
 import type { MascotState, Suggestion } from "@/lib/types";
-import { Icon } from "./Icon";
+import { Ic, Icon } from "./Icon";
 import { Glance, RoundButton } from "./IslandGlance";
 import { COMPACT, DETAIL, TITLE } from "./island-layout";
 import { MergeCard } from "./MergeCard";
@@ -182,7 +182,7 @@ export function ExpandedContent({
             {result.undoId != null && <UndoButton id={result.undoId} />}
             {result.path && (
               <RoundButton label="Show in folder" onClick={() => void api.revealPath(result.path ?? "")}>
-                <Icon name="folder" size={15} />
+                <Ic name="folder" size={15} />
               </RoundButton>
             )}
           </div>
@@ -230,7 +230,7 @@ export function UndoButton({ id }: { id: number }) {
   };
   return (
     <RoundButton label="Undo" onClick={() => void undo()}>
-      <Icon name="undo" size={15} />
+      <Ic name="undo" size={15} />
     </RoundButton>
   );
 }

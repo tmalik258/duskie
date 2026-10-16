@@ -8,7 +8,7 @@ import { useEffect, useState } from "react";
 import { api } from "@/lib/bridge";
 import { showDone, updateSettings, useDuskie } from "@/lib/store";
 import type { SetupItem } from "@/lib/types";
-import { Icon } from "../Icon";
+import { Ic } from "../Icon";
 
 const ROLES = ["Coder", "Writer", "Manager", "Student", "Something else"] as const;
 
@@ -83,7 +83,7 @@ export function WelcomeCard() {
             {found.map((i) => (
               <div key={i.id} className="rd-list-row mg-row">
                 <span style={{ color: "var(--ok)", display: "inline-flex" }}>
-                  <Icon name="check" size={13} />
+                  <Ic name="check" size={13} />
                 </span>
                 <span className="t" style={{ fontFamily: "inherit", fontSize: 13 }}>
                   {i.title}
@@ -93,7 +93,7 @@ export function WelcomeCard() {
             {later && (
               <div className="rd-list-row mg-row">
                 <span style={{ color: "var(--warn)", display: "inline-flex" }}>
-                  <Icon name="plus" size={13} />
+                  <Ic name="plus" size={13} />
                 </span>
                 <span className="t" style={{ fontFamily: "inherit", fontSize: 13 }}>
                   {later.title} <span className="text-[var(--ink-3)]">later in Settings</span>

@@ -7,7 +7,7 @@ import { activityLabel, dismissLocal, useActivities, visibleActivities } from "@
 import { api } from "@/lib/bridge";
 import { useNow } from "@/lib/hooks";
 import type { Activity } from "@/lib/types";
-import { Icon } from "./Icon";
+import { Ic } from "./Icon";
 
 const MB = 1_000_000;
 
@@ -44,7 +44,7 @@ export function ActivitiesCard() {
           return (
             <div key={a.id} className="act-row">
               <span className="act-ic" aria-hidden>
-                <Icon name={a.source === "browser" || a.source === "file" ? "folder" : "update"} size={13} />
+                <Ic name={a.source === "browser" || a.source === "file" ? "folder" : "update"} size={13} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px]">{activityLabel(a, now, { elapsed: false })}</span>
@@ -64,7 +64,7 @@ export function ActivitiesCard() {
                   void api.activityDismiss(a.id).catch(() => {});
                 }}
               >
-                <Icon name="close" size={12} />
+                <Ic name="x" size={12} />
               </button>
             </div>
           );

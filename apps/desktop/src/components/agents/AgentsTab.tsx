@@ -56,7 +56,7 @@ import { parsePlanDocument } from "@/lib/plan";
 import { setAsk, setOverlayHit, useDuskie } from "@/lib/store";
 import type { AgentInfo, AgentMode, Agents, CursorChat, EditorList } from "@/lib/types";
 import { scrollIfActive } from "../ask/parts";
-import { Icon } from "../Icon";
+import { Ic, Icon } from "../Icon";
 import { Select } from "../settings/ui";
 import { Tip } from "../Tip";
 import { Board } from "./Board";
@@ -880,7 +880,7 @@ function SessionView({
               onClick={() => closeSession(s.id)}
               className="ak-ibtn chip"
             >
-              <Icon name="close" size={13} />
+              <Ic name="x" size={13} />
             </button>
           </Tip>
         )}

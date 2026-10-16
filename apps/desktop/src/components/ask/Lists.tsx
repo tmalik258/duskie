@@ -58,7 +58,7 @@ export function ChatHistory({
               }}
               className="chip grid size-7 shrink-0 place-items-center rounded-full text-white/55 hover:bg-white/[0.12] hover:text-white/90"
             >
-              <Icon name="close" size={14} />
+              <Ic name="x" size={14} />
             </button>
           </Tip>
         </li>

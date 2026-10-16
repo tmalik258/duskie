@@ -10,7 +10,7 @@ import { REDESIGN_COMPACT } from "@/lib/redesign-layout";
 import { useDuskie } from "@/lib/store";
 import type { Activity as ActivityItem } from "@/lib/types";
 import { VoiceBars } from "./AskPanel";
-import { Icon } from "./Icon";
+import { Ic } from "./Icon";
 import { Activity } from "./IslandParts";
 import { COMPACT } from "./island-layout";
 import { Tip } from "./Tip";
@@ -233,7 +233,7 @@ export function VoicePill({
     <span role="img" aria-label="Waiting for confirmed progress" className={`size-2 shrink-0 rounded-full ${warn}`} />
   ) : done ? (
     <span className={`shrink-0 ${redesign ? "text-(--ok,#30d158)" : "text-[#30d158]"}`}>
-      <Icon name="check" size={14} />
+      <Ic name="check" size={14} />
     </span>
   ) : asks ? (
     <span className="relative flex size-2 shrink-0" role="img" aria-label="Waiting for you">
@@ -272,7 +272,7 @@ export function VoicePill({
           }}
           className={iconBtn}
         >
-          <Icon name="refresh" size={12} />
+          <Ic name="refresh" size={12} />
         </button>
       </Tip>
       <Tip label="Dismiss">
@@ -286,7 +286,7 @@ export function VoicePill({
           }}
           className={iconBtn}
         >
-          <Icon name="close" size={12} />
+          <Ic name="x" size={12} />
         </button>
       </Tip>
     </span>
