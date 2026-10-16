@@ -11,7 +11,8 @@ Duskie runs on your PC and keeps what it sees there.
 - **Crash reports** are off until you turn on Offer to report crashes. After a crash Duskie then shows the error and opens a GitHub issue you can read and edit before sending. Nothing is sent on its own.
 - **Browser password stores** are never read or written. Cookies are never read.
 - **AI** only sees what you send it: your question, plus the window, clipboard, page or screenshot you choose to attach. Claude Code runs in an empty folder and Duskie never reads its credential files.
-- **Voice** is on by default and can be turned off in Settings > AI. Speech recognition and the Supertonic voice run on this PC; audio is never saved or sent. Only the words you say go to your AI, like a typed question.
+- **Voice** is on by default and can be turned off in Settings > AI. Speech recognition and the Supertonic voice run on this PC; audio is never saved or sent. Only the words you say go to your AI, like a typed question. **Live answers** (off by default) start the answer when you pause; a change still waits for the final words and a tap on screen, and voice alone never confirms anything that deletes or closes.
+- **Text from mail, web pages, files and the screen** is treated as untrusted. Once it is read in a turn, Duskie will not make a change unless your own words asked for one.
 - **Search by meaning** uses an embedding model on your own local server; text never leaves the PC.
 - **Localhost endpoints** (Claude Code hooks, browser extension, MCP) listen on 127.0.0.1 only, refuse web pages, and the browser and MCP ones require a token.
 - **Updates**: once a day Duskie asks GitHub for the latest release number. You can turn this off.

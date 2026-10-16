@@ -21,6 +21,12 @@ All notable changes to Sidekick are listed here. The format follows [Keep a Chan
 - Claude Code and Codex questions show as option cards; plans say which steps can be undone.
 - Agent card on hover, agent ring next to a busy pill, Pause for an agent, and a card listing background work with Stop.
 
+### Voice
+
+- Live answers (Settings > AI > Voice, off by default): Duskie starts answering when you pause.
+- Spoken choices cannot pick an option that deletes or closes; those need a tap.
+- Instructions found in mail, web pages or files cannot start a change on their own.
+
 ### Git and editor
 
 - Git dock: checkbox staging, commit message writer, amend, History, Pull request and Stashes, side by side with the island (Ctrl G).

@@ -427,6 +427,9 @@ pub struct VoiceSettings {
     pub model: u32,
     /// Words voice gets wrong, comma separated: "horsepot = hotspot".
     pub fixes: String,
+    /// Live: start answering at a pause in speech and show captions in the
+    /// island. Off by default; off is the kill switch.
+    pub live: bool,
 }
 
 /// Settings saved before the v1.0 voice model had no `model` field.
@@ -452,6 +455,7 @@ impl Default for VoiceSettings {
             speed: 1.0,
             model: VOICE_MODEL,
             fixes: String::new(),
+            live: false,
         }
     }
 }

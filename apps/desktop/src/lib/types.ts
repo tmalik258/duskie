@@ -135,6 +135,8 @@ export interface VoiceSettings {
   fixes?: string;
   /** Which voice model the voice was picked for (3 = Supertonic 3). */
   model?: number;
+  /** Start answering at a pause in speech. Off by default. */
+  live?: boolean;
 }
 
 export interface VoiceStatus {
@@ -529,6 +531,7 @@ export const DEFAULT_SETTINGS: Settings = {
     conversation: true,
     speakSuggestions: true,
     interrupt: true,
+    live: false,
     voice: "f4",
     speed: 1,
   },

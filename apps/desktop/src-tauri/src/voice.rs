@@ -791,7 +791,8 @@ fn on_heard(app: &AppHandle, heard: Heard) {
         // A choice ("open", "not now") is taken when it is final.
         Heard::Pause(text) if lock(&v.choosing).is_none() => {
             let text = fixed(app, strip_wake(&text));
-            if duskie_voice::text::looks_like_request(&text) {
+            let live = lock(&app.state::<AppState>().settings).voice.live;
+            if live && duskie_voice::text::looks_like_request(&text) {
                 emit_pause(app, text);
             }
         }

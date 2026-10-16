@@ -805,6 +805,12 @@ function VoiceSection({ voice, onError }: { voice: VoiceSettings; onError: (e: s
         checked={voice.speakSuggestions}
         onChange={(speakSuggestions) => void set({ speakSuggestions })}
       />
+      <Toggle
+        label="Live answers"
+        hint="Start answering when you pause. Changes still need a tap."
+        checked={voice.live ?? false}
+        onChange={(live) => void set({ live })}
+      />
       <Field label="Voice">
         <div className="flex items-center gap-2">
           <Select
