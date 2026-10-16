@@ -528,6 +528,8 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
   ],
   git_stage: () => "Staged",
   git_unstage: () => "Unstaged",
+  git_commit: () => "Committed",
+  git_write_message: () => "Tidy the util helpers",
   git_amend: () => "Amended the last commit",
   git_last_commit_pushed: () => false,
   git_message_diff: () => ({ text: "diff --git a/src/app.ts b/src/app.ts", covered: 1, total: 1 }),
