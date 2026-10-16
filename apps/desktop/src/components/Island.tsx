@@ -87,7 +87,22 @@ export function Island() {
   const voiceStatus = useDuskie((s) => s.voiceStatus);
   const online = useDuskie((s) => s.online);
   const netNotice = useDuskie((s) => s.netNotice);
-  const later = useDuskie((s) => s.later);
+  const laterCount = useDuskie((s) => s.later);
+  // A newly held suggestion shows as a short notice, then the island rests.
+  const storeReady = useDuskie((s) => s.ready);
+  const [laterSeen, setLaterSeen] = useState<number | null>(null);
+  const [laterFresh, setLaterFresh] = useState(false);
+  if (storeReady && laterSeen === null) setLaterSeen(laterCount);
+  else if (laterSeen !== null && laterCount !== laterSeen) {
+    setLaterSeen(laterCount);
+    setLaterFresh(laterCount > laterSeen);
+  }
+  useEffect(() => {
+    if (!laterFresh) return;
+    const t = setTimeout(() => setLaterFresh(false), 8000);
+    return () => clearTimeout(t);
+  }, [laterFresh]);
+  const later = laterFresh ? laterCount : 0;
   // Design: losing the connection only changes the pill; the card opens on a click.
   const [netOpen, setNetOpen] = useState(false);
   if (netOpen && online) setNetOpen(false);
