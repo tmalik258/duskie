@@ -77,6 +77,8 @@ export interface Settings {
   welcomeStep: number;
   checkUpdates: boolean;
   composio: ComposioSettings;
+  /** Apps connected directly over MCP. */
+  directServers: DirectServer[];
   denyApps: string[];
   denySites: string[];
   routines: boolean;
@@ -463,6 +465,7 @@ export const DEFAULT_SETTINGS: Settings = {
   welcomeStep: 0,
   checkUpdates: true,
   composio: { enabled: false, account: "", userId: "", url: "", headers: {} },
+  directServers: [],
   denyApps: ["1password.exe", "bitwarden.exe", "keepass.exe", "keepassxc.exe"],
   denySites: [],
   routines: true,
@@ -849,6 +852,21 @@ export interface NotificationSettings {
 }
 
 export type AttentionProfile = "normal" | "calm";
+
+/** An app connected directly over MCP. */
+export interface DirectServer {
+  id: string;
+  app: string;
+  kind: "stdio" | "url";
+  command: string;
+  args: string[];
+  /** Names only; values are in the keychain. */
+  envNames: string[];
+  url: string;
+  /** The exact command was confirmed by the user. */
+  confirmed: boolean;
+  writesAllowed: string[];
+}
 
 /** Where the Gmail connection stands. Never holds message content. */
 export type MailState = "disconnected" | "connected" | "offline" | "auth_expired";

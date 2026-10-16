@@ -25,6 +25,7 @@ mod diag;
 mod gitdock;
 mod mcp;
 mod notify;
+mod servers;
 mod setup;
 mod voice;
 pub use attention::*;
@@ -35,6 +36,7 @@ pub use diag::*;
 pub use gitdock::*;
 pub use mcp::*;
 pub use notify::*;
+pub use servers::*;
 pub use setup::*;
 pub use voice::*;
 
