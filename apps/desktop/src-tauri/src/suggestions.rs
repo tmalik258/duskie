@@ -604,6 +604,18 @@ fn run_choice(app: &AppHandle, id: &str, index: usize, auto: bool) -> Result<(),
     mascot::dispatch(app, MascotEvent::Picked);
     if active.proposal.skill_id.starts_with("notify.") && option.action != "notify_level" {
         crate::inbox::lesson(format!("Acted on: {}", active.proposal.title));
+        // Acting counts for the app it came from (a human pick, not Auto).
+        if !auto && let Some(from) = option.args["app"].as_str().or(option.args["name"].as_str()) {
+            let mut next = lock(&app.state::<AppState>().settings).clone();
+            if next.redesign.enabled {
+                next.notifications
+                    .lessons
+                    .acted(&format!("app:{from}"), chrono::Utc::now().timestamp());
+                if let Err(err) = crate::commands::apply_settings(app, next) {
+                    log::warn!("could not save what was learned: {err}");
+                }
+            }
+        }
     }
     let follow_up = crate::learn::on_accept(app, &active.proposal, index, auto);
 
@@ -962,8 +974,12 @@ pub fn dismiss(app: &AppHandle, id: &str, reason: &str) -> Result<(), String> {
         "suggestion from {} dismissed: {reason}",
         active.proposal.skill_id
     );
-    crate::learn::on_dismiss(app, &active.proposal.skill_id, reason);
-    if reason == "user" && active.proposal.skill_id.starts_with("notify.") {
+    // With the redesign on, Dismiss is neutral: only acting and Show less teach.
+    let neutral = lock(&app.state::<AppState>().settings).redesign.enabled;
+    if !neutral {
+        crate::learn::on_dismiss(app, &active.proposal.skill_id, reason);
+    }
+    if !neutral && reason == "user" && active.proposal.skill_id.starts_with("notify.") {
         let from = active
             .proposal
             .options
