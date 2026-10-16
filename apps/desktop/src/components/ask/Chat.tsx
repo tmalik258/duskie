@@ -79,6 +79,9 @@ export function Chat({ turns }: { turns: Turn[] }) {
             ) : t.streaming && steps.length === 0 ? (
               <LiveStep step={t.tool ?? null} since={t.startedAt} />
             ) : null}
+            {!t.streaming && t.content && t.sources && t.sources.length > 0 && (
+              <span className="ak-src">via {t.sources.join(" and ")}</span>
+            )}
             {blank(t) && t.provider && (
               <p className="ak-err" role="alert">
                 No answer came back. Ask again, or try another model.

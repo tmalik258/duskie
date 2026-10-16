@@ -18,6 +18,7 @@ mod decide;
 #[cfg(test)]
 mod decisions_test;
 mod detect;
+mod direct;
 mod disk;
 #[cfg(test)]
 mod drift_test;

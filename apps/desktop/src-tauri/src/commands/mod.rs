@@ -25,7 +25,7 @@ mod diag;
 mod gitdock;
 mod mcp;
 mod notify;
-mod servers;
+pub(crate) mod servers;
 mod setup;
 mod voice;
 pub use attention::*;

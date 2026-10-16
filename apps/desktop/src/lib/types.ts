@@ -238,6 +238,8 @@ export interface ChatMessage {
 /** One turn of an Ask conversation, as the island shows it. */
 export interface Turn extends ChatMessage {
   provider?: string | null;
+  /** Where app tools answered from ("direct connection", "Composio"). */
+  sources?: string[];
   error?: string | null;
   streaming?: boolean;
   /** A screenshot went with this question. */
@@ -873,6 +875,14 @@ export interface DirectServer {
   /** The exact command was confirmed by the user. */
   confirmed: boolean;
   writesAllowed: string[];
+}
+
+/** A tool a direct server offers. Writes stay off until allowed. */
+export interface ServerTool {
+  name: string;
+  description: string;
+  writes: boolean;
+  allowed: boolean;
 }
 
 /** Where the Gmail connection stands. Never holds message content. */

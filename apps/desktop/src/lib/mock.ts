@@ -1,7 +1,7 @@
 // Browser-only stand-in for the Rust core, used when the UI runs outside
 // Tauri. It mimics the app loosely; the real rules live in Rust.
 
-import type { MailStatus } from "./types";
+import type { DirectServer, MailStatus } from "./types";
 import {
   type ActivitySnapshot,
   type CloudId,
@@ -113,6 +113,11 @@ const CUE_BY_STATE: Partial<Record<MascotState, Cue>> = {
   success: "ding",
   error: "boop",
 };
+
+function setServers(directServers: Settings["directServers"]) {
+  settings = { ...settings, directServers };
+  emit("settings://changed", settings);
+}
 
 function emit(event: string, payload: unknown) {
   for (const h of handlers.get(event) ?? []) h(payload);
@@ -548,6 +553,50 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     return "Dropped the stash";
   },
   island_width: () => undefined,
+  servers_save: (a) => {
+    const given = a.server as DirectServer;
+    const server: DirectServer = {
+      ...given,
+      id: given.id || `srv${Date.now()}`,
+      confirmed: false,
+      writesAllowed: [],
+      envNames: Object.keys((a.env as Record<string, string>) ?? {}),
+    };
+    setServers([...settings.directServers.filter((s) => s.id !== server.id), server]);
+    return server.id;
+  },
+  servers_command: (a) => {
+    const s = settings.directServers.find((x) => x.id === a.id);
+    if (!s) throw new Error("That server is gone.");
+    return s.kind === "stdio" ? [s.command, ...s.args].join(" ") : s.url;
+  },
+  servers_confirm: (a) =>
+    setServers(settings.directServers.map((s) => (s.id === a.id ? { ...s, confirmed: true } : s))),
+  servers_test: (a) => {
+    const s = settings.directServers.find((x) => x.id === a.id);
+    if (!s?.confirmed) throw new Error("Confirm the command first.");
+    return [
+      { name: "list_issues", description: "List issues in a repo", writes: false, allowed: false },
+      {
+        name: "create_issue",
+        description: "Open a new issue",
+        writes: true,
+        allowed: s.writesAllowed.includes("create_issue"),
+      },
+    ];
+  },
+  servers_allow_write: (a) =>
+    setServers(
+      settings.directServers.map((s) =>
+        s.id === a.id
+          ? {
+              ...s,
+              writesAllowed: [...s.writesAllowed.filter((t) => t !== a.tool), ...(a.allow ? [String(a.tool)] : [])],
+            }
+          : s,
+      ),
+    ),
+  servers_remove: (a) => setServers(settings.directServers.filter((s) => s.id !== a.id)),
   git_message_diff: () => ({ text: "diff --git a/src/app.ts b/src/app.ts", covered: 1, total: 1 }),
   mail_status: () => mailStatus,
   mail_connect: () => {

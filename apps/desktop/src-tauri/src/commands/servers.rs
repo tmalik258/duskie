@@ -12,13 +12,13 @@ use super::*;
 
 const MAX_SERVERS: usize = 12;
 
-fn secret_name(id: &str, var: &str) -> String {
+pub(crate) fn secret_name(id: &str, var: &str) -> String {
     format!("mcp.{id}.{var}")
 }
 
 /// The program, arguments and variables to start a server with. Values come
 /// from the keychain through `lookup`.
-fn spec_of(s: &DirectServer, lookup: impl Fn(&str) -> Option<String>) -> Spec {
+pub(crate) fn spec_of(s: &DirectServer, lookup: impl Fn(&str) -> Option<String>) -> Spec {
     Spec {
         command: s.command.clone(),
         args: s.args.clone(),

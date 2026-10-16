@@ -26,6 +26,7 @@ import type {
   CommitRow,
   ComposioStatus,
   CursorChat,
+  DirectServer,
   EditorList,
   ExtensionGuide,
   FileChange,
@@ -48,6 +49,7 @@ import type {
   ReposOverview,
   RoutineItem,
   SearchHit,
+  ServerTool,
   Settings,
   SetupPlan,
   SetupStatus,
@@ -81,6 +83,7 @@ export const EVENTS = {
   aiDelta: "ai://delta",
   aiDone: "ai://done",
   aiTool: "ai://tool",
+  connectorsDuplicate: "connectors://duplicate",
   aiProposal: "ai://proposal",
   askOpen: "ask://open",
   askClose: "ask://close",
@@ -129,7 +132,8 @@ export interface EventPayloads {
     /** US dollars, only for Anthropic API answers. */
     cost?: number | null;
   };
-  [EVENTS.aiTool]: { id: string; name: string; label?: string };
+  [EVENTS.aiTool]: { id: string; name: string; label?: string; source?: string | null };
+  [EVENTS.connectorsDuplicate]: { app: string; used: string; unused: string[] };
   [EVENTS.aiProposal]: { chatId: string; id: string; label: string; step?: boolean; undoable?: boolean };
   [EVENTS.askOpen]: AskOpen;
   [EVENTS.askClose]: { reason: "close" | "defer"; panelGen?: number };
@@ -381,6 +385,13 @@ export const api = {
   gitStashDrop: (path: string, name: string) => invoke<string>("git_stash_drop", { path, name }),
   /** Widens the island window for a dock beside it; 0 puts it back. */
   islandWidth: (width: number) => invoke<void>("island_width", { width }),
+  serversSave: (server: DirectServer, env: Record<string, string>) => invoke<string>("servers_save", { server, env }),
+  serversCommand: (id: string) => invoke<string>("servers_command", { id }),
+  serversConfirm: (id: string, shown: string) => invoke<void>("servers_confirm", { id, shown }),
+  serversTest: (id: string) => invoke<ServerTool[]>("servers_test", { id }),
+  serversAllowWrite: (id: string, tool: string, allow: boolean) =>
+    invoke<void>("servers_allow_write", { id, tool, allow }),
+  serversRemove: (id: string) => invoke<void>("servers_remove", { id }),
   gitMessageDiff: (path: string) => invoke<MessageDiff>("git_message_diff", { path }),
   mailStatus: () => invoke<MailStatus>("mail_status"),
   mailConnect: () => invoke<MailStatus>("mail_connect"),

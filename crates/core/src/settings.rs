@@ -849,6 +849,25 @@ impl Settings {
         if self.onboarded && self.codes.is_none() {
             self.codes = Some(true);
         }
+        // The older direct MCP list moves into the servers list, unconfirmed,
+        // so nothing it names runs before the user looked at it again.
+        for old in std::mem::take(&mut self.direct_mcp.servers) {
+            if self
+                .direct_servers
+                .iter()
+                .any(|s| s.command == old.command && s.args == old.args)
+            {
+                continue;
+            }
+            self.direct_servers.push(DirectServer {
+                id: old.id,
+                app: old.name.trim().to_lowercase(),
+                kind: "stdio".into(),
+                command: old.command,
+                args: old.args,
+                ..DirectServer::default()
+            });
+        }
         self.master_volume = self.master_volume.clamp(0.0, 1.0);
         for v in self.cue_volumes.values_mut() {
             *v = v.clamp(0.0, 1.0);
@@ -1149,6 +1168,27 @@ mod tests {
         assert_eq!(s.island_color, "atelier");
         assert_eq!(Settings::default().island_color, "atelier");
         assert_eq!(Settings::default().theme, "atelier");
+    }
+
+    #[test]
+    fn old_direct_mcp_moves_to_servers_unconfirmed() {
+        let mut s = Settings::default();
+        s.direct_mcp.servers.push(DirectMcpServer {
+            id: "a".into(),
+            name: "GitHub".into(),
+            command: "npx".into(),
+            args: vec!["-y".into(), "gh-mcp".into()],
+        });
+        let s = s.sanitized();
+        assert!(s.direct_mcp.servers.is_empty());
+        assert_eq!(s.direct_servers.len(), 1);
+        let d = &s.direct_servers[0];
+        assert_eq!(
+            (d.app.as_str(), d.kind.as_str(), d.confirmed),
+            ("github", "stdio", false)
+        );
+        // Sanitizing again does not add it twice.
+        assert_eq!(s.sanitized().direct_servers.len(), 1);
     }
 
     #[test]

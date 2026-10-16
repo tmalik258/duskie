@@ -707,7 +707,7 @@ function chatRequest(q: string, attach?: ChatAttach) {
 interface EarlyChat {
   id: string;
   q: string;
-  tools: { name: string; label?: string }[];
+  tools: { name: string; label?: string; source?: string | null }[];
   proposals: { id: string; label: string; step?: boolean; undoable?: boolean }[];
 }
 let early: EarlyChat | null = null;
@@ -766,6 +766,7 @@ export function sendChat(prompt: string, attach?: ChatAttach): boolean {
         startedAt: Date.now(),
         offline: !useDuskie.getState().online,
         steps: adopted?.tools.map((t) => t.label || toolStatus(t.name).replace(/\.\.\.$/, "")),
+        sources: [...new Set(adopted?.tools.flatMap((t) => (t.source ? [t.source] : [])))],
         proposals: adopted?.proposals,
       },
     ],
@@ -1244,9 +1245,12 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
           if (!useDuskie.getState().ask) void api.askOpen();
         }
       }),
-      listen(EVENTS.aiTool, ({ id, name, label }) => {
+      listen(EVENTS.connectorsDuplicate, ({ app, used, unused }) =>
+        showDone(`${app} is connected through ${[used, ...unused].join(" and ")}. Using the ${used}.`),
+      ),
+      listen(EVENTS.aiTool, ({ id, name, label, source }) => {
         if (early?.id === id) {
-          early.tools.push({ name, label });
+          early.tools.push({ name, label, source });
           return;
         }
         flushText();
@@ -1255,7 +1259,12 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
         updateLastTurn(id, (t) => (t.content && t.content.length < 240 ? { ...t, content: "" } : t));
         // Steps read as what they do ("Searching the web for ..."), in words.
         const step = label || toolStatus(name).replace(/\.\.\.$/, "");
-        updateLastTurn(id, (t) => ({ ...t, tool: step, steps: [...(t.steps ?? []), step] }));
+        updateLastTurn(id, (t) => ({
+          ...t,
+          tool: step,
+          steps: [...(t.steps ?? []), step],
+          sources: source && !t.sources?.includes(source) ? [...(t.sources ?? []), source] : t.sources,
+        }));
       }),
       listen(EVENTS.aiProposal, ({ chatId, id, label, step, undoable }) => {
         if (early?.id === chatId) {

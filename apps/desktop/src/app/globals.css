@@ -4763,3 +4763,13 @@ button.ak-cchip:hover,
   padding: 16px 2px;
   color: var(--ink-3);
 }
+
+/* Where an answer's app data came from. */
+.ak-src {
+  justify-self: start;
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 6px;
+  color: var(--ink-2);
+  background: rgb(255 255 255 / 0.06);
+}
