@@ -636,28 +636,142 @@ export function Island() {
       animate={shown ? { opacity: 1, scale: 1, filter: "blur(0px)" } : { opacity: 0, scale: 0.92, filter: "blur(4px)" }}
       transition={reduced ? { duration: 0 } : { duration: shown ? 0.32 : 0.2, ease: [0.23, 1, 0.32, 1] }}
     >
-      <motion.div
-        className="island-shell relative overflow-hidden text-white"
-        data-bare={bare}
-        data-color={settings.islandColor}
-        data-solid={look.solid || undefined}
-        data-simple={look.simple || undefined}
-        initial={false}
-        animate={{ width, height, borderRadius: radius }}
-        transition={transition}
-        style={{ scaleX: bump, originY: 0 }}
-        // Focusing the input while the shell is still small would scroll its
-        // content up; the shell never scrolls.
-        onScroll={(e) => {
-          e.currentTarget.scrollTop = 0;
-        }}
-        onPointerEnter={() => setHovered(true)}
-        onPointerLeave={() => setHovered(false)}
-      >
-        <IslandWash simple={look.simple} mascot={mascot} donePill={donePill} />
-        <Announcer />
+      <div className="relative">
         <motion.div
-          className="absolute top-0 left-0 z-1"
+          className="island-shell relative overflow-hidden text-white"
+          data-bare={bare}
+          data-color={settings.islandColor}
+          data-solid={look.solid || undefined}
+          data-simple={look.simple || undefined}
+          initial={false}
+          animate={{ width, height, borderRadius: radius }}
+          transition={transition}
+          style={{ scaleX: bump, originY: 0 }}
+          // Focusing the input while the shell is still small would scroll its
+          // content up; the shell never scrolls.
+          onScroll={(e) => {
+            e.currentTarget.scrollTop = 0;
+          }}
+          onPointerEnter={() => setHovered(true)}
+          onPointerLeave={() => setHovered(false)}
+        >
+          <IslandWash simple={look.simple} mascot={mascot} donePill={donePill} />
+          <Announcer />
+
+          <AnimatePresence initial={false}>
+            {!expanded && voicePill && (
+              <VoicePill
+                key="voice"
+                {...voicePill}
+                activity={displayedActivity}
+                onOpen={agentsOnly ? () => openBoard() : undefined}
+                onCancel={
+                  agentsOnly
+                    ? () => {
+                        for (const s of useAgents.getState().sessions) {
+                          if (s.status === "working" || s.status === "waiting") interruptSession(s.id);
+                        }
+                      }
+                    : undefined
+                }
+              />
+            )}
+            {!expanded && !bare && !voicePill && (
+              <CompactTrailing
+                key="compact"
+                busy={busy}
+                paused={paused}
+                offline={!online}
+                waiting={waiting?.label ?? null}
+              />
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence initial={false} mode="popLayout">
+            {/* Exclusive branches only (as on main): keeping Ask mounted while closed
+              stacked with Expanded and stuck the island after rapid open/close. */}
+            {asking ? (
+              <motion.div
+                key="ask"
+                ref={contentRef}
+                className="absolute top-0 right-0"
+                style={
+                  askPanel
+                    ? { left: ASK_PAD.x, paddingTop: ASK_PAD.top, paddingRight: ASK_PAD.x }
+                    : { left: EXPANDED.pad, paddingTop: EXPANDED.pad, paddingRight: EXPANDED.pad }
+                }
+                initial={
+                  reduced
+                    ? { opacity: 0 }
+                    : askPanel && askTab === "agents"
+                      ? { opacity: 0, filter: "blur(8px)", y: 10, scale: 0.985 }
+                      : { opacity: 0, y: 4 }
+                }
+                animate={{ opacity: 1, filter: "blur(0px)", y: 0, scale: 1 }}
+                exit={{
+                  opacity: 0,
+                  filter: reduced ? undefined : "blur(4px)",
+                  y: reduced ? 0 : -3,
+                  transition: { duration: 0.1 },
+                }}
+                transition={
+                  reduced
+                    ? { duration: 0 }
+                    : askPanel && askTab === "agents"
+                      ? { duration: 0.34, delay: 0.05, ease: [0.23, 1, 0.32, 1] }
+                      : { duration: 0.18, ease: [0.23, 1, 0.32, 1] }
+                }
+              >
+                {view === "settings" ? <IslandSettings /> : view === "welcome" ? <IslandWelcome /> : <AskPanel />}
+              </motion.div>
+            ) : preparingVoice ? (
+              <motion.div
+                key="preparing"
+                ref={contentRef}
+                className="absolute top-0 right-0"
+                style={{ left: EXPANDED.pad + ORB + 14, paddingTop: EXPANDED.pad, paddingRight: EXPANDED.pad }}
+                initial={reduced ? { opacity: 0 } : { opacity: 0, filter: "blur(6px)", y: 4 }}
+                animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+                exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.1 } }}
+                transition={{ duration: 0.28, delay: 0.06, ease: [0.23, 1, 0.32, 1] }}
+              >
+                <PreparingVoice voiceStatus={voiceStatus} />
+              </motion.div>
+            ) : (
+              expanded && (
+                <motion.div
+                  key="expanded"
+                  ref={contentRef}
+                  className="absolute top-0 right-0"
+                  style={
+                    {
+                      left: EXPANDED.pad + ORB + 14,
+                      paddingTop: EXPANDED.pad,
+                      paddingRight: EXPANDED.pad,
+                      // Lists below the orb (You missed) reach back under it.
+                      "--orb-indent": `${ORB + 14}px`,
+                    } as CSSProperties
+                  }
+                  initial={reduced ? { opacity: 0 } : { opacity: 0, filter: "blur(6px)", y: 4 }}
+                  animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+                  exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.1 } }}
+                  transition={{ duration: 0.28, delay: 0.06, ease: [0.23, 1, 0.32, 1] }}
+                >
+                  {fullVoice && voicePill ? (
+                    <FullVoice text={voicePill.text} thinking={voicePill.thinking} />
+                  ) : showGuide && waiting ? (
+                    <IslandGuide waiting={waiting} guide={guide} />
+                  ) : (
+                    <ExpandedContent mascot={mascot} paused={paused} suggestion={suggestion} />
+                  )}
+                </motion.div>
+              )
+            )}
+          </AnimatePresence>
+        </motion.div>
+        {/* Outside the shell, so its clipping never cuts Duskie's arms or hops. */}
+        <motion.div
+          className="pointer-events-none absolute top-0 left-0 z-2"
           initial={false}
           animate={{ x: orbX, y: orbY, scale: orbScale }}
           transition={transition}
@@ -673,118 +787,7 @@ export function Island() {
             active={shown && !bare}
           />
         </motion.div>
-
-        <AnimatePresence initial={false}>
-          {!expanded && voicePill && (
-            <VoicePill
-              key="voice"
-              {...voicePill}
-              activity={displayedActivity}
-              onOpen={agentsOnly ? () => openBoard() : undefined}
-              onCancel={
-                agentsOnly
-                  ? () => {
-                      for (const s of useAgents.getState().sessions) {
-                        if (s.status === "working" || s.status === "waiting") interruptSession(s.id);
-                      }
-                    }
-                  : undefined
-              }
-            />
-          )}
-          {!expanded && !bare && !voicePill && (
-            <CompactTrailing
-              key="compact"
-              busy={busy}
-              paused={paused}
-              offline={!online}
-              waiting={waiting?.label ?? null}
-            />
-          )}
-        </AnimatePresence>
-
-        <AnimatePresence initial={false} mode="popLayout">
-          {/* Exclusive branches only (as on main): keeping Ask mounted while closed
-              stacked with Expanded and stuck the island after rapid open/close. */}
-          {asking ? (
-            <motion.div
-              key="ask"
-              ref={contentRef}
-              className="absolute top-0 right-0"
-              style={
-                askPanel
-                  ? { left: ASK_PAD.x, paddingTop: ASK_PAD.top, paddingRight: ASK_PAD.x }
-                  : { left: EXPANDED.pad, paddingTop: EXPANDED.pad, paddingRight: EXPANDED.pad }
-              }
-              initial={
-                reduced
-                  ? { opacity: 0 }
-                  : askPanel && askTab === "agents"
-                    ? { opacity: 0, filter: "blur(8px)", y: 10, scale: 0.985 }
-                    : { opacity: 0, y: 4 }
-              }
-              animate={{ opacity: 1, filter: "blur(0px)", y: 0, scale: 1 }}
-              exit={{
-                opacity: 0,
-                filter: reduced ? undefined : "blur(4px)",
-                y: reduced ? 0 : -3,
-                transition: { duration: 0.1 },
-              }}
-              transition={
-                reduced
-                  ? { duration: 0 }
-                  : askPanel && askTab === "agents"
-                    ? { duration: 0.34, delay: 0.05, ease: [0.23, 1, 0.32, 1] }
-                    : { duration: 0.18, ease: [0.23, 1, 0.32, 1] }
-              }
-            >
-              {view === "settings" ? <IslandSettings /> : view === "welcome" ? <IslandWelcome /> : <AskPanel />}
-            </motion.div>
-          ) : preparingVoice ? (
-            <motion.div
-              key="preparing"
-              ref={contentRef}
-              className="absolute top-0 right-0"
-              style={{ left: EXPANDED.pad + ORB + 14, paddingTop: EXPANDED.pad, paddingRight: EXPANDED.pad }}
-              initial={reduced ? { opacity: 0 } : { opacity: 0, filter: "blur(6px)", y: 4 }}
-              animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
-              exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.1 } }}
-              transition={{ duration: 0.28, delay: 0.06, ease: [0.23, 1, 0.32, 1] }}
-            >
-              <PreparingVoice voiceStatus={voiceStatus} />
-            </motion.div>
-          ) : (
-            expanded && (
-              <motion.div
-                key="expanded"
-                ref={contentRef}
-                className="absolute top-0 right-0"
-                style={
-                  {
-                    left: EXPANDED.pad + ORB + 14,
-                    paddingTop: EXPANDED.pad,
-                    paddingRight: EXPANDED.pad,
-                    // Lists below the orb (You missed) reach back under it.
-                    "--orb-indent": `${ORB + 14}px`,
-                  } as CSSProperties
-                }
-                initial={reduced ? { opacity: 0 } : { opacity: 0, filter: "blur(6px)", y: 4 }}
-                animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
-                exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.1 } }}
-                transition={{ duration: 0.28, delay: 0.06, ease: [0.23, 1, 0.32, 1] }}
-              >
-                {fullVoice && voicePill ? (
-                  <FullVoice text={voicePill.text} thinking={voicePill.thinking} />
-                ) : showGuide && waiting ? (
-                  <IslandGuide waiting={waiting} guide={guide} />
-                ) : (
-                  <ExpandedContent mascot={mascot} paused={paused} suggestion={suggestion} />
-                )}
-              </motion.div>
-            )
-          )}
-        </AnimatePresence>
-      </motion.div>
+      </div>
     </motion.div>
   );
 }

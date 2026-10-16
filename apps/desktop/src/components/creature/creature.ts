@@ -917,6 +917,8 @@ function boot() {
       this.follow = o.follow ?? true;
       this.interactive = !!o.interactive;
       this.bust = o.bust ?? this.size < 40;
+      // The canvas reaches past the box so raised arms and hops are never cut.
+      this.bleed = this.bust ? 1 : (o.bleed ?? 1.3);
       this.shadow = o.shadow ?? null;
       const el = document.createElement("div");
       el.className = "mz";
@@ -936,6 +938,7 @@ function boot() {
       this.eyeKey = "";
       const c = el.querySelector("canvas");
       this.canvas = c;
+      if (this.bleed > 1) c.style.inset = `${(-(this.bleed - 1) / 2) * 100}%`;
       this.ctx = c.getContext("2d");
       // Below 40 px only the upper body shows; it fades out at the bottom.
       if (this.bust) c.style.maskImage = c.style.webkitMaskImage = "linear-gradient(180deg, #000 66%, transparent 97%)";
@@ -973,8 +976,9 @@ function boot() {
     /** Renders sharper when the view is zoomed. */
     setScale(k) {
       const ss = this.size <= 44 ? 3 : this.size <= 130 ? 2.4 : 1.2;
-      this.canvas.width = this.canvas.height = Math.round(this.size * dpr * k);
-      this.res = Math.min(700, Math.round(this.size * dpr * k * (k > 1 ? Math.max(1.5, (ss / k) * 1.2) : ss)));
+      const px = this.size * this.bleed * dpr * k;
+      this.canvas.width = this.canvas.height = Math.round(px);
+      this.res = Math.min(700, Math.round(px * (k > 1 ? Math.max(1.5, (ss / k) * 1.2) : ss)));
       this.dirty = true;
     }
     later(ms, fn) {
@@ -1321,7 +1325,7 @@ function boot() {
         uLid: Math.max(0.05, lid),
         uMouth: [mouth[0], mouth[1], mh, ma],
         uBlush: Math.max(0, s.blush.value),
-        uZoom: this.bust ? 0.78 : 1.06,
+        uZoom: (this.bust ? 0.78 : 1.06) * this.bleed,
         uCamY: this.bust ? 0.24 : 0.02,
         uWig: 1,
         uWigCol: lin("#1c1714"),
