@@ -6,6 +6,33 @@
   --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
+/* Shared tokens: the Atelier palette and everything derived from it. New
+   island UI uses these instead of raw colors. */
+:root {
+  --c1: #0a0a0a;
+  --c2: #f2f0eb;
+  --c3: #7a8f7e;
+  --c4: #95a89a;
+  --ink-2: rgb(242 240 235 / 0.66);
+  --ink-3: rgb(242 240 235 / 0.5);
+  --ink-4: rgb(242 240 235 / 0.3);
+  --line: rgb(149 168 154 / 0.15);
+  --line-2: rgb(149 168 154 / 0.28);
+  --fill: rgb(242 240 235 / 0.045);
+  --fill-2: rgb(242 240 235 / 0.08);
+  --fill-3: rgb(242 240 235 / 0.13);
+  --sage-ink: #b9c9bb;
+  --ok: #9cc79a;
+  --warn: #d9a55b;
+  --err: #de8676;
+  --listen: #a8c0cc;
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-lg: 18px;
+  --ease-io: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
 /* Colors the orb transitions between. Registered so gradients can animate. */
 @property --o1 {
   syntax: "<color>";
