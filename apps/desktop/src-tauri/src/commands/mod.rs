@@ -21,7 +21,7 @@ mod attention;
 mod chat;
 mod cloud;
 mod data;
-mod diag;
+pub mod diag;
 mod editor;
 mod gitdock;
 mod library;

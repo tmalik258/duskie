@@ -35,6 +35,7 @@ mod freeze;
 mod git_watch;
 mod github;
 mod health;
+mod help;
 mod imap;
 mod inbox;
 mod instant;

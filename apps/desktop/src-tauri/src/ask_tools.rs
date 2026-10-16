@@ -41,6 +41,7 @@ const OFFICE: &str = "office";
 const RECIPES: &str = "recipes";
 const REMEMBER: &str = "remember";
 const USE_SKILL: &str = "use_skill";
+const HELP: &str = "duskie_help";
 
 /// The Ask chat answering right now, so tools called through Duskie's
 /// MCP server (by Claude Code or Codex) put their buttons in it.
@@ -474,6 +475,18 @@ pub fn defs() -> Vec<ToolDef> {
             parameters: json!({ "type": "object", "properties": {} }),
         },
         ToolDef {
+            name: HELP.into(),
+            description: "Help with Duskie itself: where a setting is, how a feature works, or \
+                why Duskie is not working (crashes, errors, slow). Answer with where in the app \
+                to go, for example Settings > Appearance."
+                .into(),
+            parameters: json!({
+                "type": "object",
+                "properties": { "topic": { "type": "string", "description": "What they asked about" } },
+                "required": ["topic"]
+            }),
+        },
+        ToolDef {
             name: DOCTOR.into(),
             description: "Why an app crashes, freezes or will not start: reads the last 14 days \
                 of crash records, names the likely cause and the fix Duskie can run. Offer \
@@ -622,6 +635,7 @@ pub fn step_label(name: &str, args: &Value) -> String {
         NOTIFS => "Checking your notifications".into(),
         PC_STATUS => "Checking your PC".into(),
         STORAGE => "Measuring what takes space".into(),
+        HELP => "Looking it up in Duskie's help".into(),
         DOCTOR => "Reading crash records".into(),
         GIT => "Reading the project's git".into(),
         USE_SKILL => quoted("Reading the skill", arg("name")),
@@ -729,6 +743,7 @@ pub fn reads_only(name: &str) -> bool {
             | SCREEN
             | PC_STATUS
             | STORAGE
+            | HELP
             | DOCTOR
             | GIT
             | GITHUB
@@ -753,6 +768,7 @@ pub fn is_own(name: &str) -> bool {
             | REVEAL
             | PC_STATUS
             | STORAGE
+            | HELP
             | DOCTOR
             | GIT
             | GITHUB
@@ -995,6 +1011,19 @@ async fn run_tool(app: &AppHandle, chat_id: &str, name: &str, args: &Value) -> O
             .await
             .unwrap_or_else(|e| format!("Error: {e}")),
         PC_STATUS => blocking(|| Ok(pc::describe(&pc::read_state()))).await,
+        HELP => {
+            let topic = args["topic"].as_str().unwrap_or_default();
+            let mut out = crate::help::guide(topic);
+            if crate::help::is_problem(topic) {
+                out.push_str("\n\nHealth and recent problems:\n");
+                out.push_str(&crate::commands::diag::diagnostics(app.clone()).await);
+                out.push_str(
+                    "\n\nName the likely cause in one line and offer a fix or a restart. \
+                     More help: docs/debugging.md.",
+                );
+            }
+            out
+        }
         STORAGE => tokio::task::spawn_blocking(crate::disk::report)
             .await
             .unwrap_or_else(|e| format!("Error: {e}")),
@@ -1951,8 +1980,8 @@ mod tests {
             .filter(|n| !is_web(n))
             .collect();
         let mut expected = vec![
-            SEARCH, TODAY, RECENT, OPEN, SCREEN, PROPOSE, FIND, REVEAL, PC_STATUS, STORAGE, DOCTOR,
-            GIT, PC, WINDOWS, NOTIFS, DESKTOP, OFFICE, RECIPES, REMEMBER, USE_SKILL,
+            SEARCH, TODAY, RECENT, OPEN, SCREEN, PROPOSE, FIND, REVEAL, PC_STATUS, STORAGE, HELP,
+            DOCTOR, GIT, PC, WINDOWS, NOTIFS, DESKTOP, OFFICE, RECIPES, REMEMBER, USE_SKILL,
         ];
         let mut got: Vec<&str> = offline.iter().map(String::as_str).collect();
         expected.sort_unstable();
@@ -2072,7 +2101,7 @@ mod tests {
             [
                 USE_SKILL, SEARCH, FIND, REVEAL, TODAY, RECENT, SCREEN, PROPOSE, WEB_SEARCH,
                 READ_PAGE, BROWSER, APP_ACTION, DESKTOP, APPS, OFFICE, RECIPES, REMEMBER, NOTIFS,
-                PC_STATUS, STORAGE, DOCTOR, GIT, GITHUB, PC, WINDOWS, OPEN
+                PC_STATUS, STORAGE, HELP, DOCTOR, GIT, GITHUB, PC, WINDOWS, OPEN
             ]
         );
     }

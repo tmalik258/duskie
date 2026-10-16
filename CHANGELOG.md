@@ -25,7 +25,9 @@ All notable changes to Sidekick are listed here. The format follows [Keep a Chan
 
 ### Voice
 
-- Live answers (Settings > AI > Voice, off by default): Duskie starts answering when you pause.
+- Live answers (Settings > AI > Voice, off by default): Duskie starts answering when you pause, and the answer shows as a caption in the island with the step it is on and a Stop button. Ask stays closed. Live conversations stay in Ask history as text unless you turn that off.
+- Ask can uninstall an app: you pick it on screen, and the app's own uninstaller opens. Nothing is removed silently.
+- Ask knows its way around Duskie: it says where a setting is, and for crashes or errors it reads the health report and suggests a fix.
 - Spoken choices cannot pick an option that deletes or closes; those need a tap.
 - Instructions found in mail, web pages or files cannot start a change on their own.
 - A local audit log keeps which tool ran and how it ended, never what it read or wrote.
