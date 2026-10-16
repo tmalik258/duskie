@@ -20,7 +20,8 @@ export type PillKind =
   | "offline"
   | "noticing"
   | "waiting"
-  | "suggest";
+  | "suggest"
+  | "notify";
 
 export interface PillModel {
   kind: PillKind;
@@ -102,7 +103,7 @@ export function RedesignPill({ model, onWidth }: { model: PillModel; onWidth: (w
       </button>
     );
   else if (kind === "waiting") trail = <span className="badge tnum">{model.count ?? 1}</span>;
-  else if (kind === "suggest" && model.chip)
+  else if ((kind === "suggest" || kind === "notify") && model.chip)
     trail = (
       <button
         type="button"
@@ -146,7 +147,7 @@ export function RedesignPill({ model, onWidth }: { model: PillModel; onWidth: (w
           </span>
         )}
         {kind === "suggest" && <span className="dot" style={{ background: "#95a89a" }} />}
-        <span className={`cmp-label${kind === "suggest" ? " nt" : ""}${kind === "listening" ? " words" : ""}`}>
+        <span className={`cmp-label${kind === "suggest" || kind === "notify" ? " nt" : ""}${kind === "listening" ? " words" : ""}`}>
           {model.label}
           {model.dim && <span className="dim"> {model.dim}</span>}
         </span>

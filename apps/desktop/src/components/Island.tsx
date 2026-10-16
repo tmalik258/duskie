@@ -19,12 +19,13 @@ import {
 } from "@/lib/activities";
 import { interruptSession, listenToAgents, useAgents, wideScreen } from "@/lib/agents";
 import { api } from "@/lib/bridge";
+import { useCached } from "@/lib/cache";
 import { useNow, useSystemLook } from "@/lib/hooks";
 import { PILL_FRESH_MS } from "@/lib/peek";
 import { REDESIGN_HOVER_IN_MS, REDESIGN_HOVER_OUT_MS } from "@/lib/redesign-layout";
 import { resolveIslandState } from "@/lib/resolve-island-state";
 import { connect, setHovered, useDuskie, watchWaiting } from "@/lib/store";
-import { isPaused, type MascotState, type Settings, type Suggestion } from "@/lib/types";
+import { type CalendarToday, isPaused, type MascotState, type Settings, type Suggestion } from "@/lib/types";
 import { updateBusy, updateLabel } from "@/lib/updates";
 import { useRedesign } from "@/lib/use-redesign";
 import { PALETTES, type WashEvent } from "@/lib/wash";
@@ -193,6 +194,8 @@ export function Island() {
   }, [mascot, chatWorking, agentWorking, activityState]);
   const agentAsks = useAgents((s) => s.sessions.some((x) => x.status === "waiting"));
   const askingTitle = useAgents((s) => s.sessions.find((x) => x.status === "waiting")?.title ?? null);
+  const { data: calendarToday } = useCached<CalendarToday>("calendar-today", api.calendarToday);
+  const meetingSoon = soonMeeting(updateNow, calendarToday);
   const askingCount = useAgents((s) => s.sessions.filter((x) => x.status === "waiting").length);
   const working = asking
     ? null
@@ -292,7 +295,7 @@ export function Island() {
   // Redesign: a suggestion shows as a compact line first (the peek replaces the
   // fresh-message pill); hover 220ms or holding Alt opens the card, leaving
   // folds it back after 450ms, and a click inside keeps it open.
-  const notifyFresh = false && notifyAt !== null;
+  const notifyFresh = (redesign && meetingSoon !== null && !paused) || (false && notifyAt !== null);
   const [peek, setPeek] = useState(false);
   const [pinned, setPinned] = useState(false);
   const [altHeld, setAltHeld] = useState(false);
@@ -647,18 +650,26 @@ export function Island() {
                         dim: focusUntil ? `until ${clockTime(focusUntil)}` : undefined,
                         left: focusLeft,
                       }
-                    : paused
-                      ? { kind: "paused", label: "Paused", dim: pauseDim(settings.pause) }
-                      : !online
-                        ? {
-                            kind: "offline",
-                            label: "Offline",
-                            dim: "catching up when back",
-                            onOpen: () => setNetOpen(true),
-                          }
-                        : mascot === "noticing"
-                          ? { kind: "noticing", label: "Taking a look" }
-                          : null
+                    : meetingSoon && !paused
+                      ? {
+                          kind: "notify",
+                          label: meetingSoon.title,
+                          dim: meetingSoon.mins < 1 ? "starting now" : `starts in ${meetingSoon.mins} minutes`,
+                          chip: meetingSoon.join ? "Join the call" : undefined,
+                          onChip: () => meetingSoon.join && void api.openReference("page", meetingSoon.join),
+                        }
+                      : paused
+                        ? { kind: "paused", label: "Paused", dim: pauseDim(settings.pause) }
+                        : !online
+                          ? {
+                              kind: "offline",
+                              label: "Offline",
+                              dim: "catching up when back",
+                              onOpen: () => setNetOpen(true),
+                            }
+                          : mascot === "noticing"
+                            ? { kind: "noticing", label: "Taking a look" }
+                            : null
       : null;
   const [pillMeasured, setPillMeasured] = useState(0);
 
@@ -1034,4 +1045,16 @@ const APPS = [
 function sourceApp(s: { skillId: string; detail: string }): string | null {
   const hay = `${s.skillId} ${s.detail}`.toLowerCase();
   return APPS.find((a) => hay.includes(a.toLowerCase())) ?? null;
+}
+
+/** A meeting starting within ten minutes (or just started), for the notify pill. */
+function soonMeeting(now: number, cal: CalendarToday | null | undefined) {
+  for (const m of cal?.meetings ?? []) {
+    const [h, mm] = m.start.split(":").map(Number);
+    const d = new Date(now);
+    d.setHours(h ?? 0, mm ?? 0, 0, 0);
+    const mins = Math.round((d.getTime() - now) / 60_000);
+    if (mins >= -2 && mins <= 10) return { title: m.title, mins: Math.max(0, mins), join: m.joinUrl };
+  }
+  return null;
 }

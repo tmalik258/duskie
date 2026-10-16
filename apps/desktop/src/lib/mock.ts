@@ -1282,13 +1282,25 @@ commands.file_open = (a) => {
 };
 commands.project_launch = () => "Opened sidekick in VS Code and a terminal";
 commands.search_status = () => ({ items: 1240, embedded: 1240, embedError: null });
+const soon = () => {
+  const d = new Date(Date.now() + 5 * 60_000);
+  const hm = (x: Date) => `${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`;
+  return {
+    title: "Design review",
+    start: hm(d),
+    end: hm(new Date(d.getTime() + 45 * 60_000)),
+    joinUrl: "https://meet.google.com/abc-defg-hij",
+  };
+};
 commands.calendar_today = () => ({
-  meetings: connected.has("googlecalendar")
-    ? [
-        { title: "Standup", start: "10:00", end: "10:15", joinUrl: "https://meet.google.com/abc-defg-hij" },
-        { title: "Design review", start: "15:00", end: "15:45", joinUrl: null },
-      ]
-    : [],
+  meetings: previewFlag("meeting")
+    ? [soon()]
+    : connected.has("googlecalendar")
+      ? [
+          { title: "Standup", start: "10:00", end: "10:15", joinUrl: "https://meet.google.com/abc-defg-hij" },
+          { title: "Design review", start: "15:00", end: "15:45", joinUrl: null },
+        ]
+      : [],
   error: null,
   sources: connected.has("googlecalendar") ? ["Google Calendar"] : [],
 });
