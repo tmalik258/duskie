@@ -49,7 +49,12 @@ const DESKTOPS = {
   dark: "linear-gradient(180deg, #14162c, #2a2150)",
 };
 
-const browser = await chromium.launch(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {});
+// Software WebGL 2 so the real creature draws; the app skips software
+// renderers unless this flag is set.
+const browser = await chromium.launch({
+  ...(process.env.CHROMIUM ? { executablePath: process.env.CHROMIUM } : {}),
+  args: ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"],
+});
 const errors = [];
 let count = 0;
 async function shoot(name, query, desktop, act) {
@@ -57,6 +62,9 @@ async function shoot(name, query, desktop, act) {
     viewport: { width: 760, height: 560 },
     colorScheme: desktop === "light" ? "light" : "dark",
     reducedMotion: "reduce",
+  });
+  await page.addInitScript(() => {
+    window.__creatureForce = true;
   });
   page.on("pageerror", (e) => errors.push(`${name}: ${e.message}`));
   await page.goto(base + query);

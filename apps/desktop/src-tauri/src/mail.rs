@@ -527,10 +527,30 @@ fn handle(app: &AppHandle, mail: &Mail) {
     let signal = signal_of(mail, &n.vip);
     let scored = duskie_core::attention::score(&signal, &n.lessons, chrono::Utc::now().timestamp());
     log::debug!("mail scored {} ({:?})", scored.score, scored.level);
-    // Quiet and silent mail waits in the digest; it never makes a card.
-    if scored.level < duskie_core::attention::Level::Normal {
+    use duskie_core::attention::{Context, Level, Shape};
+    // Silent mail waits in the digest.
+    if scored.level == Level::Silent {
         return;
     }
+    let now = chrono::Utc::now().timestamp();
+    let ctx = Context {
+        focus: crate::focus::active(),
+        ..Default::default()
+    };
+    let delivery = {
+        let mut guard = ATTENTION.lock().unwrap_or_else(|e| e.into_inner());
+        route(
+            guard.get_or_insert_with(Default::default),
+            &signal.key,
+            scored.level,
+            n.profile,
+            ctx,
+            now,
+        )
+    };
+    let Some(delivery) = delivery else {
+        return;
+    };
     app.state::<AppState>().bus.publish(duskie_core::Event::new(
         crate::inbox::NOW_EVENT,
         "notifications",
@@ -542,9 +562,39 @@ fn handle(app: &AppHandle, mail: &Mail) {
             "body": "New email",
             "why": "an email that needs you",
             "code": null,
+            "compact": delivery.shape == Shape::Compact,
+            "sound": delivery.sound,
         }),
     ));
 }
+
+/// Whether, and how, a scored message is shown: one card per burst from a
+/// sender, a cooldown after each, and the profile and context decide the shape.
+fn route(
+    state: &mut Attention,
+    key: &str,
+    level: duskie_core::attention::Level,
+    profile: duskie_core::attention::Profile,
+    ctx: duskie_core::attention::Context,
+    now: i64,
+) -> Option<duskie_core::attention::Delivery> {
+    use duskie_core::attention::{Batch, Shape, deliver};
+    let batch = state.batcher.admit(key, level, now);
+    let delivery = deliver(level, profile, ctx);
+    if batch == Batch::Show {
+        state.metrics.delivered(delivery);
+    }
+    (batch == Batch::Show && delivery.shape != Shape::Held).then_some(delivery)
+}
+
+/// What the batcher and counters remember between messages.
+#[derive(Default)]
+struct Attention {
+    batcher: duskie_core::attention::Batcher,
+    metrics: duskie_core::attention::Metrics,
+}
+
+static ATTENTION: Mutex<Option<Attention>> = Mutex::new(None);
 
 /// Whichever account is connected.
 enum Account {
@@ -804,6 +854,35 @@ mod tests {
         .unwrap();
         let dump = format!("{m:?}");
         assert!(!dump.contains("secret"));
+    }
+
+    #[test]
+    fn a_burst_from_one_sender_is_one_card_and_focus_holds_the_rest() {
+        use duskie_core::attention::{Context, Level, Profile, Shape};
+        let mut st = Attention::default();
+        let ctx = Context::default();
+        let first = route(&mut st, "mail:a", Level::Normal, Profile::Normal, ctx, 1000).unwrap();
+        assert_eq!(first.shape, Shape::Full);
+        // Same sender seconds later: folded into the first.
+        assert!(route(&mut st, "mail:a", Level::Normal, Profile::Normal, ctx, 1010).is_none());
+        // Another sender, but the user is focusing: held, not shown.
+        let focus = Context { focus: true, ..ctx };
+        assert!(
+            route(
+                &mut st,
+                "mail:b",
+                Level::Normal,
+                Profile::Normal,
+                focus,
+                1020
+            )
+            .is_none()
+        );
+        // Urgent gets through focus.
+        assert!(route(&mut st, "mail:c", Level::Urgent, Profile::Calm, focus, 1030).is_some());
+        // Calm shows ordinary mail as a small pill.
+        let calm = route(&mut st, "mail:d", Level::Normal, Profile::Calm, ctx, 1040).unwrap();
+        assert_eq!(calm.shape, Shape::Compact);
     }
 
     #[test]
