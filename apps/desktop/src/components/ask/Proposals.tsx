@@ -4,6 +4,7 @@ import { api } from "@/lib/bridge";
 import { joinMultiPicks } from "@/lib/options";
 import { runProposal, sendChat, undoProposal, useDuskie } from "@/lib/store";
 import type { Proposal } from "@/lib/types";
+import { Ic } from "../Icon";
 import { Tip } from "../Tip";
 
 /** Buttons still waiting for a tap; they take Alt 1, Alt 2... first. */
@@ -32,7 +33,10 @@ export function useAltDigits(count: number, start: number, run: (n: number) => v
 
 /** Actions the answer offers: nothing runs until a tap, and Undo follows. */
 export function Proposals({ items, keys }: { items: Proposal[]; keys: boolean }) {
-  const pending = items.filter((p) => !p.ran);
+  const redesign = useDuskie((s) => s.settings?.redesign?.enabled ?? false);
+  const [skipped, setSkipped] = useState<string[]>([]);
+  const pending = items.filter((p) => !p.ran && !skipped.includes(p.id));
+  const waiting = pending;
   useAltDigits(keys ? Math.min(pending.length, 9) : 0, 0, (n) => void runProposal(pending[n].id));
   // Alt U undoes the newest action that can be undone.
   const undoable = [...items].reverse().find((p) => p.ran?.ok && p.ran.undoId != null && !p.ran.undone);
@@ -109,6 +113,55 @@ export function Proposals({ items, keys }: { items: Proposal[]; keys: boolean })
       </div>
     );
   }
+  if (redesign)
+    return (
+      <div className="flex flex-col gap-1.5">
+        <div className="rd-card-head">
+          <p className="rd-eyebrow flex items-center gap-1.5">
+            <span className="rd-dot" style={{ background: "#95a89a" }} />
+            Duskie suggests
+          </p>
+          <p className="rd-title">
+            {waiting.length === 1 ? "1 thing, your call" : `${waiting.length} things, your call`}
+          </p>
+          <p className="rd-detail">Each one only happens if you approve it.</p>
+        </div>
+        {items.map((p) => {
+          const left = waiting.indexOf(p);
+          const off = skipped.includes(p.id);
+          return (
+            <div key={p.id} className="rd-list-row mg-row" data-off={off || undefined}>
+              <span style={{ color: "var(--ink-3)", display: "inline-flex" }}>
+                <Ic name={p.ran ? (p.ran.ok ? "check" : "warn") : "dot"} size={12} />
+              </span>
+              <span className="t" style={{ fontFamily: "inherit", fontSize: 13, opacity: off ? 0.45 : 1 }}>
+                {p.ran && !p.ran.ok ? p.ran.message : p.label}
+              </span>
+              {!p.ran && !off && (
+                <span className="inline-flex gap-1">
+                  <button type="button" className="chip-s" onClick={() => setSkipped((x) => [...x, p.id])}>
+                    Skip
+                  </button>
+                  <button type="button" className="chip-s" disabled={busy} onClick={() => void runProposal(p.id)}>
+                    Approve
+                    {keys && left < 9 && <kbd className="ml-1 opacity-60">Alt {left + 1}</kbd>}
+                  </button>
+                </span>
+              )}
+              {p.ran?.ok && p.ran.undoId != null && !p.ran.undone && <UndoProposal proposal={p} />}
+            </div>
+          );
+        })}
+        <div className="mt-1 flex items-center gap-1.5">
+          {waiting.length > 0 && (
+            <button type="button" className="rd-btn primary" disabled={busy} onClick={() => void doAll()}>
+              {busy ? "Working" : "Approve all"}
+              {keys && !busy && <kbd className="ml-1.5 opacity-60">Alt A</kbd>}
+            </button>
+          )}
+        </div>
+      </div>
+    );
   return (
     <div className="ak-body">
       <div className="ak-prs">

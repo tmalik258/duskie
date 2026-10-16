@@ -694,7 +694,17 @@ function mockChat(a: Record<string, unknown>) {
       later(250 * (n + 1), () => emit("ai://tool", { id, name }));
     }
   }
-  if (/\bzip\b/i.test(last)) {
+  if (/\btidy\b/i.test(last)) {
+    // Separate actions, each needing its own yes.
+    const asks = [
+      "Archive 14 newsletters in Gmail",
+      "Move 3 invoices to Documents",
+      "Reply to Sara: timeline is Friday",
+      "Delete 2 old build folders (1.2 GB)",
+    ];
+    for (const [n, label] of asks.entries())
+      later(1000 + n * 60, () => emit("ai://proposal", { chatId: id, id: `p-${id}-${n}`, label, undoable: true }));
+  } else if (/\bzip\b/i.test(last)) {
     // A task with several actions comes back as a plan.
     const plan = [
       "Create Downloads\\Invoices October",
