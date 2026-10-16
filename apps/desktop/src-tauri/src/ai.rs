@@ -837,7 +837,7 @@ pub fn chat(
             .flatten()
         {
             lock(&app.state::<AppState>().chats).remove(&id);
-            let speak = attach.speak && crate::voice::begin_answer(&app, &id);
+            let speak = attach.speak && crate::voice::begin_answer(&app, &id, attach.voice);
             let text = sidekick_calc::format(answer);
             log_ask_reply(&id, "instant", started, &text, None);
             send_text(&app, &id, text, speak);
@@ -875,7 +875,7 @@ pub fn chat(
                 .unwrap_or_else(|e| Err(e.to_string())),
             };
             lock(&app.state::<AppState>().chats).remove(&id);
-            let speak = attach.speak && crate::voice::begin_answer(&app, &id);
+            let speak = attach.speak && crate::voice::begin_answer(&app, &id, attach.voice);
             let (text, error) = match result {
                 Ok(message) => (message, None),
                 Err(e) => (String::new(), Some(e.to_string())),
@@ -963,7 +963,7 @@ pub fn chat(
                             },
                         }
                     }
-                    let speak = attach.speak && crate::voice::begin_answer(&app, &id);
+                    let speak = attach.speak && crate::voice::begin_answer(&app, &id, attach.voice);
                     for text in kept {
                         send_text(&app, &id, text, speak);
                     }
@@ -972,7 +972,7 @@ pub fn chat(
                     }
                     return Some(speak);
                 }
-                let speak = attach.speak && crate::voice::begin_answer(&app, &id);
+                let speak = attach.speak && crate::voice::begin_answer(&app, &id, attach.voice);
                 while let Some(text) = rx.recv().await {
                     send_text(&app, &id, text, speak);
                 }
