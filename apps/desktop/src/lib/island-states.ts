@@ -33,13 +33,21 @@ export const ISLAND_STATES = [
   },
   { id: "working", label: "Working", size: "compact", mascot: "working", wash: "working", announce: "Working" },
   { id: "done", label: "Done", size: "compact", mascot: "success", wash: "success", announce: "Done" },
-  { id: "error", label: "Error", size: "card", mascot: "error", wash: "error", announce: "Something went wrong" },
+  { id: "error", label: "Error", size: "compact", mascot: "error", wash: "error", announce: "Something went wrong" },
   {
     id: "suggestion",
     label: "Suggestion",
     size: "card",
     mascot: "suggesting",
     wash: "suggesting",
+    announce: "Suggestion",
+  },
+  {
+    id: "suggest-peek",
+    label: "Suggestion, compact",
+    size: "compact",
+    mascot: "suggesting",
+    wash: "noticing",
     announce: "Suggestion",
   },
   {
@@ -56,6 +64,7 @@ export const ISLAND_STATES = [
   { id: "focus", label: "Focus", size: "compact", mascot: "focus", wash: "idle", announce: "Focus on" },
   { id: "paused", label: "Paused", size: "pill", mascot: "sleeping", wash: "idle", announce: "Paused" },
   { id: "offline", label: "Offline", size: "compact", mascot: null, wash: "warning", announce: "You are offline" },
+  { id: "net-card", label: "No connection", size: "card", mascot: null, wash: "warning", announce: "No connection" },
   { id: "update", label: "Update", size: "card", mascot: null, wash: "agent", announce: "Update ready" },
   {
     id: "merge-conflict",
