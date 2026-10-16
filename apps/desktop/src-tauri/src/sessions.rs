@@ -10,7 +10,7 @@
 mod local;
 pub mod reviews;
 
-use sidekick_sensors::classify::mask;
+use duskie_sensors::classify::mask;
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};

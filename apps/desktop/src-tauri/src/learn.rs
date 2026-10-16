@@ -4,9 +4,9 @@
 //! and only when that option is safe to run on its own.
 
 use chrono::{DateTime, Duration, Utc};
+use duskie_core::Habit;
+use duskie_skills::{Proposal, ProposedOption, Trust};
 use serde_json::json;
-use sidekick_core::Habit;
-use sidekick_skills::{Proposal, ProposedOption, Trust};
 use tauri::{AppHandle, Manager};
 
 use crate::state::{AppState, lock};
@@ -168,7 +168,7 @@ pub fn on_accept(
         && index == 0
         && can_automate(&proposal.skill_id)
         && proposal.trust == Trust::Suggest
-        && sidekick_actions::is_safe(&option.action);
+        && duskie_actions::is_safe(&option.action);
     if offer {
         h.offered = true;
     }

@@ -11,8 +11,8 @@ use std::sync::{LazyLock, Mutex};
 use std::time::Duration;
 
 use chrono::{Datelike, Local};
+use duskie_core::{Event, Recipe, Trigger};
 use serde_json::{Value, json};
-use sidekick_core::{Event, Recipe, Trigger};
 use tauri::{AppHandle, Manager};
 
 use crate::state::{AppState, lock};

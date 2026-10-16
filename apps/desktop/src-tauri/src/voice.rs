@@ -11,11 +11,11 @@ use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use chrono::Utc;
+use duskie_core::MascotEvent;
+use duskie_core::settings::VoiceSettings;
+use duskie_voice::text::strip_wake;
+use duskie_voice::{Control, Heard, Listener, ListenerConfig, Speaker, SpeechEvent, models};
 use serde::Serialize;
-use sidekick_core::MascotEvent;
-use sidekick_core::settings::VoiceSettings;
-use sidekick_voice::text::strip_wake;
-use sidekick_voice::{Control, Heard, Listener, ListenerConfig, Speaker, SpeechEvent, models};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::ask;
@@ -233,7 +233,7 @@ pub fn status(app: &AppHandle) -> VoiceStatus {
             .as_ref()
             .is_some_and(|r| r.listener.is_some()),
         error: lock(&v.last_error).clone(),
-        voices: sidekick_voice::VOICES
+        voices: duskie_voice::VOICES
             .iter()
             .map(|(id, label, _)| VoiceOption { id, label })
             .collect(),
@@ -256,7 +256,7 @@ pub fn refresh(app: &AppHandle) {
             s.assistant_name.clone(),
         )
     };
-    sidekick_voice::text::set_name(&name);
+    duskie_voice::text::set_name(&name);
     let v = voice(app);
     // The speaker also runs for typed answers when "Speak answers" is on,
     // even with the wake word and microphone off.
@@ -549,7 +549,7 @@ fn say_with(app: &AppHandle, text: &str, started: impl FnOnce(u64, u64)) -> bool
 
 /// Forwards what a speaker is saying to the welcome timeline, when it is
 /// the welcome line.
-fn speech_events(app: &AppHandle) -> sidekick_voice::SpeechEvents {
+fn speech_events(app: &AppHandle) -> duskie_voice::SpeechEvents {
     let app = app.clone();
     std::sync::Arc::new(move |event| {
         let v = voice(&app);
@@ -791,7 +791,7 @@ fn on_heard(app: &AppHandle, heard: Heard) {
         // A choice ("open", "not now") is taken when it is final.
         Heard::Pause(text) if lock(&v.choosing).is_none() => {
             let text = fixed(app, strip_wake(&text));
-            if sidekick_voice::text::looks_like_request(&text) {
+            if duskie_voice::text::looks_like_request(&text) {
                 emit_pause(app, text);
             }
         }
@@ -815,7 +815,7 @@ fn on_heard(app: &AppHandle, heard: Heard) {
             }
             // A wake on a stray sound turns noise into a word or two
             // ("byzant mixed"); that is not a question, so go back to rest.
-            if !pushed && !text.is_empty() && !sidekick_voice::text::looks_like_request(&text) {
+            if !pushed && !text.is_empty() && !duskie_voice::text::looks_like_request(&text) {
                 log::debug!("voice: ignored {text:?}");
                 text.clear();
             }
@@ -895,7 +895,7 @@ pub fn stop(app: &AppHandle) {
         l.send(Control::Cancel);
     }
     stop_speaking(app);
-    if mascot::current(app) == sidekick_core::MascotState::Listening {
+    if mascot::current(app) == duskie_core::MascotState::Listening {
         mascot::dispatch(app, MascotEvent::Cancelled);
     }
 }
@@ -998,7 +998,7 @@ fn listen_after_speaking(
         std::thread::sleep(wait);
         // Nothing said: stop listening instead of leaving the mic open.
         let silent = voice(&app).words_heard.load(Ordering::SeqCst) == before;
-        if silent && mascot::current(&app) == sidekick_core::MascotState::Listening {
+        if silent && mascot::current(&app) == duskie_core::MascotState::Listening {
             stop(&app);
         }
     });
@@ -1063,7 +1063,7 @@ const CHOICE_WAIT: std::time::Duration = std::time::Duration::from_secs(6);
 const SPEAK_FROM_PRIORITY: i32 = 50;
 
 fn suggestion_speech_blocked(app: &AppHandle) -> bool {
-    mascot::current(app) == sidekick_core::MascotState::Listening
+    mascot::current(app) == duskie_core::MascotState::Listening
         || lock(&voice(app).speaking).is_some()
         || !lock(&app.state::<AppState>().chats).is_empty()
 }
@@ -1232,7 +1232,7 @@ pub fn test(app: &AppHandle) -> Result<(), String> {
         std::thread::sleep(std::time::Duration::from_millis(100));
     }
     let wanted = lock(&app.state::<AppState>().settings).voice.clone();
-    let line = sidekick_voice::test_line(&wanted.voice);
+    let line = duskie_voice::test_line(&wanted.voice);
     {
         let runtime = lock(&v.runtime);
         if let Some(s) = runtime

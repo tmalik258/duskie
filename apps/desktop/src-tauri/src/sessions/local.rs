@@ -41,7 +41,7 @@ fn ram_gb() -> u64 {
 fn root(base_url: &str) -> String {
     let b = base_url.trim().trim_end_matches('/');
     let b = if b.is_empty() {
-        sidekick_ai::OLLAMA_URL
+        duskie_ai::OLLAMA_URL
     } else {
         b
     };

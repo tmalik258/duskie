@@ -66,7 +66,7 @@ pub fn prepare(
     let pulls = regex::Regex::new(r"ollama pull ([A-Za-z0-9_.:/-]+)").unwrap();
     let command = pulls.replace_all(command, |captures: &regex::Captures<'_>| {
         let body = serde_json::json!({"model": &captures[1], "stream": true}).to_string();
-        let endpoint = format!("{}/api/pull", sidekick_ai::loopback(base.trim_end_matches('/')));
+        let endpoint = format!("{}/api/pull", duskie_ai::loopback(base.trim_end_matches('/')));
         // Windows PowerShell's native argument passing loses JSON quotes;
         // send the JSON request on stdin instead.
         format!("'{}' | curl.exe --no-buffer --silent --show-error --fail -H 'Content-Type: application/json' --data-binary '@-' '{}'", body.replace('\'', "''"), endpoint.replace('\'', "''"))

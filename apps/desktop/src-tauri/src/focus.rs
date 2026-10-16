@@ -101,9 +101,9 @@ pub fn start(app: &AppHandle, minutes: u32) -> String {
     if !already {
         let app = app.clone();
         std::thread::spawn(move || {
-            let was_on = sidekick_actions::dnd::state().unwrap_or(false);
+            let was_on = duskie_actions::dnd::state().unwrap_or(false);
             if !was_on
-                && sidekick_actions::pc::set_dnd(true).is_ok()
+                && duskie_actions::pc::set_dnd(true).is_ok()
                 && let Some(f) = focus().as_mut().filter(|f| f.run == run)
             {
                 f.set_dnd = true;
@@ -133,7 +133,7 @@ pub fn stop(app: &AppHandle) -> String {
     };
     if f.set_dnd {
         std::thread::spawn(|| {
-            let _ = sidekick_actions::pc::set_dnd(false);
+            let _ = duskie_actions::pc::set_dnd(false);
         });
     }
     let _ = app.emit(
@@ -153,7 +153,7 @@ pub fn stop(app: &AppHandle) -> String {
 /// A card naming what waited, newest last. They also stay in "Saved for
 /// later" on the hover card.
 fn offer_held(app: &AppHandle, held: &[Held]) {
-    use sidekick_skills::{Proposal, ProposedOption, Trust};
+    use duskie_skills::{Proposal, ProposedOption, Trust};
     let mut lines: Vec<String> = held.iter().take(5).map(|h| h.title.clone()).collect();
     if held.len() > 5 {
         lines.push(format!("and {} more in Saved for later", held.len() - 5));

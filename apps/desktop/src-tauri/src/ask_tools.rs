@@ -5,13 +5,13 @@
 use serde::Serialize;
 use std::path::Path;
 
+use duskie_ai::ToolDef;
+use duskie_core::ActionRecord;
 use serde_json::{Value, json};
-use sidekick_ai::ToolDef;
-use sidekick_core::ActionRecord;
 use std::collections::HashMap;
 use tauri::{AppHandle, Emitter, Manager};
 
-use sidekick_actions::pc;
+use duskie_actions::pc;
 
 use crate::state::{AppState, executor, lock};
 
@@ -806,7 +806,7 @@ fn closest(q: &[f32], tools: &[(String, Vec<f32>)], n: usize) -> Vec<String> {
     let mut scored: Vec<(f32, &String)> = tools
         .iter()
         .filter(|(name, _)| !CORE.contains(&name.as_str()))
-        .map(|(name, v)| (sidekick_core::storage::cosine(q, v), name))
+        .map(|(name, v)| (duskie_core::storage::cosine(q, v), name))
         .collect();
     scored.sort_by(|a, b| b.0.total_cmp(&a.0));
     scored.into_iter().take(n).map(|(_, n)| n.clone()).collect()
@@ -959,8 +959,8 @@ fn git_tool(
     action: &str,
     path: Option<&std::path::Path>,
     number: Option<u64>,
-) -> Result<String, sidekick_actions::ActionError> {
-    use sidekick_actions::{ActionError, gitflow};
+) -> Result<String, duskie_actions::ActionError> {
+    use duskie_actions::{ActionError, gitflow};
     let need =
         || path.ok_or_else(|| ActionError::Invalid("no project found; ask which folder".into()));
     match action {
@@ -1000,8 +1000,8 @@ fn git_tool(
 }
 
 /// Crash records with their likely causes and fixes, as text for the model.
-fn doctor_report(app: Option<&str>) -> Result<String, sidekick_actions::ActionError> {
-    use sidekick_actions::doctor;
+fn doctor_report(app: Option<&str>) -> Result<String, duskie_actions::ActionError> {
+    use duskie_actions::doctor;
     let crashes = doctor::crashes(app)?;
     if crashes.is_empty() {
         return Ok(match app {
@@ -1028,7 +1028,7 @@ fn doctor_report(app: Option<&str>) -> Result<String, sidekick_actions::ActionEr
 }
 
 async fn blocking(
-    f: impl FnOnce() -> Result<String, sidekick_actions::ActionError> + Send + 'static,
+    f: impl FnOnce() -> Result<String, duskie_actions::ActionError> + Send + 'static,
 ) -> String {
     match tokio::task::spawn_blocking(f).await {
         Ok(Ok(text)) => text,
@@ -1345,7 +1345,7 @@ async fn today(app: &AppHandle) -> String {
         let state = app.state::<AppState>();
         let c = lock(&state.calendar);
         let day = chrono::Local::now().date_naive();
-        sidekick_sensors::calendar::on_day(&c.meetings, day)
+        duskie_sensors::calendar::on_day(&c.meetings, day)
             .iter()
             .map(|m| {
                 format!(
@@ -1440,7 +1440,7 @@ async fn find(app: &AppHandle, args: &Value) -> String {
         .map(std::path::PathBuf::from)
         .collect();
     let code = if configured.is_empty() {
-        sidekick_sensors::repos::ReposSensor::default_roots()
+        duskie_sensors::repos::ReposSensor::default_roots()
     } else {
         configured
     };

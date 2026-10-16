@@ -4,13 +4,13 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use serde::{Deserialize, Serialize};
-use sidekick_ai::{
+use duskie_ai::{
     AiProvider, Anthropic, CancellationToken, ChatRequest, ClaudeCode, Codex, Decider,
     LocalDecider, Message, OpenAiCompat, Router, SemIf, Sink, first_chat_model, warm_models,
 };
-use sidekick_core::{AiSettings, Settings};
-use sidekick_sensors::classify::{ClipKind, clip_kind};
+use duskie_core::{AiSettings, Settings};
+use duskie_sensors::classify::{ClipKind, clip_kind};
+use serde::{Deserialize, Serialize};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::state::{AppState, lock};
@@ -127,7 +127,7 @@ pub(crate) fn local_model(ai: &AiSettings) -> OpenAiCompat {
 }
 
 /// Settings for a cloud model reached with an API key.
-pub(crate) fn cloud_pref<'a>(ai: &'a AiSettings, id: &str) -> Option<&'a sidekick_core::CloudPref> {
+pub(crate) fn cloud_pref<'a>(ai: &'a AiSettings, id: &str) -> Option<&'a duskie_core::CloudPref> {
     match id {
         "gemini" => Some(&ai.gemini),
         "groq" => Some(&ai.groq),
@@ -144,7 +144,7 @@ pub(crate) fn key_name(id: &str) -> String {
 /// Answers through the OpenAI-compatible path, with Duskie's tools: the
 /// local model and the cloud models with a key.
 pub(crate) fn is_compat(id: &str) -> bool {
-    id == "local" || sidekick_ai::CLOUD.iter().any(|(c, _, _)| *c == id)
+    id == "local" || duskie_ai::CLOUD.iter().any(|(c, _, _)| *c == id)
 }
 
 /// The OpenAI-compatible model for `id`: the local one, or a cloud one with
@@ -298,8 +298,8 @@ pub fn warm_up(app: &AppHandle) {
 
 /// Closes warm agent sessions, so changed settings take effect.
 pub fn close_sessions() {
-    sidekick_ai::close_claude_sessions();
-    sidekick_ai::close_codex_sessions();
+    duskie_ai::close_claude_sessions();
+    duskie_ai::close_codex_sessions();
 }
 
 /// The picked provider first; the rest keep the user's order.
@@ -582,7 +582,7 @@ async fn system_prompt(app: &AppHandle, attach: &Attach) -> String {
     if attach.skill {
         return format!(
             "{SKILL_SYSTEM}\n\nEvents and their fields:\n{EVENT_CATALOG}\n\nThe skill format:\n{}",
-            sidekick_skills::FORMAT_GUIDE
+            duskie_skills::FORMAT_GUIDE
         );
     }
     // Fixed rules first and everything that changes (time, memory, context)
@@ -669,12 +669,12 @@ async fn window_uia(app: &AppHandle) -> Option<String> {
         .as_ref()
         .and_then(|w| w["pid"].as_u64())
         .and_then(|p| u32::try_from(p).ok())?;
-    let target = sidekick_actions::uia::Target {
+    let target = duskie_actions::uia::Target {
         pid: Some(pid),
         app: None,
     };
     tokio::task::spawn_blocking(move || {
-        sidekick_actions::uia::snapshot(&target)
+        duskie_actions::uia::snapshot(&target)
             .ok()
             .map(|s| s.describe().chars().take(MAX_UIA).collect::<String>())
             .filter(|t| !t.trim().is_empty())
@@ -765,7 +765,7 @@ pub fn chat(
     if let Some(last) = messages
         .iter_mut()
         .rev()
-        .find(|m| m.role == sidekick_ai::Role::User)
+        .find(|m| m.role == duskie_ai::Role::User)
     {
         if let Some(prompt) = crate::recipes::expand(app, &last.content) {
             last.content = prompt;
@@ -801,7 +801,7 @@ pub fn chat(
         let question = messages
             .iter()
             .rev()
-            .find(|m| m.role == sidekick_ai::Role::User)
+            .find(|m| m.role == duskie_ai::Role::User)
             .map(|m| m.content.clone());
         if let Some(q) = question.as_deref() {
             log_ask_user(&id, q, &attach, local_only);
@@ -833,12 +833,12 @@ pub fn chat(
         // Not while held: the question may still change.
         // "18% of 2450": worked out here, at once, never by a model.
         if let Some(answer) = (!attach.hold && !attach.screen)
-            .then(|| question.as_deref().and_then(sidekick_calc::calculate))
+            .then(|| question.as_deref().and_then(duskie_calc::calculate))
             .flatten()
         {
             lock(&app.state::<AppState>().chats).remove(&id);
             let speak = attach.speak && crate::voice::begin_answer(&app, &id, attach.voice);
-            let text = sidekick_calc::format(answer);
+            let text = duskie_calc::format(answer);
             log_ask_reply(&id, "instant", started, &text, None);
             send_text(&app, &id, text, speak);
             if speak {
@@ -867,7 +867,7 @@ pub fn chat(
                 )),
                 "focus_off" => Ok(crate::focus::stop(&app)),
                 _ => tokio::task::spawn_blocking(move || {
-                    sidekick_actions::pc::control(cmd.what, cmd.level, None)
+                    duskie_actions::pc::control(cmd.what, cmd.level, None)
                         .map(|o| o.message)
                         .map_err(|e| e.to_string())
                 })
@@ -1015,7 +1015,7 @@ pub fn chat(
             }
             Err(err) => {
                 let error = match err {
-                    sidekick_ai::AiError::NoProvider => no_provider_hint(local_only),
+                    duskie_ai::AiError::NoProvider => no_provider_hint(local_only),
                     other => other.to_string(),
                 };
                 let who =
@@ -1068,7 +1068,7 @@ pub fn cancel(app: &AppHandle, id: &str) {
 }
 
 fn send_text(app: &AppHandle, id: &str, text: String, speak: bool) {
-    if text == sidekick_ai::CLEAR {
+    if text == duskie_ai::CLEAR {
         let _ = app.emit(DELTA_EVENT, Delta { id, text });
         return;
     }
@@ -1191,7 +1191,7 @@ pub fn watch_readiness(app: &AppHandle) {
     tauri::async_runtime::spawn(async move {
         loop {
             refresh_readiness(&app).await;
-            sidekick_ai::sweep_sessions();
+            duskie_ai::sweep_sessions();
             tokio::time::sleep(READY_CHECK_EVERY).await;
         }
     });
@@ -1214,7 +1214,7 @@ pub async fn refresh_readiness(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::{ask_warm_models, first_enabled_provider};
-    use sidekick_core::Settings;
+    use duskie_core::Settings;
 
     #[test]
     fn local_first_warms_chat_vision_and_embed() {

@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use tokio::sync::oneshot;
 
-use sidekick_core::{Event, EventBus, Sensitivity};
+use duskie_core::{Event, EventBus, Sensitivity};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::task::JoinHandle;
 

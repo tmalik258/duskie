@@ -22,7 +22,7 @@ import { join } from "node:path";
 import { chromium } from "playwright";
 
 const APP =
-  process.env.DUSKIE_EXE ?? join(import.meta.dirname, "..", "..", "..", "target", "debug", "sidekick-desktop.exe");
+  process.env.DUSKIE_EXE ?? join(import.meta.dirname, "..", "..", "..", "target", "debug", "duskie-desktop.exe");
 /** Set in tauri.e2e.conf.json; WebView2 ignores the environment variable once the app passes its own arguments. */
 const PORT = 9229;
 const SHOTS = join(import.meta.dirname, "..", "e2e");

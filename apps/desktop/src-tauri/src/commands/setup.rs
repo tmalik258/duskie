@@ -14,7 +14,7 @@ pub struct BrowserInfo {
 pub fn browser_info(state: State<'_, AppState>) -> BrowserInfo {
     BrowserInfo {
         token: state.browser_token.clone(),
-        port: sidekick_sensors::BrowserSensor::DEFAULT_PORT,
+        port: duskie_sensors::BrowserSensor::DEFAULT_PORT,
     }
 }
 
@@ -142,9 +142,9 @@ pub async fn setup_detect(app: AppHandle) -> Found {
     let mut chat_models = Vec::new();
     let mut embed_models = Vec::new();
     for m in models {
-        if sidekick_ai::is_embedding_model(&m) {
+        if duskie_ai::is_embedding_model(&m) {
             embed_models.push(m);
-        } else if sidekick_ai::is_chat_model(&m) {
+        } else if duskie_ai::is_chat_model(&m) {
             chat_models.push(m);
         }
     }

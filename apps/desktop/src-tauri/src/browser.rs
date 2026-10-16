@@ -3,8 +3,8 @@
 
 use std::path::Path;
 
+use duskie_actions::Outcome;
 use serde_json::{Value, json};
-use sidekick_actions::Outcome;
 use tauri::{AppHandle, Manager};
 
 use crate::state::AppState;

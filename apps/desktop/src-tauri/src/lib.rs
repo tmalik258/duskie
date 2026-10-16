@@ -79,13 +79,13 @@ use std::error::Error;
 use std::sync::{Arc, Mutex, RwLock};
 
 use chrono::Utc;
-use sidekick_actions::{Capabilities, Executor};
-use sidekick_core::{EventBus, MascotEvent, Settings, Storage};
-use sidekick_sensors::{
+use duskie_actions::{Capabilities, Executor};
+use duskie_core::{EventBus, MascotEvent, Settings, Storage};
+use duskie_sensors::{
     BrowserBridge, BrowserSensor, ClaudeCodeSensor, ClipboardSensor, DownloadsSensor, IdleSensor,
     PortsSensor, ReposSensor, Sensor, SensorGate, SystemSensor, WindowSensor,
 };
-use sidekick_skills::Engine;
+use duskie_skills::Engine;
 use tauri::{AppHandle, Manager};
 
 use crate::state::AppState;
@@ -323,7 +323,7 @@ fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     let settings_path = config_dir.join("settings.json");
     let skills_dir = config_dir.join("skills");
     let _ = std::fs::create_dir_all(&skills_dir);
-    let (skills, skill_errors) = sidekick_skills::load_all(&skills_dir);
+    let (skills, skill_errors) = duskie_skills::load_all(&skills_dir);
     for err in &skill_errors {
         log::warn!("skill not loaded: {err}");
     }
@@ -348,8 +348,8 @@ fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     let browser_token = browser::load_or_create_token(&data_dir);
     let mcp_token = browser::load_or_create_secret(&data_dir, "mcp-token");
     let bridge = BrowserBridge::default();
-    let calendar = sidekick_sensors::Calendar::default();
-    let approvals = sidekick_sensors::Approvals::default();
+    let calendar = duskie_sensors::Calendar::default();
+    let approvals = duskie_sensors::Approvals::default();
     commands::sync_calendar(&calendar, &settings);
 
     app.manage(AppState {
@@ -434,11 +434,11 @@ fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
                 approvals,
             }),
             Box::new(SystemSensor),
-            Box::new(sidekick_sensors::CalendarSensor { state: calendar }),
+            Box::new(duskie_sensors::CalendarSensor { state: calendar }),
             Box::new(repos),
             Box::new(IdleSensor::default()),
         ];
-        sidekick_sensors::spawn_all(sensors, &bus, &gate);
+        duskie_sensors::spawn_all(sensors, &bus, &gate);
     });
 
     island::setup(app)?;

@@ -7,8 +7,8 @@
 use std::sync::Mutex;
 use std::time::Duration;
 
+use duskie_core::Event;
 use serde::Serialize;
-use sidekick_core::Event;
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::state::{AppState, lock};

@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 use tauri::AppHandle;
 
 use crate::act::{Gate, Risk, agent_settings, blocking, decide};
-use sidekick_actions::office;
+use duskie_actions::office;
 
 fn text(args: &Value, key: &str) -> String {
     args[key].as_str().unwrap_or_default().trim().to_owned()
@@ -82,7 +82,7 @@ pub async fn write(cmd: &Value) -> Result<String, String> {
     run_write(cmd).await.map(|o| o.message)
 }
 
-pub async fn run_write(cmd: &Value) -> Result<sidekick_actions::Outcome, String> {
+pub async fn run_write(cmd: &Value) -> Result<duskie_actions::Outcome, String> {
     let (path, sheet, range, values) = (
         text(cmd, "path"),
         text(cmd, "sheet"),

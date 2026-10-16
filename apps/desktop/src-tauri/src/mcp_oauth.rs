@@ -84,7 +84,7 @@ pub fn challenge(verifier: &str) -> String {
 }
 
 fn encode(s: &str) -> String {
-    sidekick_sensors::entity::encode(s)
+    duskie_sensors::entity::encode(s)
 }
 
 /// `scheme://host[:port]` of a URL.

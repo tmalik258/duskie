@@ -270,14 +270,14 @@ fn read(path: &Path) -> String {
 
 pub async fn ollama_models(base_url: &str) -> Option<Vec<String>> {
     let mut client = reqwest::Client::builder().timeout(Duration::from_millis(1500));
-    if sidekick_ai::is_local_url(base_url) {
+    if duskie_ai::is_local_url(base_url) {
         client = client.no_proxy();
     }
     let client = client.build().ok()?;
     let resp = client
         .get(format!(
             "{}/models",
-            sidekick_ai::loopback(base_url.trim_end_matches('/'))
+            duskie_ai::loopback(base_url.trim_end_matches('/'))
         ))
         .send()
         .await
@@ -301,7 +301,7 @@ const MIN_CONTEXT: u64 = 8192;
 
 /// The smallest context a loaded Ollama model runs with, when one is loaded.
 async fn loaded_context(base_url: &str) -> Option<u64> {
-    let root = sidekick_ai::loopback(base_url.trim_end_matches('/'));
+    let root = duskie_ai::loopback(base_url.trim_end_matches('/'));
     let root = root.trim_end_matches("/v1");
     let v: serde_json::Value = reqwest::Client::builder()
         .timeout(Duration::from_millis(1500))
@@ -381,7 +381,7 @@ pub async fn status(app: &AppHandle) -> Vec<SetupItem> {
     let base_url = settings.ai.local.base_url.clone();
 
     // Independent probes run together so wall time ≈ the slowest one.
-    let caps_fut = tauri::async_runtime::spawn_blocking(sidekick_actions::Capabilities::detect);
+    let caps_fut = tauri::async_runtime::spawn_blocking(duskie_actions::Capabilities::detect);
     let models_fut = ollama_models(&base_url);
     let gh_fut = gh_signed_in();
     let ctx_fut = loaded_context(&base_url);
@@ -392,7 +392,7 @@ pub async fn status(app: &AppHandle) -> Vec<SetupItem> {
         .executor
         .write()
         .unwrap_or_else(std::sync::PoisonError::into_inner) =
-        std::sync::Arc::new(sidekick_actions::Executor::new(caps.clone()));
+        std::sync::Arc::new(duskie_actions::Executor::new(caps.clone()));
     crate::editors::refresh(app);
     let caps = executor(&state).capabilities().clone();
     let home = dirs::home_dir().unwrap_or_default();
@@ -435,8 +435,8 @@ pub async fn status(app: &AppHandle) -> Vec<SetupItem> {
 
     let ollama_installed = found("ollama");
     let picked = if settings.ai.local.model.trim().is_empty() {
-        let gpu = sidekick_sensors::graphics_memory().unwrap_or(0);
-        chat_model_for(gpu, sidekick_sensors::total_memory())
+        let gpu = duskie_sensors::graphics_memory().unwrap_or(0);
+        chat_model_for(gpu, duskie_sensors::total_memory())
     } else {
         ChatPick {
             model: settings.ai.local.model.trim().to_owned(),
@@ -466,7 +466,7 @@ pub async fn status(app: &AppHandle) -> Vec<SetupItem> {
 
     let has_chat = models.as_ref().is_some_and(|m| {
         if settings.ai.local.model.trim().is_empty() {
-            m.iter().any(|x| sidekick_ai::is_chat_model(x))
+            m.iter().any(|x| duskie_ai::is_chat_model(x))
         } else {
             has_model(m, &picked.model)
         }
@@ -571,7 +571,7 @@ pub async fn status(app: &AppHandle) -> Vec<SetupItem> {
     let lighter = !short
         && OLLAMA_LIGHT
             .iter()
-            .all(|(k, v)| sidekick_sensors::user_env(k).as_deref() == Some(v));
+            .all(|(k, v)| duskie_sensors::user_env(k).as_deref() == Some(v));
     let mut light = SetupItem::new(
         "ollama_light",
         Group::Ai,
@@ -958,9 +958,9 @@ async fn start_or_open(app: &AppHandle, id: &str) -> Result<(), String> {
 
 /// Ollama's native API root from the OpenAI-style base URL in settings.
 fn ollama_api_root(base_url: &str) -> String {
-    let b = sidekick_ai::loopback(base_url.trim().trim_end_matches('/'));
+    let b = duskie_ai::loopback(base_url.trim().trim_end_matches('/'));
     let b = if b.is_empty() {
-        sidekick_ai::OLLAMA_URL.to_owned()
+        duskie_ai::OLLAMA_URL.to_owned()
     } else {
         b
     };
@@ -1362,8 +1362,8 @@ mod tests {
             resolve_model_tag(&models, "moondream").as_deref(),
             Some("moondream:latest")
         );
-        assert!(sidekick_ai::is_embedding_model("nomic-embed-text:latest"));
-        assert!(!sidekick_ai::is_embedding_model("qwen3:4b"));
+        assert!(duskie_ai::is_embedding_model("nomic-embed-text:latest"));
+        assert!(!duskie_ai::is_embedding_model("qwen3:4b"));
     }
 
     #[test]

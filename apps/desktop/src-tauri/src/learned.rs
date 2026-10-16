@@ -164,8 +164,8 @@ const WEEKLY_FROM_HOUR: u32 = 14;
 const WEEKLY_CHECK: std::time::Duration = std::time::Duration::from_secs(30 * 60);
 
 /// The card: the three newest-looking guesses, or None when there are none.
-pub fn weekly_card(items: &[Learned]) -> Option<sidekick_skills::Proposal> {
-    use sidekick_skills::{Proposal, ProposedOption, Trust};
+pub fn weekly_card(items: &[Learned]) -> Option<duskie_skills::Proposal> {
+    use duskie_skills::{Proposal, ProposedOption, Trust};
     if items.is_empty() {
         return None;
     }

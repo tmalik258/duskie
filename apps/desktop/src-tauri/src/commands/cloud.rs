@@ -1,10 +1,10 @@
 //! Cloud models reached with an API key: Gemini and Groq (free tiers) and
 //! OpenRouter. Keys live in Credential Manager, never in the settings file.
 
+use duskie_ai::OpenAiCompat;
+use duskie_core::{AiSettings, CloudPref, Settings};
 use serde::Serialize;
 use serde_json::Value;
-use sidekick_ai::OpenAiCompat;
-use sidekick_core::{AiSettings, CloudPref, Settings};
 use tauri::{AppHandle, Manager};
 
 use super::{CmdResult, apply_settings, off_ui};
