@@ -886,7 +886,7 @@ export interface MailStatus {
   lastOk: number | null;
   error: string | null;
   /** Which account is connected. */
-  provider: "gmail" | "imap" | null;
+  provider: "gmail" | "imap" | "composio" | null;
 }
 
 /** One changed file in the Git dock. */
