@@ -28,6 +28,7 @@ import { isPaused, type MascotState, type Settings, type Suggestion } from "@/li
 import { updateBusy, updateLabel } from "@/lib/updates";
 import { useRedesign } from "@/lib/use-redesign";
 import { PALETTES, type WashEvent } from "@/lib/wash";
+import { ActivitiesCard } from "./ActivitiesCard";
 import { Announcer } from "./Announcer";
 import { ASK_MASCOT, ASK_ORB, ASK_PAD, AskPanel } from "./AskPanel";
 import { Creature } from "./Creature";
@@ -917,6 +918,8 @@ export function Island() {
                     <FullVoice text={voicePill.text} thinking={voicePill.thinking} />
                   ) : showGuide && waiting ? (
                     <IslandGuide waiting={waiting} guide={guide} />
+                  ) : redesign && registryId === "activities" ? (
+                    <ActivitiesCard />
                   ) : (
                     <ExpandedContent mascot={mascot} paused={paused} suggestion={suggestion} />
                   )}

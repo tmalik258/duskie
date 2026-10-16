@@ -4418,3 +4418,41 @@ button.ak-cchip:hover,
 .ag-st[data-g="Stopped"] {
   color: #de8676;
 }
+
+/* Redesign activities card rows. */
+.act-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 4px;
+  color: #f2f0eb;
+}
+.act-ic {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgb(242 240 235 / 0.06);
+  color: rgb(242 240 235 / 0.66);
+}
+.act-sub {
+  font-size: 11.5px;
+  color: rgb(242 240 235 / 0.44);
+  font-variant-numeric: tabular-nums;
+}
+.act-bar {
+  display: block;
+  height: 3px;
+  margin-top: 5px;
+  border-radius: 2px;
+  background: rgb(242 240 235 / 0.08);
+  overflow: hidden;
+}
+.act-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #a8c0cc;
+  transition: width 0.4s ease;
+}

@@ -1555,6 +1555,10 @@ if (typeof window !== "undefined") {
         current: null,
       });
     },
+    __mockStore: async (patch: Record<string, unknown>) => {
+      const { useDuskie } = await import("./store");
+      useDuskie.setState(patch as never);
+    },
     __mockWork: async (label: string) => {
       const { beginActivity } = await import("./activities");
       beginActivity(label);
