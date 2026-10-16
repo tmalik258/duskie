@@ -4537,3 +4537,70 @@ button.ak-cchip:hover,
 .rd-field:focus-visible {
   border-color: rgb(242 240 235 / 0.3);
 }
+.st-split {
+  gap: 14px;
+}
+.st-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 150px;
+  flex: none;
+  padding-right: 10px;
+  border-right: 1px solid rgb(242 240 235 / 0.07);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.st-side::-webkit-scrollbar {
+  display: none;
+}
+.st-search {
+  height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: rgb(242 240 235 / 0.06);
+  color: #f2f0eb;
+  font-size: 12.5px;
+  outline: none;
+}
+.st-search::placeholder {
+  color: rgb(242 240 235 / 0.4);
+}
+.st-group {
+  padding: 0 6px 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgb(242 240 235 / 0.38);
+}
+.st-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 21px;
+  padding: 0 6px;
+  border-radius: 6px;
+  font-size: 12.5px;
+  color: rgb(242 240 235 / 0.72);
+  text-align: left;
+}
+.st-item:hover {
+  background: rgb(242 240 235 / 0.05);
+  color: #f2f0eb;
+}
+.st-item[aria-current="page"] {
+  background: rgb(242 240 235 / 0.08);
+  color: #f2f0eb;
+}
+.st-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: #f2f0eb;
+}
+.st-blurb {
+  margin-top: 2px;
+  font-size: 13px;
+  color: rgb(242 240 235 / 0.55);
+}
