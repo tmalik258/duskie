@@ -134,6 +134,7 @@ const ASK_ACTIONS: &[&str] = &[
     "sleep_pc",
     "empty_recycle_bin",
     "trash_download",
+    "uninstall",
     "install_app",
     "set_compat",
     "clear_compat",
@@ -259,7 +260,8 @@ pub fn defs() -> Vec<ToolDef> {
                 open_url {url}, launch_project {path}, git_pull {path}, install_deps {path}, \
                 close_app {name}, sleep_pc {}, empty_recycle_bin {}, \
                 trash_download {path} (a file in Downloads, to the Recycle Bin), \
-                open_system_page {page}. \
+                uninstall {name} (opens that app's own uninstaller; give part of the name and \
+                you get the exact installed names back), open_system_page {page}. \
                 Use full paths from search. Nothing happens until they tap it. For a task \
                 that takes several actions in order (move files, then zip them), offer each \
                 one with step: true, in order; they show as a plan with one Run."
@@ -1204,7 +1206,18 @@ fn propose(app: &AppHandle, chat_id: &str, args: &Value) -> String {
     if action == "open_path" && action_args["path"].as_str().is_some_and(runs_code) {
         return "Refused: that file runs a program. Tell the user to open it themselves.".into();
     }
-    let step = args["step"].as_bool().unwrap_or(false);
+    let mut label = label;
+    if action == "uninstall" {
+        match uninstall_target(action_args["name"].as_str().unwrap_or_default()) {
+            Ok(name) => {
+                action_args["name"] = json!(name);
+                label = format!("Uninstall {name}");
+            }
+            Err(e) => return e,
+        }
+    }
+    // Uninstalling is never a step in a plan: it gets its own tap.
+    let step = args["step"].as_bool().unwrap_or(false) && action != "uninstall";
     offer_as(app, chat_id, action, action_args, &label, step);
     if step {
         format!(
@@ -1214,6 +1227,31 @@ fn propose(app: &AppHandle, chat_id: &str, args: &Value) -> String {
         format!(
             "Shown to the user as a button \"{label}\". Say in one short sentence what it will do."
         )
+    }
+}
+
+/// The exact installed name for `query`, or the names to pick from.
+fn uninstall_target(query: &str) -> Result<String, String> {
+    use duskie_actions::installed;
+    let apps = installed::list().map_err(|e| format!("Error: {e}"))?;
+    if let Some(a) = apps
+        .iter()
+        .find(|a| a.name.eq_ignore_ascii_case(query.trim()))
+    {
+        return Ok(a.name.clone());
+    }
+    let found = installed::find(&apps, query);
+    match found.as_slice() {
+        [one] => Ok(one.name.clone()),
+        [] => Err(format!("Error: no installed app matches \"{query}\".")),
+        many => Err(format!(
+            "Error: several apps match. Ask which one, then offer it by its exact name: {}",
+            many.iter()
+                .take(15)
+                .map(|a| a.name.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )),
     }
 }
 

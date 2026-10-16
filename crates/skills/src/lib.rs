@@ -317,6 +317,7 @@ pub const ACTIONS: &[&str] = &[
     "clean_downloads",
     "sort_downloads",
     "clean_installers",
+    "uninstall",
     "summarize_file",
     "restore_layout",
     "claude_allow",
