@@ -99,6 +99,8 @@ pub struct Settings {
     /// Composio's MCP server, for apps like Jira, Slack and Gmail in chat.
     pub composio: ComposioSettings,
     pub semantic_search: SemanticSearch,
+    /// The new island look; off by default.
+    pub redesign: Redesign,
     /// The first-run welcome was finished or skipped.
     pub onboarded: bool,
     /// Step index inside the welcome flow (0-based). Kept so a restart
@@ -261,6 +263,13 @@ pub const DEFAULT_DENY_APPS: &[&str] = &[
     "snippingtool.exe",
     "screenclippinghost.exe",
 ];
+
+/// Switches for the new island look. Off until it is ready for everyone.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct Redesign {
+    pub enabled: bool,
+}
 
 /// Search by meaning with an embedding model on this PC.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -674,6 +683,7 @@ impl Default for Settings {
             calendar: CalendarSettings::default(),
             composio: ComposioSettings::default(),
             semantic_search: SemanticSearch::default(),
+            redesign: Redesign::default(),
             onboarded: false,
             welcome_step: 0,
             check_updates: true,
@@ -850,6 +860,13 @@ impl Settings {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn redesign_is_off_by_default_and_old_files_still_load() {
+        assert!(!Settings::default().redesign.enabled);
+        let old: Settings = serde_json::from_str("{\"muted\":true}").unwrap();
+        assert!(!old.redesign.enabled);
+    }
+
     use super::*;
 
     #[test]
