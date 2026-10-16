@@ -1,13 +1,13 @@
 "use client";
 
-// The Git dock: changed files with checkbox staging, one commit message
-// with a sparkle button that writes it from the staged diff, Commit, and
-// Amend. It shows exactly what will be committed.
+// The Git dock: Changes (checkbox staging, one commit message with a
+// sparkle button that writes it from the staged diff, Commit and Amend),
+// History, the branch's pull request, and Stashes. Esc closes it.
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/bridge";
 import { baseName, countChanges, groupByFolder } from "@/lib/changes";
-import type { GitFile } from "@/lib/types";
+import type { CommitRow, GitFile, RepoRow, StashRow } from "@/lib/types";
 import { Ic, Icon } from "../Icon";
 import { Tip } from "../Tip";
 
@@ -20,15 +20,21 @@ const KIND: Record<string, string> = {
   U: "conflict",
 };
 
-export function GitDock({ path, onClose }: { path: string; onClose: () => void }) {
-  const [files, setFiles] = useState<GitFile[]>([]);
-  const [message, setMessage] = useState("");
-  const [note, setNote] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [warnAmend, setWarnAmend] = useState(false);
+type GitTab = "changes" | "history" | "pr" | "stashes";
 
-  const refresh = useCallback(() => void api.gitStatus(path).then(setFiles), [path]);
-  useEffect(refresh, [refresh]);
+export function GitDock({ path, repo, onClose }: { path: string; repo?: RepoRow | null; onClose: () => void }) {
+  const [tab, setTab] = useState<GitTab>("changes");
+  const [stashes, setStashes] = useState<StashRow[]>([]);
+  const [changed, setChanged] = useState(0);
+  const loadStashes = useCallback(
+    () =>
+      void api
+        .gitStashes(path)
+        .then(setStashes)
+        .catch(() => {}),
+    [path],
+  );
+  useEffect(loadStashes, [loadStashes]);
 
   // Esc closes the dock.
   useEffect(() => {
@@ -38,6 +44,195 @@ export function GitDock({ path, onClose }: { path: string; onClose: () => void }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  const pr = repo?.prs.find((p) => p.branch === repo.branch) ?? null;
+  const tabs: [GitTab, string, number | null][] = [
+    ["changes", "Changes", changed],
+    ["history", "History", null],
+    ["pr", "Pull request", null],
+    ["stashes", "Stashes", stashes.length],
+  ];
+  return (
+    <section className="gd flex min-h-0 flex-1 flex-col" aria-label="Git">
+      <div className="gd-bar">
+        <span className="gd-pick">
+          <Ic name="folder" size={14} />
+          <span className="truncate">{repo?.name ?? baseName(path)}</span>
+        </span>
+        {repo?.branch && (
+          <span className="gd-pick">
+            <Ic name="branch" size={14} />
+            <span className="truncate mono">{repo.branch}</span>
+          </span>
+        )}
+        <button type="button" className="rd-btn ghost chip-s ic-only ml-auto" aria-label="Close Git" onClick={onClose}>
+          <Ic name="x" size={12} />
+        </button>
+      </div>
+      <div className="gd-tabs" role="tablist" aria-label="Git views">
+        {tabs.map(([k, label, n]) => (
+          <button
+            key={k}
+            type="button"
+            role="tab"
+            className="gd-tab"
+            aria-selected={tab === k}
+            onClick={() => setTab(k)}
+          >
+            {label}
+            {n !== null && n > 0 && <span className="n">{n}</span>}
+          </button>
+        ))}
+      </div>
+      <div className="gd-body min-h-0 flex-1">
+        {tab === "changes" && <Changes path={path} onCount={setChanged} />}
+        {tab === "history" && <History path={path} />}
+        {tab === "pr" && <PullRequest pr={pr} branch={repo?.branch ?? null} />}
+        {tab === "stashes" && <Stashes path={path} stashes={stashes} reload={loadStashes} />}
+      </div>
+    </section>
+  );
+}
+
+function History({ path }: { path: string }) {
+  const [rows, setRows] = useState<CommitRow[] | null>(null);
+  useEffect(
+    () =>
+      void api
+        .gitLog(path)
+        .then(setRows)
+        .catch(() => setRows([])),
+    [path],
+  );
+  if (!rows) return <p className="gd-empty shimmer-text">Reading the history</p>;
+  if (rows.length === 0) return <p className="gd-empty">No commits yet.</p>;
+  return (
+    <div className="flex flex-col">
+      {rows.map((c) => (
+        <div key={c.hash} className="gd-row">
+          <span className="mono gd-hash">{c.hash}</span>
+          <span className="min-w-0 flex-1 truncate">{c.subject}</span>
+          <span className="gd-meta">
+            {c.author}, {c.when}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+const CI_TEXT = { pass: "Checks pass", fail: "Checks failing", pending: "Checks running", none: "No checks" } as const;
+
+function PullRequest({ pr, branch }: { pr: RepoRow["prs"][number] | null; branch: string | null }) {
+  if (!pr) {
+    return <p className="gd-empty">{branch ? `No open pull request for ${branch}.` : "No open pull request."}</p>;
+  }
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div>
+        <p className="gd-meta mono">#{pr.number}</p>
+        <p className="font-medium">{pr.title}</p>
+      </div>
+      <div className="gd-row">
+        <span
+          className="rd-dot"
+          style={{
+            background:
+              pr.ci === "pass"
+                ? "var(--ok)"
+                : pr.ci === "fail"
+                  ? "var(--err)"
+                  : pr.ci === "pending"
+                    ? "var(--warn)"
+                    : "var(--ink-3)",
+          }}
+        />
+        <span className="flex-1">{CI_TEXT[pr.ci]}</span>
+        {pr.failing && (
+          <button type="button" className="rd-btn ghost" onClick={() => void api.aiOpenLink(pr.failing?.[1] ?? pr.url)}>
+            {pr.failing[0]}
+          </button>
+        )}
+      </div>
+      {pr.reviewRequested && <p className="gd-meta">Your review is requested.</p>}
+      <div className="flex gap-1.5">
+        <button type="button" className="rd-btn primary" onClick={() => void api.aiOpenLink(pr.url)}>
+          Open on GitHub
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function Stashes({ path, stashes, reload }: { path: string; stashes: StashRow[]; reload: () => void }) {
+  const [note, setNote] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<string | null>(null);
+  const run = (work: Promise<string>) =>
+    void work
+      .then(setNote)
+      .catch((e) => setNote(String(e)))
+      .finally(reload);
+  if (stashes.length === 0) return <p className="gd-empty">No stashes.</p>;
+  return (
+    <div className="flex flex-col gap-1">
+      {stashes.map((s) => (
+        <div key={s.name} className="gd-row">
+          <Ic name="box" size={14} />
+          <span className="min-w-0 flex-1">
+            <span className="block truncate">{s.message}</span>
+            <span className="gd-meta mono">
+              {s.name}, {s.when}
+            </span>
+          </span>
+          <button type="button" className="rd-btn primary" onClick={() => run(api.gitStashApply(path, s.name, true))}>
+            Pop
+          </button>
+          <button type="button" className="rd-btn ghost" onClick={() => run(api.gitStashApply(path, s.name, false))}>
+            Apply
+          </button>
+          {confirm === s.name ? (
+            <button
+              type="button"
+              className="rd-btn ghost"
+              style={{ color: "var(--err)" }}
+              onClick={() => {
+                setConfirm(null);
+                run(api.gitStashDrop(path, s.name));
+              }}
+            >
+              Drop for good
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="rd-btn ghost chip-s ic-only"
+              aria-label={`Drop ${s.name}`}
+              onClick={() => setConfirm(s.name)}
+            >
+              <Ic name="trash" size={12} />
+            </button>
+          )}
+        </div>
+      ))}
+      {note && (
+        <p className="gd-meta" role="status">
+          {note}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function Changes({ path, onCount }: { path: string; onCount: (n: number) => void }) {
+  const [files, setFiles] = useState<GitFile[]>([]);
+  const [message, setMessage] = useState("");
+  const [note, setNote] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [warnAmend, setWarnAmend] = useState(false);
+
+  const refresh = useCallback(() => void api.gitStatus(path).then(setFiles), [path]);
+  useEffect(refresh, [refresh]);
+  useEffect(() => onCount(files.length), [files, onCount]);
 
   const counts = countChanges(files);
   const act = async (work: () => Promise<string>) => {

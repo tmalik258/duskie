@@ -533,6 +533,21 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
   git_write_message: () => "Tidy the util helpers",
   git_amend: () => "Amended the last commit",
   git_last_commit_pushed: () => false,
+  git_log: () => [
+    { hash: "b56ca02", subject: "Proposals card with Skip and Approve per row", author: "You", when: "2 hours ago" },
+    { hash: "509e408", subject: "Agent card on hover", author: "You", when: "3 hours ago" },
+    { hash: "a5e488a", subject: "Meeting card on hover", author: "Ayesha", when: "yesterday" },
+  ],
+  git_stashes: () => mockStashes,
+  git_stash_apply: (a) => {
+    if (a.pop) mockStashes = mockStashes.filter((x) => x.name !== a.name);
+    return a.pop ? "Popped the stash" : "Applied the stash. A copy stays in Stashes.";
+  },
+  git_stash_drop: (a) => {
+    mockStashes = mockStashes.filter((x) => x.name !== a.name);
+    return "Dropped the stash";
+  },
+  island_width: () => undefined,
   git_message_diff: () => ({ text: "diff --git a/src/app.ts b/src/app.ts", covered: 1, total: 1 }),
   mail_status: () => mailStatus,
   mail_connect: () => {
@@ -1297,6 +1312,8 @@ commands.file_open = (a) => {
 };
 commands.project_launch = () => "Opened sidekick in VS Code and a terminal";
 commands.search_status = () => ({ items: 1240, embedded: 1240, embedError: null });
+let mockStashes = [{ name: "stash@{0}", message: "On main: island colours", when: "20 minutes ago" }];
+
 const soon = () => {
   const d = new Date(Date.now() + 5 * 60_000);
   const hm = (x: Date) => `${String(x.getHours()).padStart(2, "0")}:${String(x.getMinutes()).padStart(2, "0")}`;

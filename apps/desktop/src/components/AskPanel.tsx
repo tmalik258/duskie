@@ -13,6 +13,7 @@ import {
   handOff,
   interruptSession,
   listenToAgents,
+  openGit,
   type Session,
   setLayout,
   setTab,
@@ -180,6 +181,12 @@ export function AskPanel() {
       if (askTabRef.current && (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "n" && !e.repeat) {
         e.preventDefault();
         newChatRef.current();
+        return;
+      }
+      // Ctrl G: the Git dock for the repo with changes, on the Repos tab.
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "g" && !e.repeat) {
+        e.preventDefault();
+        openGit();
         return;
       }
       if (!e.altKey || e.ctrlKey || e.metaKey || e.repeat) return;
@@ -395,6 +402,7 @@ export function AskPanel() {
         },
         stay: true,
       },
+      { id: "git", label: "Open Git", icon: "branch", run: openGit, stay: true },
       { id: "settings", label: "Open settings", icon: "settings", run: () => setAsk({ view: "settings" }), stay: true },
       ...(turns.length
         ? [

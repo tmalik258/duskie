@@ -4651,3 +4651,115 @@ button.ak-cchip:hover,
     animation: none;
   }
 }
+
+/* Git dock: beside the Repos list on wide screens, in its place on narrow ones. */
+.gd-split {
+  display: flex;
+  min-height: 0;
+  align-items: stretch;
+  gap: 0;
+}
+.gd-split > .gd {
+  min-width: 0;
+  flex: 1;
+}
+.gd-seam {
+  position: relative;
+  width: 12px;
+  flex: none;
+  cursor: col-resize;
+  display: grid;
+  place-items: center;
+  outline: none;
+}
+.gd-seam > i {
+  width: 2px;
+  height: 32px;
+  border-radius: 2px;
+  background: var(--line-2);
+  transition:
+    background 0.15s,
+    height 0.15s;
+}
+.gd-seam:hover > i,
+.gd-seam:focus-visible > i {
+  background: var(--accent);
+  height: 48px;
+}
+.gd {
+  gap: 8px;
+  font-size: 13px;
+}
+.gd-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.gd-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  max-width: 50%;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.06);
+  color: var(--ink-2);
+}
+.gd-tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--line);
+}
+.gd-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 10px;
+  color: var(--ink-3);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+}
+.gd-tab:hover {
+  color: var(--ink-2);
+}
+.gd-tab[aria-selected="true"] {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+.gd-tab .n {
+  font-size: 11px;
+  padding: 0 5px;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 0.1);
+}
+.gd-body {
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.gd-body::-webkit-scrollbar {
+  display: none;
+}
+.gd-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 2px;
+  border-bottom: 1px solid var(--line);
+}
+.gd-hash {
+  font-size: 11px;
+  color: var(--accent);
+  flex: none;
+}
+.gd-meta {
+  font-size: 11px;
+  color: var(--ink-3);
+  flex: none;
+}
+.gd-empty {
+  padding: 16px 2px;
+  color: var(--ink-3);
+}

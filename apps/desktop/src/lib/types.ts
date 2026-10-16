@@ -898,6 +898,23 @@ export interface GitFile {
   unstaged: boolean;
 }
 
+/** One commit in the Git dock's History tab. */
+export interface CommitRow {
+  hash: string;
+  subject: string;
+  author: string;
+  /** Relative time, as git words it. */
+  when: string;
+}
+
+/** One stash in the Git dock's Stashes tab. */
+export interface StashRow {
+  /** stash@{0} and so on. */
+  name: string;
+  message: string;
+  when: string;
+}
+
 /** The capped diff a model reads to write a commit message. */
 export interface MessageDiff {
   text: string;

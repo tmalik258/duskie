@@ -121,6 +121,23 @@ fn place_on(window: &WebviewWindow, monitor: &tauri::Monitor) -> tauri::Result<(
     window.set_position(PhysicalPosition::new(x, origin.y))
 }
 
+/// Widens the island window for a dock beside it, or back to its normal
+/// width, and keeps it centred at the top of its screen.
+pub fn set_width(window: &WebviewWindow, width: f64) -> tauri::Result<()> {
+    let Some(monitor) = window.current_monitor()? else {
+        return Ok(());
+    };
+    let scale = monitor.scale_factor();
+    let screen = f64::from(monitor.size().width) / scale;
+    let width = width.clamp(BASE_WIDTH, screen.max(BASE_WIDTH));
+    let height = f64::from(window.outer_size()?.height) / scale;
+    window.set_size(tauri::LogicalSize::new(width, height))?;
+    place_on(window, &monitor)
+}
+
+/// The window's width from the app config.
+pub const BASE_WIDTH: f64 = 600.0;
+
 /// The monitor that holds point (x, y), in physical pixels.
 fn monitor_at(monitors: &[tauri::Monitor], x: i64, y: i64) -> Option<&tauri::Monitor> {
     monitors.iter().find(|m| {

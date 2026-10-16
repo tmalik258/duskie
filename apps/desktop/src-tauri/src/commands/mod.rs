@@ -160,6 +160,21 @@ pub async fn net_check(app: AppHandle, lost: bool) -> bool {
     crate::net::check(&app, lost).await
 }
 
+/// Widens the island window for a dock beside it; 0 puts it back.
+#[tauri::command]
+pub fn island_width(app: AppHandle, width: f64) {
+    if let Some(w) = app.get_webview_window(crate::island::LABEL) {
+        let want = if width <= 0.0 {
+            crate::island::BASE_WIDTH
+        } else {
+            width
+        };
+        if let Err(e) = crate::island::set_width(&w, want) {
+            log::warn!("could not resize the island: {e}");
+        }
+    }
+}
+
 #[tauri::command]
 pub fn island_set_hit_rect(state: State<'_, AppState>, rect: HitRect) {
     *lock(&state.hit_rect) = rect;

@@ -116,6 +116,8 @@ interface AgentsState {
   draftPath?: string | null;
   /** What New's box starts with ("Ask an agent to fix it"). */
   draftPrompt?: string | null;
+  /** The repo open in the Git dock; "first" picks one once the list loads. */
+  dock?: string | null;
 }
 
 /** Sessions are kept in this window's storage, so the timeline comes back
@@ -777,4 +779,10 @@ export function interruptSession(id: string) {
     entries: entriesCancelRunning(s.entries),
   }));
   void api.agentStop(id);
+}
+
+/** Ctrl G: the Repos tab with the Git dock open on the repo that has changes. */
+export function openGit() {
+  useAgents.setState({ dock: useAgents.getState().dock ?? "first" });
+  setTab("repos");
 }
