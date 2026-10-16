@@ -3,6 +3,7 @@
 // session for the Agents tab.
 
 import { create } from "zustand";
+import { type OpenChoice, parseChoose } from "./agent-questions";
 import { api, EVENTS, listen } from "./bridge";
 import { mask } from "./mask";
 import { claimsPlanReady, parsePlanDocument } from "./plan";
@@ -57,6 +58,8 @@ export interface Session extends AgentStarted {
   limit?: { status: string; window: string; resetsAt: number | null; used: number | null } | null;
   /** "Not now" on the compact offer, until the context is compacted. */
   compactDismissed?: boolean;
+  /** The agent's own multiple-choice question, waiting for an answer. */
+  choose?: OpenChoice | null;
   /** A permission question waiting for the user. */
   question: { id: string; label: string; detail: string } | null;
   error: string | null;
@@ -127,6 +130,7 @@ function loadSessions(): Session[] {
       ...s,
       status: s.status === "working" || s.status === "waiting" ? "ended" : s.status,
       question: null,
+      choose: null,
       restored: true,
     }));
   } catch {
@@ -408,6 +412,8 @@ export function sendToSession(id: string, text: string) {
   update(id, (s) => ({
     ...s,
     entries: [...s.entries, { kind: "you", text }],
+    // Sending anything answers or replaces the agent's open question.
+    choose: null,
     status: "working",
     stuck: false,
     activeMode: s.status === "working" || s.status === "waiting" ? s.activeMode : s.mode,
@@ -593,6 +599,10 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
         status: "waiting",
         question: { id: String(e.question), label: String(e.label ?? ""), detail: String(e.detail ?? "") },
       }));
+    case "choose": {
+      const choose = parseChoose(e);
+      return choose ? update(id, (s) => ({ ...s, choose })) : undefined;
+    }
     case "answered":
       return update(id, (s) => (s.question?.id === e.question ? { ...s, question: null } : s));
     case "turn_diff": {

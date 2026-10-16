@@ -18,6 +18,7 @@ import { createPortal } from "react-dom";
 import { AnswerOptions } from "@/components/ask/Proposals";
 import { activityLabel, useActivities } from "@/lib/activities";
 import { type AgentCommand, commandCatalog } from "@/lib/agent-commands";
+import { answerText, type OpenChoice } from "@/lib/agent-questions";
 import {
   answerQuestion,
   COMPACT_AT,
@@ -1010,6 +1011,8 @@ function SessionView({
               </div>
             )}
 
+            {s.choose && <ChoiceCard open={s.choose} agent={s.agent} onAnswer={(text) => sendToSession(s.id, text)} />}
+
             {s.error && <p className="ak-err">{s.error}</p>}
 
             {done && !s.error && (
@@ -1744,4 +1747,54 @@ export function limitNote(agent: string, l: NonNullable<Session["limit"]>): stri
     return `${agent} has used up its ${span}.${resets} Ask mode uses another model meanwhile.`;
   const pct = l.used !== null ? `${Math.round(l.used <= 1 ? l.used * 100 : l.used)}% of ` : "most of ";
   return `You have used ${pct}${agent}'s ${span}.${resets}`;
+}
+
+/** The agent's own multiple-choice question: tap an option to answer. With
+ * several questions, each is answered in turn; "Several" questions allow
+ * more than one pick. */
+function ChoiceCard({ open, agent, onAnswer }: { open: OpenChoice; agent: string; onAnswer: (text: string) => void }) {
+  const [picks, setPicks] = useState<string[][]>([]);
+  const at = picks.length;
+  const [multi, setMulti] = useState<string[]>([]);
+  const q = open.questions[at];
+  if (!q) return null;
+  const next = (chosen: string[]) => {
+    const all = [...picks, chosen];
+    setMulti([]);
+    if (all.length >= open.questions.length) onAnswer(answerText(open, all));
+    else setPicks(all);
+  };
+  return (
+    <section className="ak-ask ak-in" aria-label={`${agent} asks`}>
+      <p>
+        {agent} asks: <span className="font-medium text-white">{q.question}</span>
+      </p>
+      <div className="ak-chips">
+        {q.options.map((o) => {
+          const on = multi.includes(o.label);
+          return (
+            <button
+              key={o.label}
+              type="button"
+              title={o.description}
+              aria-pressed={q.multiSelect ? on : undefined}
+              onClick={() =>
+                q.multiSelect
+                  ? setMulti(on ? multi.filter((m) => m !== o.label) : [...multi, o.label])
+                  : next([o.label])
+              }
+              className={`ak-chip chip ${on ? "primary" : ""}`}
+            >
+              {o.label}
+            </button>
+          );
+        })}
+        {q.multiSelect && (
+          <button type="button" onClick={() => next(multi)} className="ak-chip primary chip">
+            Done
+          </button>
+        )}
+      </div>
+    </section>
+  );
 }
