@@ -54,6 +54,7 @@ mod pipeline;
 mod privacy;
 mod projects;
 mod promises;
+mod pty;
 mod quick;
 mod recipes;
 mod rename;
@@ -280,6 +281,10 @@ pub fn run() {
             commands::editor_changed,
             commands::editor_head,
             commands::editor_search,
+            commands::term_open,
+            commands::term_write,
+            commands::term_resize,
+            commands::term_close,
             commands::capabilities_get,
             commands::choices_reset,
             commands::routines_today,

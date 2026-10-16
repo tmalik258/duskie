@@ -4465,7 +4465,8 @@ button.ak-cchip:hover,
 .mg-row .r {
   opacity: 1;
 }
-.chip-s[aria-pressed="true"] {
+.chip-s[aria-pressed="true"],
+.rd-btn.ghost.chip-s[aria-pressed="true"] {
   background: #f2f0eb;
   color: #141412;
 }
@@ -4890,4 +4891,17 @@ button.ak-cchip:hover,
 }
 .ed-del {
   border-left: 3px solid #d9534f;
+}
+.ed-term {
+  height: 220px;
+  flex-shrink: 0;
+  padding: 4px 6px;
+  background: #141418;
+  border-top: 1px solid rgb(255 255 255 / 0.06);
+}
+.ed-term .xterm-viewport {
+  scrollbar-width: none;
+}
+.ed-term .xterm-viewport::-webkit-scrollbar {
+  display: none;
 }

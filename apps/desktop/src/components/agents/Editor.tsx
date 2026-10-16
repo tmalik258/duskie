@@ -12,6 +12,7 @@ import { lineMarks } from "@/lib/linediff";
 import { languageOf, loadMonaco } from "@/lib/monaco";
 import type { EditorHit, TreeEntry } from "@/lib/types";
 import { Ic } from "../Icon";
+import { Terminal } from "./Terminal";
 
 interface Tab {
   path: string;
@@ -46,6 +47,7 @@ export function Editor({
   const [quick, setQuick] = useState<string | null>(null);
   const [find, setFind] = useState<string | null>(null);
   const [hits, setHits] = useState<EditorHit[]>([]);
+  const [term, setTerm] = useState(false);
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
 
@@ -222,6 +224,9 @@ export function Editor({
       if (mod && e.key.toLowerCase() === "s") {
         e.preventDefault();
         void save();
+      } else if (e.ctrlKey && e.key === "`") {
+        e.preventDefault();
+        setTerm((t) => !t);
       } else if (mod && e.key.toLowerCase() === "p") {
         e.preventDefault();
         setQuick("");
@@ -274,6 +279,9 @@ export function Editor({
         </button>
         <button type="button" className="rd-btn ghost chip-s" onClick={() => setFind("")}>
           Search <kbd>Ctrl Shift F</kbd>
+        </button>
+        <button type="button" className="rd-btn ghost chip-s" aria-pressed={term} onClick={() => setTerm((t) => !t)}>
+          Terminal <kbd>Ctrl `</kbd>
         </button>
         <button
           type="button"
@@ -346,6 +354,7 @@ export function Editor({
           {!ready && <p className="gd-empty shimmer-text">Opening the editor</p>}
           {ready && !active && <p className="gd-empty">Pick a file, or press Ctrl P.</p>}
           <div ref={host} className="ed-host min-h-0 flex-1" hidden={!active} />
+          {term && <Terminal root={root} />}
         </div>
       </div>
       {quick !== null && (

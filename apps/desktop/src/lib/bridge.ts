@@ -93,6 +93,7 @@ export const EVENTS = {
   aiTool: "ai://tool",
   connectorsDuplicate: "connectors://duplicate",
   libraryFound: "library://found",
+  termData: "term://data",
   aiProposal: "ai://proposal",
   askOpen: "ask://open",
   askClose: "ask://close",
@@ -144,6 +145,7 @@ export interface EventPayloads {
   [EVENTS.aiTool]: { id: string; name: string; label?: string; source?: string | null };
   [EVENTS.connectorsDuplicate]: { app: string; used: string; unused: string[] };
   [EVENTS.libraryFound]: { names: string[] };
+  [EVENTS.termData]: { id: number; data: string | null; done: boolean };
   [EVENTS.aiProposal]: { chatId: string; id: string; label: string; step?: boolean; undoable?: boolean };
   [EVENTS.askOpen]: AskOpen;
   [EVENTS.askClose]: { reason: "close" | "defer"; panelGen?: number };
@@ -261,6 +263,10 @@ export const api = {
     invoke<boolean>("editor_changed", { root, path, stamp }),
   editorHead: (root: string, path: string) => invoke<string>("editor_head", { root, path }),
   editorSearch: (root: string, query: string) => invoke<EditorHit[]>("editor_search", { root, query }),
+  termOpen: (root: string, cols: number, rows: number) => invoke<number>("term_open", { root, cols, rows }),
+  termWrite: (id: number, data: string) => invoke<void>("term_write", { id, data }),
+  termResize: (id: number, cols: number, rows: number) => invoke<void>("term_resize", { id, cols, rows }),
+  termClose: (id: number) => invoke<void>("term_close", { id }),
   capabilitiesGet: (rescan = false) => invoke<CapabilityInfo>("capabilities_get", { rescan }),
   choicesReset: () => invoke<number>("choices_reset"),
   routinesToday: () => invoke<RoutineItem[]>("routines_today"),

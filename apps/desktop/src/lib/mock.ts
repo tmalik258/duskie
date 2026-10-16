@@ -330,6 +330,16 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     go("idle");
   },
   events_recent: () => [],
+  term_open: () => {
+    setTimeout(() => emit("term://data", { id: 1, data: "PS C:\\code\\app> ", done: false }), 50);
+    return 1;
+  },
+  term_write: (a) => {
+    const data = (a as { data: string }).data;
+    emit("term://data", { id: 1, data: data === "\r" ? "\r\nPS C:\\code\\app> " : data, done: false });
+  },
+  term_resize: () => undefined,
+  term_close: () => undefined,
   editor_tree: () => [
     { path: "src", dir: true },
     { path: "src/main.ts", dir: false },

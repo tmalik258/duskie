@@ -52,3 +52,32 @@ pub async fn editor_search(root: String, query: String) -> CmdResult<Vec<Hit>> {
     off_ui(move || workspace::search(&workspace::root_of(&root).map_err(e)?, &query).map_err(e))
         .await?
 }
+
+pub const TERM_EVENT: &str = "term://data";
+
+/// Starts a terminal in the project folder; output arrives as TERM_EVENT.
+#[tauri::command]
+pub fn term_open(app: AppHandle, root: String, cols: u16, rows: u16) -> CmdResult<u32> {
+    let dir = workspace::root_of(&root).map_err(e)?;
+    crate::pty::open(&dir, cols, rows, move |id, data| {
+        let _ = app.emit(
+            TERM_EVENT,
+            serde_json::json!({ "id": id, "data": data, "done": data.is_none() }),
+        );
+    })
+}
+
+#[tauri::command]
+pub fn term_write(id: u32, data: String) -> CmdResult<()> {
+    crate::pty::write(id, &data)
+}
+
+#[tauri::command]
+pub fn term_resize(id: u32, cols: u16, rows: u16) -> CmdResult<()> {
+    crate::pty::resize(id, cols, rows)
+}
+
+#[tauri::command]
+pub fn term_close(id: u32) {
+    crate::pty::close(id);
+}
