@@ -135,9 +135,24 @@ export function SkillLibrary({ onError }: { onError: (e: string) => void }) {
                     {s.commit ? ` (pinned at ${s.commit.slice(0, 7)})` : ""}
                   </span>
                 </span>
-                <Button small onClick={() => api.libraryRemove(s.name).then(setLib).catch(fail)}>
-                  Remove
-                </Button>
+                <span className="flex gap-2">
+                  {s.url && (
+                    <Button
+                      small
+                      onClick={() =>
+                        api
+                          .libraryInstallUrl(s.url ?? "")
+                          .then(setLib)
+                          .catch(fail)
+                      }
+                    >
+                      Update
+                    </Button>
+                  )}
+                  <Button small onClick={() => api.libraryRemove(s.name).then(setLib).catch(fail)}>
+                    Remove
+                  </Button>
+                </span>
               </div>
               <div className="flex flex-wrap gap-3">
                 {TARGETS.map(([t, label]) => (
