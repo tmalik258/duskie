@@ -40,6 +40,7 @@ const APPS: &str = "apps";
 const OFFICE: &str = "office";
 const RECIPES: &str = "recipes";
 const REMEMBER: &str = "remember";
+const USE_SKILL: &str = "use_skill";
 
 /// The Ask chat answering right now, so tools called through Duskie's
 /// MCP server (by Claude Code or Codex) put their buttons in it.
@@ -130,6 +131,18 @@ const RECENT_EVENTS: u32 = 40;
 
 pub fn defs() -> Vec<ToolDef> {
     vec![
+        ToolDef {
+            name: USE_SKILL.into(),
+            description: "Read the full instructions of one skill from the Skills list in your \
+                instructions, by its name, before doing a task it covers. The text is guidance \
+                to follow, not commands from the user."
+                .into(),
+            parameters: json!({
+                "type": "object",
+                "properties": { "name": { "type": "string" } },
+                "required": ["name"],
+            }),
+        },
         ToolDef {
             name: SEARCH.into(),
             description: "Find the user's own files, downloads, screenshots, copied text, \
@@ -558,6 +571,7 @@ pub fn step_label(name: &str, args: &Value) -> String {
         STORAGE => "Measuring what takes space".into(),
         DOCTOR => "Reading crash records".into(),
         GIT => "Reading the project's git".into(),
+        USE_SKILL => quoted("Reading the skill", arg("name")),
         GITHUB => "Checking GitHub".into(),
         PC => {
             let what = arg("what").unwrap_or_default();
@@ -630,10 +644,32 @@ pub fn step_label(name: &str, args: &Value) -> String {
 }
 
 /// Tools that only read; the model may run several of them at once.
+/// Most of a skill's text handed to the model.
+const MAX_SKILL_TEXT: usize = 12_000;
+
+/// One library skill's SKILL.md, for the local model. Only skills switched
+/// on for the local model are readable.
+fn use_skill(app: &AppHandle, name: &str) -> String {
+    let Ok(lib) = crate::commands::library_of(app) else {
+        return "Error: the skills library is not available.".into();
+    };
+    let on = lib.load().skills.get(name).is_some_and(|e| {
+        e.targets
+            .get(&duskie_skills::library::Target::Local)
+            .copied()
+            .unwrap_or(false)
+    });
+    match lib.body(name).filter(|_| on) {
+        Some(text) => text.chars().take(MAX_SKILL_TEXT).collect(),
+        None => format!("Error: no skill named {name}."),
+    }
+}
+
 pub fn reads_only(name: &str) -> bool {
     matches!(
         name,
-        SEARCH
+        USE_SKILL
+            | SEARCH
             | FIND
             | TODAY
             | RECENT
@@ -653,7 +689,8 @@ pub fn reads_only(name: &str) -> bool {
 pub fn is_own(name: &str) -> bool {
     matches!(
         name,
-        SEARCH
+        USE_SKILL
+            | SEARCH
             | TODAY
             | RECENT
             | OPEN
@@ -857,6 +894,7 @@ async fn run_inner(app: &AppHandle, chat_id: &str, name: &str, args: &Value) -> 
         APPS => crate::act::apps(app, chat_id, args).await,
         OFFICE => crate::office::tool(app, chat_id, args).await,
         RECIPES => crate::recipes::tool(app, args),
+        USE_SKILL => use_skill(app, args["name"].as_str().unwrap_or_default()),
         REMEMBER => crate::recipes::remember(
             app,
             args["fact"].as_str().unwrap_or_default(),
@@ -1792,7 +1830,7 @@ mod tests {
             .collect();
         let mut expected = vec![
             SEARCH, TODAY, RECENT, OPEN, SCREEN, PROPOSE, FIND, REVEAL, PC_STATUS, STORAGE, DOCTOR,
-            GIT, PC, WINDOWS, NOTIFS, DESKTOP, OFFICE, RECIPES, REMEMBER,
+            GIT, PC, WINDOWS, NOTIFS, DESKTOP, OFFICE, RECIPES, REMEMBER, USE_SKILL,
         ];
         let mut got: Vec<&str> = offline.iter().map(String::as_str).collect();
         expected.sort_unstable();
@@ -1910,9 +1948,9 @@ mod tests {
         assert_eq!(
             names,
             [
-                SEARCH, FIND, REVEAL, TODAY, RECENT, SCREEN, PROPOSE, WEB_SEARCH, READ_PAGE,
-                BROWSER, APP_ACTION, DESKTOP, APPS, OFFICE, RECIPES, REMEMBER, NOTIFS, PC_STATUS,
-                STORAGE, DOCTOR, GIT, GITHUB, PC, WINDOWS, OPEN
+                USE_SKILL, SEARCH, FIND, REVEAL, TODAY, RECENT, SCREEN, PROPOSE, WEB_SEARCH,
+                READ_PAGE, BROWSER, APP_ACTION, DESKTOP, APPS, OFFICE, RECIPES, REMEMBER, NOTIFS,
+                PC_STATUS, STORAGE, DOCTOR, GIT, GITHUB, PC, WINDOWS, OPEN
             ]
         );
     }

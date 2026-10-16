@@ -587,6 +587,9 @@ pub const FIXED_END: &str = "\n\nRight now:";
 /// Longest page text attached to a chat.
 const MAX_PAGE: usize = 20_000;
 
+/// Most of the prompt the skills list may take.
+const SKILL_INDEX_TOKENS: usize = 400;
+
 async fn system_prompt(app: &AppHandle, attach: &Attach) -> String {
     if attach.skill {
         return format!(
@@ -631,6 +634,14 @@ async fn system_prompt(app: &AppHandle, attach: &Attach) -> String {
     }
     for (label, text) in about.iter().filter(|(_, t)| !t.is_empty()) {
         system.push_str(&format!("\n{label}: {}", text.replace('\n', "; ")));
+    }
+    if let Ok(lib) = crate::commands::library_of(app) {
+        let entries: Vec<_> = lib.load().skills.into_values().collect();
+        let list = duskie_skills::library::index(&entries, "", SKILL_INDEX_TOKENS);
+        if !list.is_empty() {
+            system.push_str("\n\nSkills (call use_skill with a name before a task one covers):\n");
+            system.push_str(&list);
+        }
     }
     if !memory.is_empty() {
         system.push_str("\n\nAbout the user (they asked you to remember):\n");
