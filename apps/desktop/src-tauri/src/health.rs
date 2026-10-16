@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
-use sidekick_core::Event;
+use duskie_core::Event;
 use tauri::{AppHandle, Manager};
 
 use crate::state::{AppState, lock};

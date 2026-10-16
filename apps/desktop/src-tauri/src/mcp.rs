@@ -6,9 +6,9 @@
 //! web page makes (they carry its http(s) origin) are refused. Every tool
 //! call is logged.
 
+use duskie_sensors::http;
+use duskie_skills::{Proposal, ProposedOption, Trust};
 use serde_json::{Value, json};
-use sidekick_sensors::http;
-use sidekick_skills::{Proposal, ProposedOption, Trust};
 use tauri::{AppHandle, Emitter, Manager};
 use tokio::net::{TcpListener, TcpStream};
 

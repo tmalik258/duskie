@@ -6,8 +6,8 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 
 use chrono::{Duration as ChronoDuration, Utc};
-use sidekick_ai::{Decider, Decision, DecisionOption};
-use sidekick_sensors::classify::{ClipKind, clip_kind};
+use duskie_ai::{Decider, Decision, DecisionOption};
+use duskie_sensors::classify::{ClipKind, clip_kind};
 use tauri::{AppHandle, Manager};
 
 use crate::ai;

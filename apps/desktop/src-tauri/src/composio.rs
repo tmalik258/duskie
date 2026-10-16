@@ -12,13 +12,13 @@ use std::time::{Duration, Instant};
 
 use async_trait::async_trait;
 use chrono::Utc;
-use serde::Serialize;
-use serde_json::{Value, json};
-use sidekick_ai::{
+use duskie_ai::{
     AiError, AiProvider, CancellationToken, ChatRequest, McpClient, McpTool, Message, OpenAiCompat,
     Sink, ToolDef, ToolRunner,
 };
-use sidekick_core::{ActionRecord, ComposioSettings};
+use duskie_core::{ActionRecord, ComposioSettings};
+use serde::Serialize;
+use serde_json::{Value, json};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::composio_api as api;
@@ -650,7 +650,7 @@ impl AiProvider for LocalWithTools {
             .messages
             .iter()
             .rev()
-            .find(|m| m.role == sidekick_ai::Role::User)
+            .find(|m| m.role == duskie_ai::Role::User)
             .map(|m| m.content.as_str())
             .unwrap_or_default();
         let started = std::time::Instant::now();
@@ -888,7 +888,7 @@ pub fn from_claude_config(claude_json: &str) -> Option<(String, BTreeMap<String,
 
 /// A file with the chat so far, for Claude Code to pick up.
 pub fn handoff_markdown(
-    messages: &[sidekick_ai::Message],
+    messages: &[duskie_ai::Message],
     reason: Option<&str>,
     context: &crate::ai::Context,
 ) -> String {
@@ -914,8 +914,8 @@ pub fn handoff_markdown(
     md.push_str("\n## Conversation\n");
     for m in messages {
         let who = match m.role {
-            sidekick_ai::Role::User => "User",
-            sidekick_ai::Role::Assistant => "Duskie",
+            duskie_ai::Role::User => "User",
+            duskie_ai::Role::Assistant => "Duskie",
         };
         md.push_str(&format!("\n**{who}:**\n\n{}\n", m.content.trim()));
     }
@@ -1344,9 +1344,9 @@ mod tests {
     #[test]
     fn handoff_file_carries_the_conversation() {
         let messages = vec![
-            sidekick_ai::Message::user("Move my Jira ticket ABC-1 to Done"),
-            sidekick_ai::Message {
-                role: sidekick_ai::Role::Assistant,
+            duskie_ai::Message::user("Move my Jira ticket ABC-1 to Done"),
+            duskie_ai::Message {
+                role: duskie_ai::Role::Assistant,
                 content: "I can only read; Claude Code can do it.".into(),
             },
         ];

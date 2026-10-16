@@ -5,7 +5,7 @@
 
 use std::path::{Path, PathBuf};
 
-use sidekick_core::migrate::{self, Outcome};
+use duskie_core::migrate::{self, Outcome};
 use tauri::{AppHandle, Manager};
 
 /// The app's identifier and product name before the rename, worked out from

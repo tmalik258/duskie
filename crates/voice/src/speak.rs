@@ -428,7 +428,7 @@ mod tests {
     }
 
     /// Runs the real model when it is on disk:
-    /// `DUSKIE_VOICE_MODELS=<folder holding the voice model> cargo test -p sidekick-voice -- --ignored`
+    /// `DUSKIE_VOICE_MODELS=<folder holding the voice model> cargo test -p duskie-voice -- --ignored`
     #[test]
     #[ignore = "needs the downloaded voice model"]
     fn speaks_with_the_real_model() {

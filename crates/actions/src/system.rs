@@ -4,7 +4,7 @@ use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 
-use sidekick_sensors::classify::{ClipKind, clip_kind};
+use duskie_sensors::classify::{ClipKind, clip_kind};
 
 use crate::{ActionError, Outcome, file_name};
 

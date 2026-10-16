@@ -6,7 +6,7 @@
 # Remove the registry key when finished (see docs/debugging.md).
 
 $ErrorActionPreference = "Stop"
-$exe = "sidekick-desktop.exe"
+$exe = "duskie-desktop.exe"
 $dumpDir = Join-Path $env:USERPROFILE "SidekickDumps"
 New-Item -ItemType Directory -Force -Path $dumpDir | Out-Null
 

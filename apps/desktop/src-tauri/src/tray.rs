@@ -1,4 +1,4 @@
-use sidekick_core::Pause;
+use duskie_core::Pause;
 use tauri::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{AppHandle, Wry};

@@ -17,11 +17,11 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::{LazyLock, Mutex};
 use std::time::{Duration, Instant};
 
+use duskie_core::{Event, NotificationSettings};
+use duskie_sensors::toasts::{self, Toast};
 use regex::Regex;
 use serde::Serialize;
 use serde_json::json;
-use sidekick_core::{Event, NotificationSettings};
-use sidekick_sensors::toasts::{self, Toast};
 use tauri::{AppHandle, Manager};
 
 use crate::state::{AppState, lock};
@@ -507,9 +507,9 @@ async fn judge(
         t.body.chars().take(400).collect::<String>()
     ));
     let model = crate::ai::local_model(&settings.ai);
-    let req = sidekick_ai::ChatRequest {
+    let req = duskie_ai::ChatRequest {
         system: JUDGE_SYSTEM.into(),
-        messages: vec![sidekick_ai::Message::user(prompt)],
+        messages: vec![duskie_ai::Message::user(prompt)],
         image: None,
         think: false,
     };
@@ -595,7 +595,7 @@ const IGNORE_NOTIFY: &[&str] = &[
     "screenclippinghost",
 ];
 
-fn denied(app_name: &str, s: &sidekick_core::Settings) -> bool {
+fn denied(app_name: &str, s: &duskie_core::Settings) -> bool {
     let lower = app_name.to_lowercase();
     let stem = lower.trim_end_matches(".exe");
     IGNORE_NOTIFY.contains(&stem)
@@ -604,7 +604,7 @@ fn denied(app_name: &str, s: &sidekick_core::Settings) -> bool {
             .any(|d| d.trim_end_matches(".exe").eq_ignore_ascii_case(stem))
 }
 
-async fn take(app: &AppHandle, settings: &sidekick_core::Settings, t: Toast, think: bool) {
+async fn take(app: &AppHandle, settings: &duskie_core::Settings, t: Toast, think: bool) {
     if denied(&t.app, settings) {
         return;
     }
@@ -726,7 +726,7 @@ fn first_link(text: &str) -> Option<String> {
 
 /// Messages gathered since the last card, as one card, at most every
 /// `SOON_EVERY`. During a meeting the card waits (suggestions handle that).
-fn flush_soon(app: &AppHandle, settings: &sidekick_core::Settings) {
+fn flush_soon(app: &AppHandle, settings: &duskie_core::Settings) {
     let pending = {
         let mut i = inbox();
         let due = i.last_soon.is_none_or(|t| t.elapsed() >= SOON_EVERY);

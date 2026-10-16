@@ -5,11 +5,11 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError, RwLock};
 use std::time::Instant;
 
 use chrono::{DateTime, Utc};
+use duskie_actions::{Capabilities, Executor};
+use duskie_core::{EventBus, MascotMachine, Settings, Storage};
+use duskie_sensors::{GateState, SensorGateHandle};
+use duskie_skills::{Engine, Env, Proposal, Skill, Trust};
 use serde::{Deserialize, Serialize};
-use sidekick_actions::{Capabilities, Executor};
-use sidekick_core::{EventBus, MascotMachine, Settings, Storage};
-use sidekick_sensors::{GateState, SensorGateHandle};
-use sidekick_skills::{Engine, Env, Proposal, Skill, Trust};
 
 /// Every sensor the app can run, in the order shown in settings.
 pub const SENSOR_IDS: [&str; 11] = [
@@ -54,7 +54,7 @@ pub struct AppState {
     /// The last app the user was in (payload of `window.focused`).
     pub last_window: Mutex<Option<serde_json::Value>>,
     /// Chats in flight, so they can be cancelled.
-    pub chats: Mutex<HashMap<String, sidekick_ai::CancellationToken>>,
+    pub chats: Mutex<HashMap<String, duskie_ai::CancellationToken>>,
     /// Actions Ask offered as buttons, waiting for a tap.
     pub ask_proposals: Mutex<HashMap<String, crate::ask_tools::Proposed>>,
     /// Empty folder Claude Code runs in, so it has no project to touch.
@@ -69,7 +69,7 @@ pub struct AppState {
     /// Time per app and project.
     pub tracker: crate::timetrack::Tracker,
     /// Commands for the browser extension.
-    pub browser: sidekick_sensors::BrowserBridge,
+    pub browser: duskie_sensors::BrowserBridge,
     /// The pairing code the extension must send.
     pub browser_token: String,
     /// Bearer token for the MCP server.
@@ -83,9 +83,9 @@ pub struct AppState {
     /// Ranking picks per skill and app, from earlier decisions.
     pub decisions: Mutex<crate::decide::Cache>,
     pub voice: crate::voice::Voice,
-    pub calendar: sidekick_sensors::Calendar,
+    pub calendar: duskie_sensors::Calendar,
     /// Claude Code permission requests waiting on the island.
-    pub approvals: sidekick_sensors::Approvals,
+    pub approvals: duskie_sensors::Approvals,
     /// Duskie's app data folder.
     pub data_dir: PathBuf,
     /// The background features (brief, moments, search, updates...) are
@@ -238,7 +238,7 @@ impl Env for AppEnv<'_> {
     }
 
     fn default_browser_id(&self) -> Option<String> {
-        sidekick_actions::default_browser()
+        duskie_actions::default_browser()
             .filter(|id| self.caps.browser(id).is_some())
             .map(|id| id.to_string())
     }
@@ -247,7 +247,7 @@ impl Env for AppEnv<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use sidekick_core::Pause;
+    use duskie_core::Pause;
 
     #[test]
     fn hit_rect_contains_edges() {

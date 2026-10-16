@@ -1,8 +1,8 @@
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
+use duskie_core::{Event, EventBus};
 use listeners::{Protocol, SocketState};
-use sidekick_core::{Event, EventBus};
 use tokio::task::JoinHandle;
 
 use crate::{Sensor, SensorGate};
@@ -34,8 +34,8 @@ const IGNORED: &[&str] = &[
     "discord.exe",
     "spotify.exe",
     "onedrive.exe",
-    "sidekick-desktop.exe",
-    "sidekick-desktop",
+    "duskie-desktop.exe",
+    "duskie-desktop",
     "systemd",
     "systemd-resolved",
     "sshd",

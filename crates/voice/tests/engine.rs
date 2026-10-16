@@ -2,13 +2,13 @@
 //! question, the engine must wake and transcribe it. Needs the models, so it
 //! only runs when DUSKIE_VOICE_MODELS points at a folder holding them.
 
-use sherpa_onnx::OfflineTts;
-use sidekick_voice::audio::Resampler;
-use sidekick_voice::listen::Engine;
-use sidekick_voice::text::strip_wake;
-use sidekick_voice::{
+use duskie_voice::audio::Resampler;
+use duskie_voice::listen::Engine;
+use duskie_voice::text::strip_wake;
+use duskie_voice::{
     DEFAULT_VOICE, Heard, MIC_RATE, VOICES, respell, speaker_id, synthesize, tts_config,
 };
+use sherpa_onnx::OfflineTts;
 
 #[test]
 fn wakes_and_transcribes_spoken_audio() {

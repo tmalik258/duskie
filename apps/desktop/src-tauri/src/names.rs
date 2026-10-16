@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 use std::time::Duration;
 
-use sidekick_core::names::{NameHit, NameIndex};
+use duskie_core::names::{NameHit, NameIndex};
 use tauri::{AppHandle, Manager};
 
 use crate::state::AppState;
@@ -47,7 +47,7 @@ pub fn start(app: &AppHandle) {
     std::thread::spawn(move || {
         std::thread::sleep(FIRST_WAIT);
         loop {
-            if due() && sidekick_sensors::on_mains() && !crate::state::is_paused(&app) {
+            if due() && duskie_sensors::on_mains() && !crate::state::is_paused(&app) {
                 build(&app);
             }
             std::thread::sleep(CHECK_EVERY);
@@ -70,7 +70,7 @@ fn build(app: &AppHandle) {
     // Stops (keeping the old index) if the PC goes on battery or Duskie is paused.
     // Yields 2 ms every ~2 048 files so foreground disk I/O (SQLite, git) is not starved.
     let result = writer.rebuild(&drive_roots(), || {
-        if !sidekick_sensors::on_mains() || crate::state::is_paused(app) {
+        if !duskie_sensors::on_mains() || crate::state::is_paused(app) {
             return false;
         }
         std::thread::sleep(Duration::from_millis(2));

@@ -11,7 +11,7 @@ a dump.
 In an **elevated** PowerShell (once per machine):
 
 ```powershell
-$exe = "sidekick-desktop.exe"
+$exe = "duskie-desktop.exe"
 $dumpDir = "$env:USERPROFILE\DuskieDumps"
 New-Item -ItemType Directory -Force -Path $dumpDir | Out-Null
 $reg = "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\$exe"
@@ -30,14 +30,14 @@ WebView2 / `ntdll!RtlpHeap*`). Do not commit dump files.
 To remove the rule later:
 
 ```powershell
-Remove-Item -Recurse -Force "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\sidekick-desktop.exe"
+Remove-Item -Recurse -Force "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\duskie-desktop.exe"
 ```
 
 ### PageHeap (only if the dump stack is useless)
 
 Full PageHeap catches the bad write at the cost of heavy memory and speed. Use it
 only on a dedicated repro, then turn it off. Install the Windows SDK Debugging Tools
-and use `gflags` / Application Verifier on `sidekick-desktop.exe` — never leave it
+and use `gflags` / Application Verifier on `duskie-desktop.exe` — never leave it
 on for normal development.
 
 ## UI thread holds

@@ -1,5 +1,5 @@
 [package]
-name = "sidekick-ai"
+name = "duskie-ai"
 description = "AI for Duskie: Claude Code CLI, local models, the Anthropic API, and SemIf decisions"
 version.workspace = true
 edition.workspace = true

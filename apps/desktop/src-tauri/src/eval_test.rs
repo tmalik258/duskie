@@ -3,16 +3,16 @@
 //! is ignored by default and runs before each release against a local
 //! Ollama:
 //!
-//! DUSKIE_EVAL_MODEL=qwen3:4b cargo test -p sidekick-desktop eval -- --ignored --nocapture
+//! DUSKIE_EVAL_MODEL=qwen3:4b cargo test -p duskie-desktop eval -- --ignored --nocapture
 //!
 //! DUSKIE_EVAL_URL changes the server and DUSKIE_EVAL_MIN the pass rate
 //! (0.85 by default).
 
 use std::sync::Mutex;
 
+use duskie_ai::{CancellationToken, ChatRequest, Message, OpenAiCompat, Sink, ToolRunner};
 use serde::Deserialize;
 use serde_json::Value;
-use sidekick_ai::{CancellationToken, ChatRequest, Message, OpenAiCompat, Sink, ToolRunner};
 
 const PROMPTS: &str = include_str!("../evals/prompts.json");
 

@@ -6,9 +6,9 @@
 
 use std::path::{Path, PathBuf};
 
+use duskie_core::Settings;
 use serde::Serialize;
 use serde_json::Value;
-use sidekick_core::Settings;
 use tauri::{AppHandle, Manager};
 
 use crate::state::{AppState, lock};
@@ -224,7 +224,7 @@ impl Agent {
     fn info(self, s: &Settings) -> AgentInfo {
         let installed = self.resolve(s).is_some();
         let signed_in = if installed { self.signed_in() } else { None };
-        let limited = self == Agent::ClaudeCode && sidekick_ai::claude_code_limited();
+        let limited = self == Agent::ClaudeCode && duskie_ai::claude_code_limited();
         // Cursor the app ≠ cursor-agent. When the IDE is here but the agent
         // CLI is not, say that clearly so the picker does not look wrong.
         let fix = if !installed {
@@ -276,7 +276,7 @@ pub fn status(s: &Settings) -> Agents {
 
 /// Claude Code out of usage counts as missing while Codex can take over.
 fn usable(claude: bool, codex: bool) -> bool {
-    claude && !(codex && sidekick_ai::claude_code_limited())
+    claude && !(codex && duskie_ai::claude_code_limited())
 }
 
 pub const HANDOFF_PROMPT: &str =
@@ -323,7 +323,7 @@ pub fn codex_composio_args(
 /// Saves the conversation for an agent to pick up; returns its folder.
 pub fn write_handoff(
     app: &AppHandle,
-    messages: &[sidekick_ai::Message],
+    messages: &[duskie_ai::Message],
     reason: Option<&str>,
 ) -> Result<PathBuf, String> {
     let dir = app.state::<AppState>().ai_workdir.join("handoff");
@@ -343,7 +343,7 @@ pub fn write_handoff(
 /// trust it only once. Returns the agent's name.
 pub async fn hand_off(
     app: &AppHandle,
-    messages: &[sidekick_ai::Message],
+    messages: &[duskie_ai::Message],
     reason: Option<&str>,
 ) -> Result<String, String> {
     let state = app.state::<AppState>();

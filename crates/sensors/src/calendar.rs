@@ -8,9 +8,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use chrono::{DateTime, Local, NaiveDate, TimeZone, Utc};
+use duskie_core::{Event, EventBus, Sensitivity};
 use serde::Serialize;
 use serde_json::Value;
-use sidekick_core::{Event, EventBus, Sensitivity};
 use tokio::task::JoinHandle;
 
 use crate::{Sensor, SensorGate};

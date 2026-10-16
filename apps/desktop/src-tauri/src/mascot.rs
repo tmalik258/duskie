@@ -3,7 +3,7 @@
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use sidekick_core::{MascotEvent, MascotState, Transition};
+use duskie_core::{MascotEvent, MascotState, Transition};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::state::{AppState, lock};

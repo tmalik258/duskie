@@ -5,10 +5,10 @@ use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 use chrono::Utc;
+use duskie_actions::is_safe;
+use duskie_core::{ActionRecord, MascotEvent, MascotState};
+use duskie_skills::{Proposal, ProposedOption, Trust};
 use serde::Serialize;
-use sidekick_actions::is_safe;
-use sidekick_core::{ActionRecord, MascotEvent, MascotState};
-use sidekick_skills::{Proposal, ProposedOption, Trust};
 use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
@@ -505,7 +505,7 @@ fn show(app: &AppHandle, proposal: Proposal) {
 pub fn can_always(proposal: &Proposal, index: usize, action: &str) -> bool {
     proposal.trust == Trust::Suggest
         && crate::learn::can_automate(&proposal.skill_id)
-        && sidekick_actions::is_safe(action)
+        && duskie_actions::is_safe(action)
         && (index == 0 || proposal.remember.is_some())
 }
 
@@ -610,7 +610,7 @@ fn run_choice(app: &AppHandle, id: &str, index: usize, auto: bool) -> Result<(),
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let result = execute(&app, &option).await;
-        if let Ok(sidekick_actions::Outcome {
+        if let Ok(duskie_actions::Outcome {
             path: Some(path), ..
         }) = &result
         {
@@ -660,7 +660,7 @@ fn run_choice(app: &AppHandle, id: &str, index: usize, auto: bool) -> Result<(),
 async fn execute(
     app: &AppHandle,
     option: &ProposedOption,
-) -> Result<sidekick_actions::Outcome, String> {
+) -> Result<duskie_actions::Outcome, String> {
     // App-level actions that need the window system rather than the OS.
     let arg = |name: &str| option.args[name].as_str().filter(|s| !s.is_empty());
     match option.action.as_str() {
@@ -675,21 +675,21 @@ async fn execute(
                     ..Default::default()
                 },
             );
-            return Ok(sidekick_actions::Outcome {
+            return Ok(duskie_actions::Outcome {
                 message: "Asking Duskie".into(),
                 path: None,
             });
         }
         "health_fix" => {
             let message = crate::health::fix(app, arg("what").unwrap_or_default()).await?;
-            return Ok(sidekick_actions::Outcome {
+            return Ok(duskie_actions::Outcome {
                 message,
                 path: None,
             });
         }
         "install_update" => {
             let message = crate::updates::install(app).await?;
-            return Ok(sidekick_actions::Outcome {
+            return Ok(duskie_actions::Outcome {
                 message,
                 path: None,
             });
@@ -702,12 +702,12 @@ async fn execute(
             )?;
             let state = app.state::<AppState>();
             if !state.approvals.decide(id, Some(true)) {
-                return Ok(sidekick_actions::Outcome {
+                return Ok(duskie_actions::Outcome {
                     message: "Saved for next time; answer this one in the terminal".into(),
                     path: None,
                 });
             }
-            return Ok(sidekick_actions::Outcome {
+            return Ok(duskie_actions::Outcome {
                 message: format!(
                     "Allowed, and from now on in this project: {}",
                     arg("rule").unwrap_or_default()
@@ -721,7 +721,7 @@ async fn execute(
             if !app.state::<AppState>().approvals.decide(id, Some(allow)) {
                 return Err("The extension stopped waiting; press Connect in it again.".into());
             }
-            return Ok(sidekick_actions::Outcome {
+            return Ok(duskie_actions::Outcome {
                 message: if allow {
                     "Browser connected".into()
                 } else {
@@ -741,7 +741,7 @@ async fn execute(
             if !state.approvals.decide(id, answer) {
                 return Err("Claude Code already moved on; answer in the terminal.".into());
             }
-            return Ok(sidekick_actions::Outcome {
+            return Ok(duskie_actions::Outcome {
                 message: match answer {
                     Some(true) => "Allowed".into(),
                     Some(false) => "Denied".into(),
@@ -753,7 +753,7 @@ async fn execute(
         "restore_layout" => {
             return crate::layout::restore(app)
                 .await
-                .map(|message| sidekick_actions::Outcome {
+                .map(|message| duskie_actions::Outcome {
                     message,
                     path: None,
                 });
@@ -761,7 +761,7 @@ async fn execute(
         "summarize_file" => {
             return crate::files::summarize(app, arg("path").unwrap_or_default())
                 .await
-                .map(|message| sidekick_actions::Outcome {
+                .map(|message| duskie_actions::Outcome {
                     message,
                     path: None,
                 });
@@ -791,7 +791,7 @@ async fn execute(
                 arg("dir").unwrap_or_default(),
             );
             crate::clone::keep_rule(app, owner, dir)?;
-            return Ok(sidekick_actions::Outcome {
+            return Ok(duskie_actions::Outcome {
                 message: format!("Saved. {owner} repos go to {dir} from now on"),
                 path: None,
             });
@@ -805,7 +805,7 @@ async fn execute(
                     ..Default::default()
                 },
             );
-            return Ok(sidekick_actions::Outcome {
+            return Ok(duskie_actions::Outcome {
                 message: "Opened Agents".into(),
                 path: None,
             });
@@ -817,7 +817,7 @@ async fn execute(
                 arg("title").unwrap_or("the meeting"),
             )
             .await
-            .map(|message| sidekick_actions::Outcome {
+            .map(|message| duskie_actions::Outcome {
                 message,
                 path: None,
             });
@@ -831,21 +831,21 @@ async fn execute(
                     ..Default::default()
                 },
             );
-            return Ok(sidekick_actions::Outcome {
+            return Ok(duskie_actions::Outcome {
                 message: "Opened Memory".into(),
                 path: None,
             });
         }
         "skill_auto" => {
             let skill = arg("skill").ok_or("no skill")?;
-            return crate::learn::make_auto(app, skill).map(|message| sidekick_actions::Outcome {
+            return crate::learn::make_auto(app, skill).map(|message| duskie_actions::Outcome {
                 message,
                 path: None,
             });
         }
         "save_log" => {
             let (message, path) = crate::moments::save_log(arg("text").unwrap_or_default())?;
-            return Ok(sidekick_actions::Outcome {
+            return Ok(duskie_actions::Outcome {
                 message,
                 path: Some(path),
             });
@@ -861,14 +861,14 @@ async fn execute(
                 "routine_off" => crate::routines::set_off(app)?,
                 _ => crate::routines::set_auto(app, arg("on") == Some("true"))?,
             };
-            return Ok(sidekick_actions::Outcome {
+            return Ok(duskie_actions::Outcome {
                 message,
                 path: None,
             });
         }
         "recipe_run" => {
             let message = crate::recipes::run_by_id(app, arg("id").unwrap_or_default())?;
-            return Ok(sidekick_actions::Outcome {
+            return Ok(duskie_actions::Outcome {
                 message,
                 path: None,
             });
@@ -876,13 +876,13 @@ async fn execute(
         "recipe_save" => {
             let message = crate::recipes::save(
                 app,
-                sidekick_core::Recipe {
+                duskie_core::Recipe {
                     name: arg("name").unwrap_or_default().to_owned(),
                     prompt: arg("prompt").unwrap_or_default().to_owned(),
                     ..Default::default()
                 },
             )?;
-            return Ok(sidekick_actions::Outcome {
+            return Ok(duskie_actions::Outcome {
                 message,
                 path: None,
             });
@@ -892,7 +892,7 @@ async fn execute(
                 .and_then(crate::inbox::Level::parse)
                 .ok_or("pick now, soon, digest or never")?;
             let message = crate::inbox::set_level(app, arg("app").unwrap_or_default(), level)?;
-            return Ok(sidekick_actions::Outcome {
+            return Ok(duskie_actions::Outcome {
                 message,
                 path: None,
             });
@@ -912,7 +912,7 @@ fn log_action(
     app: &AppHandle,
     proposal: &Proposal,
     option: &ProposedOption,
-    result: &Result<sidekick_actions::Outcome, String>,
+    result: &Result<duskie_actions::Outcome, String>,
     auto: bool,
 ) -> Option<i64> {
     let record = ActionRecord {

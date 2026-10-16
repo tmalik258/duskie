@@ -234,7 +234,7 @@ mod tests {
 
     #[test]
     fn unpacks_only_what_is_needed_and_refuses_escapes() {
-        let dir = std::env::temp_dir().join(format!("sidekick-voice-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("duskie-voice-{}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).unwrap();
         let model = Model {

@@ -1,5 +1,5 @@
 [package]
-name = "sidekick-actions"
+name = "duskie-actions"
 description = "Built-in actions Duskie can run, and detection of installed browsers and tools"
 version.workspace = true
 edition.workspace = true
@@ -13,7 +13,7 @@ dirs = "7"
 open = "5"
 serde.workspace = true
 serde_json.workspace = true
-sidekick-sensors.workspace = true
+duskie-sensors.workspace = true
 sysinfo = { version = "0.39", default-features = false, features = ["system"] }
 thiserror.workspace = true
 tokio = { workspace = true, features = ["process"] }
