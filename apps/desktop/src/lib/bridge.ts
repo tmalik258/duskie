@@ -364,6 +364,7 @@ export const api = {
   attentionLessons: () => invoke<LessonRow[]>("attention_lessons"),
   attentionActed: (key: string) => invoke<void>("attention_acted", { key }),
   attentionShowLess: (key: string) => invoke<void>("attention_show_less", { key }),
+  mcpValidateStdio: (spec: { command: string; args: string[] }) => invoke<void>("mcp_validate_stdio", { spec }),
   attentionReset: (scope: string) => invoke<void>("attention_reset", { scope }),
   gitStatus: (path: string) => invoke<GitFile[]>("git_status", { path }),
   gitStage: (path: string, files: string[]) => invoke<string>("git_stage", { path, files }),

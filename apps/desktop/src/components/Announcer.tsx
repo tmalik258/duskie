@@ -2,10 +2,12 @@
 
 // What a screen reader hears: state changes (listening, working, done, an
 // agent waiting) and answers a sentence or two at a time as they stream,
-// instead of every token or nothing at all.
+// instead of every token or nothing at all. Redesign path prefers the
+// registry announce string so the island and this stay in sync.
 
 import { useEffect, useRef, useState } from "react";
 import { useAgents } from "@/lib/agents";
+import { type IslandStateId, stateDef } from "@/lib/island-states";
 import { useDuskie } from "@/lib/store";
 import type { MascotState } from "@/lib/types";
 
@@ -34,7 +36,7 @@ export function nextChunk(text: string, said: number, done: boolean): [string, n
 /** Markdown marks read as words otherwise ("asterisk asterisk"). */
 const plain = (t: string) => t.replace(/[*_`#>|]+/g, "").replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
 
-export function Announcer() {
+export function Announcer({ registryId }: { registryId?: IslandStateId | null }) {
   const [line, setLine] = useState("");
   const said = useRef({ id: "", n: 0 });
   const mascot = useDuskie((s) => s.mascot);
@@ -43,9 +45,14 @@ export function Announcer() {
   const waiting = useAgents((s) => s.sessions.find((x) => x.question));
 
   useEffect(() => {
+    if (registryId) {
+      const word = stateDef(registryId).announce;
+      if (word) setLine(word);
+      return;
+    }
     const word = STATE_WORDS[mascot];
     if (word) setLine(word);
-  }, [mascot]);
+  }, [mascot, registryId]);
 
   useEffect(() => {
     if (last?.role !== "assistant") return;

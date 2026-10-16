@@ -6,6 +6,7 @@ import { acceptActivities, activityElapsedSecs, activityLabel, dismissLocal } fr
 import { useAgents } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { useNow } from "@/lib/hooks";
+import { useDuskie } from "@/lib/store";
 import type { Activity as ActivityItem } from "@/lib/types";
 import { VoiceBars } from "./AskPanel";
 import { Icon } from "./Icon";
@@ -197,6 +198,7 @@ export function VoicePill({
   onCancel?: () => void;
 }) {
   const now = useNow(1000);
+  const redesign = useDuskie((s) => s.settings.redesign.enabled);
   const elapsed = activity ? activityElapsedSecs(activity, now) : null;
   // Compact pill always offers icon actions when an activity is on screen.
   const showActions = !!activity;
@@ -213,22 +215,28 @@ export function VoicePill({
       cancel: !!onCancel || !!focus,
       indicator: !!(thinking || working || done || waiting || failed || asks || (dots && dots.length > 0)),
     });
+  const warn = redesign ? "bg-(--warn)" : "bg-[#ff9f0a]";
+  const inkStrong = redesign ? "text-(--ink)" : "text-white/90";
+  const inkSoft = redesign ? "text-(--ink-2)" : "text-white/62";
+  const iconBtn = redesign
+    ? "chip grid size-6 place-items-center rounded-[8px] text-(--ink-2) hover:bg-(--fill-2) hover:text-(--ink)"
+    : "chip grid size-6 place-items-center rounded-full text-white/55 hover:bg-white/10 hover:text-white";
+  const stopBtn = redesign
+    ? "chip grid size-6 shrink-0 place-items-center rounded-[8px] bg-(--fill-2) hover:bg-(--fill-3)"
+    : "chip grid size-6 shrink-0 place-items-center rounded-full bg-white/[0.09] hover:bg-white/[0.15]";
+  const stopMark = redesign ? "size-2 rounded-[2px] bg-(--ink)" : "size-2 rounded-[2px] bg-white";
   const indicator = failed ? (
     <span role="img" aria-label="Failed" className="size-2 shrink-0 rounded-full bg-red-400" />
   ) : waiting ? (
-    <span
-      role="img"
-      aria-label="Waiting for confirmed progress"
-      className="size-2 shrink-0 rounded-full bg-[#ff9f0a]"
-    />
+    <span role="img" aria-label="Waiting for confirmed progress" className={`size-2 shrink-0 rounded-full ${warn}`} />
   ) : done ? (
-    <span className="shrink-0 text-[#30d158]">
+    <span className={`shrink-0 ${redesign ? "text-(--ok,#30d158)" : "text-[#30d158]"}`}>
       <Icon name="check" size={14} />
     </span>
   ) : asks ? (
     <span className="relative flex size-2 shrink-0" role="img" aria-label="Waiting for you">
-      <span className="absolute inset-0 animate-ping rounded-full bg-[#ff9f0a]/60 motion-reduce:animate-none" />
-      <span className="relative size-2 rounded-full bg-[#ff9f0a]" />
+      <span className={`absolute inset-0 animate-ping rounded-full opacity-60 motion-reduce:animate-none ${warn}`} />
+      <span className={`relative size-2 rounded-full ${warn}`} />
     </span>
   ) : dots && dots.length > 1 ? (
     <AgentRing states={dots} />
@@ -237,7 +245,7 @@ export function VoicePill({
   ) : null;
   const labelClass = `text-[12.5px] font-medium ${
     listening ? "min-w-0 flex-1 truncate" : clip ? "min-w-0 truncate" : "shrink-0"
-  } ${text.trim() || thinking || working ? "text-white/90" : "text-white/62"}`;
+  } ${text.trim() || thinking || working ? inkStrong : inkSoft}`;
   const labelInner = <span className="min-w-0 truncate">{label}</span>;
   const labelEl = onOpen ? (
     <button type="button" onClick={onOpen} className={`text-left ${labelClass}`}>
@@ -260,7 +268,7 @@ export function VoicePill({
               .then(acceptActivities)
               .catch(() => {});
           }}
-          className="chip grid size-6 place-items-center rounded-full text-white/55 hover:bg-white/10 hover:text-white"
+          className={iconBtn}
         >
           <Icon name="refresh" size={12} />
         </button>
@@ -274,7 +282,7 @@ export function VoicePill({
             if (activity.source === "open") dismissLocal(activity.id);
             void api.activityDismiss(activity.id).catch(() => {});
           }}
-          className="chip grid size-6 place-items-center rounded-full text-white/55 hover:bg-white/10 hover:text-white"
+          className={iconBtn}
         >
           <Icon name="close" size={12} />
         </button>
@@ -287,9 +295,10 @@ export function VoicePill({
     if (focus) void api.focusStop();
     else onCancel?.();
   };
+  const pillH = redesign ? "h-[38px]" : "h-9";
   return (
     <motion.div
-      className={`absolute top-0 right-0 flex h-9 items-center ${listening ? "gap-2.5 pr-3.5" : "pr-2"}`}
+      className={`absolute top-0 right-0 flex ${pillH} items-center ${listening ? "gap-2.5 pr-3.5" : "pr-2"}`}
       style={{ left: COMPACT.height + 4 }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1, transition: { delay: 0.1, duration: 0.2 } }}
@@ -308,9 +317,9 @@ export function VoicePill({
                 e.stopPropagation();
                 void api.voiceStop();
               }}
-              className="chip grid size-6 shrink-0 place-items-center rounded-full bg-white/[0.09] hover:bg-white/[0.15]"
+              className={stopBtn}
             >
-              <span className="size-2 rounded-[2px] bg-white" />
+              <span className={stopMark} />
             </button>
           </Tip>
         </>
@@ -318,7 +327,7 @@ export function VoicePill({
         <div className="flex min-w-0 max-w-full items-center gap-1.5">
           {labeled}
           {elapsed !== null && (
-            <span className="shrink-0 text-[12.5px] font-medium text-white/90 tabular-nums">· {elapsed}s</span>
+            <span className={`shrink-0 text-[12.5px] font-medium tabular-nums ${inkStrong}`}>· {elapsed}s</span>
           )}
           {indicator && <span className="flex shrink-0 items-center">{indicator}</span>}
           {actions}
@@ -331,9 +340,9 @@ export function VoicePill({
                   e.stopPropagation();
                   runCancel();
                 }}
-                className="chip grid size-6 shrink-0 place-items-center rounded-full bg-white/[0.09] hover:bg-white/[0.15]"
+                className={stopBtn}
               >
-                <span className="size-2 rounded-[2px] bg-white" />
+                <span className={stopMark} />
               </button>
             </Tip>
           )}

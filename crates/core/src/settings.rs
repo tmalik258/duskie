@@ -101,6 +101,8 @@ pub struct Settings {
     pub semantic_search: SemanticSearch,
     /// The new island look; off by default.
     pub redesign: Redesign,
+    /// MCP servers the user connected directly (stdio), preferred over Composio.
+    pub direct_mcp: DirectMcp,
     /// The first-run welcome was finished or skipped.
     pub onboarded: bool,
     /// Step index inside the welcome flow (0-based). Kept so a restart
@@ -298,6 +300,35 @@ pub const DEFAULT_DENY_APPS: &[&str] = &[
 #[serde(rename_all = "camelCase", default)]
 pub struct Redesign {
     pub enabled: bool,
+}
+
+/// One MCP server started as a program on this PC (no shell).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct DirectMcpServer {
+    pub id: String,
+    pub name: String,
+    /// Program path or name; never a shell command line.
+    pub command: String,
+    pub args: Vec<String>,
+}
+
+impl Default for DirectMcpServer {
+    fn default() -> Self {
+        Self {
+            id: String::new(),
+            name: String::new(),
+            command: String::new(),
+            args: Vec::new(),
+        }
+    }
+}
+
+/// Direct MCP connections the user added in Settings > Apps.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct DirectMcp {
+    pub servers: Vec<DirectMcpServer>,
 }
 
 /// Search by meaning with an embedding model on this PC.
@@ -713,6 +744,7 @@ impl Default for Settings {
             composio: ComposioSettings::default(),
             semantic_search: SemanticSearch::default(),
             redesign: Redesign::default(),
+            direct_mcp: DirectMcp::default(),
             onboarded: false,
             welcome_step: 0,
             check_updates: true,

@@ -39,8 +39,12 @@ export function motionFor(spec: SpringSpec, reduced: boolean): SpringTransition 
 
 /** The island's shared springs. */
 export const SPRINGS = {
-  /** Size and shape changes of the island. */
+  /** Size and shape changes of the island (legacy path). */
   morph: { response: 0.42, damping: 0.86 },
+  /** Prototype GROW: opening into a card or panel. */
+  grow: { response: 0.46, damping: 0.78 },
+  /** Prototype SETTLE: size changes while already open. */
+  settle: { response: 0.38, damping: 0.97 },
   /** Small things appearing: chips, rows, badges. */
   pop: { response: 0.3, damping: 0.72 },
   /** Panels and docks sliding in. */

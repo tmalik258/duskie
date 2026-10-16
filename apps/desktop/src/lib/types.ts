@@ -28,6 +28,18 @@ export interface Transition {
 
 export type Pause = { kind: "none" } | { kind: "until"; until: string } | { kind: "indefinite" };
 
+/** One MCP server started as a program on this PC (no shell). */
+export interface DirectMcpServer {
+  id: string;
+  name: string;
+  command: string;
+  args: string[];
+}
+
+export interface DirectMcp {
+  servers: DirectMcpServer[];
+}
+
 export interface Settings {
   muted: boolean;
   masterVolume: number;
@@ -58,6 +70,8 @@ export interface Settings {
   semanticSearch: { enabled: boolean; model: string };
   /** The new island look; off by default. */
   redesign: { enabled: boolean };
+  /** MCP servers connected directly (stdio), preferred over Composio. */
+  directMcp: DirectMcp;
   onboarded: boolean;
   /** 0-based welcome step; resumed until onboarded is true. */
   welcomeStep: number;
@@ -444,6 +458,7 @@ export const DEFAULT_SETTINGS: Settings = {
   calendar: { remindMinutes: 5 },
   semanticSearch: { enabled: true, model: "nomic-embed-text" },
   redesign: { enabled: false },
+  directMcp: { servers: [] },
   onboarded: false,
   welcomeStep: 0,
   checkUpdates: true,

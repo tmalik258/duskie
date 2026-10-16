@@ -67,6 +67,30 @@ export const ISLAND_STATES = [
   },
   { id: "setup-guide", label: "Setup guide", size: "panel", mascot: null, wash: "idle", announce: null },
   { id: "welcome", label: "Welcome", size: "panel", mascot: "idle", wash: "idle", announce: null },
+  {
+    id: "ask",
+    label: "Ask",
+    size: "panel",
+    mascot: "noticing",
+    wash: "suggesting",
+    announce: null,
+  },
+  {
+    id: "agents",
+    label: "Agents",
+    size: "panel",
+    mascot: "working",
+    wash: "agent",
+    announce: null,
+  },
+  {
+    id: "settings",
+    label: "Settings",
+    size: "panel",
+    mascot: "idle",
+    wash: "idle",
+    announce: null,
+  },
 ] as const satisfies readonly IslandStateDef[];
 
 export type IslandStateId = (typeof ISLAND_STATES)[number]["id"];

@@ -15,11 +15,18 @@ import { installUpdate, updateSettings, useAssistantName, useDuskie } from "@/li
 import { pickTip } from "@/lib/tips";
 import { type AppTime, type CalendarToday, formatDuration, type LaterItem } from "@/lib/types";
 import { updateBusy, updateLabel } from "@/lib/updates";
+import { useRedesign } from "@/lib/use-redesign";
 import { ActivityProgress } from "./ActivityProgress";
 import { Icon } from "./Icon";
 import { AwaySection, NeedsYouSection } from "./IslandAgents";
 import { CardChips, CardHead, CardNote } from "./IslandCard";
 import { Tip } from "./Tip";
+
+/** QA / round button look: glass legacy vs porcelain redesign. */
+const qbClass = (redesign: boolean) =>
+  redesign
+    ? "rd-qb chip relative grid size-8 place-items-center overflow-hidden"
+    : "chip relative grid size-8 place-items-center overflow-hidden rounded-full bg-white/12 text-white/90 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff]";
 
 /** A meeting this close (or already on) takes the headline. */
 const MEETING_SOON_MIN = 60;
@@ -38,12 +45,13 @@ function openHistory() {
 
 /** Unified island hover: stacked sections, empty ones omit themselves. */
 export function Glance({ paused }: { paused: boolean }) {
+  const redesign = useRedesign();
   const sessions = useAgents((s) => s.sessions);
   const agentsLive = sessions.some((s) => s.status === "working" || s.status === "waiting");
   const { data: crash, refresh: refreshCrash } = useCached<string | null>("crash", api.crashPending);
   const activityState = useActivities();
   const activityNow = useNow(1000);
-  const keepProblems = useDuskie((s) => s.settings.redesign.enabled);
+  const keepProblems = redesign;
   // Agent/chat rows belong in the agents list, not the flat activity line.
   const otherActivities = visibleActivities(
     [...activityState.activities, ...activityState.local],
@@ -55,27 +63,36 @@ export function Glance({ paused }: { paused: boolean }) {
   const { data: time } = useCached<AppTime[]>("time-today", api.timeToday);
   const head = headline(now, paused, calendar, time);
   const [focusOpen, setFocusOpen] = useState(false);
+  const eyebrow = head.quiet ? "Today" : paused ? "Paused" : head.join ? "Calendar" : "Now";
   return (
-    <div className="flex flex-col">
+    <div className={redesign ? "rd-glance flex flex-col gap-2.5" : "flex flex-col"}>
       {crash && <CrashCard note={crash} onDone={() => void refreshCrash()} />}
-      <div className="flex items-center gap-3">
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <p className="truncate font-display text-[15px] leading-5 font-semibold tracking-[-0.015em] text-white">
-            {head.title}
-          </p>
-          <p className="truncate text-[13px] leading-4 tracking-[-0.005em] text-[rgb(235_235_245/0.6)] tabular-nums">
-            {head.detail}
-          </p>
+      {redesign ? (
+        <div className="rd-card-head">
+          <p className="rd-eyebrow">{eyebrow}</p>
+          <p className="rd-title">{head.title}</p>
+          <p className="rd-detail">{head.detail}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {head.join && (
-            <RoundButton label="Join meeting" onClick={() => void api.openReference("page", head.join ?? "")}>
-              <Icon name="play" size={14} />
-            </RoundButton>
-          )}
-          <QuickActions paused={paused} focusOpen={focusOpen} onFocusOpenChange={setFocusOpen} />
+      ) : (
+        <div className="flex items-center gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <p className="truncate font-display text-[15px] leading-5 font-semibold tracking-[-0.015em] text-white">
+              {head.title}
+            </p>
+            <p className="truncate text-[13px] leading-4 tracking-[-0.005em] text-[rgb(235_235_245/0.6)] tabular-nums">
+              {head.detail}
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-1.5">
+            {head.join && (
+              <RoundButton label="Join meeting" onClick={() => void api.openReference("page", head.join ?? "")}>
+                <Icon name="play" size={14} />
+              </RoundButton>
+            )}
+            <QuickActions paused={paused} focusOpen={focusOpen} onFocusOpenChange={setFocusOpen} />
+          </div>
         </div>
-      </div>
+      )}
       {focusOpen && <FocusPicker onDone={() => setFocusOpen(false)} />}
       <NeedsYouSection sessions={sessions} />
       <AwaySection />
@@ -87,6 +104,22 @@ export function Glance({ paused }: { paused: boolean }) {
       <FullscreenSwitch />
       <LaterList />
       {head.quiet && <QuietTip />}
+      {redesign && (
+        <div className="rd-gfoot">
+          {head.join ? (
+            <button
+              type="button"
+              className="rd-gfoot-btn"
+              onClick={() => void api.openReference("page", head.join ?? "")}
+            >
+              Join
+            </button>
+          ) : (
+            <span />
+          )}
+          <QuickActions paused={paused} focusOpen={focusOpen} onFocusOpenChange={setFocusOpen} />
+        </div>
+      )}
     </div>
   );
 }
@@ -94,16 +127,29 @@ export function Glance({ paused }: { paused: boolean }) {
 /** About one hover in four, when nothing needs you: one short tip, never
  * the same one twice in a row. */
 function QuietTip() {
+  const redesign = useRedesign();
   const on = useDuskie((s) => s.settings.tips);
   const later = useDuskie((s) => s.later);
   const [tip] = useState(pickTip);
   if (!on || later > 0 || !tip) return null;
   return (
     <p
-      className="mt-3 flex items-baseline gap-2 rounded-xl bg-white/[0.05] px-3 py-2 text-[12.5px] text-[rgb(235_235_245/0.7)]"
+      className={
+        redesign
+          ? "rd-list-row mt-1 flex items-baseline gap-2"
+          : "mt-3 flex items-baseline gap-2 rounded-xl bg-white/[0.05] px-3 py-2 text-[12.5px] text-[rgb(235_235_245/0.7)]"
+      }
       style={{ marginLeft: "calc(var(--orb-indent, 0px) * -1)" }}
     >
-      <span className="text-[10.5px] font-semibold tracking-[0.04em] text-[rgb(235_235_245/0.45)] uppercase">Tip</span>
+      <span
+        className={
+          redesign
+            ? "rd-eyebrow shrink-0"
+            : "text-[10.5px] font-semibold tracking-[0.04em] text-[rgb(235_235_245/0.45)] uppercase"
+        }
+      >
+        Tip
+      </span>
       {tip}
     </p>
   );
@@ -111,6 +157,7 @@ function QuietTip() {
 
 /** Only while a fullscreen app is in front: keep the island out of it. */
 function FullscreenSwitch() {
+  const redesign = useRedesign();
   const fullscreen = useDuskie((s) => s.fullscreen);
   const hide = useDuskie((s) => s.settings.hideInFullscreen);
   if (!fullscreen) return null;
@@ -121,25 +168,51 @@ function FullscreenSwitch() {
       aria-checked={hide}
       onClick={() => void updateSettings({ hideInFullscreen: !hide })}
       style={{ marginLeft: "calc(var(--orb-indent, 0px) * -1)", width: "calc(100% + var(--orb-indent, 0px))" }}
-      className="chip mt-3 flex items-center gap-3 rounded-xl bg-white/[0.07] px-3 py-2 text-left hover:bg-white/12"
+      className={
+        redesign
+          ? "rd-list-row chip mt-1 flex items-center gap-3 text-left"
+          : "chip mt-3 flex items-center gap-3 rounded-xl bg-white/[0.07] px-3 py-2 text-left hover:bg-white/12"
+      }
     >
       <span className="min-w-0 flex-1">
-        <span className="block text-[13px] font-medium text-white">Hide while fullscreen</span>
-        <span className="block text-[12px] text-[rgb(235_235_245/0.62)]">
+        <span className={`block text-[13px] font-medium ${redesign ? "text-(--ink)" : "text-white"}`}>
+          Hide while fullscreen
+        </span>
+        <span className={`block text-[12px] ${redesign ? "text-(--ink-2)" : "text-[rgb(235_235_245/0.62)]"}`}>
           {hide ? "Hidden; hover the top edge to bring it back" : "The island stays on top of this app"}
         </span>
       </span>
       <span
         aria-hidden="true"
-        className="flex shrink-0 gap-0.5 rounded-[10px] bg-white/[0.08] p-[3px] text-[12.5px] leading-none"
+        className={
+          redesign
+            ? "flex shrink-0 gap-0.5 rounded-[10px] bg-(--fill) p-[3px] text-[12.5px] leading-none shadow-[inset_0_0_0_1px_var(--line)]"
+            : "flex shrink-0 gap-0.5 rounded-[10px] bg-white/[0.08] p-[3px] text-[12.5px] leading-none"
+        }
       >
         <span
-          className={`rounded-[8px] px-2.5 py-[5px] ${hide ? "bg-[#f5f5f7] font-semibold text-black" : "text-white/62"}`}
+          className={`rounded-[8px] px-2.5 py-[5px] ${
+            hide
+              ? redesign
+                ? "bg-(--c2) font-semibold text-(--c1)"
+                : "bg-[#f5f5f7] font-semibold text-black"
+              : redesign
+                ? "text-(--ink-2)"
+                : "text-white/62"
+          }`}
         >
           On
         </span>
         <span
-          className={`rounded-[8px] px-2.5 py-[5px] ${hide ? "text-white/62" : "bg-[#f5f5f7] font-semibold text-black"}`}
+          className={`rounded-[8px] px-2.5 py-[5px] ${
+            hide
+              ? redesign
+                ? "text-(--ink-2)"
+                : "text-white/62"
+              : redesign
+                ? "bg-(--c2) font-semibold text-(--c1)"
+                : "bg-[#f5f5f7] font-semibold text-black"
+          }`}
         >
           Off
         </span>
@@ -207,6 +280,7 @@ function topFocus(time: AppTime[]): string | null {
 
 /** Suggestions you missed (shown and timed out) or that waited quietly. */
 function LaterList() {
+  const redesign = useRedesign();
   const count = useDuskie((s) => s.later);
   const { data, refresh } = useCached<LaterItem[]>("later-list", api.laterList);
   const [all, setAll] = useState(false);
@@ -218,6 +292,12 @@ function LaterList() {
   if (items.length === 0) return null;
   const missed = items.some((l) => l.missed);
   const shown = all ? items : items.slice(0, LATER_SHOWN);
+  const muted = redesign ? "text-(--ink-2)" : "text-[rgb(235_235_245/0.6)]";
+  const title = redesign ? "text-(--ink)" : "text-white";
+  const detail = redesign ? "text-(--ink-2)" : "text-[rgb(235_235_245/0.62)]";
+  const dismissBtn = redesign
+    ? "chip grid size-7 shrink-0 place-items-center rounded-[8px] text-(--ink-2) hover:bg-(--fill-2) hover:text-(--ink)"
+    : "chip grid size-7 shrink-0 place-items-center rounded-full text-white/45 hover:bg-white/10 hover:text-white";
   return (
     <div
       className="mt-3 flex flex-col gap-1.5"
@@ -226,15 +306,23 @@ function LaterList() {
         width: "calc(100% + var(--orb-indent, 0px))",
       }}
     >
-      <div className="flex items-center justify-between text-[12px] text-[rgb(235_235_245/0.6)]">
+      <div className={`flex items-center justify-between text-[12px] ${muted}`}>
         <span>{missed ? "You missed" : "Saved for later"}</span>
         <span className="flex items-center gap-3">
           {all && (
-            <button type="button" onClick={() => setAll(false)} className="chip hover:text-white">
+            <button
+              type="button"
+              onClick={() => setAll(false)}
+              className={redesign ? "chip rd-gfoot-btn" : "chip hover:text-white"}
+            >
               Show less
             </button>
           )}
-          <button type="button" onClick={() => void api.laterClear()} className="chip hover:text-white">
+          <button
+            type="button"
+            onClick={() => void api.laterClear()}
+            className={redesign ? "chip rd-gfoot-btn" : "chip hover:text-white"}
+          >
             Clear
           </button>
         </span>
@@ -246,23 +334,25 @@ function LaterList() {
           <div
             key={l.id}
             style={{ animationDelay: `${Math.min(n, 6) * 40}ms` }}
-            className="rise-in flex w-full shrink-0 items-center gap-2 rounded-xl bg-white/[0.07] pr-1.5 hover:bg-white/12"
+            className="rise-in rd-list-row flex w-full shrink-0 items-center gap-2 pr-1.5"
           >
             <button
               type="button"
               onClick={() => void api.laterOpen(l.id)}
               className="chip min-w-0 flex-1 px-3 py-1.5 text-left"
             >
-              <span className="block truncate text-[13px] font-medium text-white">{l.title}</span>
-              <span className="block truncate text-[12px] text-[rgb(235_235_245/0.62)]">{l.detail}</span>
+              <span className={`block truncate text-[13px] font-medium ${title}`}>{l.title}</span>
+              <span className={`block truncate text-[12px] ${detail}`}>{l.detail}</span>
             </button>
-            <span className="shrink-0 text-[11px] text-white/40 tabular-nums">{ago(l.minutesAgo)}</span>
+            <span className={`shrink-0 text-[11px] tabular-nums ${redesign ? "text-(--ink-2)" : "text-white/40"}`}>
+              {ago(l.minutesAgo)}
+            </span>
             <Tip label="Clear">
               <button
                 type="button"
                 aria-label={`Clear ${l.title}`}
                 onClick={() => void api.laterDismiss(l.id)}
-                className="chip grid size-7 shrink-0 place-items-center rounded-full text-white/45 hover:bg-white/10 hover:text-white"
+                className={dismissBtn}
               >
                 <Icon name="close" size={12} />
               </button>
@@ -274,7 +364,11 @@ function LaterList() {
         <button
           type="button"
           onClick={() => setAll(true)}
-          className="chip self-start text-[12px] text-white/62 hover:text-white"
+          className={
+            redesign
+              ? "chip rd-gfoot-btn self-start text-[12px]"
+              : "chip self-start text-[12px] text-white/62 hover:text-white"
+          }
         >
           Show {items.length - LATER_SHOWN} more
         </button>
@@ -357,7 +451,7 @@ function SettingsShiftHistoryButton({ shift }: { shift: boolean }) {
           if (e.shiftKey || history) openHistory();
           else void api.openSettings();
         }}
-        className="chip relative grid size-8 place-items-center overflow-hidden rounded-full bg-white/12 text-white/90 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff]"
+        className={qbClass(useRedesign())}
       >
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.span
@@ -395,7 +489,7 @@ function AskShiftAgentsButton({ shift }: { shift: boolean }) {
           if (e.shiftKey || agents) openAgentsBoard();
           else void api.askOpen();
         }}
-        className="chip relative grid size-8 place-items-center overflow-hidden rounded-full bg-white/12 text-white/90 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff]"
+        className={qbClass(useRedesign())}
       >
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.span
@@ -471,6 +565,7 @@ function FocusShiftPauseButton({
           : `Focus${focusHint} · Shift for Pause${pauseHint}`;
   const active = !pauseSide && (open || focusing);
   const icon = pauseSide ? (paused ? "play" : "pause") : "focus";
+  const redesign = useRedesign();
   return (
     <Tip label={label}>
       <button
@@ -491,9 +586,13 @@ function FocusShiftPauseButton({
           }
           onOpenChange(!open);
         }}
-        className={`chip relative grid size-8 place-items-center overflow-hidden rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff] ${
-          active ? "bg-white text-black hover:bg-white/90" : "bg-white/12 text-white/90 hover:bg-white/20"
-        }`}
+        className={
+          redesign
+            ? `rd-qb chip relative grid size-8 place-items-center overflow-hidden${active ? " rd-qb-on" : ""}`
+            : `chip relative grid size-8 place-items-center overflow-hidden rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff] ${
+                active ? "bg-white text-black hover:bg-white/90" : "bg-white/12 text-white/90 hover:bg-white/20"
+              }`
+        }
       >
         <AnimatePresence mode="popLayout" initial={false}>
           <motion.span
@@ -514,6 +613,7 @@ function FocusShiftPauseButton({
 
 /** Choose how long, then start — presets plus a quiet custom stepper. */
 function FocusPicker({ onDone }: { onDone: () => void }) {
+  const redesign = useRedesign();
   const [minutes, setMinutes] = useState(readLastFocus);
   const start = (n: number) => {
     const next = Math.min(FOCUS_MAX, Math.max(FOCUS_MIN, Math.round(n)));
@@ -538,34 +638,62 @@ function FocusPicker({ onDone }: { onDone: () => void }) {
   const nudge = (delta: number) => setMinutes((m) => Math.min(FOCUS_MAX, Math.max(FOCUS_MIN, m + delta)));
   return (
     <div
-      className="rise-in mt-3 rounded-2xl bg-white/[0.06] p-3 ring-1 ring-white/[0.08]"
+      className={
+        redesign
+          ? "rise-in mt-3 rounded-[12px] bg-(--fill-2) p-3 shadow-[inset_0_0_0_1px_var(--line)]"
+          : "rise-in mt-3 rounded-2xl bg-white/[0.06] p-3 ring-1 ring-white/[0.08]"
+      }
       style={{ marginLeft: "calc(var(--orb-indent, 0px) * -1)" }}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-display text-[14px] leading-5 font-semibold tracking-[-0.015em] text-white">Focus</p>
-          <p className="mt-0.5 text-[12px] leading-4 text-[rgb(235_235_245/0.6)]">
+          <p
+            className={`font-display text-[14px] leading-5 font-semibold tracking-[-0.015em] ${
+              redesign ? "text-(--ink)" : "text-white"
+            }`}
+          >
+            Focus
+          </p>
+          <p className={`mt-0.5 text-[12px] leading-4 ${redesign ? "text-(--ink-2)" : "text-[rgb(235_235_245/0.6)]"}`}>
             Suggestions and alerts wait until you are done.
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-1 rounded-full bg-black/25 px-1 py-0.5 ring-1 ring-white/[0.06]">
+        <div
+          className={
+            redesign
+              ? "flex shrink-0 items-center gap-1 rounded-[10px] bg-(--fill) px-1 py-0.5 shadow-[inset_0_0_0_1px_var(--line)]"
+              : "flex shrink-0 items-center gap-1 rounded-full bg-black/25 px-1 py-0.5 ring-1 ring-white/[0.06]"
+          }
+        >
           <button
             type="button"
             aria-label="Five minutes less"
             onClick={() => nudge(-5)}
-            className="chip grid size-7 place-items-center rounded-full text-white/70 hover:bg-white/10 hover:text-white"
+            className={
+              redesign
+                ? "chip grid size-7 place-items-center rounded-[8px] text-(--ink-2) hover:bg-(--fill-2) hover:text-(--ink)"
+                : "chip grid size-7 place-items-center rounded-full text-white/70 hover:bg-white/10 hover:text-white"
+            }
           >
             −
           </button>
-          <span className="min-w-[4.5rem] text-center font-display text-[15px] font-semibold tracking-[-0.02em] text-white tabular-nums">
+          <span
+            className={`min-w-[4.5rem] text-center font-display text-[15px] font-semibold tracking-[-0.02em] tabular-nums ${
+              redesign ? "text-(--ink)" : "text-white"
+            }`}
+          >
             {minutes}
-            <span className="ml-1 text-[11px] font-medium text-white/45">min</span>
+            <span className={`ml-1 text-[11px] font-medium ${redesign ? "text-(--ink-2)" : "text-white/45"}`}>min</span>
           </span>
           <button
             type="button"
             aria-label="Five minutes more"
             onClick={() => nudge(5)}
-            className="chip grid size-7 place-items-center rounded-full text-white/70 hover:bg-white/10 hover:text-white"
+            className={
+              redesign
+                ? "chip grid size-7 place-items-center rounded-[8px] text-(--ink-2) hover:bg-(--fill-2) hover:text-(--ink)"
+                : "chip grid size-7 place-items-center rounded-full text-white/70 hover:bg-white/10 hover:text-white"
+            }
           >
             +
           </button>
@@ -579,10 +707,14 @@ function FocusPicker({ onDone }: { onDone: () => void }) {
               key={n}
               type="button"
               onClick={() => setMinutes(n)}
-              className={`chip min-h-8 rounded-full px-3 text-[12.5px] font-medium tracking-[-0.01em] tabular-nums transition-[background,color,transform] duration-150 ${
-                on
-                  ? "bg-white text-black shadow-[0_1px_0_rgb(255_255_255/0.35)_inset]"
-                  : "bg-white/[0.08] text-white/80 hover:bg-white/14 hover:text-white"
+              className={`chip min-h-8 rounded-[10px] px-3 text-[12.5px] font-medium tracking-[-0.01em] tabular-nums transition-[background,color,transform] duration-150 ${
+                redesign
+                  ? on
+                    ? "bg-(--c2) text-(--c1)"
+                    : "bg-(--fill) text-(--ink-2) hover:bg-(--fill-2) hover:text-(--ink)"
+                  : on
+                    ? "rounded-full bg-white text-black shadow-[0_1px_0_rgb(255_255_255/0.35)_inset]"
+                    : "rounded-full bg-white/[0.08] text-white/80 hover:bg-white/14 hover:text-white"
               }`}
             >
               {n}m
@@ -594,16 +726,26 @@ function FocusPicker({ onDone }: { onDone: () => void }) {
         <button
           type="button"
           onClick={() => start(minutes)}
-          className="chip flex min-h-9 flex-1 items-center justify-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.01em] text-black hover:bg-white/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff]"
+          className={
+            redesign
+              ? "chip flex min-h-9 flex-1 items-center justify-center gap-2 rounded-[10px] bg-(--c2) px-4 text-[13px] font-semibold tracking-[-0.01em] text-(--c1) hover:opacity-92 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-(--c4)"
+              : "chip flex min-h-9 flex-1 items-center justify-center gap-2 rounded-full bg-white px-4 text-[13px] font-semibold tracking-[-0.01em] text-black hover:bg-white/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff]"
+          }
         >
           <Icon name="focus" size={14} />
           Start {minutes} minutes
-          <kbd className="ml-0.5 font-sans text-[11px] font-medium text-black/35">Enter</kbd>
+          <kbd className={`ml-0.5 font-sans text-[11px] font-medium ${redesign ? "text-(--c1)/40" : "text-black/35"}`}>
+            Enter
+          </kbd>
         </button>
         <button
           type="button"
           onClick={onDone}
-          className="chip shrink-0 rounded-full px-3 py-2 text-[12.5px] text-white/60 hover:bg-white/10 hover:text-white"
+          className={
+            redesign
+              ? "chip shrink-0 rounded-[10px] px-3 py-2 text-[12.5px] text-(--ink-2) hover:bg-(--fill) hover:text-(--ink)"
+              : "chip shrink-0 rounded-full px-3 py-2 text-[12.5px] text-white/60 hover:bg-white/10 hover:text-white"
+          }
         >
           Not now
         </button>
@@ -639,7 +781,7 @@ function UpdateButton() {
       </RoundButton>
       <span
         aria-hidden="true"
-        className="pointer-events-none absolute top-0 right-0 size-2 rounded-full bg-[#0a84ff] ring-2 ring-black"
+        className="pointer-events-none absolute top-0 right-0 size-2 rounded-full bg-(--c3,#0a84ff) ring-2 ring-(--c1,#000)"
       />
     </span>
   );
@@ -663,7 +805,7 @@ export function RoundButton({
         aria-label={label}
         disabled={disabled}
         onClick={onClick}
-        className="chip grid size-8 place-items-center rounded-full bg-white/12 text-white/90 hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff] disabled:cursor-wait disabled:opacity-60"
+        className={`${qbClass(useRedesign())} disabled:cursor-wait disabled:opacity-60`}
       >
         {children}
       </button>

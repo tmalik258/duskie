@@ -4,6 +4,8 @@
 
 export const PEEK_OPEN_MS = 220;
 export const PEEK_CLOSE_MS = 450;
+/** Idle notification pill stays "fresh" this long, then becomes a count. */
+export const PILL_FRESH_MS = 8000;
 
 export interface PeekInput {
   hover: boolean;

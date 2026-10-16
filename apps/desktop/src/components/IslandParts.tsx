@@ -26,23 +26,26 @@ export function CompactTrailing({
   waiting: string | null;
 }) {
   const later = useDuskie((s) => s.later);
+  const redesign = useDuskie((s) => s.settings.redesign.enabled);
+  const labelInk = redesign ? "text-(--c2)/85" : "text-white/85";
+  const h = redesign ? "h-[38px]" : "h-9";
   if (waiting) {
     return (
       <motion.div
-        className="absolute top-0 right-0 flex h-9 items-center gap-2.5 pr-3.5"
+        className={`absolute top-0 right-0 flex ${h} items-center gap-2.5 pr-3.5`}
         style={{ left: COMPACT.height + 4 }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1, transition: { delay: 0.12, duration: 0.2 } }}
         exit={{ opacity: 0, transition: { duration: 0.08 } }}
       >
-        <span className="min-w-0 flex-1 truncate text-[12.5px] font-medium text-white/85">Waiting for {waiting}</span>
+        <span className={`min-w-0 flex-1 truncate text-[12.5px] font-medium ${labelInk}`}>Waiting for {waiting}</span>
         <Activity />
       </motion.div>
     );
   }
   return (
     <motion.div
-      className="absolute top-0 right-0 flex h-9 items-center pr-3.5"
+      className={`absolute top-0 right-0 flex ${h} items-center pr-3.5`}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1, transition: { delay: 0.12, duration: 0.2 } }}
       exit={{ opacity: 0, transition: { duration: 0.08 } }}
@@ -51,18 +54,25 @@ export function CompactTrailing({
         <Activity />
       ) : offline ? (
         <Tip label="Offline">
-          <span role="img" aria-label="Offline" className="text-[#ff9f0a]">
+          <span role="img" aria-label="Offline" className={redesign ? "text-(--warn)" : "text-[#ff9f0a]"}>
             <Icon name="wifiOff" size={14} />
           </span>
         </Tip>
       ) : paused ? (
         <Tip label="Paused">
-          <span className="size-1.5 rounded-full bg-[#ffd60a]" style={{ boxShadow: "0 0 8px #ffd60a" }} />
+          <span
+            className={`size-1.5 rounded-full ${redesign ? "bg-(--warn)" : "bg-[#ffd60a]"}`}
+            style={{ boxShadow: redesign ? "0 0 8px var(--warn)" : "0 0 8px #ffd60a" }}
+          />
         </Tip>
       ) : (
         later > 0 && (
           <Tip label={`${later} waiting for you`}>
-            <span className="grid h-4 min-w-4 place-items-center rounded-full bg-[#0a84ff] px-1 text-[10px] leading-none font-semibold text-white">
+            <span
+              className={`grid h-4 min-w-4 place-items-center rounded-full px-1 text-[10px] leading-none font-semibold ${
+                redesign ? "bg-(--c3) text-(--c1)" : "bg-[#0a84ff] text-white"
+              }`}
+            >
               {later}
             </span>
           </Tip>
@@ -74,12 +84,13 @@ export function CompactTrailing({
 
 /** Three bars that breathe while the mascot is busy. */
 export function Activity() {
+  const redesign = useDuskie((s) => s.settings.redesign.enabled);
   return (
     <span className="flex h-3 items-center gap-0.75" role="img" aria-label="Busy">
       {[0, 1, 2].map((i) => (
         <motion.span
           key={i}
-          className="w-0.75 rounded-full bg-white/85"
+          className={`w-0.75 rounded-full ${redesign ? "bg-(--listen)" : "bg-white/85"}`}
           animate={{ height: [4, 12, 4] }}
           transition={{ duration: 0.9, repeat: Number.POSITIVE_INFINITY, delay: i * 0.15, ease: "easeInOut" }}
         />
@@ -228,6 +239,52 @@ export function Options({ suggestion }: { suggestion: Suggestion }) {
   const alwaysAt = suggestion.always?.findIndex(Boolean) ?? -1;
   // Shift while hovered, or Shift+Alt anywhere — Rust polls; no hover required.
   const priv = useDuskie((s) => s.shiftHeld);
+  const redesign = useDuskie((s) => s.settings.redesign.enabled);
+  if (redesign) {
+    return (
+      <div className="mt-3 flex flex-col gap-1.5">
+        {suggestion.options.map((option, i) => {
+          const openUrl = suggestion.actions[i] === "open_url";
+          const label = priv && openUrl ? privateOpenLabel(option) : option;
+          return (
+            <motion.button
+              // biome-ignore lint/suspicious/noArrayIndexKey: labels can repeat and the list never reorders
+              key={`${i}-${option}`}
+              type="button"
+              onClick={(e) => choose(suggestion, i, e.shiftKey || (priv && openUrl))}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, delay: 0.08 + i * 0.03, ease: [0.23, 1, 0.32, 1] }}
+              className={`rd-opt chip justify-between gap-2 ${i === 0 ? "rd-opt-primary" : ""}`}
+            >
+              <span className="min-w-0 flex-1 leading-snug text-balance">{label}</span>
+              <kbd className={`shrink-0 font-sans text-[11px] leading-none ${i === 0 ? "opacity-40" : "opacity-45"}`}>
+                Alt {i + 1}
+              </kbd>
+            </motion.button>
+          );
+        })}
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          {alwaysAt >= 0 && (
+            <Tip label={`From now on, "${suggestion.options[alwaysAt]}" without asking. Undo in Settings > Skills.`}>
+              <button type="button" onClick={() => always(suggestion, alwaysAt)} className="rd-gfoot-btn chip">
+                Always {suggestion.options[alwaysAt].toLowerCase()}
+              </button>
+            </Tip>
+          )}
+          <button type="button" onClick={() => showLess(suggestion)} className="rd-gfoot-btn chip">
+            Show less
+          </button>
+          <button type="button" onClick={() => dismiss(suggestion)} className="rd-gfoot-btn chip">
+            Dismiss
+            <kbd className="ml-1.5 font-sans text-[11px] opacity-45">
+              <i className="alt-pre">Alt </i>0
+            </kbd>
+          </button>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="mt-3 flex flex-wrap items-center gap-1.5">
       {suggestion.options.map((option, i) => {
@@ -279,7 +336,6 @@ export function Options({ suggestion }: { suggestion: Suggestion }) {
         transition={{ duration: 0.2, delay: 0.12 + suggestion.options.length * 0.04 }}
         className="ak-ignore chip rounded-full px-3 py-1.5 text-[13px] text-[rgb(235_235_245/0.7)] hover:text-white"
       >
-        {/* Empties as the island's own close timer runs; full again on hover. */}
         <span
           className="ak-ignore-fill"
           aria-hidden="true"
@@ -349,6 +405,13 @@ export function always(suggestion: Suggestion, index: number) {
 
 export function dismiss(suggestion: Suggestion) {
   playSound("toggle_off", uiVolume(), useDuskie.getState().settings.soundKit);
+  void api.suggestionDismiss(suggestion.id, "user");
+}
+
+/** Quieter next time; counts toward scoring (Dismiss does not). */
+export function showLess(suggestion: Suggestion) {
+  playSound("toggle_off", uiVolume(), useDuskie.getState().settings.soundKit);
+  void api.attentionShowLess(suggestion.skillId);
   void api.suggestionDismiss(suggestion.id, "user");
 }
 
