@@ -37,60 +37,6 @@ const TOOL_BUDGET: usize = 12_000;
 const CONNECT_TIMEOUT: Duration = Duration::from_secs(8);
 const SKILL_ID: &str = "chat.composio";
 
-/// Words in a tool's name that mean it changes something.
-const WRITE_WORDS: &[&str] = &[
-    "ADD",
-    "APPROVE",
-    "ARCHIVE",
-    "ASSIGN",
-    "BASH",
-    "CANCEL",
-    "CLOSE",
-    "COMMENT",
-    "COPY",
-    "CREATE",
-    "DELETE",
-    "DISABLE",
-    "EDIT",
-    "ENABLE",
-    "EXECUTE",
-    "FORWARD",
-    "INITIATE",
-    "INSERT",
-    "INVITE",
-    "LABEL",
-    "MANAGE",
-    "MARK",
-    "MERGE",
-    "MODIFY",
-    "MOVE",
-    "PATCH",
-    "POST",
-    "PUBLISH",
-    "PUT",
-    "REJECT",
-    "REMOVE",
-    "RENAME",
-    "REPLY",
-    "RUN",
-    "SCHEDULE",
-    "SEND",
-    "SET",
-    "SHARE",
-    "STAR",
-    "START",
-    "STOP",
-    "SUBMIT",
-    "TRANSITION",
-    "TRASH",
-    "TRIGGER",
-    "UPDATE",
-    "UPLOAD",
-    "UPSERT",
-    "WORKBENCH",
-    "WRITE",
-];
-
 /// Keys where meta tools (like COMPOSIO_MULTI_EXECUTE_TOOL) name the tool
 /// they will run.
 const SLUG_KEYS: &[&str] = &[
@@ -318,16 +264,7 @@ pub fn manual(c: &ComposioSettings) -> Option<(String, Vec<(String, String)>)> {
     (!headers.is_empty()).then(|| (url.to_owned(), headers))
 }
 
-fn words(name: &str) -> impl Iterator<Item = String> + '_ {
-    name.split(|c: char| !c.is_ascii_alphanumeric())
-        .filter(|w| !w.is_empty())
-        .map(str::to_ascii_uppercase)
-}
-
-/// The tool's name says it changes something.
-pub fn is_write(name: &str) -> bool {
-    words(name).any(|w| WRITE_WORDS.contains(&w.as_str()))
-}
+pub use duskie_core::connectors::is_write;
 
 fn collect_slugs(v: &Value, out: &mut Vec<String>) {
     match v {

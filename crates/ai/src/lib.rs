@@ -11,6 +11,7 @@ mod codex;
 mod decide;
 pub mod fit;
 mod mcp;
+pub mod mcp_stdio;
 mod openai;
 mod pool;
 mod router;

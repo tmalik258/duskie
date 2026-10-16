@@ -8,6 +8,7 @@
 
 pub mod attention;
 pub mod bus;
+pub mod connectors;
 pub mod event;
 pub mod mascot;
 pub mod migrate;
