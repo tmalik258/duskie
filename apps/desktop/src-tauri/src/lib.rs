@@ -221,6 +221,7 @@ pub fn run() {
             commands::servers_test,
             commands::servers_allow_write,
             commands::servers_remove,
+            commands::servers_sign_in,
             commands::git_status,
             commands::git_stage,
             commands::git_unstage,

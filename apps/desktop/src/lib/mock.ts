@@ -596,6 +596,12 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
           : s,
       ),
     ),
+  servers_sign_in: (a) =>
+    setServers(
+      settings.directServers.map((s) =>
+        s.id === a.id ? { ...s, envNames: [...s.envNames.filter((n) => n !== "Authorization"), "Authorization"] } : s,
+      ),
+    ),
   servers_remove: (a) => setServers(settings.directServers.filter((s) => s.id !== a.id)),
   git_message_diff: () => ({ text: "diff --git a/src/app.ts b/src/app.ts", covered: 1, total: 1 }),
   mail_status: () => mailStatus,

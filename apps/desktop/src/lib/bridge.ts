@@ -392,6 +392,7 @@ export const api = {
   serversAllowWrite: (id: string, tool: string, allow: boolean) =>
     invoke<void>("servers_allow_write", { id, tool, allow }),
   serversRemove: (id: string) => invoke<void>("servers_remove", { id }),
+  serversSignIn: (id: string) => invoke<void>("servers_sign_in", { id }),
   gitMessageDiff: (path: string) => invoke<MessageDiff>("git_message_diff", { path }),
   mailStatus: () => invoke<MailStatus>("mail_status"),
   mailConnect: () => invoke<MailStatus>("mail_connect"),

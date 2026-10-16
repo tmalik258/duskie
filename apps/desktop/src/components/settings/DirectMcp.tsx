@@ -44,6 +44,11 @@ function Row({ s, onError }: { s: DirectServer; onError: (e: string) => void }) 
           <b className="font-medium">{s.app}</b>
           <span className="ml-2 text-(--muted)">{s.kind === "stdio" ? `${s.command} ${s.args.join(" ")}` : s.url}</span>
         </span>
+        {s.kind === "url" && (
+          <Button small disabled={busy} onClick={() => void run(() => api.serversSignIn(s.id))}>
+            {s.envNames.includes("Authorization") ? "Sign in again" : "Sign in"}
+          </Button>
+        )}
         {s.confirmed ? (
           <Button small disabled={busy} onClick={() => void run(async () => setTools(await api.serversTest(s.id)))}>
             {busy ? "Connecting..." : "Test"}
