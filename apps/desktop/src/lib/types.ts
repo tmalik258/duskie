@@ -454,7 +454,14 @@ export const DEFAULT_SETTINGS: Settings = {
   tips: true,
   alive: true,
   crashReports: false,
-  notifications: { enabled: true, apps: {}, vip: [], profile: "normal", lessons: { entries: {} } },
+  notifications: {
+    enabled: true,
+    apps: {},
+    vip: [],
+    profile: "normal",
+    lessons: { entries: {} },
+    imap: { host: "", port: 993, user: "" },
+  },
   recipes: [],
   memory: [],
   userName: "",
@@ -820,6 +827,8 @@ export interface NotificationSettings {
   profile: AttentionProfile;
   /** What Duskie learned from what you act on and ask for less of. */
   lessons: { entries: Record<string, { acted: number; showLess: number; updated: number }> };
+  /** An IMAP account (Advanced). The password is in the keychain. */
+  imap: { host: string; port: number; user: string };
 }
 
 export type AttentionProfile = "normal" | "calm";
@@ -834,6 +843,8 @@ export interface MailStatus {
   /** Seconds since the epoch of the last good check. */
   lastOk: number | null;
   error: string | null;
+  /** Which account is connected. */
+  provider: "gmail" | "imap" | null;
 }
 
 /** One learned sender or source, as Settings lists it. */

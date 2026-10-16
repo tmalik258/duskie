@@ -365,6 +365,8 @@ export const api = {
   attentionReset: (scope: string) => invoke<void>("attention_reset", { scope }),
   mailStatus: () => invoke<MailStatus>("mail_status"),
   mailConnect: () => invoke<MailStatus>("mail_connect"),
+  mailConnectImap: (host: string, port: number, user: string, password: string) =>
+    invoke<MailStatus>("mail_connect_imap", { host, port, user, password }),
   mailDisconnect: () => invoke<MailStatus>("mail_disconnect"),
   attentionSetProfile: (profile: AttentionProfile) => invoke<void>("attention_set_profile", { profile }),
   dndGet: () => invoke<boolean | null>("dnd_get"),
