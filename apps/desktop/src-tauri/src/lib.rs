@@ -234,6 +234,7 @@ pub fn run() {
             commands::git_stash_drop,
             commands::island_width,
             commands::limits_paused,
+            commands::gpu_memory,
             commands::git_message_diff,
             commands::git_write_message,
             commands::mail_status,

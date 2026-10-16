@@ -387,6 +387,7 @@ export const api = {
   /** Widens the island window for a dock beside it; 0 puts it back. */
   islandWidth: (width: number) => invoke<void>("island_width", { width }),
   limitsPaused: () => invoke<LimitState[]>("limits_paused"),
+  gpuMemory: () => invoke<number | null>("gpu_memory"),
   serversSave: (server: DirectServer, env: Record<string, string>) => invoke<string>("servers_save", { server, env }),
   serversCommand: (id: string) => invoke<string>("servers_command", { id }),
   serversConfirm: (id: string, shown: string) => invoke<void>("servers_confirm", { id, shown }),

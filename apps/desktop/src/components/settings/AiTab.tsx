@@ -41,8 +41,15 @@ const NOT_READY: Record<AiProviderId, string> = {
 export function AiTab({ onError }: { onError: (e: string) => void }) {
   const ai = useDuskie((s) => s.settings.ai);
   const voice = useDuskie((s) => s.settings.voice);
+  const { data: gpu } = useCached<number | null>("gpu-memory", api.gpuMemory);
   return (
     <>
+      {gpu !== undefined && gpu !== null && gpu < 4096 && (
+        <p className="text-[13px] text-(--muted)" role="note">
+          This PC has no graphics card with about 4 GB of memory, so local chat and Live mode use a cloud provider. Add
+          a key below or sign in to Claude Code.
+        </p>
+      )}
       <Section
         title="Models"
         hint="Ask tries them top to bottom. Drag to reorder."

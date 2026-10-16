@@ -160,6 +160,12 @@ pub async fn net_check(app: AppHandle, lost: bool) -> bool {
     crate::net::check(&app, lost).await
 }
 
+/// Graphics memory in MB, or None when Windows does not say.
+#[tauri::command]
+pub fn gpu_memory() -> Option<u64> {
+    duskie_sensors::graphics_memory().map(|b| b / (1 << 20))
+}
+
 /// Providers and connectors paused after repeated errors, for the usage popover.
 #[tauri::command]
 pub fn limits_paused() -> Vec<duskie_ai::limit::LimitState> {

@@ -559,6 +559,7 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     return "Dropped the stash";
   },
   island_width: () => undefined,
+  gpu_memory: () => (new URLSearchParams(location.search).has("cpu") ? 0 : 8192),
   limits_paused: () =>
     new URLSearchParams(location.search).has("limited") ? [{ name: "Anthropic", pausedSecs: 42 }] : [],
   servers_save: (a) => {
