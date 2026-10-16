@@ -6,6 +6,7 @@
 //! - [`settings`]: user settings persisted as JSON.
 //! - [`storage`]: SQLite storage for events and history.
 
+pub mod attention;
 pub mod bus;
 pub mod event;
 pub mod mascot;
