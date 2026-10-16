@@ -126,7 +126,7 @@ export interface EventPayloads {
     cost?: number | null;
   };
   [EVENTS.aiTool]: { id: string; name: string; label?: string };
-  [EVENTS.aiProposal]: { chatId: string; id: string; label: string; step?: boolean };
+  [EVENTS.aiProposal]: { chatId: string; id: string; label: string; step?: boolean; undoable?: boolean };
   [EVENTS.askOpen]: AskOpen;
   [EVENTS.askClose]: { reason: "close" | "defer"; panelGen?: number };
   [EVENTS.actionResult]: ActionResult;

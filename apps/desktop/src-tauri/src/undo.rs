@@ -15,6 +15,16 @@ const UNDOABLE: &[&str] = &["convert", "extract_archive", "zip"];
 const MOVE_BACK: &str = "move-back:";
 const WINDOW_HOURS: i64 = 24;
 
+/// Whether an action can be put back once it has run, for showing that
+/// before it does. Mirrors what `undo_path` and the move record allow.
+pub fn undoable(action: &str) -> bool {
+    UNDOABLE.contains(&action)
+        || matches!(
+            action,
+            "move_file" | "git_pull" | "git_update_branch" | "git_clone"
+        )
+}
+
 pub fn undo_path(action: &str, produced: Option<&str>) -> Option<String> {
     // A pull's record resets the repo back to where it was.
     if action == "git_pull" || action == "git_update_branch" {
@@ -132,6 +142,23 @@ pub fn undo(app: &AppHandle, id: i64) -> Result<String, String> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn undoable_matches_what_undo_can_record() {
+        for a in [
+            "convert",
+            "zip",
+            "extract_archive",
+            "move_file",
+            "git_pull",
+            "git_clone",
+        ] {
+            assert!(super::undoable(a), "{a}");
+        }
+        for a in ["open_url", "send_message", "delete_file", "dnd_on"] {
+            assert!(!super::undoable(a), "{a}");
+        }
+    }
+
     use super::*;
 
     #[test]

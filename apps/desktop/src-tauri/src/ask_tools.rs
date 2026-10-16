@@ -108,6 +108,8 @@ struct ProposalNote<'a> {
     label: &'a str,
     /// One step of a task, shown with the others as a plan to run in order.
     step: bool,
+    /// Whether Undo can put this back once it has run.
+    undoable: bool,
 }
 
 /// What a tapped action did, for the answer it belongs to.
@@ -1213,6 +1215,7 @@ fn offer_as(
             id: &id,
             label: &label,
             step,
+            undoable: crate::undo::undoable(action),
         },
     );
 }

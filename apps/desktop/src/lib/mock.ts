@@ -689,7 +689,9 @@ function mockChat(a: Record<string, unknown>) {
       "Zip it as Invoices-October.zip",
     ];
     for (const [n, label] of plan.entries()) {
-      later(1000 + n * 60, () => emit("ai://proposal", { chatId: id, id: `p-${id}-${n}`, label, step: true }));
+      later(1000 + n * 60, () =>
+        emit("ai://proposal", { chatId: id, id: `p-${id}-${n}`, label, step: true, undoable: n % 2 === 0 }),
+      );
     }
   } else {
     later(1200, () => emit("ai://proposal", { chatId: id, id: `p-${id}`, label: "Move invoice-sept.pdf to Invoices" }));

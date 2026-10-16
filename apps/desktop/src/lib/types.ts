@@ -245,6 +245,8 @@ export interface Proposal {
   label: string;
   /** One step of a task: shown with the others as a plan, run in order. */
   step?: boolean;
+  /** Undo can put this back once it has run. */
+  undoable?: boolean;
   /** Set once tapped: what happened, and Undo if it can be undone. */
   ran?: { ok: boolean; message: string; undoId: number | null; path: string | null; undone?: boolean };
 }
