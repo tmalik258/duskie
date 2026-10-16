@@ -4501,3 +4501,21 @@ button.ak-cchip:hover,
   padding-top: 8px;
   padding-bottom: 8px;
 }
+.rd-steps {
+  display: flex;
+  gap: 4px;
+  padding: 2px 4px 6px;
+}
+.rd-steps i {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: rgb(242 240 235 / 0.1);
+  transition: background 0.3s ease;
+}
+.rd-steps i[data-s="done"] {
+  background: rgb(242 240 235 / 0.55);
+}
+.rd-steps i[data-s="now"] {
+  background: #95a89a;
+}

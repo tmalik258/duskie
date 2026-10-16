@@ -72,8 +72,8 @@ export function redesignShell(opts: {
     height = Math.max(REDESIGN_COMPACT.height, opts.contentHeight + 18);
     radius = REDESIGN_AGENTS.radius;
     take = TAKE_A_ASK;
-  } else if (opts.id === "ask" || opts.id === "welcome" || opts.id === "setup-guide") {
-    width = opts.id === "ask" ? REDESIGN_ASK.width : opts.id === "welcome" ? 440 : 452;
+  } else if (opts.id === "ask") {
+    width = REDESIGN_ASK.width;
     height = Math.max(REDESIGN_COMPACT.height, opts.contentHeight + 18);
     radius = REDESIGN_ASK.radius;
     take = TAKE_A_ASK;

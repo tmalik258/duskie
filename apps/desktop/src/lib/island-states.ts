@@ -74,8 +74,8 @@ export const ISLAND_STATES = [
     wash: "warning",
     announce: "Merge conflict",
   },
-  { id: "setup-guide", label: "Setup guide", size: "panel", mascot: null, wash: "idle", announce: null },
-  { id: "welcome", label: "Welcome", size: "panel", mascot: "idle", wash: "idle", announce: null },
+  { id: "setup-guide", label: "Setup guide", size: "card", mascot: "noticing", wash: "noticing", announce: null },
+  { id: "welcome", label: "Welcome", size: "card", mascot: "success", wash: "success", announce: null },
   {
     id: "ask",
     label: "Ask",
