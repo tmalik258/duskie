@@ -434,6 +434,11 @@ function Plan({ items, keys }: { items: Proposal[]; keys: boolean }) {
               <span className="n mono">{s === "done" ? "✓" : s === "failed" ? "✕" : i + 1}</span>
               <span className="min-w-0">
                 {p.label}
+                {!started && (
+                  <span className="ml-1.5 text-[11px] opacity-60">
+                    {p.undoable ? "can be undone" : "cannot be undone"}
+                  </span>
+                )}
                 {s === "failed" && p.ran && <span className="block text-[12px]">{p.ran.message}</span>}
               </span>
             </div>

@@ -708,7 +708,7 @@ interface EarlyChat {
   id: string;
   q: string;
   tools: { name: string; label?: string }[];
-  proposals: { id: string; label: string; step?: boolean }[];
+  proposals: { id: string; label: string; step?: boolean; undoable?: boolean }[];
 }
 let early: EarlyChat | null = null;
 
@@ -1257,12 +1257,12 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
         const step = label || toolStatus(name).replace(/\.\.\.$/, "");
         updateLastTurn(id, (t) => ({ ...t, tool: step, steps: [...(t.steps ?? []), step] }));
       }),
-      listen(EVENTS.aiProposal, ({ chatId, id, label, step }) => {
+      listen(EVENTS.aiProposal, ({ chatId, id, label, step, undoable }) => {
         if (early?.id === chatId) {
-          early.proposals.push({ id, label, step });
+          early.proposals.push({ id, label, step, undoable });
           return;
         }
-        updateLastTurn(chatId, (t) => ({ ...t, proposals: [...(t.proposals ?? []), { id, label, step }] }));
+        updateLastTurn(chatId, (t) => ({ ...t, proposals: [...(t.proposals ?? []), { id, label, step, undoable }] }));
       }),
       listen(EVENTS.islandFocus, ({ until }) => useDuskie.setState({ focusUntil: until })),
       listen(EVENTS.islandDone, ({ id, text }) => {
