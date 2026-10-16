@@ -81,7 +81,7 @@ export function GitDock({ path, onClose }: { path: string; onClose: () => void }
       <div className="flex items-center justify-between">
         <span className="font-medium">
           Changes{" "}
-          <span className="text-white/50">
+          <span className="text-white/55">
             {counts.staged} of {counts.total} staged
           </span>
         </span>
