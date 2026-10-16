@@ -98,6 +98,8 @@ pub struct Settings {
     pub calendar: CalendarSettings,
     /// Composio's MCP server, for apps like Jira, Slack and Gmail in chat.
     pub composio: ComposioSettings,
+    /// Apps connected directly over MCP, preferred over Composio.
+    pub direct_servers: Vec<DirectServer>,
     pub semantic_search: SemanticSearch,
     /// The new island look; off by default.
     pub redesign: Redesign,
@@ -246,6 +248,28 @@ pub struct NotificationSettings {
     pub imap: MailAccountSettings,
 }
 
+/// An MCP server the user connected directly. A program on this PC is
+/// arbitrary code, so it only runs after the user confirmed the exact
+/// command. Variable values (tokens) are in the keychain, never here.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(default, rename_all = "camelCase")]
+pub struct DirectServer {
+    pub id: String,
+    /// The app it serves, lower case ("github").
+    pub app: String,
+    /// "stdio" runs `command`; "url" connects to `url`.
+    pub kind: String,
+    pub command: String,
+    pub args: Vec<String>,
+    /// Names of the variables it gets. Values are in the keychain.
+    pub env_names: Vec<String>,
+    pub url: String,
+    /// The user confirmed running exactly this command and arguments.
+    pub confirmed: bool,
+    /// Tools the user allowed to change things, by exact name.
+    pub writes_allowed: Vec<String>,
+}
+
 /// Where an IMAP account lives and who signs in. No password.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
@@ -303,7 +327,7 @@ pub struct Redesign {
 }
 
 /// One MCP server started as a program on this PC (no shell).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct DirectMcpServer {
     pub id: String,
@@ -313,16 +337,6 @@ pub struct DirectMcpServer {
     pub args: Vec<String>,
 }
 
-impl Default for DirectMcpServer {
-    fn default() -> Self {
-        Self {
-            id: String::new(),
-            name: String::new(),
-            command: String::new(),
-            args: Vec::new(),
-        }
-    }
-}
 
 /// Direct MCP connections the user added in Settings > Apps.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -742,6 +756,7 @@ impl Default for Settings {
             voice: VoiceSettings::default(),
             calendar: CalendarSettings::default(),
             composio: ComposioSettings::default(),
+            direct_servers: Vec::new(),
             semantic_search: SemanticSearch::default(),
             redesign: Redesign::default(),
             direct_mcp: DirectMcp::default(),
