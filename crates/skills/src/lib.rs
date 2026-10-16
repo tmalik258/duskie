@@ -5,6 +5,7 @@
 //! - [`template`]: `{{field}}` rendering.
 
 pub mod engine;
+pub mod library;
 pub mod manifest;
 pub mod template;
 
