@@ -10,6 +10,7 @@ import { baseName, countChanges, groupByFolder } from "@/lib/changes";
 import type { CommitRow, GitFile, RepoRow, StashRow } from "@/lib/types";
 import { Ic, Icon } from "../Icon";
 import { Tip } from "../Tip";
+import { Editor } from "./Editor";
 
 const KIND: Record<string, string> = {
   M: "changed",
@@ -26,6 +27,7 @@ export function GitDock({ path, repo, onClose }: { path: string; repo?: RepoRow 
   const [tab, setTab] = useState<GitTab>("changes");
   const [stashes, setStashes] = useState<StashRow[]>([]);
   const [changed, setChanged] = useState(0);
+  const [full, setFull] = useState(false);
   const loadStashes = useCallback(
     () =>
       void api
@@ -36,14 +38,15 @@ export function GitDock({ path, repo, onClose }: { path: string; repo?: RepoRow 
   );
   useEffect(loadStashes, [loadStashes]);
 
-  // Esc closes the dock.
+  // Esc closes the dock (the editor handles its own Esc).
   useEffect(() => {
+    if (full) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, full]);
 
   const pr = repo?.prs.find((p) => p.branch === repo.branch) ?? null;
   const tabs: [GitTab, string, number | null][] = [
@@ -52,6 +55,7 @@ export function GitDock({ path, repo, onClose }: { path: string; repo?: RepoRow 
     ["pr", "Pull request", null],
     ["stashes", "Stashes", stashes.length],
   ];
+  if (full) return <Editor root={path} onClose={() => setFull(false)} />;
   return (
     <section className="gd flex min-h-0 flex-1 flex-col" aria-label="Git">
       <div className="gd-bar">
@@ -65,7 +69,10 @@ export function GitDock({ path, repo, onClose }: { path: string; repo?: RepoRow 
             <span className="truncate mono">{repo.branch}</span>
           </span>
         )}
-        <button type="button" className="rd-btn ghost chip-s ic-only ml-auto" aria-label="Close Git" onClick={onClose}>
+        <button type="button" className="rd-btn ghost chip-s ml-auto" onClick={() => setFull(true)}>
+          Full screen
+        </button>
+        <button type="button" className="rd-btn ghost chip-s ic-only" aria-label="Close Git" onClick={onClose}>
           <Ic name="x" size={12} />
         </button>
       </div>

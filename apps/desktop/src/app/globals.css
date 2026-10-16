@@ -4773,3 +4773,121 @@ button.ak-cchip:hover,
   color: var(--ink-2);
   background: rgb(255 255 255 / 0.06);
 }
+
+/* Full editor in the dock */
+.ed-main {
+  display: flex;
+  min-height: 0;
+}
+.ed-tree {
+  display: flex;
+  flex-direction: column;
+  width: 200px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  border-right: 1px solid rgb(255 255 255 / 0.06);
+  padding: 4px 0;
+}
+.ed-tree::-webkit-scrollbar,
+.ed-pop::-webkit-scrollbar {
+  display: none;
+}
+.ed-node {
+  text-align: left;
+  font-size: 12px;
+  color: var(--ink-2);
+  padding: 2px 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ed-node[data-dir="true"] {
+  color: var(--ink-3);
+}
+.ed-node[data-active="true"],
+.ed-node:hover:not(:disabled) {
+  color: var(--ink);
+  background: rgb(255 255 255 / 0.06);
+}
+.ed-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.ed-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  color: var(--ink-2);
+}
+.ed-tab[data-active="true"] {
+  color: var(--ink);
+  background: rgb(255 255 255 / 0.08);
+}
+.ed-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 6px 8px;
+  color: var(--ink);
+  background: rgb(255 200 80 / 0.12);
+}
+.ed-pop {
+  position: absolute;
+  top: 48px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(520px, 90%);
+  max-height: 60%;
+  overflow-y: auto;
+  scrollbar-width: none;
+  display: flex;
+  flex-direction: column;
+  padding: 6px;
+  border-radius: 10px;
+  background: rgb(24 24 28 / 0.98);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.5);
+  z-index: 20;
+}
+.ed-pop input {
+  font-size: 13px;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 0.06);
+  color: var(--ink);
+}
+.ed-pop button {
+  text-align: left;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ed-pop button:hover,
+.ed-pop button:focus-visible {
+  color: var(--ink);
+  background: rgb(255 255 255 / 0.08);
+}
+.ed {
+  position: relative;
+}
+.ed-add {
+  border-left: 3px solid #4caf7d;
+}
+.ed-chg {
+  border-left: 3px solid #4a90d9;
+}
+.ed-del {
+  border-left: 3px solid #d9534f;
+}
