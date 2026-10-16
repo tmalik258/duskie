@@ -147,7 +147,9 @@ export function RedesignPill({ model, onWidth }: { model: PillModel; onWidth: (w
           </span>
         )}
         {kind === "suggest" && <span className="dot" style={{ background: "#95a89a" }} />}
-        <span className={`cmp-label${kind === "suggest" || kind === "notify" ? " nt" : ""}${kind === "listening" ? " words" : ""}`}>
+        <span
+          className={`cmp-label${kind === "suggest" || kind === "notify" ? " nt" : ""}${kind === "listening" ? " words" : ""}`}
+        >
           {model.label}
           {model.dim && <span className="dim"> {model.dim}</span>}
         </span>
