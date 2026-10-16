@@ -64,6 +64,7 @@ export const ISLAND_STATES = [
   { id: "focus", label: "Focus", size: "compact", mascot: "focus", wash: "idle", announce: "Focus on" },
   { id: "paused", label: "Paused", size: "pill", mascot: "sleeping", wash: "idle", announce: "Paused" },
   { id: "offline", label: "Offline", size: "compact", mascot: null, wash: "warning", announce: "You are offline" },
+  { id: "agent-card", label: "Agent", size: "card", mascot: "working", wash: "agent", announce: null },
   { id: "notify-card", label: "Notification", size: "card", mascot: "noticing", wash: "noticing", announce: null },
   { id: "net-card", label: "No connection", size: "card", mascot: null, wash: "warning", announce: "No connection" },
   { id: "update", label: "Update", size: "card", mascot: null, wash: "agent", announce: "Update ready" },

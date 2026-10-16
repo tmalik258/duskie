@@ -30,10 +30,11 @@ import { updateBusy, updateLabel } from "@/lib/updates";
 import { useRedesign } from "@/lib/use-redesign";
 import { PALETTES, type WashEvent } from "@/lib/wash";
 import { ActivitiesCard } from "./ActivitiesCard";
+import { AgentCard } from "./AgentCard";
 import { Announcer } from "./Announcer";
 import { ASK_MASCOT, ASK_ORB, ASK_PAD, AskPanel } from "./AskPanel";
 import { Creature } from "./Creature";
-import { IslandBubbles } from "./IslandBubbles";
+import { type BubbleItem, IslandBubbles } from "./IslandBubbles";
 import { IslandGuide, useGuide } from "./IslandGuide";
 import { CompactTrailing, ExpandedContent } from "./IslandParts";
 import { IslandSettings } from "./IslandSettings";
@@ -198,6 +199,29 @@ export function Island() {
   const askingTitle = useAgents((s) => s.sessions.find((x) => x.status === "waiting")?.title ?? null);
   const { data: calendarToday } = useCached<CalendarToday>("calendar-today", api.calendarToday);
   const meetingSoon = soonMeeting(updateNow, calendarToday);
+  const cardAgent = useAgents(
+    (s) =>
+      (s.sessions.find((x) => x.status === "waiting") ?? s.sessions.find((x) => x.status === "working"))?.id ?? null,
+  );
+  const splitAgent = useAgents(
+    useShallow((s) => {
+      const x = s.sessions.find((y) => y.status === "working");
+      if (!x) return null;
+      const mark = x.agent
+        .split(/\s+/)
+        .map((w) => w[0] ?? "")
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+      return {
+        id: x.id,
+        agent: x.agent,
+        mark,
+        done: x.plan.filter((p) => p.status === "completed").length,
+        total: x.plan.length,
+      };
+    }),
+  );
   const askingCount = useAgents((s) => s.sessions.filter((x) => x.status === "waiting").length);
   const working = asking
     ? null
@@ -701,6 +725,7 @@ export function Island() {
         offline: !online,
         netCard: netShown && !voicePill,
         notifyCard: redesign && hovered && meetingSoon !== null && !paused,
+        agentCard: redesign && hovered && agentsOnly && cardAgent !== null,
         focus: focusLeft !== null,
         paused,
         notifyFresh: !!notifyFresh && !busy && !expanded,
@@ -790,12 +815,24 @@ export function Island() {
         ? ("error" as const)
         : ("success" as const)
       : null;
-  const bubbleItems =
-    redesign && busy && suggestion
+  const agentBubble: BubbleItem[] =
+    redesign && splitAgent && working !== agentWorking
+      ? [
+          {
+            id: `agent-${splitAgent.id}`,
+            label: splitAgent.total > 1 ? `${splitAgent.done + 1} of ${splitAgent.total}` : splitAgent.agent,
+            ring: { mark: splitAgent.mark, done: splitAgent.done, total: splitAgent.total },
+          },
+        ]
+      : [];
+  const bubbleItems = [
+    ...agentBubble,
+    ...(redesign && busy && suggestion
       ? [{ id: suggestion.id, label: suggestion.title || "Suggestion" }]
       : redesign && busy
         ? liveActivities.slice(redesign ? 1 : 0, 5).map((a) => ({ id: a.id, label: a.label || a.source }))
-        : [];
+        : []),
+  ];
 
   return (
     <motion.div
@@ -966,6 +1003,8 @@ export function Island() {
                     <ActivitiesCard />
                   ) : redesign && registryId === "update" && updateWorking !== null ? (
                     <UpdateCard activityId={updateActivity?.id ?? null} startedAt={updateActivity?.startedAt ?? null} />
+                  ) : redesign && registryId === "agent-card" && cardAgent ? (
+                    <AgentCard id={cardAgent} />
                   ) : redesign && registryId === "notify-card" && meetingSoon ? (
                     <MeetingCard meeting={meetingSoon} />
                   ) : redesign && registryId === "net-card" ? (

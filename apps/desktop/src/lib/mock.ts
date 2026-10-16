@@ -1525,7 +1525,7 @@ if (typeof window !== "undefined") {
     __mockEmit: emit,
     __mockGo: go,
     __mockCall: (name: string, args: Record<string, unknown> = {}) => commands[name]?.(args),
-    __mockAgents: async () => {
+    __mockAgents: async (calm = false) => {
       const { useAgents } = await import("./agents");
       const now = Date.now();
       const mk = (
@@ -1566,8 +1566,29 @@ if (typeof window !== "undefined") {
           mk("a3", "Claude Code", "falconxoft-portal", "Add CSV export to invoices", "idle", "edit", 14, {
             changes: 5,
           }),
-          mk("a4", "Codex", "api-gateway", "Fix missing rate limit headers", "waiting", "ask", 3),
-          mk("a5", "Claude Code", "duskie", "Voice settings: rate slider", "working", "edit", 1),
+          mk("a4", "Codex", "api-gateway", "Fix missing rate limit headers", calm ? "idle" : "waiting", "ask", 3),
+          mk("a5", "Claude Code", "duskie", "Writing tests for the wash controller", "working", "edit", 1, {
+            branch: "agent/claude-voice-settings",
+            plan: ["Read the controller", "List the cases", "Write the tests", "Run them", "Open a review"].map(
+              (text, i) => ({ text, status: i < 2 ? "completed" : i === 2 ? "in_progress" : "pending" }),
+            ),
+            entries: [
+              {
+                kind: "step",
+                step: { id: "s1", tool: "edit", label: "Edited lib/wash.ts", detail: "+42 -6", state: "done" },
+              },
+              {
+                kind: "step",
+                step: {
+                  id: "s2",
+                  tool: "bash",
+                  label: "Ran pnpm test --filter desktop",
+                  detail: "38 passed",
+                  state: "done",
+                },
+              },
+            ],
+          }),
         ] as never,
         current: null,
       });
