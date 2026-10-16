@@ -20,7 +20,7 @@ export interface IslandStateDef {
 
 export const ISLAND_STATES = [
   { id: "idle", label: "Idle", size: "pill", mascot: "idle", wash: "idle", announce: null },
-  { id: "quiet-glance", label: "Quiet glance", size: "compact", mascot: "idle", wash: "idle", announce: null },
+  { id: "quiet-glance", label: "Quiet glance", size: "card", mascot: "idle", wash: "idle", announce: null },
   { id: "glance", label: "Glance", size: "card", mascot: "idle", wash: "idle", announce: null },
   { id: "noticing", label: "Noticing", size: "compact", mascot: "noticing", wash: "noticing", announce: null },
   {

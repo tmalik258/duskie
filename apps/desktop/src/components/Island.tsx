@@ -24,14 +24,14 @@ import { PILL_FRESH_MS } from "@/lib/peek";
 import { REDESIGN_HOVER_IN_MS, REDESIGN_HOVER_OUT_MS } from "@/lib/redesign-layout";
 import { resolveIslandState } from "@/lib/resolve-island-state";
 import { connect, setHovered, useDuskie, watchWaiting } from "@/lib/store";
-import { isPaused } from "@/lib/types";
+import { isPaused, type MascotState } from "@/lib/types";
 import { updateBusy, updateLabel } from "@/lib/updates";
 import { useRedesign } from "@/lib/use-redesign";
+import { PALETTES, type WashEvent } from "@/lib/wash";
 import { Announcer } from "./Announcer";
 import { ASK_MASCOT, ASK_ORB, ASK_PAD, AskPanel } from "./AskPanel";
 import { Creature } from "./Creature";
 import { IslandBubbles } from "./IslandBubbles";
-import { IslandGrain } from "./IslandGrain";
 import { IslandGuide, useGuide } from "./IslandGuide";
 import { CompactTrailing, ExpandedContent } from "./IslandParts";
 import { IslandSettings } from "./IslandSettings";
@@ -685,6 +685,7 @@ export function Island() {
           className="island-shell relative overflow-hidden text-white"
           data-bare={redesignBare}
           data-color={shellColor}
+          data-state={registryId ?? undefined}
           data-solid={look.solid || undefined}
           data-simple={look.simple || undefined}
           initial={false}
@@ -700,7 +701,11 @@ export function Island() {
           onPointerLeave={() => setHovered(false)}
         >
           {redesign && redesignLayout ? (
-            <IslandGrain base={redesignLayout.geom.wash} event={washEvent} />
+            <div
+              className="isl-tint"
+              aria-hidden
+              style={{ "--tint": tintRgb(washEvent ?? redesignLayout.geom.wash) } as CSSProperties}
+            />
           ) : (
             <IslandWash simple={look.simple} mascot={mascot} donePill={donePill} />
           )}
@@ -836,16 +841,19 @@ export function Island() {
           transition={transition}
           style={{ originX: 0, originY: 0 }}
         >
-          <Creature
-            state={chatting && mascot === "idle" ? "working" : mascot}
-            face={chatting && mascot === "idle" ? null : face}
-            size={mascotSize}
-            theme={redesign ? "atelier" : settings.theme}
-            alive={settings.alive && visible && !look.simple}
-            simple={look.simple}
-            active={shown && !(redesign ? redesignBare : bare)}
-            bust={redesign ? false : undefined}
-          />
+          <span className={redesign ? "dk-orb" : undefined} data-face={redesign ? haloFace(mascot) : undefined}>
+            {redesign && <span className="dk-halo" />}
+            <Creature
+              state={chatting && mascot === "idle" ? "working" : mascot}
+              face={chatting && mascot === "idle" ? null : face}
+              size={mascotSize}
+              theme={redesign ? "atelier" : settings.theme}
+              alive={settings.alive && visible && !look.simple}
+              simple={look.simple}
+              active={shown && (redesign || !bare)}
+              bust={redesign ? false : undefined}
+            />
+          </span>
         </motion.div>
       </div>
     </motion.div>
@@ -853,3 +861,19 @@ export function Island() {
 }
 
 /** Newest words matter most while talking; keep the pill from growing forever. */
+
+/** Wash palette colour as "r g b" for the tint gradient. */
+function tintRgb(e: WashEvent): string {
+  const h = PALETTES[e].a;
+  return [1, 3, 5].map((i) => Number.parseInt(h.slice(i, i + 2), 16)).join(" ");
+}
+
+/** Halo colour and strength follow the mascot's mood. */
+function haloFace(m: MascotState): string {
+  if (m === "listening") return "listen";
+  if (m === "success") return "happy";
+  if (m === "error") return "sad";
+  if (m === "working") return "work";
+  if (m === "sleeping") return "sleep";
+  return "idle";
+}
