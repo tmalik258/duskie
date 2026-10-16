@@ -178,10 +178,20 @@ export interface VoiceDownload {
   error: string | null;
 }
 
-export const AI_PROVIDERS = ["local", "gemini", "groq", "claude_code", "codex", "anthropic", "openrouter"] as const;
+export const AI_PROVIDERS = [
+  "local",
+  "gemini",
+  "groq",
+  "claude_code",
+  "codex",
+  "anthropic",
+  "openrouter",
+  "openai",
+  "xai",
+] as const;
 /** Cloud models reached with an API key kept in Credential Manager. */
-export type CloudId = "gemini" | "groq" | "openrouter";
-export const CLOUD_IDS: CloudId[] = ["gemini", "groq", "openrouter"];
+export type CloudId = "gemini" | "groq" | "openrouter" | "openai" | "xai";
+export const CLOUD_IDS: CloudId[] = ["gemini", "groq", "openrouter", "openai", "xai"];
 export type AiProviderId = (typeof AI_PROVIDERS)[number];
 
 export interface AiSettings {
@@ -195,6 +205,8 @@ export interface AiSettings {
   gemini: { enabled: boolean; model: string };
   groq: { enabled: boolean; model: string };
   openrouter: { enabled: boolean; model: string };
+  openai: { enabled: boolean; model: string };
+  xai: { enabled: boolean; model: string };
   semif: {
     enabled: boolean;
     command: string[];
@@ -217,6 +229,8 @@ export const PROVIDER_LABELS: Record<string, string> = {
   gemini: "Gemini",
   groq: "Groq",
   openrouter: "OpenRouter",
+  openai: "OpenAI",
+  xai: "xAI Grok",
   semif: "SemIf",
 };
 
@@ -449,7 +463,7 @@ export const DEFAULT_SETTINGS: Settings = {
   endOfDayHour: 18,
   cloneRules: {},
   ai: {
-    order: ["local", "gemini", "groq", "claude_code", "codex", "anthropic", "openrouter"],
+    order: ["local", "gemini", "groq", "claude_code", "codex", "anthropic", "openrouter", "openai", "xai"],
     claudeCode: { enabled: true, path: "", model: FAST_CLAUDE_MODEL },
     codex: { enabled: true, path: "", model: FAST_CODEX_MODEL },
     codingAgent: "auto",
@@ -458,6 +472,8 @@ export const DEFAULT_SETTINGS: Settings = {
     gemini: { enabled: false, model: "" },
     groq: { enabled: false, model: "" },
     openrouter: { enabled: false, model: "" },
+    openai: { enabled: false, model: "" },
+    xai: { enabled: false, model: "" },
     semif: {
       enabled: true,
       command: ["semif-score"],

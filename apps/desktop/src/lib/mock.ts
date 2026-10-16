@@ -139,7 +139,13 @@ function later(ms: number, fn: () => void) {
   }, ms);
 }
 
-const cloudKeys: Record<CloudId, boolean> = { gemini: previewFlag("gemini"), groq: false, openrouter: false };
+const cloudKeys: Record<CloudId, boolean> = {
+  gemini: previewFlag("gemini"),
+  groq: false,
+  openrouter: false,
+  openai: false,
+  xai: false,
+};
 
 function saveSettings(next: Settings): Settings {
   if (settings.codeFolders.some((p) => !next.codeFolders.includes(p))) {

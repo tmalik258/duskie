@@ -474,6 +474,10 @@ pub struct AiSettings {
     pub groq: CloudPref,
     /// One key for hundreds of models, some free.
     pub openrouter: CloudPref,
+    /// OpenAI's API with the user's key.
+    pub openai: CloudPref,
+    /// xAI Grok with the user's key.
+    pub xai: CloudPref,
     pub semif: SemIfPref,
     /// Let SemIf or the local model rank suggestion options.
     pub decisions: bool,
@@ -555,7 +559,7 @@ pub struct SemIfPref {
     pub gguf: String,
 }
 
-pub const AI_PROVIDERS: [&str; 7] = [
+pub const AI_PROVIDERS: [&str; 9] = [
     "local",
     "gemini",
     "groq",
@@ -563,6 +567,8 @@ pub const AI_PROVIDERS: [&str; 7] = [
     "codex",
     "anthropic",
     "openrouter",
+    "openai",
+    "xai",
 ];
 
 /// A cloud model reached with an API key kept in Credential Manager. On
@@ -586,6 +592,8 @@ impl Default for AiSettings {
             gemini: CloudPref::default(),
             groq: CloudPref::default(),
             openrouter: CloudPref::default(),
+            openai: CloudPref::default(),
+            xai: CloudPref::default(),
             semif: SemIfPref::default(),
             decisions: true,
             local_only: false,
@@ -1028,7 +1036,9 @@ mod tests {
                 "claude_code",
                 "codex",
                 "anthropic",
-                "openrouter"
+                "openrouter",
+                "openai",
+                "xai"
             ]
         );
         assert_eq!(s.ai.coding_agent, "auto");
