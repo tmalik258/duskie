@@ -193,7 +193,12 @@ export function Island() {
   // Combine outside a store selector so closed-over chat/agent labels stay fresh.
   const activityState = useActivities();
   const activityNow = useNow(1000);
-  const liveActivities = visibleActivities([...activityState.activities, ...activityState.local], activityNow);
+  const keepProblems = useDuskie((s) => s.settings.redesign.enabled);
+  const liveActivities = visibleActivities(
+    [...activityState.activities, ...activityState.local],
+    activityNow,
+    keepProblems,
+  );
   const foreground = liveActivities.filter((a) => !["browser", "file"].includes(a.source));
   const backgroundAll = liveActivities.filter((a) => ["browser", "file"].includes(a.source));
   const background = backgroundAll.filter((a) => !terminal(a));
