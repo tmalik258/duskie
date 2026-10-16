@@ -553,6 +553,8 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     return "Dropped the stash";
   },
   island_width: () => undefined,
+  limits_paused: () =>
+    new URLSearchParams(location.search).has("limited") ? [{ name: "Anthropic", pausedSecs: 42 }] : [],
   servers_save: (a) => {
     const given = a.server as DirectServer;
     const server: DirectServer = {

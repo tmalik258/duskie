@@ -881,6 +881,13 @@ export interface DirectServer {
   writesAllowed: string[];
 }
 
+/** A provider or connector paused after repeated errors. */
+export interface LimitState {
+  name: string;
+  /** Seconds until it is tried again. */
+  pausedSecs: number;
+}
+
 /** A tool a direct server offers. Writes stay off until allowed. */
 export interface ServerTool {
   name: string;

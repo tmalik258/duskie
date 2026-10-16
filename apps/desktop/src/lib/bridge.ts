@@ -38,6 +38,7 @@ import type {
   LaterItem,
   Learned,
   LessonRow,
+  LimitState,
   LocalModels,
   MailStatus,
   MascotState,
@@ -385,6 +386,7 @@ export const api = {
   gitStashDrop: (path: string, name: string) => invoke<string>("git_stash_drop", { path, name }),
   /** Widens the island window for a dock beside it; 0 puts it back. */
   islandWidth: (width: number) => invoke<void>("island_width", { width }),
+  limitsPaused: () => invoke<LimitState[]>("limits_paused"),
   serversSave: (server: DirectServer, env: Record<string, string>) => invoke<string>("servers_save", { server, env }),
   serversCommand: (id: string) => invoke<string>("servers_command", { id }),
   serversConfirm: (id: string, shown: string) => invoke<void>("servers_confirm", { id, shown }),

@@ -160,6 +160,12 @@ pub async fn net_check(app: AppHandle, lost: bool) -> bool {
     crate::net::check(&app, lost).await
 }
 
+/// Providers and connectors paused after repeated errors, for the usage popover.
+#[tauri::command]
+pub fn limits_paused() -> Vec<duskie_ai::limit::LimitState> {
+    duskie_ai::limit::paused()
+}
+
 /// Widens the island window for a dock beside it; 0 puts it back.
 #[tauri::command]
 pub fn island_width(app: AppHandle, width: f64) {
