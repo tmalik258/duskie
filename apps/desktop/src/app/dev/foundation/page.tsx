@@ -5,9 +5,9 @@
 
 import { useRef, useState } from "react";
 import { Creature } from "@/components/Creature";
+import { EXPRESSIONS } from "@/components/creature/expressions";
 import { GrainWash, type GrainWashHandle } from "@/components/GrainWash";
 import { IslandWash } from "@/components/IslandWash";
-import { EXPRESSIONS, type Expression } from "@/components/orb/expressions";
 import { SPRINGS, spring } from "@/lib/spring";
 import { MASCOT_STATES, type MascotState } from "@/lib/types";
 import { WASH_EVENTS, washFor } from "@/lib/wash";
@@ -80,7 +80,7 @@ export default function FoundationPage() {
       <section className="mb-8">
         <h2 className="mb-3 text-sm text-[var(--ink-2)]">Every expression</h2>
         <div className="flex flex-wrap gap-4">
-          {(Object.keys(EXPRESSIONS) as Expression[]).map((x) => (
+          {EXPRESSIONS.map((x) => (
             <div key={x} className="flex w-24 flex-col items-center gap-1">
               <Creature state="idle" face={x} size={72} magnetic={false} />
               <code className="text-xs text-[var(--ink-3)]">{x}</code>

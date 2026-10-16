@@ -1,16 +1,14 @@
 "use client";
 
 // Duskie's face: a small fur creature with the app's eyes, drawn by
-// creature/creature.ts. Same props as the Orb, which stays as the fallback
-// when this machine has no WebGL 2.
+// creature/creature.ts. Without WebGL 2 it shows a still silhouette.
 
 import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { subscribeCursor } from "@/lib/cursor";
 import type { MascotState, Theme } from "@/lib/types";
 import { createCreature, creatureSupported } from "./creature/creature";
-import { Orb } from "./Orb";
-import { type Expression, FOR_STATE } from "./orb/expressions";
+import { type Expression, FOR_STATE } from "./creature/expressions";
 
 interface Live {
   show: (expr: string) => void;
@@ -112,7 +110,17 @@ export function Creature(props: {
     };
   }, [supported, size, magnetic, reduced]);
 
-  if (!supported) return <Orb {...props} />;
+  // No WebGL 2 on this machine: a still silhouette, no animation.
+  if (!supported) {
+    return (
+      <div
+        className="creature-still"
+        style={{ width: size, height: size }}
+        role="img"
+        aria-label={`Duskie is ${state}`}
+      />
+    );
+  }
   return (
     <div
       ref={root}

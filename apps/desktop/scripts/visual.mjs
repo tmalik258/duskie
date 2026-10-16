@@ -16,8 +16,8 @@ const shots = join(dir, "..", "visual");
 mkdirSync(shots, { recursive: true });
 
 const css = readFileSync(join(dir, "..", "src", "app", "globals.css"), "utf8");
-const orb = readFileSync(join(dir, "..", "src", "components", "Orb.tsx"), "utf8");
-const themes = [...orb.matchAll(/^ {2}(\w+): \{\n {4}label:/gm)].map((m) => m[1]);
+const themeFile = readFileSync(join(dir, "..", "src", "components", "creature", "themes.ts"), "utf8");
+const themes = [...themeFile.matchAll(/^ {2}(\w+): "/gm)].map((m) => m[1]);
 const colors = ["glass", ...[...css.matchAll(/\.island-shell\[data-color="([^"]+)"\]/g)].map((m) => m[1])];
 
 const TYPES = {
