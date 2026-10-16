@@ -835,11 +835,19 @@ export function Island() {
                 className="absolute top-0 right-0"
                 style={
                   askPanel
-                    ? {
-                        left: redesign ? (redesignLayout?.geom.contentPadLeft ?? ASK_PAD.x) : ASK_PAD.x,
-                        paddingTop: ASK_PAD.top,
-                        paddingRight: ASK_PAD.x,
-                      }
+                    ? redesign
+                      ? ({
+                          // Design: only the tab row sits beside Duskie; the rest runs full width.
+                          left: 12,
+                          paddingTop: ASK_PAD.top,
+                          paddingRight: ASK_PAD.x,
+                          "--ak-indent": `${(redesignLayout?.geom.contentPadLeft ?? ASK_PAD.x) - 12}px`,
+                        } as CSSProperties)
+                      : {
+                          left: ASK_PAD.x,
+                          paddingTop: ASK_PAD.top,
+                          paddingRight: ASK_PAD.x,
+                        }
                     : {
                         left: redesign ? (redesignLayout?.geom.contentPadLeft ?? EXPANDED.pad) : EXPANDED.pad,
                         paddingTop: EXPANDED.pad,
