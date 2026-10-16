@@ -42,6 +42,7 @@ import type {
   LessonRow,
   LibrarySkill,
   LimitState,
+  LinkPreview,
   LocalModels,
   MailStatus,
   MascotState,
@@ -254,7 +255,9 @@ export const api = {
     invoke<LibrarySkill[]>("library_set_target", { name, target, on }),
   libraryRemove: (name: string) => invoke<LibrarySkill[]>("library_remove", { name }),
   librarySync: () => invoke<SyncReport>("library_sync"),
-  libraryInstallUrl: (url: string) => invoke<LibrarySkill[]>("library_install_url", { url }),
+  libraryFetchUrl: (url: string) => invoke<LinkPreview>("library_fetch_url", { url }),
+  libraryInstallFetched: (url: string, commit: string, names: string[]) =>
+    invoke<LibrarySkill[]>("library_install_fetched", { url, commit, names }),
   editorTree: (root: string) => invoke<TreeEntry[]>("editor_tree", { root }),
   editorRead: (root: string, path: string) => invoke<OpenFile>("editor_read", { root, path }),
   editorWrite: (root: string, path: string, text: string, stamp: string) =>

@@ -623,6 +623,24 @@ export interface LibrarySkill {
   commit: string | null;
 }
 
+/** One skill behind a link, compared with the library. */
+export interface LinkSkill {
+  name: string;
+  description: string;
+  files: number;
+  bytes: number;
+  hasScripts: boolean;
+  status: "new" | "changed" | "same";
+  /** Files added, changed or removed against the library copy. */
+  diff: string[];
+}
+
+export interface LinkPreview {
+  url: string;
+  commit: string;
+  skills: LinkSkill[];
+}
+
 export interface SyncReport {
   written: string[];
   conflicts: string[];

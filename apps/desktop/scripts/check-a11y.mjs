@@ -12,7 +12,7 @@ import { chromium } from "playwright";
 const OUT = join(import.meta.dirname, "..", "out");
 const axe = readFileSync(createRequire(import.meta.url).resolve("axe-core/axe.min.js"), "utf8");
 const TYPES = { ".js": "text/javascript", ".css": "text/css", ".html": "text/html", ".woff2": "font/woff2", ".svg": "image/svg+xml" };
-const PAGES = ["/", "/island/", "/dev/git/", "/dev/editor/", "/dev/states/"];
+const PAGES = ["/", "/island/", "/dev/git/", "/dev/editor/", "/dev/states/", "/dev/skills/"];
 
 const srv = http
   .createServer((q, r) => {

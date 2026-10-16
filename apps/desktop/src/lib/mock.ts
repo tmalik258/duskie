@@ -400,19 +400,50 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     library = library.filter((l) => l.name !== (a as { name: string }).name);
     return library;
   },
-  library_install_url: (a) => {
-    const name = (a as { url: string }).url.split("/").pop() || "skill";
-    library.push({
-      name,
-      description: "Added from a link.",
-      origin: "url",
-      hash: "u1",
-      hasScripts: false,
-      targets: { claude: true, codex: true, local: true },
-      synced: {},
-      url: (a as { url: string }).url,
-      commit: "abc1234",
-    });
+  library_fetch_url: (a) => {
+    const url = (a as { url: string }).url;
+    const had = library.find((l) => l.name === "pdf-tools");
+    return {
+      url,
+      commit: had ? "def5678" : "abc1234",
+      skills: [
+        {
+          name: "pdf-tools",
+          description: "Fill and split PDFs.",
+          files: 2,
+          bytes: 2048,
+          hasScripts: false,
+          status: had ? "changed" : "new",
+          diff: had ? ["changed SKILL.md"] : [],
+        },
+        {
+          name: "deploy",
+          description: "Ship a build.",
+          files: 3,
+          bytes: 4096,
+          hasScripts: true,
+          status: "new",
+          diff: [],
+        },
+      ],
+    };
+  },
+  library_install_fetched: (a) => {
+    const { url, commit, names } = a as { url: string; commit: string; names: string[] };
+    for (const name of names) {
+      library = library.filter((l) => l.name !== name);
+      library.push({
+        name,
+        description: "Added from a link.",
+        origin: "url",
+        hash: commit,
+        hasScripts: name === "deploy",
+        targets: { claude: true, codex: true, local: true },
+        synced: {},
+        url,
+        commit,
+      });
+    }
     return library;
   },
   library_sync: () => ({ written: library.map((l) => l.name), conflicts: [], backups: [] }),
