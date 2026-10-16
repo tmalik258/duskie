@@ -1523,6 +1523,13 @@ pub fn claude_events(v: &Value) -> Vec<Value> {
                     out.push(json!({ "kind": "plan_doc", "text": plan }));
                     continue;
                 }
+                // The agent's own multiple-choice question, with its options.
+                if name == "AskUserQuestion" && b["input"]["questions"].is_array() {
+                    out.push(json!({
+                        "kind": "choose", "id": b["id"], "questions": b["input"]["questions"],
+                    }));
+                    continue;
+                }
                 let (label, detail) = describe_tool(name, &b["input"]);
                 out.push(json!({
                     "kind": "step", "id": b["id"], "tool": name, "label": label,
@@ -2692,6 +2699,15 @@ mod tests {
         assert_eq!(ev.len(), 1, "the plan is not also a step");
         assert_eq!(ev[0]["kind"], "plan_doc");
         assert!(ev[0]["text"].as_str().unwrap().contains("Add retries"));
+
+        let ask: Value = serde_json::from_str(
+            r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t4","name":"AskUserQuestion","input":{"questions":[{"question":"Which database?","header":"DB","multiSelect":false,"options":[{"label":"SQLite","description":"local"},{"label":"Postgres","description":"server"}]}]}}]}}"#,
+        )
+        .unwrap();
+        let ev = claude_events(&ask);
+        assert_eq!(ev.len(), 1);
+        assert_eq!(ev[0]["kind"], "choose");
+        assert_eq!(ev[0]["questions"][0]["options"][1]["label"], "Postgres");
 
         let result: Value = serde_json::from_str(
             r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","is_error":true}]}}"#,
