@@ -4,5 +4,6 @@ onlyBuiltDependencies:
   - "@biomejs/biome"
   - "@tailwindcss/oxide"
   - "@tauri-apps/cli"
-  - esbuild
   - sharp
+allowBuilds:
+  esbuild: true
