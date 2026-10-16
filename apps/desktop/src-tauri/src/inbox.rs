@@ -974,6 +974,21 @@ pub fn describe(level: Option<&str>, from: Option<&str>, minutes: Option<u64>) -
 mod tests {
     use super::*;
 
+    /// Logs may name an id or a count, never what a notification said.
+    #[test]
+    fn logs_carry_no_notification_content() {
+        let src = include_str!("inbox.rs");
+        let body = src.split("#[cfg(test)]").next().unwrap_or(src);
+        for line in body.lines().filter(|l| l.contains("log::")) {
+            for word in ["title", "body", "text", "subject", "sender"] {
+                assert!(
+                    !line.contains(&format!("{{{word}")) && !line.contains(&format!(", {word}")),
+                    "log line may carry content: {line}"
+                );
+            }
+        }
+    }
+
     #[test]
     fn finds_the_link_in_a_message() {
         assert_eq!(
