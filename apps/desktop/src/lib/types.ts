@@ -824,6 +824,18 @@ export interface NotificationSettings {
 
 export type AttentionProfile = "normal" | "calm";
 
+/** Where the Gmail connection stands. Never holds message content. */
+export type MailState = "disconnected" | "connected" | "offline" | "auth_expired";
+
+export interface MailStatus {
+  state: MailState;
+  /** False when this build has no Google sign-in set up. */
+  configured: boolean;
+  /** Seconds since the epoch of the last good check. */
+  lastOk: number | null;
+  error: string | null;
+}
+
 /** One learned sender or source, as Settings lists it. */
 export interface LessonRow {
   key: string;

@@ -1,6 +1,7 @@
 // Browser-only stand-in for the Rust core, used when the UI runs outside
 // Tauri. It mimics the app loosely; the real rules live in Rust.
 
+import type { MailStatus } from "./types";
 import {
   type ActivitySnapshot,
   type CloudId,
@@ -18,6 +19,7 @@ type Handler = (payload: unknown) => void;
 
 const handlers = new Map<string, Set<Handler>>();
 let settings: Settings = structuredClone(DEFAULT_SETTINGS);
+let mailStatus: MailStatus = { state: "disconnected", configured: true, lastOk: null, error: null };
 if (typeof localStorage !== "undefined") {
   try {
     Object.assign(settings, JSON.parse(localStorage.getItem("sidekick.mock.savedFolders") ?? "{}"));
@@ -518,6 +520,15 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     }
     settings = { ...settings, notifications: { ...settings.notifications, lessons: { entries } } };
     return null;
+  },
+  mail_status: () => mailStatus,
+  mail_connect: () => {
+    mailStatus = { state: "connected", configured: true, lastOk: Math.floor(Date.now() / 1000), error: null };
+    return mailStatus;
+  },
+  mail_disconnect: () => {
+    mailStatus = { state: "disconnected", configured: true, lastOk: null, error: null };
+    return mailStatus;
   },
   attention_set_profile: (args) => {
     settings = { ...settings, notifications: { ...settings.notifications, profile: args.profile as never } };

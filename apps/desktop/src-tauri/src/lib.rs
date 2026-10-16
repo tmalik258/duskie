@@ -39,6 +39,7 @@ mod island;
 mod layout;
 mod learn;
 mod learned;
+mod mail;
 mod mascot;
 mod mcp;
 mod mcp_oauth;
@@ -211,6 +212,9 @@ pub fn run() {
             commands::attention_show_less,
             commands::attention_reset,
             commands::attention_set_profile,
+            commands::mail_status,
+            commands::mail_connect,
+            commands::mail_disconnect,
             commands::dnd_get,
             commands::dnd_set,
             commands::setup_run,
@@ -489,6 +493,7 @@ pub fn start_features(app: &AppHandle) {
     editors::start(app);
     moments::start(app);
     inbox::start(app);
+    mail::start(app);
     recipes::start(app);
     brief::start(app, state.data_dir.join("last-brief"), roots);
     search::reindex_folders(app);
