@@ -6,7 +6,7 @@ import type { MascotState } from "./types";
 
 export interface IslandContext {
   asking: boolean;
-  /** Ask tab: ask | agents | repos | history — agents uses agents wash. */
+  /** Ask tab: ask | agents | repos | history, agents uses agents wash. */
   askTab: "ask" | "agents" | "repos" | "history" | "settings" | null;
   settingsView: boolean;
   welcome: boolean;

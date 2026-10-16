@@ -17,7 +17,7 @@ pub const CURSOR_EVENT: &str = "island://cursor";
 pub const VISIBLE_EVENT: &str = "island://visible";
 /// Shift (or Shift+Alt with a suggestion) for morph labels without focus.
 /// Glance: Shift while hovered. Suggestion chips: Shift+Alt even when the
-/// cursor is elsewhere — Alt+N shortcuts are global, so the words must be too.
+/// cursor is elsewhere, Alt+N shortcuts are global, so the words must be too.
 pub const SHIFT_EVENT: &str = "island://shift";
 /// Whether a fullscreen app is in front on the island's screen, so the glance
 /// can offer "Hide while fullscreen" right there.

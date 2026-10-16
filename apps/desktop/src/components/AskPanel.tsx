@@ -632,7 +632,7 @@ export function AskPanel() {
             label: f.name,
             hint: f.place,
             // Enter opens; for files, Ctrl Enter shows the parent folder.
-            // Folders are already folders — Enter alone is enough.
+            // Folders are already folders, Enter alone is enough.
             run: () => openFile(f.path),
             ...(f.folder
               ? {}
@@ -872,7 +872,7 @@ export function AskPanel() {
       requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
       return;
     }
-    // Streaming: cancel only — Ctrl+N starts a new chat without aborting.
+    // Streaming: cancel only, Ctrl+N starts a new chat without aborting.
     if (current.chatId !== null) {
       cancelChat();
       return;
@@ -1020,7 +1020,7 @@ export function AskPanel() {
   }
 
   // First-run card only when nothing is set up yet. If a provider is
-  // configured but not running, the footer says so — not this picker.
+  // configured but not running, the footer says so, not this picker.
   const firstRun = !anySetUp && providersData !== null && !inChat && !asking && !slash && !inHistory && !showClips;
   const footer =
     !best && !firstRun ? (

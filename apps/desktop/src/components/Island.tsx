@@ -270,7 +270,7 @@ export function Island() {
   const voiceQuestion = useDuskie((s) => (s.ask ? null : s.voiceQuestion));
   // Something finished that needs nothing more: a short done pill.
   // Also covers mascot success without Undo / Open (e.g. "Switched to Claude"
-  // after Settings closed — showDone was skipped while Ask was open).
+  // after Settings closed, showDone was skipped while Ask was open).
   const donePill = useDuskie((s) => {
     if (s.ask || updateBusy(s.updateProgress)) return null;
     if (s.donePill) return s.donePill;
@@ -474,7 +474,7 @@ export function Island() {
     !voicePill.focus &&
     !voicePill.done &&
     (settings.voice.listeningStyle ?? "compact") === "full";
-  // Suggestions stay normal during thinking — do not gate them on !voicePill.
+  // Suggestions stay normal during thinking, do not gate them on !voicePill.
   const askOpens =
     questionId !== null && !dndOn && !fullscreen && !paused && settings.onboarded && agentsOnly && !quiet;
   const expanded =
@@ -567,7 +567,7 @@ export function Island() {
   // so a stale tall height does not stick after the chat clears.
   const turnsLen = useDuskie((s) => s.turns.length);
   const chatId = useDuskie((s) => s.chatId);
-  // biome-ignore lint/correctness/useExhaustiveDependencies: triggers only — remeasure when Agents body changes size
+  // biome-ignore lint/correctness/useExhaustiveDependencies: triggers only, remeasure when Agents body changes size
   useEffect(() => {
     if (!asking) return;
     let id2 = 0;
@@ -829,7 +829,7 @@ export function Island() {
 
   // Number keys must not pick a suggestion while the user is typing.
   useSuggestionKeys(asking ? null : suggestion);
-  // WebView chrome: Ctrl+J is Downloads — not a Duskie feature.
+  // WebView chrome: Ctrl+J is Downloads, not a Duskie feature.
   useBlockBrowserKeys();
 
   if (!ready) return null;

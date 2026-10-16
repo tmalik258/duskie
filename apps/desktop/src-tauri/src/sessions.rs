@@ -2176,7 +2176,7 @@ pub fn codex_events(v: &Value) -> Vec<Value> {
                     };
                     ("WebSearch", label, q)
                 }
-                // Plan-mode document from Codex — full markdown, not a tool step.
+                // Plan-mode document from Codex, full markdown, not a tool step.
                 Some("plan") => {
                     if done
                         && let Some(text) = item["text"].as_str().filter(|t| !t.trim().is_empty())

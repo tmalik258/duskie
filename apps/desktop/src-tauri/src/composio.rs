@@ -1060,7 +1060,7 @@ pub async fn apps(c: &ComposioSettings) -> Result<Vec<api::App>, String> {
             let listed = api::connected_from_list(&v);
             let inactive = api::inactive_from_list(&v);
             // Union description + active list. Keep what we already knew unless
-            // this list explicitly marks it inactive — a fresh connect can
+            // this list explicitly marks it inactive, a fresh connect can
             // disappear from the next poll for a second or two.
             connected.extend(listed);
             for s in previous {

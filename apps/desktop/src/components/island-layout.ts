@@ -69,7 +69,7 @@ export const HOVER_IN_ACTIONS_MS = 450;
 export const HOVER_OUT_MS = 320;
 
 /** Opening settles rather than wobbles: overshoot belongs after a fling,
- * not a hover. Stiffness form — Motion rejects some bounce/duration springs. */
+ * not a hover. Stiffness form, Motion rejects some bounce/duration springs. */
 export const morphOpen = spring(SPRINGS.morph);
 export const morphClose = spring({ response: 0.42, damping: 0.9 });
 /** Growing or shrinking while already open (an answer streaming in, New):

@@ -240,7 +240,7 @@ export interface ProviderStatus {
   id: string;
   available: boolean;
   local: boolean;
-  /** Installed / keyed / model chosen — even if not running right now. */
+  /** Installed / keyed / model chosen, even if not running right now. */
   configured: boolean;
 }
 

@@ -48,7 +48,7 @@ interface DuskieState {
   netNotice: NetNotice | null;
   /** Cursor is over the island's interactive area (reported by Rust). */
   hovered: boolean;
-  /** Shift (hovered) or Shift+Alt (suggestion) — Rust polls; webview has no focus. */
+  /** Shift (hovered) or Shift+Alt (suggestion), Rust polls; webview has no focus. */
   shiftHeld: boolean;
   /** Extra interactive area while a floating menu is open (unioned into the hit rect). */
   overlayHit: HitRect | null;
@@ -394,7 +394,7 @@ export function finishWaiting(waiting: Waiting, line: string) {
   playCue("ding", cueVolume(settings, "ding"), settings.soundKit);
   void api.voiceSay(line);
 
-  // Island Done / All set (mascot success) — not only the orb celebrate face.
+  // Island Done / All set (mascot success), not only the orb celebrate face.
   // Welcome/Settings reopen after this so the card is actually visible.
   const detail = line.replace(/^Done\.\s*/i, "").trim() || `${waiting.label} is connected.`;
   useDuskie.setState({
@@ -965,7 +965,7 @@ export const setHovered = (hovered: boolean) => {
     useDuskie.setState({ hovered });
     return;
   }
-  // Leave shiftHeld alone while a suggestion is up — Shift+Alt morph is global
+  // Leave shiftHeld alone while a suggestion is up, Shift+Alt morph is global
   // and must survive the cursor leaving the island.
   const keepShift = useDuskie.getState().suggestion != null;
   useDuskie.setState(keepShift ? { hovered } : { hovered, shiftHeld: false });

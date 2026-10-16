@@ -435,7 +435,7 @@ function QuickActions({
 }) {
   const update = useDuskie((s) => s.update);
   const shift = useShiftHeld();
-  // Single row keeps the glance short — two rows stacked taller than the copy.
+  // Single row keeps the glance short, two rows stacked taller than the copy.
   return (
     <div className="flex gap-1.5">
       <AskShiftAgentsButton shift={shift} />
@@ -447,7 +447,7 @@ function QuickActions({
 }
 
 /** Shift for glance morphs. The shell stays unfocused, so keydown never
- * arrives — Rust polls while hovered (and Shift+Alt for suggestions); pointer
+ * arrives, Rust polls while hovered (and Shift+Alt for suggestions); pointer
  * events back it up when the cursor is over the webview. */
 function useShiftHeld(): boolean {
   const fromRust = useDuskie((s) => s.shiftHeld);
@@ -652,7 +652,7 @@ function FocusShiftPauseButton({
   );
 }
 
-/** Choose how long, then start — presets plus a quiet custom stepper. */
+/** Choose how long, then start, presets plus a quiet custom stepper. */
 function FocusPicker({ onDone }: { onDone: () => void }) {
   const redesign = useRedesign();
   const [minutes, setMinutes] = useState(readLastFocus);

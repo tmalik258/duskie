@@ -265,7 +265,7 @@ if (typeof window !== "undefined") {
   window.addEventListener("pagehide", () => saveView());
   window.addEventListener("beforeunload", () => saveView());
 }
-/** Flush session view (draft/scroll) + localStorage immediately — island hide / unmount. */
+/** Flush session view (draft/scroll) + localStorage immediately, island hide / unmount. */
 export function flushAgentsView() {
   if (saveTimer) clearTimeout(saveTimer);
   saveView();
@@ -618,7 +618,7 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
     case "turn":
       return update(id, (s) => {
         const entries = appendReview(s.entries, e.review);
-        // Plan mode often answers in prose without turn/plan/updated — lift the doc.
+        // Plan mode often answers in prose without turn/plan/updated, lift the doc.
         let plan = s.plan;
         let planDoc = s.planDoc;
         // Only the newest answer of this turn, and only when it says the plan

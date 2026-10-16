@@ -237,7 +237,7 @@ export function UndoButton({ id }: { id: number }) {
 
 export function Options({ suggestion }: { suggestion: Suggestion }) {
   const alwaysAt = suggestion.always?.findIndex(Boolean) ?? -1;
-  // Shift while hovered, or Shift+Alt anywhere — Rust polls; no hover required.
+  // Shift while hovered, or Shift+Alt anywhere, Rust polls; no hover required.
   const priv = useDuskie((s) => s.shiftHeld);
   const redesign = useDuskie((s) => s.settings.redesign.enabled);
   if (redesign) {

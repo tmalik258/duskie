@@ -24,7 +24,7 @@ import { WelcomeCard } from "./welcome/WelcomeCard";
 import { WelcomeIntro } from "./welcome/WelcomeIntro";
 
 const STEPS = ["Welcome", "Your AI", "Connect", "Tools", "Extras"] as const;
-/** Welcome is info-only — advance on its own once the line has finished. */
+/** Welcome is info-only, advance on its own once the line has finished. */
 const WELCOME_AUTO_SEC = 5;
 /** No activity away from the panel: park so it stops blocking the screen. */
 const IDLE_HIDE_MS = 8_000;
@@ -54,7 +54,7 @@ function WelcomeSteps() {
   const [idleGen, setIdleGen] = useState(0);
   /** Welcome line finished (or was already heard); idle hide waits for this. */
   const [lineReady, setLineReady] = useState(() => wasHeard(0));
-  /** Pointer over the panel — reading counts as activity, not idle. */
+  /** Pointer over the panel, reading counts as activity, not idle. */
   const [over, setOver] = useState(false);
   const edges = useScrollEdge();
   const root = useRef<HTMLDivElement>(null);

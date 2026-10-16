@@ -130,7 +130,7 @@ async fn handle(app: &AppHandle, mut event: Event) {
         island::follow_fullscreen(app, &event.payload);
         let exe = event.payload["exe"].as_str().unwrap_or_default();
         let app_name = event.payload["app"].as_str().unwrap_or_default();
-        // Lock / sign-in UI: pause time and skip "where was I" — IdleSensor owns away.
+        // Lock / sign-in UI: pause time and skip "where was I", IdleSensor owns away.
         if duskie_sensors::is_lock_ui(exe) || duskie_sensors::is_lock_ui(app_name) {
             timetrack::on_away(app);
             return;

@@ -1757,7 +1757,7 @@ fn reg_default(key: &str) -> Option<String> {
     }
     let text = String::from_utf8_lossy(&out.stdout);
     text.lines().find(|l| l.contains("REG_")).and_then(|l| {
-        // "    (Default)    REG_SZ    value" — value may be missing.
+        // "    (Default)    REG_SZ    value", value may be missing.
         let mut parts = l.split_whitespace();
         let _ = parts.next()?; // (Default)
         let _ = parts.next()?; // REG_SZ

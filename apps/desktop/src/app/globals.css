@@ -126,7 +126,7 @@ body {
   --isl-rim: transparent;
   --isl-sheen: none;
 }
-/* Atelier: near-black / porcelain / sage — opt-in test theme. */
+/* Atelier: near-black / porcelain / sage, opt-in test theme. */
 .island-shell[data-color="atelier"] {
   --c1: #0a0a0a;
   --c2: #f2f0eb;
@@ -167,7 +167,7 @@ body {
   );
   mix-blend-mode: soft-light;
 }
-/* Press scale only on real controls — not composer .ak-row wrappers (input click
+/* Press scale only on real controls, not composer .ak-row wrappers (input click
    keeps the parent :active and squished the field). */
 .island-shell button.ak-row:active,
 .island-shell .ak-tab:active {
@@ -1455,7 +1455,7 @@ body {
 .ak.ak-enter .ak-tl,
 .ak.ak-enter .ak-grid,
 .ak.ak-enter .ak-rlist {
-  /* Soft only — blur on a long timeline is costly. */
+  /* Soft only, blur on a long timeline is costly. */
   animation: ak-stage-soft 340ms var(--ease-out-strong) 120ms both;
 }
 .ak.ak-enter .ak-composer {
@@ -3203,7 +3203,7 @@ select.ak-mi option {
   color: var(--i3);
   margin: 0 0 4px;
 }
-/* Equal portrait cards: mark in a well, name + place — quiet, not a list. */
+/* Equal portrait cards: mark in a well, name + place, quiet, not a list. */
 .ak-tpick {
   --pick: 255 255 255;
   display: grid;
