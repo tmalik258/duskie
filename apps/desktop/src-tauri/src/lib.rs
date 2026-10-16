@@ -456,6 +456,7 @@ fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
     }
     net::start(app);
     git_watch::start(app);
+    commands::library_watch(app);
     github::start(app);
     tauri::async_runtime::spawn(async move {
         let sensors: Vec<Box<dyn Sensor>> = vec![

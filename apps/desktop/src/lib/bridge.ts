@@ -89,6 +89,7 @@ export const EVENTS = {
   aiDone: "ai://done",
   aiTool: "ai://tool",
   connectorsDuplicate: "connectors://duplicate",
+  libraryFound: "library://found",
   aiProposal: "ai://proposal",
   askOpen: "ask://open",
   askClose: "ask://close",
@@ -139,6 +140,7 @@ export interface EventPayloads {
   };
   [EVENTS.aiTool]: { id: string; name: string; label?: string; source?: string | null };
   [EVENTS.connectorsDuplicate]: { app: string; used: string; unused: string[] };
+  [EVENTS.libraryFound]: { names: string[] };
   [EVENTS.aiProposal]: { chatId: string; id: string; label: string; step?: boolean; undoable?: boolean };
   [EVENTS.askOpen]: AskOpen;
   [EVENTS.askClose]: { reason: "close" | "defer"; panelGen?: number };

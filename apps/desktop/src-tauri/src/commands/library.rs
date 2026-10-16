@@ -114,3 +114,71 @@ pub async fn library_sync(app: AppHandle) -> CmdResult<SyncReport> {
     })
     .await?
 }
+
+pub const FOUND_EVENT: &str = "library://found";
+/// How often the skill folders are looked at again.
+const WATCH_EVERY: std::time::Duration = std::time::Duration::from_secs(600);
+
+/// Names in `found` not told before; adds them to `told`.
+pub fn fresh(found: &[Found], told: &mut std::collections::BTreeSet<String>) -> Vec<String> {
+    found
+        .iter()
+        .filter(|f| told.insert(format!("{}:{}", f.name, f.hash)))
+        .map(|f| f.name.clone())
+        .collect()
+}
+
+/// Looks at the skill folders now and then and says once per new skill
+/// that it can be added. Nothing is imported without a tap.
+pub fn library_watch(app: &AppHandle) {
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            let a = app.clone();
+            let _ = off_ui(move || {
+                let Ok(lib) = library_of(&a) else { return };
+                let path = lib.root.join("told.json");
+                let mut told: std::collections::BTreeSet<String> = std::fs::read(&path)
+                    .ok()
+                    .and_then(|b| serde_json::from_slice(&b).ok())
+                    .unwrap_or_default();
+                let names = fresh(&review_now(&lib), &mut told);
+                if names.is_empty() {
+                    return;
+                }
+                let _ = std::fs::create_dir_all(&lib.root);
+                if let Ok(b) = serde_json::to_vec(&told) {
+                    let _ = std::fs::write(&path, b);
+                }
+                let _ = a.emit(FOUND_EVENT, serde_json::json!({ "names": names }));
+            })
+            .await;
+            tokio::time::sleep(WATCH_EVERY).await;
+        }
+    });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn found(name: &str, hash: &str) -> Found {
+        Found {
+            name: name.into(),
+            description: String::new(),
+            origin: Origin::Claude,
+            dir: PathBuf::new(),
+            hash: hash.into(),
+            files: Vec::new(),
+            has_scripts: false,
+        }
+    }
+
+    #[test]
+    fn tells_once_per_skill_version() {
+        let mut told = Default::default();
+        assert_eq!(fresh(&[found("pdf", "a")], &mut told), ["pdf"]);
+        assert!(fresh(&[found("pdf", "a")], &mut told).is_empty());
+        assert_eq!(fresh(&[found("pdf", "b")], &mut told), ["pdf"]);
+    }
+}

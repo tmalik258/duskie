@@ -1251,6 +1251,13 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
       listen(EVENTS.connectorsDuplicate, ({ app, used, unused }) =>
         showDone(`${app} is connected through ${[used, ...unused].join(" and ")}. Using the ${used}.`),
       ),
+      listen(EVENTS.libraryFound, ({ names }) =>
+        showDone(
+          names.length === 1
+            ? `New skill ${names[0]} found. Add it in Settings, Skills.`
+            : `${names.length} new skills found. Add them in Settings, Skills.`,
+        ),
+      ),
       listen(EVENTS.aiTool, ({ id, name, label, source }) => {
         if (early?.id === id) {
           early.tools.push({ name, label, source });
