@@ -2,7 +2,7 @@
 // just happened (Claude finished, you said thanks). The state machine says
 // what Duskie is doing; a mood says how it feels about it, for a few seconds.
 
-import type { Expression } from "@/components/orb/expressions";
+import type { Expression } from "@/components/creature/expressions";
 
 export interface Mood {
   id: Expression;
