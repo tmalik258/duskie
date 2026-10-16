@@ -31,7 +31,7 @@ pub struct Codex {
 const SCREENSHOT: &str = "screen.png";
 /// Codex reads the token for Duskie's server from this variable, so it
 /// never appears on a command line.
-const TOKEN_VAR: &str = "SIDEKICK_MCP_TOKEN";
+const TOKEN_VAR: &str = "DUSKIE_MCP_TOKEN";
 
 impl Codex {
     pub fn resolve(&self) -> Option<PathBuf> {

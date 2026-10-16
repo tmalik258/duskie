@@ -22,7 +22,7 @@ import { join } from "node:path";
 import { chromium } from "playwright";
 
 const APP =
-  process.env.SIDEKICK_EXE ?? join(import.meta.dirname, "..", "..", "..", "target", "debug", "sidekick-desktop.exe");
+  process.env.DUSKIE_EXE ?? join(import.meta.dirname, "..", "..", "..", "target", "debug", "sidekick-desktop.exe");
 /** Set in tauri.e2e.conf.json; WebView2 ignores the environment variable once the app passes its own arguments. */
 const PORT = 9229;
 const SHOTS = join(import.meta.dirname, "..", "e2e");
@@ -31,7 +31,7 @@ const BUDGET = { open: 1500, instant: 1500, freeze: 250 };
 
 // Start onboarded with voice off, so no welcome or model download gets in
 // the way. Your own settings are put back when the run ends.
-const settingsFile = process.env.APPDATA ? join(process.env.APPDATA, "app.sidekick.desktop", "settings.json") : null;
+const settingsFile = process.env.APPDATA ? join(process.env.APPDATA, "app.duskie.desktop", "settings.json") : null;
 const backup = settingsFile ? `${settingsFile}.e2e-backup` : null;
 if (settingsFile && backup) {
   mkdirSync(join(settingsFile, ".."), { recursive: true });
@@ -47,7 +47,7 @@ mkdirSync(SHOTS, { recursive: true });
 
 /** The end of Duskie's own log, for a failed start. */
 function appLog() {
-  const dir = process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, "app.sidekick.desktop", "logs") : null;
+  const dir = process.env.LOCALAPPDATA ? join(process.env.LOCALAPPDATA, "app.duskie.desktop", "logs") : null;
   if (!dir || !existsSync(dir)) return "(no log)";
   return readdirSync(dir)
     .map((f) => readFileSync(join(dir, f), "utf8").split("\n").slice(-30).join("\n"))

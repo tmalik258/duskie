@@ -428,11 +428,11 @@ mod tests {
     }
 
     /// Runs the real model when it is on disk:
-    /// `SIDEKICK_VOICE_MODELS=<folder holding the voice model> cargo test -p sidekick-voice -- --ignored`
+    /// `DUSKIE_VOICE_MODELS=<folder holding the voice model> cargo test -p sidekick-voice -- --ignored`
     #[test]
     #[ignore = "needs the downloaded voice model"]
     fn speaks_with_the_real_model() {
-        let root = std::env::var("SIDEKICK_VOICE_MODELS").expect("set SIDEKICK_VOICE_MODELS");
+        let root = std::env::var("DUSKIE_VOICE_MODELS").expect("set DUSKIE_VOICE_MODELS");
         let models = Path::new(&root);
         let tts = OfflineTts::create(&tts_config(models)).expect("model loads");
         for (voice, _, sid) in VOICES {

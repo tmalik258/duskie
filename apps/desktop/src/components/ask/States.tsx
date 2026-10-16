@@ -7,7 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { handOff } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
-import { askWhenOnline, retryLast, setAsk, setAskModel, useSidekick } from "@/lib/store";
+import { askWhenOnline, retryLast, setAsk, setAskModel, useDuskie } from "@/lib/store";
 import type { SetupItem, SetupStatus, Turn } from "@/lib/types";
 import { AGENT_IMAGES } from "../agents/AgentsTab";
 import { useAgentName } from "./Chat";
@@ -294,5 +294,5 @@ export function FirstRun() {
 
 /** "Offline" at the start of the context line while the internet is gone. */
 export function useOffline(): boolean {
-  return !useSidekick((s) => s.online);
+  return !useDuskie((s) => s.online);
 }

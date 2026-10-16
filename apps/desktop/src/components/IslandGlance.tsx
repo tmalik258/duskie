@@ -11,7 +11,7 @@ import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
 import { shortcutBinding } from "@/lib/shortcuts";
-import { installUpdate, updateSettings, useAssistantName, useSidekick } from "@/lib/store";
+import { installUpdate, updateSettings, useAssistantName, useDuskie } from "@/lib/store";
 import { pickTip } from "@/lib/tips";
 import { type AppTime, type CalendarToday, formatDuration, type LaterItem } from "@/lib/types";
 import { updateBusy, updateLabel } from "@/lib/updates";
@@ -91,8 +91,8 @@ export function Glance({ paused }: { paused: boolean }) {
 /** About one hover in four, when nothing needs you: one short tip, never
  * the same one twice in a row. */
 function QuietTip() {
-  const on = useSidekick((s) => s.settings.tips);
-  const later = useSidekick((s) => s.later);
+  const on = useDuskie((s) => s.settings.tips);
+  const later = useDuskie((s) => s.later);
   const [tip] = useState(pickTip);
   if (!on || later > 0 || !tip) return null;
   return (
@@ -108,8 +108,8 @@ function QuietTip() {
 
 /** Only while a fullscreen app is in front: keep the island out of it. */
 function FullscreenSwitch() {
-  const fullscreen = useSidekick((s) => s.fullscreen);
-  const hide = useSidekick((s) => s.settings.hideInFullscreen);
+  const fullscreen = useDuskie((s) => s.fullscreen);
+  const hide = useDuskie((s) => s.settings.hideInFullscreen);
   if (!fullscreen) return null;
   return (
     <button
@@ -204,7 +204,7 @@ function topFocus(time: AppTime[]): string | null {
 
 /** Suggestions you missed (shown and timed out) or that waited quietly. */
 function LaterList() {
-  const count = useSidekick((s) => s.later);
+  const count = useDuskie((s) => s.later);
   const { data, refresh } = useCached<LaterItem[]>("later-list", api.laterList);
   const [all, setAll] = useState(false);
   // The count changes when one is added, opened or cleared.
@@ -295,7 +295,7 @@ function QuickActions({
   focusOpen: boolean;
   onFocusOpenChange: (open: boolean) => void;
 }) {
-  const update = useSidekick((s) => s.update);
+  const update = useDuskie((s) => s.update);
   const shift = useShiftHeld();
   // Single row keeps the glance short — two rows stacked taller than the copy.
   return (
@@ -312,7 +312,7 @@ function QuickActions({
  * arrives — Rust polls while hovered (and Shift+Alt for suggestions); pointer
  * events back it up when the cursor is over the webview. */
 function useShiftHeld(): boolean {
-  const fromRust = useSidekick((s) => s.shiftHeld);
+  const fromRust = useDuskie((s) => s.shiftHeld);
   const [fromPointer, setFromPointer] = useState(false);
   useEffect(() => {
     const sync = (e: PointerEvent | KeyboardEvent) => setFromPointer(e.shiftKey);
@@ -375,8 +375,8 @@ function SettingsShiftHistoryButton({ shift }: { shift: boolean }) {
 
 /** Ask by default; hold Shift to morph into Agents (one slot, animated icon). */
 function AskShiftAgentsButton({ shift }: { shift: boolean }) {
-  const askKeys = shortcutBinding(useSidekick((s) => s.settings.paletteHotkey));
-  const agentsKeys = shortcutBinding(useSidekick((s) => s.settings.shortcuts.agents ?? ""));
+  const askKeys = shortcutBinding(useDuskie((s) => s.settings.paletteHotkey));
+  const agentsKeys = shortcutBinding(useDuskie((s) => s.settings.shortcuts.agents ?? ""));
   const name = useAssistantName();
   const reduced = useReducedMotion() ?? false;
   const agents = shift;
@@ -447,9 +447,9 @@ function FocusShiftPauseButton({
   onOpenChange: (open: boolean) => void;
   shift: boolean;
 }) {
-  const focusing = useSidekick((s) => s.focusUntil !== null && s.focusUntil > Date.now());
-  const focusKeys = useSidekick((s) => s.settings.shortcuts.focus);
-  const pauseKeys = useSidekick((s) => s.settings.shortcuts.pause);
+  const focusing = useDuskie((s) => s.focusUntil !== null && s.focusUntil > Date.now());
+  const focusKeys = useDuskie((s) => s.settings.shortcuts.focus);
+  const pauseKeys = useDuskie((s) => s.settings.shortcuts.pause);
   const reduced = useReducedMotion() ?? false;
   // Paused → Resume is primary; otherwise Focus is primary and Shift → Pause.
   const pauseSide = paused ? !shift : shift;
@@ -611,8 +611,8 @@ function FocusPicker({ onDone }: { onDone: () => void }) {
 
 /** Only while a newer release is waiting: a small button with a dot. */
 function UpdateButton() {
-  const update = useSidekick((s) => s.update);
-  const progress = useSidekick((s) => s.updateProgress);
+  const update = useDuskie((s) => s.update);
+  const progress = useDuskie((s) => s.updateProgress);
   const busy = updateBusy(progress);
   if (!update) return null;
   const install = () => {

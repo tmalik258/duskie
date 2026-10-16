@@ -139,7 +139,7 @@ pub async fn discover(mcp_url: &str) -> Result<Discovery, String> {
         .json(
             &serde_json::json!({ "jsonrpc": "2.0", "id": 0, "method": "initialize",
             "params": { "protocolVersion": "2025-06-18", "capabilities": {},
-                "clientInfo": { "name": "sidekick", "version": env!("CARGO_PKG_VERSION") } } }),
+                "clientInfo": { "name": "duskie", "version": env!("CARGO_PKG_VERSION") } } }),
         )
         .send()
         .await

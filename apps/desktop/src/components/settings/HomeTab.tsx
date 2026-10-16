@@ -8,7 +8,7 @@ import { api, EVENTS, listen } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useDnd } from "@/lib/hooks";
 import { checkKit, cueVolume, playCue, SYNTH_KIT } from "@/lib/sound";
-import { installUpdate, updateSettings, useSidekick } from "@/lib/store";
+import { installUpdate, updateSettings, useDuskie } from "@/lib/store";
 import {
   type ActionRecord,
   type AppInfo,
@@ -43,8 +43,8 @@ const END_OF_DAY: [string, string][] = [16, 17, 18, 19, 20, 21, 22].map((h) => [
 ]);
 
 export function HomeTab({ onError, onOpenTab }: { onError: (e: string) => void; onOpenTab: (tab: string) => void }) {
-  const settings = useSidekick((s) => s.settings);
-  const mascot = useSidekick((s) => s.mascot);
+  const settings = useDuskie((s) => s.settings);
+  const mascot = useDuskie((s) => s.mascot);
   const [info, setInfo] = useState<AppInfo | null>(null);
   useEffect(() => {
     void api.appInfo().then(setInfo);
@@ -521,7 +521,7 @@ function DoNotDisturb({ onError }: { onError: (e: string) => void }) {
 
 /** Read Windows notifications and only bring up what matters. */
 function NotificationInbox({ onError }: { onError: (e: string) => void }) {
-  const notifications = useSidekick((s) => s.settings.notifications);
+  const notifications = useDuskie((s) => s.settings.notifications);
   const [status, setStatus] = useState<InboxStatus | null>(null);
   const refresh = useCallback(() => void api.notificationsStatus().then(setStatus), []);
   useEffect(() => {
@@ -617,8 +617,8 @@ function NotificationInbox({ onError }: { onError: (e: string) => void }) {
 
 /** This version, and a newer one when it is out: Install, or Check now. */
 function UpdateRow({ version, onError }: { version: string; onError: (e: string) => void }) {
-  const update = useSidekick((s) => s.update);
-  const progress = useSidekick((s) => s.updateProgress);
+  const update = useDuskie((s) => s.update);
+  const progress = useDuskie((s) => s.updateProgress);
   const busy = updateBusy(progress);
   const [state, setState] = useState<"idle" | "checking" | "latest">("idle");
   const check = () => {

@@ -17,7 +17,7 @@ import { chromium } from "playwright";
 import { checkAnswer, checkCase } from "./ask-check.mjs";
 
 const APP =
-  process.env.SIDEKICK_EXE ?? join(import.meta.dirname, "..", "..", "..", "target", "debug", "sidekick-desktop.exe");
+  process.env.DUSKIE_EXE ?? join(import.meta.dirname, "..", "..", "..", "target", "debug", "sidekick-desktop.exe");
 const PORT = 9229;
 const OUT = join(import.meta.dirname, "..", "e2e");
 const ANSWER_MS = 180_000;

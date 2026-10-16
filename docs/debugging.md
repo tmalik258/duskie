@@ -12,7 +12,7 @@ In an **elevated** PowerShell (once per machine):
 
 ```powershell
 $exe = "sidekick-desktop.exe"
-$dumpDir = "$env:USERPROFILE\SidekickDumps"
+$dumpDir = "$env:USERPROFILE\DuskieDumps"
 New-Item -ItemType Directory -Force -Path $dumpDir | Out-Null
 $reg = "HKLM:\SOFTWARE\Microsoft\Windows\Windows Error Reporting\LocalDumps\$exe"
 New-Item -Force -Path $reg | Out-Null
@@ -23,7 +23,7 @@ Set-ItemProperty $reg -Name DumpCount -Value 5
 
 Or run [`scripts/enable-local-dumps.ps1`](../scripts/enable-local-dumps.ps1) as Administrator.
 
-Reproduce until Duskie exits. Open the newest `.dmp` under `%USERPROFILE%\SidekickDumps`
+Reproduce until Duskie exits. Open the newest `.dmp` under `%USERPROFILE%\DuskieDumps`
 in Visual Studio or WinDbg and note the faulting stack (`tao` / `tauri_runtime` /
 WebView2 / `ntdll!RtlpHeap*`). Do not commit dump files.
 
@@ -58,7 +58,7 @@ has been linked to intermittent Windows `STATUS_HEAP_CORRUPTION` in Tauri/tao, s
 the beat is intentionally slow, and you can turn it off:
 
 ```powershell
-$env:SIDEKICK_NO_FREEZE_WATCH = "1"
+$env:DUSKIE_NO_FREEZE_WATCH = "1"
 pnpm dev
 ```
 

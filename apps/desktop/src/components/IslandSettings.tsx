@@ -9,7 +9,7 @@ import { type AskTab, activeCount, setTab, useAgents } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { useAltHeld } from "@/lib/hooks";
 import { PANEL_MAX_HEIGHT } from "@/lib/islandSize";
-import { setAsk, useSidekick } from "@/lib/store";
+import { setAsk, useDuskie } from "@/lib/store";
 import { nextTab, type PanelTab, PanelTabs } from "./PanelTabs";
 import { SettingsPanel } from "./SettingsPanel";
 
@@ -20,7 +20,7 @@ function leave(tab: PanelTab) {
 }
 
 export function IslandSettings() {
-  const coder = useSidekick((s) => s.settings.codes !== false);
+  const coder = useDuskie((s) => s.settings.codes !== false);
   const working = useAgents((s) => activeCount(s.sessions));
   const alt = useAltHeld();
 

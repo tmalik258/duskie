@@ -6,7 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, EVENTS, listen } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
-import { installExtension, startWaiting, updateSettings, useSidekick } from "@/lib/store";
+import { installExtension, startWaiting, updateSettings, useDuskie } from "@/lib/store";
 import type {
   BrowserInfo,
   BrowserStatus,
@@ -79,7 +79,7 @@ function hours(minutes: number): string {
 }
 
 function EditorPicker({ onError }: { onError: (e: string) => void }) {
-  const choice = useSidekick((s) => s.settings.codeEditor);
+  const choice = useDuskie((s) => s.settings.codeEditor);
   const { data, refresh } = useCached<EditorList>("editors", api.editorsList);
   const editors = data?.editors ?? [];
   // One editor: no Auto — lock to that id. Two or more: Auto is the default.
@@ -139,8 +139,8 @@ function EditorPicker({ onError }: { onError: (e: string) => void }) {
 }
 
 function ComposioCard({ onError }: { onError: (e: string) => void }) {
-  const composio = useSidekick((s) => s.settings.composio);
-  const justDone = useSidekick((s) => s.justDone);
+  const composio = useDuskie((s) => s.settings.composio);
+  const justDone = useDuskie((s) => s.justDone);
   const { data: status, refresh: reload } = useCached<ComposioStatus>("composio-status", api.composioStatus);
   const [waiting, setWaiting] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -256,7 +256,7 @@ function ComposioCard({ onError }: { onError: (e: string) => void }) {
 
 /** A consumer key, or another MCP link, instead of the browser sign-in. */
 function OtherWays({ onError }: { onError: (e: string) => void }) {
-  const composio = useSidekick((s) => s.settings.composio);
+  const composio = useDuskie((s) => s.settings.composio);
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
@@ -329,7 +329,7 @@ function OtherWays({ onError }: { onError: (e: string) => void }) {
 
 /** Today's meetings and the reminder time, once a calendar is connected. */
 function Meetings({ onError }: { onError: (e: string) => void }) {
-  const calendar = useSidekick((s) => s.settings.calendar);
+  const calendar = useDuskie((s) => s.settings.calendar);
   const { data: today, refresh } = useCached<CalendarToday>("calendar-today", api.calendarToday, 30_000);
   useEffect(() => {
     const off = listen(EVENTS.composioChanged, () => setTimeout(() => void refresh().catch(() => undefined), 3000));

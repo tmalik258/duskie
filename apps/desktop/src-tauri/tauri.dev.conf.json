@@ -1,5 +1,5 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Duskie Dev",
-  "identifier": "app.sidekick.desktop.dev"
+  "identifier": "app.duskie.desktop.dev"
 }

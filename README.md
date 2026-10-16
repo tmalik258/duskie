@@ -43,8 +43,8 @@ Released October 14, 2026. See the [full changelog](CHANGELOG.md#022---2026-10-1
 ## Install
 
 1. Download the latest installer from [Releases](https://github.com/tmalik258/sidekick/releases/latest):
-   - `Sidekick_x.y.z_x64-setup.exe` for most people.
-   - `Sidekick_x.y.z_x64_en-US.msi` for managed or scripted installs.
+   - `Duskie_x.y.z_x64-setup.exe` for most people.
+   - `Duskie_x.y.z_x64_en-US.msi` for managed or scripted installs.
 2. Run it. Duskie starts in the island at the top of the screen and walks you through setup.
 
 Duskie runs on Windows 10 and 11 (64-bit). The installer sets up the WebView2 runtime if it is missing.
@@ -56,7 +56,7 @@ The installers are not code signed yet, so Microsoft Defender SmartScreen may st
 To check the download first, compare its hash with `SHA256SUMS.txt` from the same release:
 
 ```powershell
-Get-FileHash .\Sidekick_x.y.z_x64-setup.exe -Algorithm SHA256
+Get-FileHash .\Duskie_x.y.z_x64-setup.exe -Algorithm SHA256
 ```
 
 Updates come to the island on their own (Settings > Home > Tell me about new versions) and are checked against `SHA256SUMS.txt` before they run. See [CHANGELOG.md](CHANGELOG.md) for what changed in each release.
@@ -133,9 +133,9 @@ pnpm dev:fresh    # wipe Duskie Dev data, then `pnpm dev` (first-run welcome aga
 | | Production (`pnpm build` / installer) | Dev (`pnpm dev`) |
 | --- | --- | --- |
 | Product name | Duskie | Duskie Dev |
-| Identifier | `app.sidekick.desktop` | `app.sidekick.desktop.dev` |
-| Settings, DB, skills | `%APPDATA%\app.sidekick.desktop\` | `%APPDATA%\app.sidekick.desktop.dev\` |
-| Extension, local AI files | `%LOCALAPPDATA%\app.sidekick.desktop\` | `%LOCALAPPDATA%\app.sidekick.desktop.dev\` |
+| Identifier | `app.duskie.desktop` | `app.duskie.desktop.dev` |
+| Settings, DB, skills | `%APPDATA%\app.duskie.desktop\` | `%APPDATA%\app.duskie.desktop.dev\` |
+| Extension, local AI files | `%LOCALAPPDATA%\app.duskie.desktop\` | `%LOCALAPPDATA%\app.duskie.desktop.dev\` |
 | Credential Manager service | Duskie | Duskie Dev |
 
 You can run both at once. `pnpm dev:fresh` only deletes the **dev** folders and Duskie Dev secrets; it refuses to touch production. Work log (`Documents\Duskie\worklog.md`) stays shared.

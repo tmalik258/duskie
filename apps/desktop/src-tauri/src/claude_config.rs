@@ -74,14 +74,14 @@ fn add_hooks_at(path: &Path) -> Result<Option<PathBuf>, String> {
         None
     } else {
         let b = path.with_file_name(format!(
-            "settings.json.sidekick-backup-{}",
+            "settings.json.duskie-backup-{}",
             chrono::Local::now().format("%Y%m%d-%H%M%S")
         ));
         std::fs::write(&b, &old).map_err(|e| format!("could not back up the settings: {e}"))?;
         Some(b)
     };
     // Write next to it, then swap, so a crash never leaves half a file.
-    let tmp = path.with_extension("json.sidekick-tmp");
+    let tmp = path.with_extension("json.duskie-tmp");
     std::fs::write(&tmp, new).map_err(|e| e.to_string())?;
     std::fs::rename(&tmp, path).map_err(|e| e.to_string())?;
     Ok(backup)
@@ -98,7 +98,7 @@ pub async fn add_mcp(claude: &Path, url: &str, token: &str) -> Result<(), String
         "user",
         "--transport",
         "http",
-        "sidekick",
+        "duskie",
         url,
         "--header",
         &format!("Authorization: Bearer {token}"),
@@ -117,6 +117,28 @@ pub async fn add_mcp(claude: &Path, url: &str, token: &str) -> Result<(), String
         Ok(())
     } else {
         Err(format!("claude mcp add failed: {}", text.trim()))
+    }
+}
+
+/// Removes the MCP server Claude Code knew as `name` (the one from before
+/// the rename). Not having it is fine.
+pub async fn remove_mcp(claude: &Path, name: &str) -> Result<(), String> {
+    let mut cmd = tokio::process::Command::new(claude);
+    cmd.args(["mcp", "remove", "--scope", "user", name])
+        .stdin(std::process::Stdio::null())
+        .kill_on_drop(true);
+    #[cfg(windows)]
+    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    let out = tokio::time::timeout(std::time::Duration::from_secs(30), cmd.output())
+        .await
+        .map_err(|_| "Claude Code did not answer".to_string())?
+        .map_err(|e| format!("could not run Claude Code: {e}"))?;
+    let text =
+        String::from_utf8_lossy(&out.stderr).to_string() + &String::from_utf8_lossy(&out.stdout);
+    if out.status.success() || text.contains("not found") || text.contains("No MCP server") {
+        Ok(())
+    } else {
+        Err(format!("claude mcp remove failed: {}", text.trim()))
     }
 }
 

@@ -98,7 +98,7 @@ async function mockInstallUpdate(): Promise<string> {
   report("verifying", 100 * 1_048_576);
   await delay();
   report("opening", 100 * 1_048_576);
-  return "Installing Sidekick_0.2.0_x64-setup.exe";
+  return "Installing Duskie_0.2.0_x64-setup.exe";
 }
 
 const CUE_BY_STATE: Partial<Record<MascotState, Cue>> = {
@@ -588,7 +588,7 @@ function mockChat(a: Record<string, unknown>) {
   const answer: string = formatted
     ? "Here is the plan for **Friday**:\n\n1. Send the invoice to **Ali** by 10:00\n2. Review the *Upwork* proposal\n3. Book the dentist\n\nCosts so far:\n\n| Item | Amount |\n| --- | --- |\n| Hosting | **$24** |\n| Domain | $12 |\n\n- Invoice is in [invoice-sept.pdf](C:\\Users\\you\\Downloads\\invoice-sept.pdf)\n- Notes are in [Projects](C:\\Users\\you\\Projects\\)\nOPTION: Draft the email to Ali"
     : /sidekick/i.test(last)
-      ? "Found it: [Duskie's app folder](/C:/Users/you/AppData/Roaming/app.sidekick.desktop), changed today. Its settings are in [settings.json](C:\\Users\\you\\AppData\\Roaming\\app.sidekick.desktop\\settings.json).\nOPTION: Open the folder\nOPTION: Show settings.json"
+      ? "Found it: [Duskie's app folder](/C:/Users/you/AppData/Roaming/app.duskie.desktop), changed today. Its settings are in [settings.json](C:\\Users\\you\\AppData\\Roaming\\app.duskie.desktop\\settings.json).\nOPTION: Open the folder\nOPTION: Show settings.json"
       : `Found invoice-sept.pdf in Downloads, from Ali on Tuesday (preview, you asked "${last}").\nOPTION: Open invoice-sept.pdf\nOPTION: Show the folder\nOPTION: Find other invoices`;
   // Formatted answers arrive in bursts, like Claude Code's whole sentences.
   const words = formatted ? (answer.match(/[\s\S]{1,90}/g) ?? [answer]) : answer.split(/(?<=\s)/);
@@ -1095,7 +1095,7 @@ commands.browsers_status = () => [
 commands.extension_install = (a) => {
   later(4000, () => browsersSeen.add(a.browser as string));
   return {
-    copied: "C:\\Users\\you\\AppData\\Local\\app.sidekick.desktop\\extension",
+    copied: "C:\\Users\\you\\AppData\\Local\\app.duskie.desktop\\extension",
     page: "chrome://extensions/",
     steps: [
       "If the extensions page is not showing, paste its address into the address bar and press Enter (it is copied).",

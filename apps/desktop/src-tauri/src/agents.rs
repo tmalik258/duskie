@@ -302,7 +302,7 @@ pub fn codex_composio_args(
     let mut env = Vec::new();
     let mut map = Vec::new();
     for (i, (k, v)) in headers.iter().enumerate() {
-        let var = format!("SIDEKICK_COMPOSIO_HEADER_{i}");
+        let var = format!("DUSKIE_COMPOSIO_HEADER_{i}");
         let key: String = k
             .chars()
             .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
@@ -503,12 +503,12 @@ mod tests {
         );
         let joined = args.join(" ");
         assert!(joined.contains("mcp_servers.composio.url=\"https://connect.composio.dev/mcp\""));
-        assert!(joined.contains("\"authorization\" = \"SIDEKICK_COMPOSIO_HEADER_0\""));
+        assert!(joined.contains("\"authorization\" = \"DUSKIE_COMPOSIO_HEADER_0\""));
         assert!(!joined.contains("secret"));
         assert_eq!(
             env,
             vec![(
-                "SIDEKICK_COMPOSIO_HEADER_0".to_owned(),
+                "DUSKIE_COMPOSIO_HEADER_0".to_owned(),
                 "Bearer secret".to_owned()
             )]
         );

@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 import { api, EVENTS, listen } from "@/lib/bridge";
-import { startWaiting, useSidekick } from "@/lib/store";
+import { startWaiting, useDuskie } from "@/lib/store";
 import type { ComposioStatus } from "@/lib/types";
 import { Tip } from "../Tip";
 import { Button } from "./ui";
@@ -21,7 +21,7 @@ export function ComposioApps({
   /** Where the island returns once an app finishes connecting. */
   resumeTab: string;
 }) {
-  const justDone = useSidekick((s) => s.justDone);
+  const justDone = useDuskie((s) => s.justDone);
   const [connecting, setConnecting] = useState<string | null>(null);
   useEffect(() => {
     const off = listen(EVENTS.composioChanged, () => setConnecting(null));

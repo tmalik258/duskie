@@ -7,7 +7,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
-import { updateSettings, useSidekick } from "@/lib/store";
+import { updateSettings, useDuskie } from "@/lib/store";
 import {
   type CapabilityInfo,
   type Folder,
@@ -20,7 +20,7 @@ import {
 import { appName, Button, ChipList, Field, FolderPicker, Section, Select, Toggle } from "./ui";
 
 export function PrivacyTab({ onError }: { onError: (e: string) => void }) {
-  const settings = useSidekick((s) => s.settings);
+  const settings = useDuskie((s) => s.settings);
   const save = (patch: Parameters<typeof updateSettings>[0]) =>
     updateSettings(patch).catch((e: unknown) => onError(String(e)));
   const run = (p: Promise<unknown>) => void p.catch((e: unknown) => onError(String(e)));
@@ -112,8 +112,8 @@ function PauseStatus({ pause }: { pause: Pause }) {
 }
 
 function SearchSettings({ onError }: { onError: (e: string) => void }) {
-  const folders = useSidekick((s) => s.settings.indexFolders);
-  const semantic = useSidekick((s) => s.settings.semanticSearch);
+  const folders = useDuskie((s) => s.settings.indexFolders);
+  const semantic = useDuskie((s) => s.settings.semanticSearch);
   const { data: detected } = useCached<Found>("setup-detect", api.setupDetect);
   const found: Folder[] = detected?.searchFolders ?? [];
   const { data: models } = useCached<LocalModels>("local-models", api.localModels);
@@ -260,7 +260,7 @@ function Capabilities({ onError }: { onError: (e: string) => void }) {
 
 /** Facts about the user, given to every model, plus learned paths. */
 export function Memory({ onError }: { onError: (e: string) => void }) {
-  const memory = useSidekick((s) => s.settings.memory);
+  const memory = useDuskie((s) => s.settings.memory);
   const [draft, setDraft] = useState("");
   const [cleared, setCleared] = useState(false);
   const save = (next: string[]) => void updateSettings({ memory: next }).catch((e: unknown) => onError(String(e)));

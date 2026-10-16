@@ -13,7 +13,7 @@ import { api } from "@/lib/bridge";
 import { prefetch, revalidate, SETUP_STATUS_CACHE_KEY } from "@/lib/cache";
 import { useScrollEdge } from "@/lib/hooks";
 import { PANEL_MAX_HEIGHT } from "@/lib/islandSize";
-import { showDone, updateSettings, useSidekick } from "@/lib/store";
+import { showDone, updateSettings, useDuskie } from "@/lib/store";
 import { ASK_ORB } from "./AskPanel";
 import { SetupChecklist } from "./SetupChecklist";
 import { SpokenLine, wasHeard } from "./SpokenLine";
@@ -39,8 +39,8 @@ function stepsFor(codes: boolean | null): number[] {
 }
 
 export function IslandWelcome() {
-  const saved = useSidekick((s) => s.settings.welcomeStep);
-  const codes = useSidekick((s) => s.settings.codes);
+  const saved = useDuskie((s) => s.settings.welcomeStep);
+  const codes = useDuskie((s) => s.settings.codes);
   const order = stepsFor(codes);
   const [step, setStep] = useState(() => clampStep(saved));
   const [autoIn, setAutoIn] = useState<number | null>(null);

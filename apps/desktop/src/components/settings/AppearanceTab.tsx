@@ -3,7 +3,7 @@
 // Appearance: how the mascot and the island look, and how the island
 // behaves on screen. Every choice applies at once.
 
-import { updateSettings, useSidekick } from "@/lib/store";
+import { updateSettings, useDuskie } from "@/lib/store";
 import { ISLAND_COLORS, type IslandColor, THEMES } from "@/lib/types";
 import { Creature } from "../Creature";
 import { THEME_STYLES } from "../Orb";
@@ -47,7 +47,7 @@ const tile = (on: boolean) =>
   }`;
 
 export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
-  const settings = useSidekick((s) => s.settings);
+  const settings = useDuskie((s) => s.settings);
   const save = (patch: Parameters<typeof updateSettings>[0]) =>
     void updateSettings(patch).catch((e) => onError(String(e)));
 

@@ -88,15 +88,17 @@ pub fn merge_notify(text: &str, script: &Path) -> Result<String, String> {
     Ok(out)
 }
 
-/// The config with `[mcp_servers.sidekick]` set to this link and token,
-/// replacing an older entry.
+/// The config with `[mcp_servers.duskie]` set to this link and token,
+/// replacing an older entry (including one from before the rename).
 pub fn merge_mcp(text: &str, url: &str, token: &str) -> String {
     let mut out = String::new();
     let mut skipping = false;
     for line in text.split_inclusive('\n') {
         let t = line.trim();
         if t.starts_with('[') {
-            skipping = t == "[mcp_servers.sidekick]" || t.starts_with("[mcp_servers.sidekick.");
+            skipping = ["duskie", "sidekick"].iter().any(|n| {
+                t == format!("[mcp_servers.{n}]") || t.starts_with(&format!("[mcp_servers.{n}."))
+            });
         }
         if !skipping {
             out.push_str(line);
@@ -109,11 +111,16 @@ pub fn merge_mcp(text: &str, url: &str, token: &str) -> String {
         out.push('\n');
     }
     out.push_str(&format!(
-        "[mcp_servers.sidekick]\nurl = {}\nhttp_headers = {{ \"Authorization\" = {} }}\ndefault_tools_approval_mode = \"approve\"\n",
+        "[mcp_servers.duskie]\nurl = {}\nhttp_headers = {{ \"Authorization\" = {} }}\ndefault_tools_approval_mode = \"approve\"\n",
         lit(url),
         lit(&format!("Bearer {token}")),
     ));
     out
+}
+
+/// Codex still has the server under its name from before the rename.
+pub fn has_old_mcp(text: &str) -> bool {
+    text.lines().any(|l| l.trim() == "[mcp_servers.sidekick]")
 }
 
 pub fn has_notify(text: &str) -> bool {
@@ -121,7 +128,7 @@ pub fn has_notify(text: &str) -> bool {
 }
 
 pub fn has_mcp(text: &str) -> bool {
-    text.lines().any(|l| l.trim() == "[mcp_servers.sidekick]")
+    text.lines().any(|l| l.trim() == "[mcp_servers.duskie]")
 }
 
 fn write_with_backup(path: &Path, old: &str, new: &str) -> Result<Option<PathBuf>, String> {
@@ -135,7 +142,7 @@ fn write_with_backup(path: &Path, old: &str, new: &str) -> Result<Option<PathBuf
         None
     } else {
         let b = path.with_file_name(format!(
-            "config.toml.sidekick-backup-{}",
+            "config.toml.duskie-backup-{}",
             chrono::Local::now().format("%Y%m%d-%H%M%S")
         ));
         std::fs::write(&b, old).map_err(|e| format!("could not back up Codex's settings: {e}"))?;
@@ -143,6 +150,39 @@ fn write_with_backup(path: &Path, old: &str, new: &str) -> Result<Option<PathBuf
     };
     std::fs::write(path, new).map_err(|e| format!("could not save Codex's settings: {e}"))?;
     Ok(backup)
+}
+
+/// The config with the notify script's folder changed from `old_dir` to
+/// `new_dir` (the data folder moved). Other lines are untouched.
+pub fn retarget_notify(text: &str, old_dir: &Path, new_dir: &Path) -> String {
+    let (old, new) = (
+        old_dir.to_string_lossy().to_string(),
+        new_dir.to_string_lossy().to_string(),
+    );
+    text.split_inclusive('\n')
+        .map(|line| {
+            let t = line.trim_start();
+            if t.starts_with("notify") && line.contains(NOTIFY_SCRIPT) {
+                line.replace(&old, &new)
+            } else {
+                line.to_owned()
+            }
+        })
+        .collect()
+}
+
+/// After the data folder moved: points Codex's notify at the new folder and
+/// renames Duskie's MCP server entry. Backs the file up first.
+pub fn after_move(old_dir: &Path, new_dir: &Path, url: &str, token: &str) -> Result<(), String> {
+    let path = config_path().ok_or("no home folder")?;
+    let Ok(old) = std::fs::read_to_string(&path) else {
+        return Ok(());
+    };
+    let mut new = retarget_notify(&old, old_dir, new_dir);
+    if has_old_mcp(&new) {
+        new = merge_mcp(&new, url, token);
+    }
+    write_with_backup(&path, &old, &new).map(|_| ())
 }
 
 /// Writes the notify script into `data_dir` and adds it to Codex.
@@ -191,19 +231,32 @@ mod tests {
     }
 
     #[test]
-    fn sets_sidekicks_server_and_replaces_an_old_one() {
+    fn sets_duskies_server_and_replaces_an_old_one() {
         let old = "model = \"gpt-5\"\n[mcp_servers.sidekick]\nurl = 'old'\n[profiles.x]\nmodel = \"o3\"\n";
         let new = merge_mcp(old, "http://127.0.0.1:47823/mcp", "t0k");
-        assert_eq!(new.matches("[mcp_servers.sidekick]").count(), 1);
+        assert_eq!(new.matches("[mcp_servers.duskie]").count(), 1);
+        assert!(!new.contains("[mcp_servers.sidekick]"));
         assert!(!new.contains("'old'"));
         assert!(new.contains("[profiles.x]"));
         assert!(new.contains("'Bearer t0k'"));
         assert!(has_mcp(&new));
-        assert!(merge_mcp("", "http://x", "t").starts_with("[mcp_servers.sidekick]"));
+        assert!(merge_mcp("", "http://x", "t").starts_with("[mcp_servers.duskie]"));
     }
 
     #[test]
-    fn script_posts_to_sidekick() {
+    fn moves_the_notify_script_with_the_data() {
+        let text = "notify = ['powershell.exe', '-File', 'C:\\A\\app.sidekick.desktop\\codex-notify.ps1']\nmodel = 'x'\n";
+        let out = retarget_notify(
+            text,
+            Path::new("C:\\A\\app.sidekick.desktop"),
+            Path::new("C:\\A\\app.duskie.desktop"),
+        );
+        assert!(out.contains("app.duskie.desktop\\codex-notify.ps1"));
+        assert!(out.ends_with("model = 'x'\n"));
+    }
+
+    #[test]
+    fn script_posts_to_duskie() {
         let s = script_text();
         assert!(s.contains(CODEX_HOOK_URL));
         assert!(s.contains("catch {}"));
