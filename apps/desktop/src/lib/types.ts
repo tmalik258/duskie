@@ -55,6 +55,8 @@ export interface Settings {
   voice: VoiceSettings;
   calendar: { remindMinutes: number };
   semanticSearch: { enabled: boolean; model: string };
+  /** The new island look; off by default. */
+  redesign: { enabled: boolean };
   onboarded: boolean;
   /** 0-based welcome step; resumed until onboarded is true. */
   welcomeStep: number;
@@ -438,6 +440,7 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   calendar: { remindMinutes: 5 },
   semanticSearch: { enabled: true, model: "nomic-embed-text" },
+  redesign: { enabled: false },
   onboarded: false,
   welcomeStep: 0,
   checkUpdates: true,
