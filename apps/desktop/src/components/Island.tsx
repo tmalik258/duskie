@@ -63,8 +63,10 @@ import {
   TOP,
   WELCOME_WIDTH,
 } from "./island-layout";
+import { NetCard } from "./NetCard";
 import { PreparingVoice } from "./PreparingVoice";
 import { type PillModel, RedesignPill } from "./RedesignPill";
+import { UpdateCard } from "./UpdateCard";
 import { redesignShell } from "./use-island-shell";
 
 export function Island() {
@@ -82,6 +84,10 @@ export function Island() {
   const voiceStatus = useDuskie((s) => s.voiceStatus);
   const online = useDuskie((s) => s.online);
   const netNotice = useDuskie((s) => s.netNotice);
+  // Design: losing the connection only changes the pill; the card opens on a click.
+  const [netOpen, setNetOpen] = useState(false);
+  if (netOpen && online) setNetOpen(false);
+  const netShown = redesign ? netOpen : !!netNotice;
   const merging = useDuskie((s) => s.merge !== null);
   const updateProgress = useDuskie((s) => s.updateProgress);
   const updateActivity = useActivities((s) => latestActivity(s.activities, "update"));
@@ -417,7 +423,7 @@ export function Island() {
     (OPEN_STATES.has(mascot) && !voicePill && !(redesign && mascot !== "suggesting")) ||
     successCard ||
     (!!suggestion && suggestOpen) ||
-    (!!netNotice && !voicePill) ||
+    (netShown && !voicePill) ||
     updateProgress?.phase === "failed" ||
     merging;
   // At rest only the sphere shows. The shell keeps its size (so hover and the
@@ -604,7 +610,9 @@ export function Island() {
       ? peeking
         ? {
             kind: "suggest",
-            label: peeking.title,
+            ...(sourceApp(peeking)
+              ? { label: sourceApp(peeking) as string, dim: peeking.title }
+              : { label: peeking.title }),
             chip: peeking.options[0],
             onChip: () => void api.suggestionChoose(peeking.id, 0),
           }
@@ -632,7 +640,12 @@ export function Island() {
                   : paused
                     ? { kind: "paused", label: "Paused", dim: pauseDim(settings.pause) }
                     : !online
-                      ? { kind: "offline", label: "Offline", dim: "catching up when back" }
+                      ? {
+                          kind: "offline",
+                          label: "Offline",
+                          dim: "catching up when back",
+                          onOpen: () => setNetOpen(true),
+                        }
                       : mascot === "noticing"
                         ? { kind: "noticing", label: "Taking a look" }
                         : null
@@ -654,9 +667,9 @@ export function Island() {
         suggestPeek: !!suggestion && !suggestOpen,
         waitingForYou: !!waiting && !waiting.minimized && !guiding,
         merging,
-        updateCard: updateProgress?.phase === "failed",
+        updateCard: updateProgress?.phase === "failed" || (redesign && hovered && updateWorking !== null),
         offline: !online,
-        netCard: !!netNotice && !voicePill,
+        netCard: netShown && !voicePill,
         focus: focusLeft !== null,
         paused,
         notifyFresh: !!notifyFresh && !busy && !expanded,
@@ -920,6 +933,10 @@ export function Island() {
                     <IslandGuide waiting={waiting} guide={guide} />
                   ) : redesign && registryId === "activities" ? (
                     <ActivitiesCard />
+                  ) : redesign && registryId === "update" && updateWorking !== null ? (
+                    <UpdateCard activityId={updateActivity?.id ?? null} startedAt={updateActivity?.startedAt ?? null} />
+                  ) : redesign && registryId === "net-card" ? (
+                    <NetCard onClose={() => setNetOpen(false)} />
                   ) : (
                     <ExpandedContent mascot={mascot} paused={paused} suggestion={suggestion} />
                   )}
@@ -987,4 +1004,24 @@ function clockTime(ms: number): string {
 
 function pauseDim(p: Settings["pause"]): string | undefined {
   return p.kind === "until" ? `until ${clockTime(Date.parse(p.until))}` : undefined;
+}
+
+const APPS = [
+  "Outlook",
+  "Gmail",
+  "Slack",
+  "Teams",
+  "Calendar",
+  "Chrome",
+  "Edge",
+  "WhatsApp",
+  "Discord",
+  "GitHub",
+  "Notion",
+];
+
+/** The app a suggestion came from, when its text names one. */
+function sourceApp(s: { skillId: string; detail: string }): string | null {
+  const hay = `${s.skillId} ${s.detail}`.toLowerCase();
+  return APPS.find((a) => hay.includes(a.toLowerCase())) ?? null;
 }

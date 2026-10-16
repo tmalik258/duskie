@@ -4288,6 +4288,8 @@ button.ak-cchip:hover,
   }
 }
 .cmp-label.nt {
+  font-weight: 600;
+  white-space: nowrap;
   max-width: 250px;
   overflow: hidden;
   text-overflow: ellipsis;

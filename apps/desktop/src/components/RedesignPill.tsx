@@ -88,9 +88,18 @@ export function RedesignPill({ model, onWidth }: { model: PillModel; onWidth: (w
     trail = <span className="dot" style={{ background: "var(--warn)", boxShadow: "0 0 8px var(--warn)" }} />;
   else if (kind === "offline")
     trail = (
-      <span style={{ color: "var(--warn)", display: "inline-flex" }}>
-        <Icon name="wifiOff" size={14} />
-      </span>
+      <button
+        type="button"
+        className="chip-s ic-only"
+        aria-label="Details"
+        style={{ color: "var(--warn)" }}
+        onClick={(e) => {
+          e.stopPropagation();
+          model.onOpen?.();
+        }}
+      >
+        <Icon name="wifiOff" size={13} />
+      </button>
     );
   else if (kind === "waiting") trail = <span className="badge tnum">{model.count ?? 1}</span>;
   else if (kind === "suggest" && model.chip)
