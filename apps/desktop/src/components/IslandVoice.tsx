@@ -6,6 +6,7 @@ import { acceptActivities, activityElapsedSecs, activityLabel, dismissLocal } fr
 import { useAgents } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { useNow } from "@/lib/hooks";
+import { REDESIGN_COMPACT } from "@/lib/redesign-layout";
 import { useDuskie } from "@/lib/store";
 import type { Activity as ActivityItem } from "@/lib/types";
 import { VoiceBars } from "./AskPanel";
@@ -101,7 +102,7 @@ export function statusTextWidth(label: string): number {
 export function voiceShellWidth(
   text: string,
   thinking: boolean,
-  opts?: { status?: boolean; cancel?: boolean; indicator?: boolean },
+  opts?: { status?: boolean; cancel?: boolean; indicator?: boolean; redesign?: boolean },
 ): number {
   const status = !!opts?.status;
   const label = voiceLabel(text, thinking, status);
@@ -117,8 +118,9 @@ export function voiceShellWidth(
 }
 
 /** Orb column + trailing controls for a compact status pill (gap-1.5 + pr-2). */
-export function statusChrome(opts?: { cancel?: boolean; indicator?: boolean }): number {
-  let chrome = COMPACT.height + 4 + 8;
+export function statusChrome(opts?: { cancel?: boolean; indicator?: boolean; redesign?: boolean }): number {
+  // Redesign: the mascot column is the prototype's 48px (REDESIGN_COMPACT.padLeft).
+  let chrome = (opts?.redesign ? REDESIGN_COMPACT.padLeft : COMPACT.height + 4) + 8;
   if (opts?.indicator) chrome += 6 + 12;
   if (opts?.cancel) chrome += 6 + 24;
   return chrome;
@@ -243,7 +245,7 @@ export function VoicePill({
   ) : thinking || working ? (
     <Activity />
   ) : null;
-  const labelClass = `text-[12.5px] font-medium ${
+  const labelClass = `${redesign ? "text-[13px] tracking-[-0.005em]" : "text-[12.5px]"} font-medium ${
     listening ? "min-w-0 flex-1 truncate" : clip ? "min-w-0 truncate" : "shrink-0"
   } ${text.trim() || thinking || working ? inkStrong : inkSoft}`;
   const labelInner = <span className="min-w-0 truncate">{label}</span>;
@@ -296,10 +298,12 @@ export function VoicePill({
     else onCancel?.();
   };
   const pillH = redesign ? "h-[38px]" : "h-9";
+  // Prototype .cmp: the label starts after the mascot (48px) on the compact pill.
+  const pillPad = redesign && !listening ? "pl-12" : "";
   return (
     <motion.div
-      className={`absolute top-0 right-0 flex ${pillH} items-center ${listening ? "gap-2.5 pr-3.5" : "pr-2"}`}
-      style={{ left: COMPACT.height + 4 }}
+      className={`absolute top-0 right-0 flex ${pillH} items-center ${listening ? "gap-2.5 pr-3.5" : redesign ? `${pillPad} pr-2` : "pr-2"}`}
+      style={{ left: redesign ? 0 : COMPACT.height + 4 }}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1, transition: { delay: 0.1, duration: 0.2 } }}
       exit={{ opacity: 0, transition: { duration: 0.08 } }}
@@ -324,7 +328,7 @@ export function VoicePill({
           </Tip>
         </>
       ) : (
-        <div className="flex min-w-0 max-w-full items-center gap-1.5">
+        <div className={`flex min-w-0 max-w-full items-center ${redesign ? "gap-2.5 pr-3" : "gap-1.5"}`}>
           {labeled}
           {elapsed !== null && (
             <span className={`shrink-0 text-[12.5px] font-medium tabular-nums ${inkStrong}`}>· {elapsed}s</span>

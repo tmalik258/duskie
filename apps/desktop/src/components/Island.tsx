@@ -484,6 +484,7 @@ export function Island() {
     (mascot === "idle" || mascot === "sleeping");
   const pillWidth = voicePill
     ? voiceShellWidth(voicePill.text, voicePill.thinking, {
+        redesign,
         status: !!(
           voicePill.working ||
           voicePill.done ||
