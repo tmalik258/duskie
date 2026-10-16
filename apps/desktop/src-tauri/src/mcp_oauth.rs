@@ -295,14 +295,16 @@ pub fn authorize_url(
         '?'
     };
     let mut url = format!(
-        "{}{sep}response_type=code&client_id={}&redirect_uri={}&code_challenge={}&code_challenge_method=S256&state={}&resource={}",
+        "{}{sep}response_type=code&client_id={}&redirect_uri={}&code_challenge={}&code_challenge_method=S256&state={}",
         d.authorization_endpoint,
         encode(client_id),
         encode(redirect),
         challenge(verifier),
         encode(state),
-        encode(&d.resource),
     );
+    if !d.resource.is_empty() {
+        url.push_str(&format!("&resource={}", encode(&d.resource)));
+    }
     if let Some(scope) = &d.scope {
         url.push_str(&format!("&scope={}", encode(scope)));
     }
@@ -402,6 +404,15 @@ async fn catch_code(listener: TcpListener, state: &str) -> Result<String, String
     }
 }
 
+/// A local port for the browser to come back to, and the redirect URL.
+pub async fn bind_loopback() -> Result<(TcpListener, String), String> {
+    let listener = TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .map_err(|e| format!("could not open a local port: {e}"))?;
+    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
+    Ok((listener, format!("http://127.0.0.1:{port}/callback")))
+}
+
 /// The whole sign-in: discovery, registration, browser, code, tokens.
 /// `open` shows the page in the browser. Returns the grant to keep and a
 /// fresh access token.
@@ -411,19 +422,31 @@ where
     Fut: std::future::Future<Output = Result<(), String>>,
 {
     let d = discover(mcp_url).await?;
-    let listener = TcpListener::bind(("127.0.0.1", 0))
-        .await
-        .map_err(|e| format!("could not open a local port: {e}"))?;
-    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
-    let redirect = format!("http://127.0.0.1:{port}/callback");
+    let (listener, redirect) = bind_loopback().await?;
     let reg = d
         .registration_endpoint
         .as_deref()
         .ok_or("This server needs a key instead of a sign-in.")?;
     let (client_id, client_secret) = register(reg, &redirect).await?;
+    run_flow(&d, listener, &redirect, client_id, client_secret, open).await
+}
+
+/// Browser, code and tokens for a service whose client is already known.
+pub async fn run_flow<F, Fut>(
+    d: &Discovery,
+    listener: TcpListener,
+    redirect: &str,
+    client_id: String,
+    client_secret: String,
+    open: F,
+) -> Result<(Grant, String, u64), String>
+where
+    F: FnOnce(String) -> Fut,
+    Fut: std::future::Future<Output = Result<(), String>>,
+{
     let verifier = random(48);
     let state = random(16);
-    open(authorize_url(&d, &client_id, &redirect, &verifier, &state)).await?;
+    open(authorize_url(d, &client_id, redirect, &verifier, &state)).await?;
     let code = tokio::time::timeout(SIGN_IN_WAIT, catch_code(listener, &state))
         .await
         .map_err(|_| "Sign-in timed out. Press Connect again.".to_string())??;
@@ -432,7 +455,7 @@ where
         &[
             ("grant_type", "authorization_code"),
             ("code", &code),
-            ("redirect_uri", &redirect),
+            ("redirect_uri", redirect),
             ("client_id", &client_id),
             ("client_secret", &client_secret),
             ("code_verifier", &verifier),
@@ -443,8 +466,8 @@ where
     let grant = Grant {
         client_id,
         client_secret,
-        token_endpoint: d.token_endpoint,
-        resource: d.resource,
+        token_endpoint: d.token_endpoint.clone(),
+        resource: d.resource.clone(),
         access_token: if refresh.is_empty() {
             access.clone()
         } else {

@@ -79,3 +79,23 @@ pub fn attention_set_profile(app: AppHandle, profile: String) -> CmdResult<()> {
     };
     edit(&app, |n| n.profile = profile)
 }
+
+/// Where the Gmail connection stands.
+#[tauri::command]
+pub fn mail_status() -> crate::mail::Status {
+    crate::mail::status()
+}
+
+/// Opens Google's sign-in and connects the account.
+#[tauri::command]
+pub async fn mail_connect(app: AppHandle) -> CmdResult<crate::mail::Status> {
+    crate::mail::connect(&app).await?;
+    Ok(crate::mail::status())
+}
+
+/// Signs out and deletes the saved sign-in.
+#[tauri::command]
+pub async fn mail_disconnect() -> crate::mail::Status {
+    crate::mail::disconnect_account().await;
+    crate::mail::status()
+}

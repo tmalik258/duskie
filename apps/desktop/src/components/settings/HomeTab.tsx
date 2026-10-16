@@ -29,6 +29,7 @@ import { SetupChecklist, usePendingByTab } from "../SetupChecklist";
 import { Tip } from "../Tip";
 import { UpdateProgress } from "../UpdateProgress";
 import { LearnedList, NotificationProfile } from "./LearnedList";
+import { MailCard } from "./MailCard";
 import { Button, ChipList, Field, FolderPicker, Section, Select, Slider, Toggle } from "./ui";
 
 const DAY_SUMMARY_SKILL = "system.day-summary";
@@ -568,6 +569,7 @@ function NotificationInbox({ onError }: { onError: (e: string) => void }) {
             onChange={(vip) => save({ vip })}
           />
           <NotificationProfile onError={onError} />
+          <MailCard onError={onError} />
           <LearnedList onError={onError} />
           {status && status.apps.length > 0 && (
             <div className="flex flex-col gap-2">

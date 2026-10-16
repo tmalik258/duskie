@@ -942,7 +942,7 @@ fn changed(app: &AppHandle, ok: bool, message: impl Into<String>) {
     );
 }
 
-async fn open_url(app: &AppHandle, url: &str) -> Result<(), String> {
+pub async fn open_url(app: &AppHandle, url: &str) -> Result<(), String> {
     crate::state::executor(&app.state::<AppState>())
         .run("open_url", &serde_json::json!({ "url": url }))
         .await

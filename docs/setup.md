@@ -85,3 +85,9 @@ Duskie checks for these when it starts a session and says so plainly when someth
 | Ollama | 0.5 or newer | `/api/ps` for the model's context size, and `keep_alive`. |
 | Code editors | Cursor, VS Code, VSCodium, Antigravity, Windsurf, Zed, JetBrains IDEs (2023 or newer) and Visual Studio 2019 or newer | Found from Windows' list of installed apps; projects open with the editor's own command line. |
 | git | 2.30 or newer, for reviewing and undoing agent changes | Projects without git are tracked in a private copy inside Duskie's data folder, so review and undo work there too. |
+
+## Gmail
+
+Settings > Home > Notifications > Gmail > Connect Gmail opens Google in your browser. Allow read access to mail and come back. New mail is then checked every 20 to 90 seconds while Duskie runs, and only mail that needs you becomes a card. Disconnect signs out and deletes the saved sign-in.
+
+Builds that do not include a Google sign-in show "not set up in this build yet". To try it with your own Google client, set `DUSKIE_GOOGLE_CLIENT_ID` (and `DUSKIE_GOOGLE_CLIENT_SECRET` if the client has one) before starting Duskie.
