@@ -18,6 +18,9 @@ How Duskie is put together, and the rules every change has to keep. Read this be
 - MCP search only returns shareable sources (`search::SHAREABLE`): never clipboard or page text.
 - Voice (`crates/voice`) runs fully on this PC (official sherpa-onnx crate, linked statically: no DLLs; Supertonic 3 voice). Voice is on by default. Models are prefetched at build/dev into `src-tauri/resources/voice-models` (SHA-256 checked), copied into app data on launch, and only downloaded from pinned GitHub release URLs when still missing (the voice first). First-run welcome waits until the voice can speak, then greets aloud. The microphone is open only while voice is on and Duskie is not paused; audio is never saved, logged or sent. Only the final transcript goes to the AI.
 - Agent sessions (`sessions.rs`) run Claude Code (`claude -p`, stream-json in and out) or Codex (`codex app-server`) in a project the user picked. Claude Code's permission questions come through Duskie's MCP server (`sidekick_permission`, called by the CLI, not the model); Codex asks as JSON-RPC requests. Both wait for the user's answer in the island and are declined after 10 minutes. Before a session starts, `review.rs` snapshots the project with `git stash create` (which changes nothing); undo puts back only what changed since, and sends files the agent created to the Recycle Bin.
+- Secrets live in the OS keychain (`secrets.rs`), never in settings, logs or prompts.
+- Email, web page, file and MCP output text is untrusted data. It can never choose or run a tool by itself.
+- Skills (`SKILL.md` folders) are untrusted instructions and possibly code. Nothing in a skill runs on import or sync; scripts only run under the agent's own permission prompts or an approved action.
 - Undo only touches paths an action itself produced (`undo::UNDOABLE`), sends them to the Recycle Bin, and only within 24 hours.
 
 ## Frontend rules
@@ -25,6 +28,8 @@ How Duskie is put together, and the rules every change has to keep. Read this be
 - Next.js runs as a static export inside Tauri: no SSR, API routes, server actions, or middleware.
 - Tauri APIs are imported dynamically through `src/lib/bridge.ts`; it falls back to `src/lib/mock.ts` in a plain browser.
 - Keep `src/lib/types.ts` in sync with the Rust serde types.
+- Pure TypeScript logic gets Vitest tests next to the file (`*.test.ts`).
+- Honor `prefers-reduced-motion`. No visible scrollbars inside the island.
 - Next.js 16 differs from older versions; check the guides in `node_modules/next/dist/docs/` before using an API.
 
 ## Checks before pushing
@@ -33,12 +38,12 @@ How Duskie is put together, and the rules every change has to keep. Read this be
 cargo fmt --all --check
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-pnpm lint && pnpm typecheck && pnpm --filter desktop build
+pnpm lint && pnpm typecheck && pnpm --filter desktop test && pnpm --filter desktop build
 ```
 
 Native crashes and UI-thread freezes: [debugging.md](debugging.md).
 
 ## Style
 
-- No em dashes in user-facing text or docs.
+- No em dashes or emojis in user-facing text or docs.
 - Mascot art and sounds must be original or properly licensed and credited.

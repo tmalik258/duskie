@@ -1086,6 +1086,7 @@ export function AskPanel() {
           value={text}
           onChange={(e) => {
             setText(e.target.value);
+            api.voiceTyping(e.target.value.trim() !== "").catch(() => undefined);
             setOpenWhere(null);
             setSelected(INTENT_PENDING);
             setPick(0);

@@ -390,6 +390,7 @@ export const api = {
   voiceDownload: () => invoke<void>("voice_download"),
   voiceCancelDownload: () => invoke<void>("voice_cancel_download"),
   voiceListen: () => invoke<void>("voice_listen"),
+  voiceTyping: (hasText: boolean) => invoke<void>("voice_typing", { hasText }),
   voiceStop: () => invoke<void>("voice_stop"),
   voiceTest: () => invoke<void>("voice_test"),
   voiceWelcome: () => invoke<WelcomeSpeech>("voice_welcome"),
