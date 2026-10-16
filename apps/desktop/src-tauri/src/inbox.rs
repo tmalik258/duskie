@@ -66,6 +66,16 @@ impl Level {
         }
     }
 
+    /// Higher is quieter.
+    fn quietness(self) -> u8 {
+        match self {
+            Level::Now => 0,
+            Level::Soon => 1,
+            Level::Digest => 2,
+            Level::Never => 3,
+        }
+    }
+
     fn lower(self) -> Self {
         match self {
             Level::Now => Level::Soon,
@@ -837,9 +847,21 @@ pub fn clear_level(app: &AppHandle, from: &str) -> Result<String, String> {
 /// The user's level for one app, from a card ("Less from WhatsApp") or Settings.
 pub fn set_level(app: &AppHandle, from: &str, level: Level) -> Result<String, String> {
     let mut next = lock(&app.state::<AppState>().settings).clone();
+    let before = next
+        .notifications
+        .apps
+        .get(from)
+        .and_then(|l| Level::parse(l))
+        .unwrap_or(Level::Now);
     next.notifications
         .apps
         .insert(from.to_owned(), level.as_str().to_owned());
+    // Asking for less is the one thing besides acting that teaches scoring.
+    if level.quietness() > before.quietness() {
+        next.notifications
+            .lessons
+            .show_less(&format!("app:{from}"), chrono::Utc::now().timestamp());
+    }
     crate::commands::apply_settings(app, next)?;
     inbox().dismissals.remove(from);
     lesson(format!("Set {from} to {}", level.as_str()));
