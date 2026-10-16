@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/bridge";
 import { baseName, countChanges, groupByFolder } from "@/lib/changes";
 import type { GitFile } from "@/lib/types";
-import { Icon } from "../Icon";
+import { Ic, Icon } from "../Icon";
 import { Tip } from "../Tip";
 
 const KIND: Record<string, string> = {
@@ -135,7 +135,7 @@ export function GitDock({ path, onClose }: { path: string; onClose: () => void }
             onClick={() => void write()}
             className="absolute top-1.5 right-1.5 grid size-6 place-items-center rounded-md hover:bg-white/10 disabled:opacity-40"
           >
-            <Icon name="sparkle" size={14} />
+            <Ic name="spark" size={14} />
           </button>
         </Tip>
       </div>

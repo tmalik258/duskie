@@ -4544,7 +4544,7 @@ button.ak-cchip:hover,
   display: flex;
   flex-direction: column;
   gap: 8px;
-  width: 150px;
+  width: 168px;
   flex: none;
   padding-right: 10px;
   border-right: 1px solid rgb(242 240 235 / 0.07);
@@ -4555,15 +4555,37 @@ button.ak-cchip:hover,
   display: none;
 }
 .st-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   height: 30px;
-  padding: 0 10px;
+  padding: 0 8px;
   border-radius: 8px;
   background: rgb(242 240 235 / 0.06);
   color: #f2f0eb;
   font-size: 12.5px;
   outline: none;
 }
-.st-search::placeholder {
+.st-search input {
+  min-width: 0;
+  flex: 1;
+  background: none;
+  outline: none;
+  color: inherit;
+}
+.st-search svg {
+  flex: none;
+  opacity: 0.55;
+}
+.st-search kbd {
+  font: inherit;
+  font-size: 11px;
+  padding: 0 5px;
+  border-radius: 4px;
+  background: rgb(242 240 235 / 0.08);
+  color: rgb(242 240 235 / 0.5);
+}
+.st-search input::placeholder {
   color: rgb(242 240 235 / 0.4);
 }
 .st-group {
@@ -4584,6 +4606,9 @@ button.ak-cchip:hover,
   font-size: 12.5px;
   color: rgb(242 240 235 / 0.72);
   text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .st-item:hover {
   background: rgb(242 240 235 / 0.05);

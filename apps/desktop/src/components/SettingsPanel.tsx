@@ -4,7 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { friendlyError } from "@/lib/friendly";
 import { useScrollEdge } from "@/lib/hooks";
 import { useDuskie } from "@/lib/store";
-import { Icon, type IconName } from "./Icon";
+import { Ic, type IcName } from "./Icon";
 import { AiTab } from "./settings/AiTab";
 import { AppearanceTab } from "./settings/AppearanceTab";
 import { ConnectionsTab } from "./settings/ConnectionsTab";
@@ -17,39 +17,47 @@ import { StorageTab } from "./settings/StorageTab";
 import { SettingsQuery } from "./settings/ui";
 
 /** Design layout: the sections grouped in a sidebar, with a short line on each. */
-const GROUPS: { label: string; items: { id: SettingsTab; label: string; icon: IconName; blurb: string }[] }[] = [
+const GROUPS: { label: string; items: { id: SettingsTab; label: string; icon: IcName; blurb: string }[] }[] = [
   {
     label: "Duskie",
     items: [
-      { id: "home", label: "General", icon: "settings", blurb: "Setup, how Duskie starts, and when it stays quiet." },
-      { id: "appearance", label: "Appearance", icon: "sparkle", blurb: "How the island and Duskie look and move." },
-      { id: "shortcuts", label: "Shortcuts", icon: "terminal", blurb: "Keys that work from anywhere." },
+      {
+        id: "home",
+        label: "General",
+        icon: "home",
+        blurb: "How Duskie starts, how your day is shaped, and when it stays quiet.",
+      },
+      {
+        id: "appearance",
+        label: "Appearance",
+        icon: "palette",
+        blurb: "The look of Duskie, the island and the wash behind it.",
+      },
     ],
   },
   {
     label: "Intelligence",
     items: [
-      { id: "ai", label: "AI models", icon: "ask", blurb: "Which models answer, and where they run." },
+      { id: "ai", label: "AI models", icon: "cpu", blurb: "Which brain answers, and which one writes code." },
+      { id: "memory", label: "Memory", icon: "brain", blurb: "What Duskie knows about you. All of it is editable." },
       {
-        id: "memory",
-        label: "Memory",
-        icon: "history",
-        blurb: "What Duskie remembers about you, and how to forget it.",
+        id: "skills",
+        label: "Skills and automations",
+        icon: "bolt",
+        blurb: "What Duskie offers, and what it now does on its own.",
       },
-      { id: "skills", label: "Skills", icon: "play", blurb: "What Duskie can notice and do for you." },
     ],
   },
   {
-    label: "Data",
+    label: "Connections",
+    items: [{ id: "connections", label: "Apps", icon: "plug", blurb: "Accounts Duskie can read from and act in." }],
+  },
+  {
+    label: "System",
     items: [
-      { id: "connections", label: "Apps", icon: "wifi", blurb: "Mail, calendar and the other apps Duskie can reach." },
-      { id: "storage", label: "Storage", icon: "folder", blurb: "What is kept on this computer, and for how long." },
-      {
-        id: "privacy",
-        label: "Privacy",
-        icon: "lock",
-        blurb: "What Duskie may look at, and what never leaves this computer.",
-      },
+      { id: "shortcuts", label: "Shortcuts", icon: "key", blurb: "Click a shortcut, then press the new keys." },
+      { id: "privacy", label: "Privacy", icon: "shield", blurb: "What Duskie notices, and what it never looks at." },
+      { id: "storage", label: "Storage", icon: "disk", blurb: "What takes space on this PC." },
     ],
   },
 ];
@@ -210,15 +218,18 @@ export function SettingsPanel() {
     return (
       <div className="island-settings st-split flex min-h-0 flex-auto">
         <nav aria-label="Settings sections" className="st-side">
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search settings"
-            aria-label="Search settings"
-            spellCheck={false}
-            className="st-search"
-          />
+          <label className="st-search">
+            <Ic name="search" size={14} />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search settings"
+              aria-label="Search settings"
+              spellCheck={false}
+            />
+            <kbd>/</kbd>
+          </label>
           {GROUPS.map((g) => (
             <div key={g.label} className="flex flex-col">
               <p className="st-group">{g.label}</p>
@@ -233,7 +244,7 @@ export function SettingsPanel() {
                     pick(i.id);
                   }}
                 >
-                  <Icon name={i.icon} size={14} />
+                  <Ic name={i.icon} size={14} />
                   {i.label}
                 </button>
               ))}

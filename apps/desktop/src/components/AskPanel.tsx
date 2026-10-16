@@ -57,7 +57,7 @@ import type { Command } from "./ask/Starters";
 import { ContextLine, contextStarters, soonestMeeting } from "./ask/Starters";
 import { FirstRun } from "./ask/States";
 import { Timings } from "./ask/Timings";
-import { Icon } from "./Icon";
+import { Ic, Icon } from "./Icon";
 import { markSeen } from "./IslandAgents";
 import { nextTab, type PanelTab, PanelTabs } from "./PanelTabs";
 import { SETTINGS_TABS } from "./SettingsPanel";
@@ -715,7 +715,7 @@ export function AskPanel() {
           {
             id: "search",
             group: "More",
-            icon: <Icon name="ask" size={12} />,
+            icon: <Ic name="spark" size={12} />,
             label: "Search my stuff",
             hint: "Files, pages, chats",
             run: () => {
@@ -1323,11 +1323,7 @@ function commandItem(c: Command): Item {
   return {
     id: c.id,
     icon:
-      c.id === "starter:error" ? (
-        <span className="text-[11px] font-semibold">!</span>
-      ) : (
-        <Icon name={c.icon} size={12} />
-      ),
+      c.id === "starter:error" ? <span className="text-[11px] font-semibold">!</span> : <Ic name={c.icon} size={12} />,
     label: c.label,
     hint: c.hint,
     run: c.run,
@@ -1413,7 +1409,7 @@ function HistoryList({ rows, active, onHover }: { rows: HistoryRow[]; active: nu
             className="ak-row"
           >
             <span className="ak-ico">
-              <Icon name={r.agent ? "terminal" : "ask"} size={12} />
+              <Ic name={r.agent ? "cpu" : "spark"} size={12} />
             </span>
             <span className="min-w-0 flex-1 truncate">{r.title}</span>
             <span className="ak-hint">{r.meta}</span>

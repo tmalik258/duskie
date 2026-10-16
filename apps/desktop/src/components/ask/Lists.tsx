@@ -1,7 +1,7 @@
 "use client";
 import { api } from "@/lib/bridge";
 import type { ChatSummary, SearchHit } from "@/lib/types";
-import { Icon } from "../Icon";
+import { Ic, Icon } from "../Icon";
 import { Tip } from "../Tip";
 import { ago, Kbd, Snippet, SOURCE_LABELS, scrollIfActive } from "./parts";
 
@@ -42,7 +42,7 @@ export function ChatHistory({
             }`}
           >
             <span className="grid size-6 shrink-0 place-items-center rounded-full bg-white/[0.12] text-white/85">
-              <Icon name="ask" size={13} />
+              <Ic name="spark" size={13} />
             </span>
             <span className="min-w-0 flex-1 truncate text-[13px] text-white/90">{c.title}</span>
             <span className="shrink-0 text-[11px] text-[rgb(235_235_245/0.45)]">{ago(c.updated)}</span>
