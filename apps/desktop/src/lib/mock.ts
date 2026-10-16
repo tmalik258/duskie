@@ -123,7 +123,7 @@ function go(state: MascotState) {
   mascot = state;
   epoch += 1;
   emit("mascot://state", { previous, state, cue: CUE_BY_STATE[state] ?? null });
-  if (state === "success") later(1500, () => go("idle"));
+  if (state === "success") later(4000, () => go("idle"));
   if (state === "error") later(4000, () => go("idle"));
 }
 
@@ -1507,6 +1507,12 @@ if (typeof window !== "undefined") {
   Object.assign(window, {
     __mockEmit: emit,
     __mockGo: go,
+    __mockCall: (name: string, args: Record<string, unknown> = {}) => commands[name]?.(args),
+    __mockWork: async (label: string) => {
+      const { beginActivity } = await import("./activities");
+      beginActivity(label);
+      go("working");
+    },
     __mockSuggest: (s: Suggestion) => {
       suggestion = s;
       emit("suggestion://new", s);

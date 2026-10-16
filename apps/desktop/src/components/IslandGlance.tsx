@@ -63,7 +63,15 @@ export function Glance({ paused }: { paused: boolean }) {
   const { data: time } = useCached<AppTime[]>("time-today", api.timeToday);
   const head = headline(now, paused, calendar, time);
   const [focusOpen, setFocusOpen] = useState(false);
-  const eyebrow = head.quiet ? "Today" : paused ? "Paused" : head.join ? "Calendar" : "Now";
+  const eyebrow = redesign
+    ? new Date(now).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })
+    : head.quiet
+      ? "Today"
+      : paused
+        ? "Paused"
+        : head.join
+          ? "Calendar"
+          : "Now";
   return (
     <div className={redesign ? "rd-glance flex flex-col gap-2.5" : "flex flex-col"}>
       {crash && <CrashCard note={crash} onDone={() => void refreshCrash()} />}
@@ -330,35 +338,68 @@ function LaterList() {
       <div
         className={`flex flex-col gap-1.5 ${all ? "island-scroll max-h-[260px] overflow-y-auto overscroll-contain" : ""}`}
       >
-        {shown.map((l, n) => (
-          <div
-            key={l.id}
-            style={{ animationDelay: `${Math.min(n, 6) * 40}ms` }}
-            className="rise-in rd-list-row flex w-full shrink-0 items-center gap-2 pr-1.5"
-          >
-            <button
-              type="button"
+        {shown.map((l, n) =>
+          redesign ? (
+            // biome-ignore lint/a11y/useSemanticElements: the row holds its own dismiss button, so it cannot be a button
+            <div
+              key={l.id}
+              role="button"
+              tabIndex={0}
+              style={{ animationDelay: `${Math.min(n, 6) * 40}ms` }}
+              className="rise-in rd-list-row chip"
               onClick={() => void api.laterOpen(l.id)}
-              className="chip min-w-0 flex-1 px-3 py-1.5 text-left"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void api.laterOpen(l.id);
+              }}
             >
-              <span className={`block truncate text-[13px] font-medium ${title}`}>{l.title}</span>
-              <span className={`block truncate text-[12px] ${detail}`}>{l.detail}</span>
-            </button>
-            <span className={`shrink-0 text-[11px] tabular-nums ${redesign ? "text-(--ink-2)" : "text-white/40"}`}>
-              {ago(l.minutesAgo)}
-            </span>
-            <Tip label="Clear">
+              <span className="dot" style={{ background: "#95a89a" }} />
+              <span className="t">
+                {l.title}
+                {l.detail && <span className="text-(--ink-3)"> {l.detail}</span>}
+              </span>
+              <span className="r">{ago(l.minutesAgo)}</span>
               <button
                 type="button"
+                className="rx"
                 aria-label={`Clear ${l.title}`}
-                onClick={() => void api.laterDismiss(l.id)}
-                className={dismissBtn}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void api.laterDismiss(l.id);
+                }}
               >
                 <Icon name="close" size={12} />
               </button>
-            </Tip>
-          </div>
-        ))}
+            </div>
+          ) : (
+            <div
+              key={l.id}
+              style={{ animationDelay: `${Math.min(n, 6) * 40}ms` }}
+              className="rise-in rd-list-row flex w-full shrink-0 items-center gap-2 pr-1.5"
+            >
+              <button
+                type="button"
+                onClick={() => void api.laterOpen(l.id)}
+                className="chip min-w-0 flex-1 px-3 py-1.5 text-left"
+              >
+                <span className={`block truncate text-[13px] font-medium ${title}`}>{l.title}</span>
+                <span className={`block truncate text-[12px] ${detail}`}>{l.detail}</span>
+              </button>
+              <span className={`shrink-0 text-[11px] tabular-nums ${redesign ? "text-(--ink-2)" : "text-white/40"}`}>
+                {ago(l.minutesAgo)}
+              </span>
+              <Tip label="Clear">
+                <button
+                  type="button"
+                  aria-label={`Clear ${l.title}`}
+                  onClick={() => void api.laterDismiss(l.id)}
+                  className={dismissBtn}
+                >
+                  <Icon name="close" size={12} />
+                </button>
+              </Tip>
+            </div>
+          ),
+        )}
       </div>
       {!all && items.length > LATER_SHOWN && (
         <button

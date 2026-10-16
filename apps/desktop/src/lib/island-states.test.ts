@@ -10,7 +10,7 @@ describe("island state registry", () => {
   });
 
   it("covers every state the design lists", () => {
-    expect(ISLAND_STATES).toHaveLength(23);
+    expect(ISLAND_STATES).toHaveLength(25);
   });
 
   it("points only at real washes", () => {

@@ -24,7 +24,7 @@ import { PILL_FRESH_MS } from "@/lib/peek";
 import { REDESIGN_HOVER_IN_MS, REDESIGN_HOVER_OUT_MS } from "@/lib/redesign-layout";
 import { resolveIslandState } from "@/lib/resolve-island-state";
 import { connect, setHovered, useDuskie, watchWaiting } from "@/lib/store";
-import { isPaused, type MascotState } from "@/lib/types";
+import { isPaused, type MascotState, type Settings, type Suggestion } from "@/lib/types";
 import { updateBusy, updateLabel } from "@/lib/updates";
 import { useRedesign } from "@/lib/use-redesign";
 import { PALETTES, type WashEvent } from "@/lib/wash";
@@ -63,6 +63,7 @@ import {
   WELCOME_WIDTH,
 } from "./island-layout";
 import { PreparingVoice } from "./PreparingVoice";
+import { type PillModel, RedesignPill } from "./RedesignPill";
 import { redesignShell } from "./use-island-shell";
 
 export function Island() {
@@ -279,7 +280,41 @@ export function Island() {
     const id = setTimeout(() => setNotifyAt(null), PILL_FRESH_MS);
     return () => clearTimeout(id);
   }, [suggestionId]);
-  const notifyFresh = redesign && !!suggestion && notifyAt !== null;
+  // Redesign: a suggestion shows as a compact line first (the peek replaces the
+  // fresh-message pill); hover 220ms or holding Alt opens the card, leaving
+  // folds it back after 450ms, and a click inside keeps it open.
+  const notifyFresh = false && notifyAt !== null;
+  const [peek, setPeek] = useState(false);
+  const [pinned, setPinned] = useState(false);
+  const [altHeld, setAltHeld] = useState(false);
+  useEffect(() => {
+    setPeek(false);
+    setPinned(false);
+  }, [suggestionId]);
+  useEffect(() => {
+    if (!redesign || !suggestionId) return;
+    const id = setTimeout(() => setPeek(rawHover), rawHover ? 220 : 450);
+    return () => clearTimeout(id);
+  }, [redesign, suggestionId, rawHover]);
+  useEffect(() => {
+    if (!redesign || !suggestionId) return;
+    const down = (e: KeyboardEvent) => {
+      if (e.key === "Alt") setAltHeld(true);
+    };
+    const up = (e: KeyboardEvent) => {
+      if (e.key === "Alt") setAltHeld(false);
+    };
+    const blur = () => setAltHeld(false);
+    window.addEventListener("keydown", down);
+    window.addEventListener("keyup", up);
+    window.addEventListener("blur", blur);
+    return () => {
+      window.removeEventListener("keydown", down);
+      window.removeEventListener("keyup", up);
+      window.removeEventListener("blur", blur);
+    };
+  }, [redesign, suggestionId]);
+  const suggestOpen = !redesign || peek || pinned || altHeld;
   // Until onboarding is done, hover shows the steps being waited on, or else
   // brings the welcome back; the idle card ("watching for moments") would
   // just flash on the way.
@@ -376,9 +411,9 @@ export function Island() {
     preparingVoice ||
     (hovered && (!voicePill || agentsOnly || updateWorking !== null || liveActivities.length > 0)) ||
     guiding ||
-    (OPEN_STATES.has(mascot) && !voicePill) ||
+    (OPEN_STATES.has(mascot) && !voicePill && !(redesign && mascot !== "suggesting")) ||
     successCard ||
-    !!suggestion ||
+    (!!suggestion && suggestOpen) ||
     (!!netNotice && !voicePill) ||
     updateProgress?.phase === "failed" ||
     merging;
@@ -559,6 +594,48 @@ export function Island() {
           : morphOpen
       : morphClose;
 
+  const lastError = useDuskie((s) => (s.lastResult && !s.lastResult.ok ? s.lastResult.message : null));
+  const peeking: Suggestion | null = suggestion && !suggestOpen ? suggestion : null;
+  const pillModel: PillModel | null =
+    redesign && !expanded && !asking
+      ? peeking
+        ? {
+            kind: "suggest",
+            label: peeking.title,
+            chip: peeking.options[0],
+            onChip: () => void api.suggestionChoose(peeking.id, 0),
+          }
+        : hearing !== null || mascot === "listening"
+          ? { kind: "listening", label: hearing?.trim() ? hearing : "", dim: hearing?.trim() ? undefined : "Listening" }
+          : mascot === "error"
+            ? { kind: "error", label: shortError(lastError) }
+            : donePill !== null
+              ? { kind: "done", label: donePill }
+              : working !== null || voiceQuestion !== null
+                ? {
+                    kind: "working",
+                    label: displayedActivity
+                      ? activityLabel(displayedActivity, activityNow, { elapsed: false }).replace(/(\.\.\.|…)$/, "")
+                      : (voiceQuestion ?? working ?? "").replace(/(\.\.\.|…)$/, ""),
+                    startedAt: displayedActivity?.startedAt,
+                  }
+                : focusLeft !== null
+                  ? {
+                      kind: "focus",
+                      label: "Focus",
+                      dim: focusUntil ? `until ${clockTime(focusUntil)}` : undefined,
+                      left: focusLeft,
+                    }
+                  : paused
+                    ? { kind: "paused", label: "Paused", dim: pauseDim(settings.pause) }
+                    : !online
+                      ? { kind: "offline", label: "Offline", dim: "catching up when back" }
+                      : mascot === "noticing"
+                        ? { kind: "noticing", label: "Taking a look" }
+                        : null
+      : null;
+  const [pillMeasured, setPillMeasured] = useState(0);
+
   const registryId = redesign
     ? resolveIslandState({
         asking,
@@ -570,7 +647,8 @@ export function Island() {
         bare,
         fullVoice,
         voicePill: voicePill !== null,
-        suggestion: !!suggestion && !notifyFresh,
+        suggestion: !!suggestion && suggestOpen,
+        suggestPeek: !!suggestion && !suggestOpen,
         waitingForYou: !!waiting && !waiting.minimized && !guiding,
         merging,
         updateCard: updateProgress?.phase === "failed",
@@ -596,7 +674,7 @@ export function Island() {
       ? redesignShell({
           id: registryId,
           contentHeight,
-          pillWidth,
+          pillWidth: pillModel && pillMeasured ? pillMeasured : pillWidth,
           askTab,
           agentsWide: agentCurrent !== null,
           boardWide: agentsLayout === "board" && wideScreen(),
@@ -669,7 +747,7 @@ export function Island() {
     redesign && busy && suggestion
       ? [{ id: suggestion.id, label: suggestion.title || "Suggestion" }]
       : redesign && busy
-        ? liveActivities.slice(0, 5).map((a) => ({ id: a.id, label: a.label || a.source }))
+        ? liveActivities.slice(redesign ? 1 : 0, 5).map((a) => ({ id: a.id, label: a.label || a.source }))
         : [];
 
   return (
@@ -698,6 +776,9 @@ export function Island() {
           onScroll={(e) => {
             e.currentTarget.scrollTop = 0;
           }}
+          onPointerDownCapture={() => {
+            if (redesign && suggestion && peek) setPinned(true);
+          }}
           onPointerEnter={() => setHovered(true)}
           onPointerLeave={() => setHovered(false)}
         >
@@ -713,7 +794,8 @@ export function Island() {
           <Announcer registryId={registryId} />
 
           <AnimatePresence initial={false}>
-            {!expanded && voicePill && (
+            {pillModel && <RedesignPill key={`pill-${pillModel.kind}`} model={pillModel} onWidth={setPillMeasured} />}
+            {!pillModel && !expanded && voicePill && (
               <VoicePill
                 key="voice"
                 {...voicePill}
@@ -730,7 +812,7 @@ export function Island() {
                 }
               />
             )}
-            {!expanded && !bare && !voicePill && (
+            {!pillModel && !expanded && !bare && !voicePill && (
               <CompactTrailing
                 key="compact"
                 busy={busy}
@@ -877,4 +959,19 @@ function haloFace(m: MascotState): string {
   if (m === "working") return "work";
   if (m === "sleeping") return "sleep";
   return "idle";
+}
+
+/** First clause of an error, short enough for the compact line. */
+function shortError(msg: string | null): string {
+  const first = (msg ?? "").split(/[.\n]/)[0]?.trim() ?? "";
+  if (!first) return "That did not work";
+  return first.length > 42 ? `${first.slice(0, 41)}…` : first;
+}
+
+function clockTime(ms: number): string {
+  return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function pauseDim(p: Settings["pause"]): string | undefined {
+  return p.kind === "until" ? `until ${clockTime(Date.parse(p.until))}` : undefined;
 }
