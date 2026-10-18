@@ -1,11 +1,12 @@
-// Syncs app-icon.png into repo / extension / Next favicon sizes, and draws
-// assets/social-preview.png (1280×640) with the mascot + "Duskie" wordmark.
-// Requires Windows (System.Drawing). Run from apps/desktop:
+// Syncs app-icon.png into repo / extension / Next favicon sizes.
+// The social preview is rendered separately from assets/social-preview.html by
+// scripts/export-social-preview.mjs. Requires Windows (System.Drawing). Run from apps/desktop:
 //   node scripts/make-icon.mjs && node scripts/sync-brand-assets.mjs
+
+import { spawnSync } from "node:child_process";
 import { copyFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { spawnSync } from "node:child_process";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const desktop = join(here, "..");
@@ -48,44 +49,7 @@ function Save-Resized([string]$path, [int]$size) {
 Save-Resized ${JSON.stringify(jobs[0].out)} 512
 Save-Resized ${JSON.stringify(jobs[1].out)} 256
 
-# Social preview: dark field, mascot left, Duskie wordmark right.
-$w = 1280; $h = 640
-$social = ${JSON.stringify(join(root, "assets", "social-preview.png"))}
-$bmp = New-Object System.Drawing.Bitmap $w, $h
-$g = [System.Drawing.Graphics]::FromImage($bmp)
-$g.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
-$g.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
-$g.Clear([System.Drawing.Color]::FromArgb(255, 10, 10, 12))
-
-# Soft radial glow behind the face.
-$glowBrush = New-Object System.Drawing.Drawing2D.PathGradientBrush (
-  ,(
-    [System.Drawing.Point]::new(220, 120),
-    [System.Drawing.Point]::new(540, 120),
-    [System.Drawing.Point]::new(540, 520),
-    [System.Drawing.Point]::new(220, 520)
-  )
-)
-$glowBrush.CenterPoint = New-Object System.Drawing.PointF 380, 320
-$glowBrush.CenterColor = [System.Drawing.Color]::FromArgb(70, 255, 231, 184)
-$glowBrush.SurroundColors = @([System.Drawing.Color]::FromArgb(0, 10, 10, 12))
-$g.FillEllipse($glowBrush, 200, 100, 360, 420)
-$glowBrush.Dispose()
-
-$face = 360
-$g.DrawImage($srcImg, [int](380 - $face/2), [int](320 - $face/2), $face, $face)
-
-$font = New-Object System.Drawing.Font 'Segoe UI Semibold', 72, ([System.Drawing.FontStyle]::Bold)
-$brush = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(255, 245, 240, 230))
-$dim = New-Object System.Drawing.SolidBrush ([System.Drawing.Color]::FromArgb(180, 180, 170, 155))
-$g.DrawString('Duskie', $font, $brush, 620, 230)
-$sub = New-Object System.Drawing.Font 'Segoe UI', 22, ([System.Drawing.FontStyle]::Regular)
-$g.DrawString('A proactive desktop companion', $sub, $dim, 628, 330)
-
-$bmp.Save($social, [System.Drawing.Imaging.ImageFormat]::Png)
-$g.Dispose(); $bmp.Dispose(); $font.Dispose(); $sub.Dispose(); $brush.Dispose(); $dim.Dispose()
 $srcImg.Dispose()
-Write-Host "wrote $social"
 `;
 
 const r = spawnSync("powershell.exe", ["-NoProfile", "-Command", ps], {

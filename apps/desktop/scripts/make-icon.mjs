@@ -7,6 +7,7 @@
 //   pnpm tauri icon app-icon.png
 //   node scripts/apply-small-icons.mjs   # overwrite 32/64/128 from 120px
 //   node scripts/sync-brand-assets.mjs
+//   node scripts/export-social-preview.mjs   # assets/social-preview.png from social-preview.html
 import { spawnSync } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";

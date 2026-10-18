@@ -1,73 +1,67 @@
-"""Write 32/64/128 (and extension) icons from the 120px full-body capture."""
+"""Write 32/64/128 (and extension) icons from the 120px full-body capture, transparent background."""
+
 from __future__ import annotations
 
+import io
+import struct
 import sys
 from pathlib import Path
 
-from PIL import Image, ImageDraw, ImageFilter
+from PIL import Image
 
-FIELD = (8, 8, 10, 255)
+from icon_key import key_background
+
 SIZES = (32, 64, 128)
+MARGIN = 0.05
 
 
-def on_field(src: Image.Image, out_size: int, face_frac: float = 0.9) -> Image.Image:
-    src = src.convert("RGBA")
-    canvas = Image.new("RGBA", (out_size, out_size), (0, 0, 0, 0))
-    field = Image.new("RGBA", (out_size, out_size), (0, 0, 0, 0))
-    ImageDraw.Draw(field).ellipse((1, 1, out_size - 2, out_size - 2), fill=FIELD)
-
-    face_box = int(out_size * face_frac)
-    ratio = src.width / max(src.height, 1)
-    if ratio >= 1:
-        nw, nh = face_box, max(1, int(face_box / ratio))
-    else:
-        nw, nh = max(1, int(face_box * ratio)), face_box
-    face = src.resize((nw, nh), Image.Resampling.LANCZOS)
-    ox = (out_size - nw) // 2
-    oy = (out_size - nh) // 2
-    canvas.alpha_composite(field)
-    canvas.alpha_composite(face, (ox, oy))
-
-    mask = Image.new("L", (out_size, out_size), 0)
-    ImageDraw.Draw(mask).ellipse((1, 1, out_size - 2, out_size - 2), fill=255)
-    mask = mask.filter(ImageFilter.GaussianBlur(0.4))
-    out = Image.new("RGBA", (out_size, out_size), (0, 0, 0, 0))
-    out.paste(canvas, (0, 0))
-    out.putalpha(mask)
-
-    flat = Image.new("RGBA", (out_size, out_size), FIELD)
-    flat.alpha_composite(out)
-    return flat.convert("RGB")
+def write_ico(path: Path, layers: list[Image.Image]) -> None:
+    """Write a multi-size ICO with one PNG-compressed entry per layer (Windows Vista+ format)."""
+    blobs = []
+    for im in sorted(layers, key=lambda layer: layer.width):
+        buf = io.BytesIO()
+        im.save(buf, "PNG")
+        blobs.append((im.width, im.height, buf.getvalue()))
+    offset = 6 + 16 * len(blobs)
+    header = struct.pack("<HHH", 0, 1, len(blobs))
+    entries = b""
+    data = b""
+    for w, h, png in blobs:
+        entries += struct.pack(
+            "<BBBBHHII", w % 256, h % 256, 0, 0, 1, 32, len(png), offset
+        )
+        offset += len(png)
+        data += png
+    path.write_bytes(header + entries + data)
 
 
 def main() -> None:
     src = Image.open(Path(sys.argv[1]))
+    figure = key_background(src, MARGIN)
     desktop = Path(__file__).resolve().parent.parent
     icons = desktop / "src-tauri" / "icons"
     ext = desktop.parent / "extension" / "icons"
     ext.mkdir(parents=True, exist_ok=True)
 
+    def at(size: int) -> Image.Image:
+        return figure.resize((size, size), Image.Resampling.LANCZOS)
+
     for s in SIZES:
         path = icons / f"{s}x{s}.png"
-        on_field(src, s).save(path, "PNG", optimize=True)
+        at(s).save(path, "PNG", optimize=True)
         print(f"wrote {path} (from 120px)")
 
-    on_field(src, 32).save(ext / "32.png", "PNG", optimize=True)
-    on_field(src, 128).save(ext / "128.png", "PNG", optimize=True)
+    at(32).save(ext / "32.png", "PNG", optimize=True)
+    at(128).save(ext / "128.png", "PNG", optimize=True)
     print(f"wrote {ext / '32.png'} and {ext / '128.png'} (from 120px)")
 
     # Rebuild ICO so tray/installer use the 120px-derived small sizes.
-    layers = [Image.open(icons / f"{s}x{s}.png").convert("RGBA") for s in SIZES]
+    layers = [at(16), *(Image.open(icons / f"{s}x{s}.png").convert("RGBA") for s in SIZES)]
     big = icons / "icon.png"
     if big.exists():
         layers.append(Image.open(big).convert("RGBA").resize((256, 256), Image.Resampling.LANCZOS))
-    layers[0].save(
-        icons / "icon.ico",
-        format="ICO",
-        sizes=[(im.width, im.height) for im in layers],
-        append_images=layers[1:],
-    )
-    print(f"rewrote {icons / 'icon.ico'}")
+    write_ico(icons / "icon.ico", layers)
+    print(f"rewrote {icons / 'icon.ico'} ({', '.join(str(im.width) for im in layers)}px)")
 
 
 if __name__ == "__main__":
