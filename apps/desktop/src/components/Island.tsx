@@ -305,7 +305,7 @@ export function Island() {
   }, [quiet, rawHover]);
   const intent = useIntent(rawHover && !quiet, SHELL_HOVER_IN_MS);
 
-  // Full suggestion card as soon as it arrives — no fresh pill / compact peek.
+  // Full suggestion card as soon as it arrives - no fresh pill / compact peek.
   const notifyFresh = meetingSoon !== null && !paused;
   // Until onboarding is done, hover shows the steps being waited on, or else
   // brings the welcome back; the idle card ("watching for moments") would
@@ -557,7 +557,7 @@ export function Island() {
     const id = setTimeout(() => setSettled(true), 600);
     return () => clearTimeout(id);
   }, [expanded, asking]);
-  // Dock open/close is a fresh shell morph — reset to GROW (not SETTLE).
+  // Dock open/close is a fresh shell morph - reset to GROW (not SETTLE).
   useEffect(() => {
     if (!asking) return;
     setSettled(false);
@@ -682,7 +682,7 @@ export function Island() {
     agentsBoard: agentsLayout === "board",
     boardWide: agentsLayout === "board" && wideScreen(),
     gitListW: gitBeside ? gitListW : null,
-    // Fixed shell size — IslandSettings uses the same height so inner panes can scroll.
+    // Fixed shell size - IslandSettings uses the same height so inner panes can scroll.
     settingsHeight: view === "settings" ? SHELL_SETTINGS.height + 18 : undefined,
     reduced,
     settled: settled || (!expanded && !asking),
@@ -909,7 +909,7 @@ export function Island() {
                       left: layout.geom.contentPadLeft,
                       paddingTop: EXPANDED.pad,
                       paddingRight: EXPANDED.pad,
-                      // Tight inset only — clears the shell radius; height hugs content.
+                      // Tight inset only - clears the shell radius; height hugs content.
                       paddingBottom: 6,
                       // Lists below the orb (You missed) reach back under it.
                       "--orb-indent": `${layout.geom.mascotSize + 14}px`,

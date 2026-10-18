@@ -41,7 +41,7 @@ export const staggerChildReduced = {
   },
 } as const;
 
-/** Git dock beside Ask — slide from the seam (transform + opacity only). */
+/** Git dock beside Ask - slide from the seam (transform + opacity only). */
 export const gitDockHidden = {
   opacity: 0,
   transform: "translateX(-14px)",

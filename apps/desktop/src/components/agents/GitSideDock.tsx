@@ -53,7 +53,7 @@ export function GitSideDock({ height, visible }: { height: number; visible: bool
       style={{
         height,
         width: targetW,
-        // Keep warm off-flow when another Ask tab is selected — no layout thrash.
+        // Keep warm off-flow when another Ask tab is selected - no layout thrash.
         ...(!visible
           ? { position: "absolute" as const, visibility: "hidden" as const, pointerEvents: "none" as const }
           : {}),

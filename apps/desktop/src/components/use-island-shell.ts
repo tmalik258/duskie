@@ -78,7 +78,7 @@ export function shellGeom(opts: {
     radius = SHELL_SETTINGS.radius;
     take = TAKE_A_ASK;
   } else if (opts.id === "agents") {
-    // Board always gets room for its tiles — never fall back to Ask width.
+    // Board always gets room for its tiles - never fall back to Ask width.
     width = opts.boardWide
       ? BOARD_WIDE_WIDTH
       : opts.agentsBoard
@@ -94,7 +94,7 @@ export function shellGeom(opts: {
     const listW = opts.gitListW;
     const gitBeside = listW != null && opts.askTab === "repos";
     width = gitBeside ? listW : SHELL_ASK.width;
-    // Soft floor when Git is beside — hug content above it, avoid a hard snap.
+    // Soft floor when Git is beside - hug content above it, avoid a hard snap.
     height = gitBeside
       ? Math.max(SHELL_GIT_MIN_H, opts.contentHeight + 8)
       : Math.max(SHELL_COMPACT.height, opts.contentHeight + 8);

@@ -66,7 +66,7 @@ export function dockTotal(screenWidth: number): number {
   return Math.max(ISLAND_MIN + DOCK_MIN, Math.min(screenWidth - 48 - chrome, 1480));
 }
 
-/** Island + seam + dock + side edges — the window width when Git is open beside. */
+/** Island + seam + dock + side edges - the window width when Git is open beside. */
 export function dockWindowWidth(screenWidth: number): number {
   return dockTotal(screenWidth) + SEAM_W + DOCK_EDGE * 2;
 }

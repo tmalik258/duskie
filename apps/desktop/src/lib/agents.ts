@@ -809,7 +809,7 @@ export function openGit() {
 }
 
 /** Open the Git tab (and dock) without toggling a dock that is already open.
- * Layout only — the OS window stays at dock-max from launch (no set_size). */
+ * Layout only - the OS window stays at dock-max from launch (no set_size). */
 export async function showGit() {
   const { dock, listW } = useAgents.getState();
   const screenW = typeof window === "undefined" ? 1920 : window.screen.availWidth;

@@ -41,7 +41,7 @@ export function GitDock({
     setRev((r) => r + 1);
   }, [path]);
 
-  // Stashes load only when that tab is open — not on every Changes open.
+  // Stashes load only when that tab is open - not on every Changes open.
   // biome-ignore lint/correctness/useExhaustiveDependencies: rev means something changed, so read stashes again
   useEffect(() => {
     if (tab !== "stashes") return;

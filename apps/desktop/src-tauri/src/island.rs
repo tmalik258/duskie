@@ -124,7 +124,7 @@ fn place_on(window: &WebviewWindow, monitor: &tauri::Monitor) -> tauri::Result<(
 }
 
 /// Keep the island at dock-max width (or the screen, if smaller).
-/// `_width` is ignored — the window stays wide so Git open never hits `set_size`.
+/// `_width` is ignored - the window stays wide so Git open never hits `set_size`.
 pub fn set_width(window: &WebviewWindow, _width: f64) -> tauri::Result<()> {
     ensure_base_width(window)
 }
@@ -153,7 +153,7 @@ pub fn ensure_base_width(window: &WebviewWindow) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Logical width of the transparent island window — large enough for Ask + Git
+/// Logical width of the transparent island window - large enough for Ask + Git
 /// dock beside it (`dockWindowWidth` max ≈ 1540). Stays at this size always so
 /// opening Git is a CSS layout change, not an OS resize.
 pub const BASE_WIDTH: f64 = 1540.0;
@@ -203,7 +203,7 @@ pub fn follow_active_monitor(app: &AppHandle, payload: &serde_json::Value) {
     if let Err(err) = place_on(&window, target) {
         log::warn!("could not move the island: {err}");
     }
-    // New monitor may be narrower/wider — keep dock-max (clamped to screen).
+    // New monitor may be narrower/wider - keep dock-max (clamped to screen).
     if let Err(err) = ensure_base_width(&window) {
         log::warn!("could not size the island: {err}");
     }
