@@ -9,7 +9,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { chromium } from "playwright";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const srcHtml = join(here, "../../../docs/internal/Sidekick Mascot Prototype.html");
+const srcHtml = join(here, "../../../docs/internal/Duskie Mascot Prototype.html");
 const out120 = join(here, "../mascot-120.png");
 const out512 = join(here, "../mascot-512.png");
 

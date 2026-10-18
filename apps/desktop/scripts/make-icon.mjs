@@ -1,5 +1,5 @@
 // Builds app-icon.png from the live full-body mascot in
-// docs/internal/Sidekick Mascot Prototype.html.
+// docs/internal/Duskie Mascot Prototype.html.
 // Uses the sizes-section 120px mode (full body). Never use HTML sizes <40
 // (those are clipped bust crops).
 //

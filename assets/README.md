@@ -4,7 +4,7 @@ Images for the repository: `icon.png` (the app icon, the Duskie creature) and
 `social-preview.png` (the GitHub social preview, 1280 by 640).
 
 Regenerate from the live full-body mascot in
-`docs/internal/Sidekick Mascot Prototype.html` (sizes section **120 px** —
+`docs/internal/Duskie Mascot Prototype.html` (sizes section **120 px** -
 do not use the smaller bust crops):
 
 ```bash
