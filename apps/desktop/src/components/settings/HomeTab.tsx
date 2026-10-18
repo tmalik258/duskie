@@ -674,7 +674,7 @@ function UpdateRow({ version, onError }: { version: string; onError: (e: string)
 
 /** Version, models, timings and the end of the log, with secrets and your
  * name taken out, copied for a bug report. */
-const ISSUES = "https://github.com/tmalik258/sidekick/issues/new";
+const ISSUES = "https://github.com/tmalik258/duskie/issues/new";
 
 function CopyDiagnostics({ onError }: { onError: (e: string) => void }) {
   const [copied, setCopied] = useState(false);

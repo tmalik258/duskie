@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tmalik258/sidekick/releases/latest"><b>Download</b></a> ·
+  <a href="https://github.com/tmalik258/duskie/releases/latest"><b>Download</b></a> ·
   <a href="docs/setup.md">Setup</a> ·
   <a href="docs/privacy.md">Privacy</a> ·
   <a href="CHANGELOG.md">Changelog</a> ·
@@ -18,7 +18,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/tmalik258/sidekick/actions/workflows/ci.yml"><img src="https://github.com/tmalik258/sidekick/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/tmalik258/duskie/actions/workflows/ci.yml"><img src="https://github.com/tmalik258/duskie/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <img src="https://img.shields.io/badge/platform-Windows%2010%20%7C%2011-0078D4" alt="Windows 10 and 11">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="MIT license"></a>
 </p>
@@ -42,7 +42,7 @@ Released October 14, 2026. See the [full changelog](CHANGELOG.md#022---2026-10-1
 
 ## Install
 
-1. Download the latest installer from [Releases](https://github.com/tmalik258/sidekick/releases/latest):
+1. Download the latest installer from [Releases](https://github.com/tmalik258/duskie/releases/latest):
    - `Duskie_x.y.z_x64-setup.exe` for most people.
    - `Duskie_x.y.z_x64_en-US.msi` for managed or scripted installs.
 2. Run it. Duskie starts in the island at the top of the screen and walks you through setup.
@@ -151,7 +151,7 @@ Preview only the UI in a browser, with a mock core instead of Rust:
 pnpm web          # then open http://localhost:3002/island/ or /settings/
 ```
 
-In the browser preview, `window.sidekickMock.go("success")` switches mascot states from the console.
+In the browser preview, `window.duskieMock.go("success")` switches mascot states from the console.
 
 ### Checks
 

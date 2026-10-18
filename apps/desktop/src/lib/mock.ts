@@ -330,7 +330,7 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
   net_status: () => !previewFlag("offline"),
   update_status: () =>
     previewFlag("update")
-      ? { version: "0.2.0", current: "0.1.0", url: "https://github.com/tmalik258/sidekick/releases" }
+      ? { version: "0.2.0", current: "0.1.0", url: "https://github.com/tmalik258/duskie/releases" }
       : null,
   activity_open_start: () => undefined,
   activity_open_finish: () => undefined,
@@ -366,7 +366,7 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
   update_progress: () => mockUpdateProgress,
   // The preview pretends a release is out, so the update UI can be seen.
   update_check: () => {
-    const update = { version: "0.2.0", current: "0.1.0", url: "https://github.com/tmalik258/sidekick/releases" };
+    const update = { version: "0.2.0", current: "0.1.0", url: "https://github.com/tmalik258/duskie/releases" };
     emit("update://available", update);
     return update;
   },
@@ -1268,7 +1268,7 @@ const voiceStatus = () => ({
 commands.voice_status = voiceStatus;
 commands.clipboard_history = () => [
   { text: "npm run dev -- --port 3001", ts: new Date().toISOString() },
-  { text: "https://github.com/tmalik258/sidekick/pull/5", ts: new Date().toISOString() },
+  { text: "https://github.com/tmalik258/duskie/pull/5", ts: new Date().toISOString() },
   { text: "#0ea5e9", ts: new Date().toISOString() },
 ];
 commands.clipboard_copy = () => undefined;
@@ -1844,7 +1844,7 @@ export const mock = {
 
 // Exposed for console debugging in the browser preview.
 if (typeof window !== "undefined") {
-  (window as unknown as { sidekickMock: unknown }).sidekickMock = { go, cues: CUES, invoke: mock.invoke, emit };
+  (window as unknown as { duskieMock: unknown }).duskieMock = { go, cues: CUES, invoke: mock.invoke, emit };
 }
 
 // Preview only (browser mock, never in the app): lets the parity script put

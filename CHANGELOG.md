@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Sidekick are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
+All notable changes to Duskie are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
@@ -320,8 +320,8 @@ The first public release.
 - Update checks once a day. A small sign on the island shows a waiting update; installs are checked against SHA256SUMS.txt and only run after your click.
 - History with Undo for files Sidekick creates (24 hours).
 
-[Unreleased]: https://github.com/tmalik258/sidekick/compare/v0.2.2...HEAD
-[0.2.2]: https://github.com/tmalik258/sidekick/compare/v0.2.1...v0.2.2
-[0.2.1]: https://github.com/tmalik258/sidekick/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/tmalik258/sidekick/compare/v0.1.0...v0.2.0
-[0.1.0]: https://github.com/tmalik258/sidekick/releases/tag/v0.1.0
+[Unreleased]: https://github.com/tmalik258/duskie/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/tmalik258/duskie/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/tmalik258/duskie/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/tmalik258/duskie/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/tmalik258/duskie/releases/tag/v0.1.0

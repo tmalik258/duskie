@@ -668,7 +668,7 @@ export function RoundButton({
   );
 }
 
-const ISSUES = "https://github.com/tmalik258/sidekick/issues/new";
+const ISSUES = "https://github.com/tmalik258/duskie/issues/new";
 
 /** After a crash, for people who opted in: the report, and sending it is
  * their choice (a GitHub issue they can read and edit first). */
