@@ -22,11 +22,10 @@ import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow, useSystemLook } from "@/lib/hooks";
 import { PANEL_PAD } from "@/lib/islandSize";
-import { PILL_FRESH_MS } from "@/lib/peek";
 import { resolveIslandState } from "@/lib/resolve-island-state";
 import { DOCK_MIN, dockTotal, SEAM_W, stacked } from "@/lib/seam";
 import { connect, setHovered, stopLive, useDuskie, watchWaiting } from "@/lib/store";
-import { type CalendarToday, isPaused, type MascotState, type Settings, type Suggestion } from "@/lib/types";
+import { type CalendarToday, isPaused, type MascotState, type Settings } from "@/lib/types";
 import { updateBusy, updateLabel } from "@/lib/updates";
 import { PALETTES, type WashEvent } from "@/lib/wash";
 import { ActivitiesCard } from "./ActivitiesCard";
@@ -306,23 +305,8 @@ export function Island() {
   }, [quiet, rawHover]);
   const intent = useIntent(rawHover && !quiet, SHELL_HOVER_IN_MS);
 
-  // Fresh timer still drives meeting notify pills; suggestions open as a card.
-  const [notifyAt, setNotifyAt] = useState<number | null>(null);
-  const suggestionId = suggestion?.id ?? null;
-  useEffect(() => {
-    if (!suggestionId) {
-      setNotifyAt(null);
-      return;
-    }
-    setNotifyAt(Date.now());
-    const id = setTimeout(() => setNotifyAt(null), PILL_FRESH_MS);
-    return () => clearTimeout(id);
-  }, [suggestionId]);
-  // Full suggestion card as soon as it arrives — no fresh pill / compact peek
-  // that grew the island when the cursor arrived.
-  const suggestionFresh = notifyAt !== null;
-  const notifyFresh = (meetingSoon !== null && !paused) || suggestionFresh;
-  const suggestOpen = !!suggestion;
+  // Full suggestion card as soon as it arrives — no fresh pill / compact peek.
+  const notifyFresh = meetingSoon !== null && !paused;
   // Until onboarding is done, hover shows the steps being waited on, or else
   // brings the welcome back; the idle card ("watching for moments") would
   // just flash on the way.
@@ -424,7 +408,7 @@ export function Island() {
     guiding ||
     (OPEN_STATES.has(mascot) && !voicePill && mascot === "suggesting") ||
     successCard ||
-    (!!suggestion && suggestOpen) ||
+    !!suggestion ||
     (netShown && !voicePill) ||
     updateProgress?.phase === "failed" ||
     merging;
@@ -583,90 +567,76 @@ export function Island() {
   }, [gitBeside, asking]);
 
   const lastError = useDuskie((s) => (s.lastResult && !s.lastResult.ok ? s.lastResult.message : null));
-  const peeking: Suggestion | null = suggestion && !suggestOpen ? suggestion : null;
   const pillModel: PillModel | null =
     !expanded && !asking
-      ? peeking
-        ? {
-            kind: "suggest",
-            // Compact (lower priority): the source or title only, no chip.
-            ...(peeking.compact
-              ? { label: sourceApp(peeking) ?? peeking.title }
-              : sourceApp(peeking)
-                ? { label: sourceApp(peeking) as string, dim: peeking.title }
-                : { label: peeking.title }),
-            ...(peeking.compact
-              ? {}
-              : { chip: peeking.options[0], onChip: () => void api.suggestionChoose(peeking.id, 0) }),
-          }
-        : hearing !== null || mascot === "listening"
-          ? { kind: "listening", label: hearing?.trim() ? hearing : "", dim: hearing?.trim() ? undefined : "Listening" }
-          : live !== null
-            ? {
-                kind: "caption",
-                label: live.caption || (live.tool ?? "Thinking"),
-                chip: live.caption && live.tool ? live.tool : undefined,
-                onChip: stopLive,
-              }
-            : mascot === "error"
-              ? { kind: "error", label: shortError(lastError) }
-              : donePill !== null
-                ? { kind: "done", label: donePill }
-                : asksYou && askingTitle && voiceQuestion === null
+      ? hearing !== null || mascot === "listening"
+        ? { kind: "listening", label: hearing?.trim() ? hearing : "", dim: hearing?.trim() ? undefined : "Listening" }
+        : live !== null
+          ? {
+              kind: "caption",
+              label: live.caption || (live.tool ?? "Thinking"),
+              chip: live.caption && live.tool ? live.tool : undefined,
+              onChip: stopLive,
+            }
+          : mascot === "error"
+            ? { kind: "error", label: shortError(lastError) }
+            : donePill !== null
+              ? { kind: "done", label: donePill }
+              : asksYou && askingTitle && voiceQuestion === null
+                ? {
+                    kind: "waiting",
+                    label: askingTitle,
+                    dim: "waiting for you",
+                    count: askingCount,
+                    onOpen: () => void api.askOpen(),
+                  }
+                : working !== null || voiceQuestion !== null
                   ? {
-                      kind: "waiting",
-                      label: askingTitle,
-                      dim: "waiting for you",
-                      count: askingCount,
-                      onOpen: () => void api.askOpen(),
+                      kind: "working",
+                      label: displayedActivity
+                        ? activityLabel(displayedActivity, activityNow, { elapsed: false }).replace(/(\.\.\.|…)$/, "")
+                        : (voiceQuestion ?? working ?? "").replace(/(\.\.\.|…)$/, ""),
+                      startedAt: displayedActivity?.startedAt,
                     }
-                  : working !== null || voiceQuestion !== null
+                  : focusLeft !== null
                     ? {
-                        kind: "working",
-                        label: displayedActivity
-                          ? activityLabel(displayedActivity, activityNow, { elapsed: false }).replace(/(\.\.\.|…)$/, "")
-                          : (voiceQuestion ?? working ?? "").replace(/(\.\.\.|…)$/, ""),
-                        startedAt: displayedActivity?.startedAt,
+                        kind: "focus",
+                        label: "Focus",
+                        dim: focusUntil ? `until ${clockTime(focusUntil)}` : undefined,
+                        left: focusLeft,
                       }
-                    : focusLeft !== null
+                    : meetingSoon && !paused
                       ? {
-                          kind: "focus",
-                          label: "Focus",
-                          dim: focusUntil ? `until ${clockTime(focusUntil)}` : undefined,
-                          left: focusLeft,
+                          kind: "notify",
+                          label: meetingSoon.title,
+                          dim: meetingSoon.mins < 1 ? "starting now" : `starts in ${meetingSoon.mins} minutes`,
+                          chip: meetingSoon.join ? "Join the call" : undefined,
+                          onChip: () => meetingSoon.join && void api.openReference("page", meetingSoon.join),
                         }
-                      : meetingSoon && !paused
+                      : later > 0 && !paused
                         ? {
-                            kind: "notify",
-                            label: meetingSoon.title,
-                            dim: meetingSoon.mins < 1 ? "starting now" : `starts in ${meetingSoon.mins} minutes`,
-                            chip: meetingSoon.join ? "Join the call" : undefined,
-                            onChip: () => meetingSoon.join && void api.openReference("page", meetingSoon.join),
+                            kind: "waiting",
+                            label: later === 1 ? "1 suggestion" : `${later} suggestions`,
+                            dim: "held while you were busy",
+                            count: later,
                           }
-                        : later > 0 && !paused
+                        : showPausedPill
                           ? {
-                              kind: "waiting",
-                              label: later === 1 ? "1 suggestion" : `${later} suggestions`,
-                              dim: "held while you were busy",
-                              count: later,
+                              kind: "paused",
+                              label: "Paused",
+                              dim: pauseDim(settings.pause),
+                              onCancel: () => void api.sensorsResume(),
                             }
-                          : showPausedPill
+                          : !online
                             ? {
-                                kind: "paused",
-                                label: "Paused",
-                                dim: pauseDim(settings.pause),
-                                onCancel: () => void api.sensorsResume(),
+                                kind: "offline",
+                                label: "Offline",
+                                dim: "catching up when back",
+                                onOpen: () => setNetOpen(true),
                               }
-                            : !online
-                              ? {
-                                  kind: "offline",
-                                  label: "Offline",
-                                  dim: "catching up when back",
-                                  onOpen: () => setNetOpen(true),
-                                }
-                              : mascot === "noticing"
-                                ? { kind: "noticing", label: "Taking a look" }
-                                : null
+                            : mascot === "noticing"
+                              ? { kind: "noticing", label: "Taking a look" }
+                              : null
       : null;
   const [pillMeasured, setPillMeasured] = useState(0);
 
@@ -680,8 +650,8 @@ export function Island() {
     bare,
     fullVoice,
     voicePill: voicePill !== null,
-    suggestion: !!suggestion && suggestOpen,
-    suggestPeek: !!suggestion && !suggestOpen && !suggestionFresh,
+    suggestion: !!suggestion,
+    suggestPeek: false,
     waitingForYou: !!waiting && !waiting.minimized && !guiding,
     merging,
     updateCard: updateProgress?.phase === "failed" || (hovered && updateWorking !== null),
@@ -1034,26 +1004,6 @@ function clockTime(ms: number): string {
 
 function pauseDim(p: Settings["pause"]): string | undefined {
   return p.kind === "until" ? `until ${clockTime(Date.parse(p.until))}` : undefined;
-}
-
-const APPS = [
-  "Outlook",
-  "Gmail",
-  "Slack",
-  "Teams",
-  "Calendar",
-  "Chrome",
-  "Edge",
-  "WhatsApp",
-  "Discord",
-  "GitHub",
-  "Notion",
-];
-
-/** The app a suggestion came from, when its text names one. */
-function sourceApp(s: { skillId: string; detail: string }): string | null {
-  const hay = `${s.skillId} ${s.detail}`.toLowerCase();
-  return APPS.find((a) => hay.includes(a.toLowerCase())) ?? null;
 }
 
 /** A meeting starting within ten minutes (or just started), for the notify pill. */
