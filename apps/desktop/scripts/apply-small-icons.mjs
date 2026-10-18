@@ -7,11 +7,10 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const desktop = join(here, "..");
-const r = spawnSync(
-  "python",
-  [join(here, "render-small-icons.py"), join(desktop, "mascot-120.png")],
-  { encoding: "utf8", cwd: desktop },
-);
+const r = spawnSync("python", [join(here, "render-small-icons.py"), join(desktop, "mascot-120.png")], {
+  encoding: "utf8",
+  cwd: desktop,
+});
 if (r.stdout) process.stdout.write(r.stdout);
 if (r.stderr) process.stderr.write(r.stderr);
 process.exit(r.status ?? 1);

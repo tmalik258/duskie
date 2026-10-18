@@ -23,8 +23,4 @@ function run(cmd, args) {
 }
 
 run("node", [join(here, "capture-mascot-120.mjs")]);
-run("python", [
-  join(here, "render-app-icon.py"),
-  join(desktop, "mascot-512.png"),
-  join(desktop, "app-icon.png"),
-]);
+run("python", [join(here, "render-app-icon.py"), join(desktop, "mascot-512.png"), join(desktop, "app-icon.png")]);
