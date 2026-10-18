@@ -599,6 +599,192 @@ pub fn stash_drop(path: &Path, name: &str) -> Result<Outcome, ActionError> {
     Ok(Outcome::msg("Dropped the stash"))
 }
 
+// ---- Branches, fetch, push ----------------------------------------------------
+
+/// One local branch in the Git dock's Branches tab.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchRow {
+    pub name: String,
+    pub current: bool,
+    pub ahead: u64,
+    pub behind: u64,
+}
+
+fn safe_branch(name: &str) -> Result<&str, ActionError> {
+    if name.is_empty()
+        || name.starts_with('-')
+        || name.contains("..")
+        || name.contains('\\')
+        || name.contains('\0')
+    {
+        return Err(ActionError::Invalid(format!("not a branch name: {name}")));
+    }
+    Ok(name)
+}
+
+fn track_counts(path: &Path, branch: &str) -> (u64, u64) {
+    let Ok(upstream) = git(
+        path,
+        &[
+            "rev-parse",
+            "--abbrev-ref",
+            &format!("{branch}@{{upstream}}"),
+        ],
+    ) else {
+        return (0, 0);
+    };
+    let upstream = upstream.trim();
+    if upstream.is_empty() {
+        return (0, 0);
+    }
+    let Ok(counts) = git(
+        path,
+        &[
+            "rev-list",
+            "--left-right",
+            "--count",
+            &format!("{branch}...{upstream}"),
+        ],
+    ) else {
+        return (0, 0);
+    };
+    let mut parts = counts.trim().split('\t');
+    let ahead = parts.next().unwrap_or("0").parse().unwrap_or(0);
+    let behind = parts.next().unwrap_or("0").parse().unwrap_or(0);
+    (ahead, behind)
+}
+
+/// Every local branch, newest commit first, with upstream ahead/behind when set.
+pub fn branches(path: &Path) -> Result<Vec<BranchRow>, ActionError> {
+    repo(path)?;
+    let current = git(path, &["branch", "--show-current"])?.trim().to_owned();
+    let list = git(
+        path,
+        &[
+            "for-each-ref",
+            "--sort=-committerdate",
+            "refs/heads/",
+            "--format=%(refname:short)",
+        ],
+    )?;
+    Ok(list
+        .lines()
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+        .map(|name| {
+            let (ahead, behind) = track_counts(path, name);
+            BranchRow {
+                name: name.to_owned(),
+                current: name == current,
+                ahead,
+                behind,
+            }
+        })
+        .collect())
+}
+
+/// Updates remotes (`git fetch`).
+pub fn fetch(path: &Path) -> Result<Outcome, ActionError> {
+    repo(path)?;
+    git(path, &["fetch", "--prune", "--tags"])?;
+    Ok(Outcome::msg("Fetched from the remote"))
+}
+
+/// Pushes the current branch; sets upstream when this branch has none yet.
+pub fn push(path: &Path) -> Result<Outcome, ActionError> {
+    repo(path)?;
+    let has_upstream = git(path, &["rev-parse", "--abbrev-ref", "@{upstream}"]).is_ok();
+    if has_upstream {
+        git(path, &["push"])?;
+        Ok(Outcome::msg("Pushed to the remote"))
+    } else {
+        git(path, &["push", "-u", "origin", "HEAD"])?;
+        Ok(Outcome::msg("Pushed and set the upstream branch"))
+    }
+}
+
+/// Checks out an existing local branch.
+pub fn switch_branch(path: &Path, name: &str) -> Result<Outcome, ActionError> {
+    repo(path)?;
+    let name = safe_branch(name)?;
+    git(path, &["switch", name])?;
+    Ok(Outcome::msg(format!("Switched to {name}")))
+}
+
+/// Creates a branch from HEAD and checks it out.
+pub fn create_branch(path: &Path, name: &str) -> Result<Outcome, ActionError> {
+    repo(path)?;
+    let name = safe_branch(name)?;
+    git(path, &["switch", "-c", name])?;
+    Ok(Outcome::msg(format!("Created and switched to {name}")))
+}
+
+/// One file's diff text, staged or in the working tree.
+pub fn diff_file(path: &Path, file: &str, staged: bool) -> Result<String, ActionError> {
+    repo(path)?;
+    let file = safe_file(file)?;
+    let args: Vec<&str> = if staged {
+        vec![
+            "-c",
+            "core.quotepath=false",
+            "diff",
+            "--cached",
+            "--no-color",
+            "--no-ext-diff",
+            "-U3",
+            "--",
+            file,
+        ]
+    } else {
+        vec![
+            "-c",
+            "core.quotepath=false",
+            "diff",
+            "--no-color",
+            "--no-ext-diff",
+            "-U3",
+            "--",
+            file,
+        ]
+    };
+    git(path, &args)
+}
+
+/// Stages one hunk from a unified diff via `git apply --cached`.
+pub fn apply_cached(path: &Path, patch: &str) -> Result<(), ActionError> {
+    repo(path)?;
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    let mut cmd = Command::new("git");
+    cmd.arg("-C")
+        .arg(path)
+        .args(["apply", "--cached", "--recount"])
+        .stdin(Stdio::piped())
+        .env("GIT_TERMINAL_PROMPT", "0");
+    hidden(&mut cmd);
+    let mut child = cmd.spawn().map_err(fail)?;
+    child
+        .stdin
+        .take()
+        .ok_or_else(|| ActionError::Failed("could not write the patch".into()))?
+        .write_all(patch.as_bytes())
+        .map_err(fail)?;
+    let out = child.wait_with_output().map_err(fail)?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(ActionError::Failed(
+            String::from_utf8_lossy(&out.stderr)
+                .lines()
+                .last()
+                .unwrap_or("git apply failed")
+                .trim()
+                .to_owned(),
+        ))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

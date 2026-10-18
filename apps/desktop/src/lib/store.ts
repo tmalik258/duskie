@@ -21,6 +21,7 @@ import {
   type MascotState,
   type MergeState,
   type Proposal,
+  type SearchHit,
   type Settings,
   type Suggestion,
   type Turn,
@@ -76,6 +77,8 @@ interface DuskieState {
   chatSkill: boolean;
   /** The model picked in Ask mode; null lets Duskie choose. */
   askModel: string | null;
+  /** Typed Ask draft and last search hits; survives close for the session. */
+  askForm: AskForm;
   /** A spoken question asked with Ask closed: the island stays compact
    * ("Thinking...") until the answer starts, then opens to show it. */
   voiceQuestion: string | null;
@@ -159,7 +162,23 @@ export interface AskState {
   tool?: "screen" | "clipboard" | null;
 }
 
+/** Sticky Ask input + search results for the app session (not localStorage). */
+export interface AskForm {
+  text: string;
+  hits: { query: string; items: SearchHit[] } | null;
+}
+
 const MODEL_KEY = "sidekick.askModel";
+
+/** Updates the typed Ask draft. Survives panel close. */
+export function setAskFormText(text: string) {
+  useDuskie.setState((s) => ({ askForm: { ...s.askForm, text } }));
+}
+
+/** Updates the last search hit list in Ask. Survives panel close. */
+export function setAskHits(hits: AskForm["hits"]) {
+  useDuskie.setState((s) => ({ askForm: { ...s.askForm, hits } }));
+}
 
 function savedModel(): string | null {
   try {
@@ -206,6 +225,7 @@ export const useDuskie = create<DuskieState>(() => ({
   chatPage: null,
   chatSkill: false,
   askModel: savedModel(),
+  askForm: { text: "", hits: null },
   voiceQuestion: null,
   donePill: null,
   focusUntil: null,

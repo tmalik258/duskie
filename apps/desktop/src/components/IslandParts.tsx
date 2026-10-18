@@ -8,6 +8,7 @@ import { playSound } from "@/lib/sound";
 import { installUpdate, notePick, uiVolume, useDuskie } from "@/lib/store";
 import type { MascotState, Suggestion } from "@/lib/types";
 import { Ic } from "./Icon";
+import { FULL } from "./IslandCard";
 import { Glance, RoundButton } from "./IslandGlance";
 import { COMPACT, DETAIL, TITLE } from "./island-layout";
 import { MergeCard } from "./MergeCard";
@@ -150,7 +151,7 @@ export function ExpandedContent({
     <div className="flex flex-col">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate font-display text-[15px] leading-5 font-semibold tracking-[-0.015em] text-white">
+          <p className="font-display text-[15px] leading-5 font-semibold tracking-[-0.015em] text-white">
             {suggestion?.title ?? TITLE[mascot]}
           </p>
           <p
@@ -162,9 +163,6 @@ export function ExpandedContent({
           >
             {detail}
           </p>
-          {suggestion?.why && (
-            <p className="mt-1 truncate text-[11.5px] leading-4 text-[rgb(235_235_245/0.42)]">{suggestion.why}</p>
-          )}
         </div>
         {!suggestion && reporting && (result?.path || result?.undoId) ? (
           <div className="flex shrink-0 gap-1.5">
@@ -177,6 +175,12 @@ export function ExpandedContent({
           </div>
         ) : null}
       </div>
+
+      {suggestion?.why ? (
+        <p className="mt-2 text-[11.5px] text-center mx-auto leading-4 text-[rgb(235_235_245/0.42)]" style={FULL}>
+          {suggestion.why}
+        </p>
+      ) : null}
 
       {suggestion ? <Options key={suggestion.id} suggestion={suggestion} /> : null}
     </div>
@@ -229,29 +233,31 @@ export function Options({ suggestion }: { suggestion: Suggestion }) {
   // Shift while hovered, or Shift+Alt anywhere, Rust polls; no hover required.
   const priv = useDuskie((s) => s.shiftHeld);
   return (
-    <div className="mt-3 flex flex-col gap-1.5">
-      {suggestion.options.map((option, i) => {
-        const openUrl = suggestion.actions[i] === "open_url";
-        const label = priv && openUrl ? privateOpenLabel(option) : option;
-        return (
-          <motion.button
-            // biome-ignore lint/suspicious/noArrayIndexKey: labels can repeat and the list never reorders
-            key={`${i}-${option}`}
-            type="button"
-            onClick={(e) => choose(suggestion, i, e.shiftKey || (priv && openUrl))}
-            initial={{ opacity: 0, y: 4 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.22, delay: 0.08 + i * 0.03, ease: [0.23, 1, 0.32, 1] }}
-            className={`rd-opt chip justify-between gap-2 ${i === 0 ? "rd-opt-primary" : ""}`}
-          >
-            <span className="min-w-0 flex-1 leading-snug text-balance">{label}</span>
-            <kbd className={`shrink-0 font-sans text-[11px] leading-none ${i === 0 ? "opacity-40" : "opacity-45"}`}>
-              Alt {i + 1}
-            </kbd>
-          </motion.button>
-        );
-      })}
-      <div className="mt-1 flex flex-wrap items-center gap-2">
+    <div className="mt-2 flex flex-col gap-1" style={FULL}>
+      <div className="flex flex-wrap justify-center gap-1.5">
+        {suggestion.options.map((option, i) => {
+          const openUrl = suggestion.actions[i] === "open_url";
+          const label = priv && openUrl ? privateOpenLabel(option) : option;
+          return (
+            <motion.button
+              // biome-ignore lint/suspicious/noArrayIndexKey: labels can repeat and the list never reorders
+              key={`${i}-${option}`}
+              type="button"
+              onClick={(e) => choose(suggestion, i, e.shiftKey || (priv && openUrl))}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, delay: 0.08 + i * 0.03, ease: [0.23, 1, 0.32, 1] }}
+              className={`rd-opt chip gap-2 ${i === 0 ? "rd-opt-primary" : ""}`}
+            >
+              <span className="whitespace-nowrap leading-snug">{label}</span>
+              <kbd className={`shrink-0 font-sans text-[11px] leading-none ${i === 0 ? "opacity-40" : "opacity-45"}`}>
+                Alt {i + 1}
+              </kbd>
+            </motion.button>
+          );
+        })}
+      </div>
+      <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-0.5">
         {alwaysAt >= 0 && (
           <Tip label={`From now on, "${suggestion.options[alwaysAt]}" without asking. Undo in Settings > Skills.`}>
             <button type="button" onClick={() => always(suggestion, alwaysAt)} className="rd-gfoot-btn chip">

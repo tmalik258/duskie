@@ -17,6 +17,7 @@ import {
   type Session,
   setLayout,
   setTab,
+  showGit,
   useAgents,
 } from "@/lib/agents";
 import { api } from "@/lib/bridge";
@@ -29,6 +30,8 @@ import {
   runOpen,
   sendChat,
   setAsk,
+  setAskFormText,
+  setAskHits,
   setAskModel,
   showDone,
   startListening,
@@ -45,7 +48,6 @@ import {
   type InstantResults,
   isPaused,
   type ProviderStatus,
-  type SearchHit,
 } from "@/lib/types";
 import { staggerChild, staggerChildReduced, staggerParent } from "@/lib/ui-motion";
 import { AgentsTab } from "./agents/AgentsTab";
@@ -60,7 +62,9 @@ import { FirstRun } from "./ask/States";
 import { Timings } from "./ask/Timings";
 import { Ic, Icon } from "./Icon";
 import { markSeen } from "./IslandAgents";
-import { nextTab, type PanelTab, PanelTabs } from "./PanelTabs";
+import { LayoutSwitch } from "./LayoutSwitch";
+import { PanelShell } from "./PanelShell";
+import { nextTab, type PanelTab } from "./PanelTabs";
 import { SETTINGS_TABS } from "./SettingsPanel";
 import { SetupSpinner } from "./SetupChecklistRow";
 import { Tip } from "./Tip";
@@ -70,7 +74,7 @@ export const ASK_ORB = 30;
 /** The mascot in Ask: 36 px, on the input line under the tabs. */
 export const ASK_MASCOT = { size: 36, x: 10, y: 40 } as const;
 /** Ask's padding inside the island: top, sides, bottom. */
-export const ASK_PAD = { top: 8, x: 10, bottom: 10 } as const;
+export const ASK_PAD = { top: 8, x: 10, bottom: 14 } as const;
 
 /** The "Hold Alt" hint shows in the first five sessions only. */
 const EARLY_SESSIONS = (() => {
@@ -150,10 +154,12 @@ export function AskPanel() {
   const voiceReady = useDuskie((s) => s.settings.voice.enabled && (s.voiceStatus?.listening ?? false));
   const settings = useDuskie((s) => s.settings);
   const reducedMotion = useReducedMotion() ?? false;
-  const [text, setText] = useState(ask?.prompt ?? "");
+  const text = useDuskie((s) => s.askForm.text);
+  const hits = useDuskie((s) => s.askForm.hits);
+  const setText = setAskFormText;
+  const setHits = setAskHits;
   const alt = useAltHeld();
   const tab = useAgents((s) => s.tab);
-  const layout = useAgents((s) => s.layout);
   const working = useAgents((s) => activeCount(s.sessions));
   // "Do you work with code?" No hides Agents and Repos; unanswered counts as yes.
   const coder = useDuskie((s) => s.settings.codes !== false);
@@ -197,7 +203,8 @@ export function AskPanel() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-  const [selected, setSelected] = useState(0);
+  // INTENT_PENDING: short names ("loom") highlight the app/file match, not Ask.
+  const [selected, setSelected] = useState(INTENT_PENDING);
   const { data: providersData, refresh: refreshProviders } = useCached<ProviderStatus[]>("ai-status", api.aiStatus);
   const providers = providersData ?? [];
   // While nothing is set up yet, keep checking so FirstRun goes away once a
@@ -211,7 +218,6 @@ export function AskPanel() {
   const [handoffError, setHandoffError] = useState<string | null>(null);
   /** The chat's name when renamed; its first question otherwise. */
   const [chatName, setChatName] = useState<string | null>(null);
-  const [hits, setHits] = useState<{ query: string; items: SearchHit[] } | null>(null);
   const [clips, setClips] = useState<{ text: string; ts: string }[] | null>(null);
   /** File with no default app: Ask shows where to open it. */
   const [openWhere, setOpenWhere] = useState<{ name: string; path: string } | null>(null);
@@ -263,6 +269,16 @@ export function AskPanel() {
   const seq = ask?.seq;
   const [scrollMax, setScrollMax] = useState(ASK_SCROLL_CAP);
 
+  /** Focus the Ask field and select the draft so Enter / reopen can replace it. */
+  const focusAndSelectInput = useCallback(() => {
+    requestAnimationFrame(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      el.focus({ preventScroll: true });
+      el.select();
+    });
+  }, []);
+
   useEffect(() => {
     const sync = () => setScrollMax(askScrollMax());
     sync();
@@ -270,12 +286,14 @@ export function AskPanel() {
     return () => window.removeEventListener("resize", sync);
   }, []);
 
-  // Every open: focus the input and refresh which AI is reachable.
+  // Every open: restore the draft (or a shortcut prompt), focus + select, refresh AI.
   useEffect(() => {
     if (seq === undefined) return;
-    setText(useDuskie.getState().ask?.prompt ?? "");
+    const prompt = useDuskie.getState().ask?.prompt ?? "";
+    if (prompt) setText(prompt);
     markSeen();
-    setSelected(0);
+    // Reuse intent for leftover draft ("loom" → Loom app), not always row 0 (Ask).
+    setSelected(INTENT_PENDING);
     setClips(null);
     setOpenWhere(null);
     setHandoffError(null);
@@ -292,9 +310,8 @@ export function AskPanel() {
     if (tool === "screen") {
       sendChat("What's on my screen? Explain it briefly and point out anything I should act on.", { screen: true });
     }
-    const id = requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
-    return () => cancelAnimationFrame(id);
-  }, [seq, refreshProviders]);
+    focusAndSelectInput();
+  }, [seq, refreshProviders, focusAndSelectInput]);
 
   // A new question always jumps to the bottom, even after scrolling up.
   const userTurns = turns.filter((t) => t.role === "user").length;
@@ -338,28 +355,30 @@ export function AskPanel() {
         page: chatPage,
         meeting: soonestMeeting(calendar),
         coder,
-        // After the row runs (which clears the input), type the prefix in.
+        // After the row runs, type the prefix in and select it.
         focusInput: (prefix) =>
           requestAnimationFrame(() => {
             setText(prefix);
-            inputRef.current?.focus({ preventScroll: true });
+            focusAndSelectInput();
           }),
       }),
-    [ask?.context, chatPage, calendar, coder],
+    [ask?.context, chatPage, calendar, coder, focusAndSelectInput],
   );
-  const resetChat = useCallback((opts?: { cancel?: boolean }) => {
-    if (useDuskie.getState().hearing !== null) stopListening();
-    newChat(opts);
-    setChatName(null);
-    setText("");
-    setSelected(0);
-    setClips(null);
-    setHits(null);
-    setOpenWhere(null);
-    setPick(0);
-    nearBottom.current = true;
-    requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
-  }, []);
+  const resetChat = useCallback(
+    (opts?: { cancel?: boolean }) => {
+      if (useDuskie.getState().hearing !== null) stopListening();
+      newChat(opts);
+      setChatName(null);
+      setSelected(0);
+      setClips(null);
+      setOpenWhere(null);
+      setPick(0);
+      nearBottom.current = true;
+      // Keep the Ask draft and search hits; highlight so they are easy to replace.
+      focusAndSelectInput();
+    },
+    [focusAndSelectInput],
+  );
   // Ask tab only: Ctrl+N starts a fresh chat; leave streams running unbound.
   askTabRef.current = tab === "ask";
   newChatRef.current = () => {
@@ -456,7 +475,6 @@ export function AskPanel() {
             return;
           }
           setOpenWhere(null);
-          setText("");
           void api.askClose();
           showDone(`Opened ${name}`);
         },
@@ -465,7 +483,6 @@ export function AskPanel() {
       return;
     }
     setOpenWhere(null);
-    setText("");
     void runOpen(async () => {
       const r = await api.fileOpen(path, how);
       return r.opened;
@@ -554,8 +571,11 @@ export function AskPanel() {
           </>
         ),
         run: () => {
-          sendChat(text);
+          const q = text.trim();
+          sendChat(q);
+          // Agent turns clear the field; app/file/folder hits keep the draft.
           setText("");
+          focusAndSelectInput();
         },
         stay: true,
         keepText: true,
@@ -584,6 +604,7 @@ export function AskPanel() {
                 await api.appLaunch(a.id, privateNamed && browser ? { private: true, browser } : undefined);
                 return true;
               }, `Opened ${a.name}`),
+            keepText: true,
           });
           appsGrouped = true;
           if (browser && !privateNamed && !privateBrowsers.has(browser)) {
@@ -599,6 +620,7 @@ export function AskPanel() {
                   await api.appLaunch(a.id, { private: true, browser });
                   return true;
                 }, `Opened ${label}`),
+              keepText: true,
             });
           }
         }
@@ -606,23 +628,24 @@ export function AskPanel() {
           "Commands",
           commands.filter((c) => c.label.toLowerCase().includes(q)),
         );
-        named(
-          "Projects",
-          projects
-            .filter((p) => p.name.toLowerCase().includes(q.replace(/^open\s+/, "")))
-            .slice(0, 3)
-            .map((p) => ({
-              id: `project:${p.path}`,
-              label: p.name,
-              hint: "Editor and terminal",
-              icon: "folder" as const,
-              run: () =>
-                void runOpen(async () => {
-                  await api.projectLaunch(p.path);
-                  return true;
-                }, `Opened ${p.name}`),
-            })),
-        );
+        for (const [n, p] of projects
+          .filter((p) => p.name.toLowerCase().includes(q.replace(/^open\s+/, "")))
+          .slice(0, 3)
+          .entries()) {
+          items.push({
+            id: `project:${p.path}`,
+            group: n === 0 ? "Projects" : undefined,
+            icon: <Ic name="folder" size={12} />,
+            label: p.name,
+            hint: "Editor and terminal",
+            run: () =>
+              void runOpen(async () => {
+                await api.projectLaunch(p.path);
+                return true;
+              }, `Opened ${p.name}`),
+            keepText: true,
+          });
+        }
         for (const [n, f] of instant.files.entries()) {
           items.push({
             id: `file:${f.path}`,
@@ -728,7 +751,7 @@ export function AskPanel() {
             run: () => {
               const query = text.trim();
               void api.search(query).then((found) => setHits({ query, items: found }));
-              setText("");
+              focusAndSelectInput();
             },
             stay: true,
             keepText: true,
@@ -739,7 +762,7 @@ export function AskPanel() {
             label: "Teach Duskie a skill",
             run: () => {
               startSkill(text.trim());
-              setText("");
+              focusAndSelectInput();
             },
             stay: true,
             keepText: true,
@@ -788,25 +811,25 @@ export function AskPanel() {
 
   const goTab = (next: AskTab) => {
     setTab(next);
-    setText("");
     setPick(0);
     setOpenWhere(null);
     if (next === "history") {
       setClips(null);
-      setHits(null);
       void api
         .chatsList()
         .then(setChats)
         .catch(() => setChats([]));
     }
     // Agents focuses its own composer; Ask/History use this input.
-    if (next !== "agents") {
-      requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
-    }
+    if (next !== "agents") focusAndSelectInput();
   };
 
   const pickTab = (next: PanelTab) =>
-    next === "settings" ? setAsk({ view: "settings" }) : next === "repos" && tab !== "repos" ? openGit() : goTab(next);
+    next === "settings"
+      ? setAsk({ view: "settings" })
+      : next === "repos" && tab !== "repos"
+        ? void showGit()
+        : goTab(next);
 
   altKeys.current = {
     s: toggleSpeak,
@@ -828,7 +851,8 @@ export function AskPanel() {
     const item = items[i];
     if (!item) return;
     item.run();
-    if (!item.keepText) setText("");
+    // Keep the draft; select it so the next type replaces it.
+    if (!item.keepText) focusAndSelectInput();
     if (!item.stay) void api.askClose();
   };
 
@@ -840,7 +864,6 @@ export function AskPanel() {
       if (c) void api.clipboardCopy(c.text).then(() => api.askClose());
     } else if (inHistory) {
       history[i]?.open();
-      setText("");
     } else if (showHits && hits) {
       const h = hits.items[i];
       if (h) openHit(h.source, h.reference, h.title);
@@ -862,14 +885,14 @@ export function AskPanel() {
     }
     if (inHistory || slash) {
       if (inHistory) setTab("ask");
-      setText("");
+      focusAndSelectInput();
       return;
     }
     const current = useDuskie.getState();
     // Listening: Esc only stops the mic and leaves the box ready to type in.
     if (current.hearing !== null || current.mascot === "listening") {
       stopListening();
-      requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
+      focusAndSelectInput();
       return;
     }
     // Streaming: cancel only, Ctrl+N starts a new chat without aborting.
@@ -882,6 +905,16 @@ export function AskPanel() {
     } else {
       void api.askClose();
     }
+  };
+
+  /** Same path as Enter: open a list hit, run the active row, or send a follow-up. */
+  const submitComposer = () => {
+    if (listLen) {
+      openListItem(Math.min(pick, listLen - 1));
+      return;
+    }
+    if (asking && inChat) runRow(0);
+    else if (rows) runRow(active);
   };
 
   const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -912,15 +945,13 @@ export function AskPanel() {
         .map(({ role, content }) => ({ role, content }));
       if (text.trim()) messages.push({ role: "user", content: text.trim() });
       if (messages.length === 0) return;
-      setText("");
+      focusAndSelectInput();
       setHandoffError(null);
       // It carries on in the Agents tab, step by step.
       void handOff(messages, null).catch((err: unknown) => setHandoffError(String(err)));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      // In a conversation Enter sends the follow-up.
-      if (asking && inChat) runRow(0);
-      else if (rows) runRow(active);
+      submitComposer();
     } else if (e.key === "Escape") {
       e.preventDefault();
       if (!e.repeat) escRef.current();
@@ -933,90 +964,34 @@ export function AskPanel() {
     nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 48;
   };
 
-  const tabs = (
-    <PanelTabs
-      current={tab}
-      onPick={pickTab}
-      coder={coder}
-      working={working}
-      alt={alt}
-      extra={
-        tab === "agents" && (
-          <fieldset aria-label="Layout" className="ak-lay ak-seg border-0">
-            {(
-              [
-                ["one", "One", "Alt O"],
-                ["board", "Board", "Alt B"],
-              ] as const
-            ).map(([id, label, key]) => (
-              <Tip key={id} label={`${label} (${key})`}>
-                <button
-                  type="button"
-                  aria-pressed={layout === id}
-                  aria-label={label}
-                  onClick={() => setLayout(id)}
-                  className="chip relative"
-                >
-                  <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3.5">
-                    {id === "one" ? (
-                      <rect
-                        x="3"
-                        y="3"
-                        width="10"
-                        height="10"
-                        rx="2"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="1.4"
-                      />
-                    ) : (
-                      <path
-                        d="M3 3h4v4H3zM9 3h4v4H9zM3 9h4v4H3zM9 9h4v4H9z"
-                        fill="currentColor"
-                        stroke="currentColor"
-                        strokeWidth="0.6"
-                        strokeLinejoin="round"
-                      />
-                    )}
-                  </svg>
-                  <KeyHint show={alt}>{key}</KeyHint>
-                </button>
-              </Tip>
-            ))}
-          </fieldset>
-        )
-      }
-    />
-  );
-
-  // Stable host so AgentsTab is not remounted when Ask closes/reopens or tabs change.
-  // ak-enter: staged reveal on Agents open (tabs → chrome → timeline → composer).
-  const agentsHost = keepAgents ? (
-    <div
-      data-agents-host=""
-      className={tab === "agents" ? "ak ak-enter" : undefined}
-      hidden={tab !== "agents"}
-      aria-hidden={tab !== "agents"}
-    >
-      <div data-agents-tabs="">{tab === "agents" ? tabs : null}</div>
+  // Stable Agents mount across tab switches (hidden when not active). Tab row lives in PanelShell.
+  const agentsBody = keepAgents ? (
+    <div data-agents-host="" hidden={tab !== "agents"} aria-hidden={tab !== "agents"}>
       <AgentsTab maxHeight={scrollMax} active={tab === "agents"} />
     </div>
   ) : null;
 
+  const shell = {
+    current: tab as PanelTab,
+    onPick: pickTab,
+    coder,
+    working,
+    alt,
+    extra: tab === "agents" ? <LayoutSwitch alt={alt} /> : null,
+    enter: tab === "agents",
+  };
+
   if (tab === "repos" && coder) {
     return (
-      <>
-        {agentsHost}
-        <div className="ak">
-          {tabs}
-          <Repos maxHeight={scrollMax} />
-        </div>
-      </>
+      <PanelShell {...shell}>
+        {agentsBody}
+        <Repos maxHeight={scrollMax} />
+      </PanelShell>
     );
   }
 
   if (tab === "agents" && coder) {
-    return <>{agentsHost}</>;
+    return <PanelShell {...shell}>{agentsBody}</PanelShell>;
   }
 
   // First-run card only when nothing is set up yet. If a provider is
@@ -1085,8 +1060,9 @@ export function AskPanel() {
       </div>
     ) : null;
 
+  const outsideChat = !showChat;
   const field = (
-    <div className="ak-bar">
+    <div className="ak-composer ak-field">
       {hearing !== null ? (
         <Hearing text={hearing} />
       ) : (
@@ -1101,7 +1077,7 @@ export function AskPanel() {
             setPick(0);
           }}
           onKeyDown={onKey}
-          placeholder={inHistory ? "Search history" : inChat ? "Ask a follow-up" : "Ask anything"}
+          placeholder={inHistory ? "Search history" : inChat ? "Ask a follow-up" : "Ask anything, or describe a task"}
           spellCheck={false}
           className="ak-q"
         />
@@ -1152,12 +1128,16 @@ export function AskPanel() {
                 Stop <kbd>Esc</kbd>
               </button>
             ) : (
-              inChat &&
-              !showChat && (
-                <IconButton label="New chat (Ctrl N)" keys={alt} hint="Ctrl N" onClick={() => resetChat()}>
-                  <Ic name="plus" size={15} />
-                </IconButton>
-              )
+              <>
+                {inChat && !showChat && (
+                  <IconButton label="New chat (Ctrl N)" keys={alt} hint="Ctrl N" onClick={() => resetChat()}>
+                    <Ic name="plus" size={15} />
+                  </IconButton>
+                )}
+                <button type="button" aria-label="Send" className="ak-send" onClick={submitComposer}>
+                  <Ic name="send" size={14} />
+                </button>
+              </>
             )}
           </>
         )}
@@ -1165,144 +1145,132 @@ export function AskPanel() {
     </div>
   );
 
-  const fieldLast = !showChat;
   return (
-    <>
-      {agentsHost}
-      <div className="ak" data-chat={showChat || undefined}>
-        {tabs}
-        {showChat && (
-          <div className="ak-head">
-            <input
-              aria-label="Chat name"
-              value={chatName ?? turns.find((t) => t.role === "user")?.content ?? ""}
-              onChange={(e) => setChatName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === "Escape") {
-                  e.preventDefault();
-                  inputRef.current?.focus();
-                }
-              }}
-              spellCheck={false}
-              className="ak-title ak-cname"
-            />
-            <IconButton
-              label="New chat (Ctrl N)"
-              keys={alt}
-              hint="Ctrl N"
-              onClick={() => resetChat({ cancel: !streaming })}
-            >
-              <Ic name="plus" size={15} />
-            </IconButton>
-          </div>
-        )}
-        {/* In a chat the field is a box at the bottom: what goes with the
-          question on top, then the field, then the model and voice. The
-          same wrapper either way, so the input keeps focus on send. */}
-        {/* Redesign, outside a chat: context on top, the field at the bottom. */}
-        {fieldLast ? (
-          !inHistory && <ContextLine keys={alt} />
-        ) : (
-          <div className={showChat ? "ak-askc" : "contents"}>
-            {field}
-            {!inHistory && <ContextLine keys={alt} />}
-          </div>
-        )}
+    <PanelShell {...shell} chat={showChat}>
+      {agentsBody}
+      {showChat && (
+        <div className="ak-head">
+          <input
+            aria-label="Chat name"
+            value={chatName ?? turns.find((t) => t.role === "user")?.content ?? ""}
+            onChange={(e) => setChatName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "Escape") {
+                e.preventDefault();
+                inputRef.current?.focus();
+              }
+            }}
+            spellCheck={false}
+            className="ak-title ak-cname"
+          />
+          <IconButton
+            label="New chat (Ctrl N)"
+            keys={alt}
+            hint="Ctrl N"
+            onClick={() => resetChat({ cancel: !streaming })}
+          >
+            <Ic name="plus" size={15} />
+          </IconButton>
+        </div>
+      )}
+      {/* Launcher + chat: context, then composer on top, then the scrollable body. */}
+      <div className={showChat ? "ak-askc" : "contents"}>
+        {!inHistory && <ContextLine keys={alt} />}
+        {field}
+      </div>
 
-        {showClips && clips ? (
-          <div key="clips" className="ak-scroll ak-in" style={{ maxHeight: scrollMax }}>
-            <Clips
-              items={shownClips}
-              filtered={clipFilter.length > 0}
-              active={Math.min(pick, shownClips.length - 1)}
-              onHover={setPick}
-            />
-          </div>
-        ) : inHistory ? (
-          <div key="history" className="ak-scroll ak-in" style={{ maxHeight: scrollMax }}>
-            <HistoryList rows={history} active={Math.min(pick, Math.max(history.length - 1, 0))} onHover={setPick} />
-          </div>
-        ) : showHits && hits ? (
-          <div key="hits" className="ak-scroll ak-in" style={{ maxHeight: scrollMax }}>
-            <Results
-              query={hits.query}
-              items={hits.items}
-              active={Math.min(pick, hits.items.length - 1)}
-              onHover={setPick}
-              onOpen={(h) => openHit(h.source, h.reference, h.title)}
-            />
-          </div>
-        ) : showChat && !(asking && rows > 0 && !inChat) ? (
-          <div key="chat" ref={chatRef} onScroll={onScroll} className="ak-scroll" style={{ maxHeight: scrollMax }}>
-            <Chat turns={turns} />
-          </div>
-        ) : firstRun ? (
-          <FirstRun />
-        ) : (
-          rows > 0 && (
-            <motion.ul
-              key={slash ? "slash" : asking ? "typing" : "start"}
-              className="ak-list ak-scroll"
-              style={{ maxHeight: scrollMax }}
-              initial="hidden"
-              animate="show"
-              variants={staggerParent}
-            >
-              {items.map((it, i) => (
-                <motion.li
-                  key={it.id}
-                  ref={scrollIfActive(active === i)}
-                  variants={reducedMotion ? staggerChildReduced : staggerChild}
+      {showClips && clips ? (
+        <div key="clips" className="ak-scroll ak-in" style={{ maxHeight: scrollMax }}>
+          <Clips
+            items={shownClips}
+            filtered={clipFilter.length > 0}
+            active={Math.min(pick, shownClips.length - 1)}
+            onHover={setPick}
+          />
+        </div>
+      ) : inHistory ? (
+        <div key="history" className="ak-scroll ak-in" style={{ maxHeight: scrollMax }}>
+          <HistoryList rows={history} active={Math.min(pick, Math.max(history.length - 1, 0))} onHover={setPick} />
+        </div>
+      ) : showHits && hits ? (
+        <div key="hits" className="ak-scroll ak-in" style={{ maxHeight: scrollMax }}>
+          <Results
+            query={hits.query}
+            items={hits.items}
+            active={Math.min(pick, hits.items.length - 1)}
+            onHover={setPick}
+            onOpen={(h) => openHit(h.source, h.reference, h.title)}
+          />
+        </div>
+      ) : showChat && !(asking && rows > 0 && !inChat) ? (
+        <div key="chat" ref={chatRef} onScroll={onScroll} className="ak-scroll" style={{ maxHeight: scrollMax }}>
+          <Chat turns={turns} />
+        </div>
+      ) : firstRun ? (
+        <FirstRun />
+      ) : (
+        rows > 0 && (
+          <motion.ul
+            key={slash ? "slash" : asking ? "typing" : "start"}
+            className="ak-list ak-scroll"
+            style={{ maxHeight: scrollMax }}
+            initial="hidden"
+            animate="show"
+            variants={staggerParent}
+          >
+            {items.map((it, i) => (
+              <motion.li
+                key={it.id}
+                ref={scrollIfActive(active === i)}
+                variants={reducedMotion ? staggerChildReduced : staggerChild}
+              >
+                {(it.group ?? (outsideChat && !asking && !slash && i === 0 ? "Try" : undefined)) && (
+                  <p className="ak-group">{it.group ?? "Try"}</p>
+                )}
+                <button
+                  type="button"
+                  data-sel={active === i}
+                  onMouseMove={() => setSelected(i)}
+                  onClick={() => runRow(i)}
+                  className="ak-row"
                 >
-                  {(it.group ?? (fieldLast && !asking && !slash && i === 0 ? "Try" : undefined)) && (
-                    <p className="ak-group">{it.group ?? "Try"}</p>
+                  <span className="ak-ico">{it.icon}</span>
+                  {outsideChat && !asking ? (
+                    <span className="ak-two min-w-0 flex-1">
+                      <span className="block truncate">{it.label}</span>
+                      {it.hint && <span className="ak-sub block truncate">{it.hint}</span>}
+                    </span>
+                  ) : (
+                    <>
+                      <span className="min-w-0 flex-1 truncate">{it.label}</span>
+                      {it.hint && <span className="ak-hint">{it.hint}</span>}
+                    </>
                   )}
-                  <button
-                    type="button"
-                    data-sel={active === i}
-                    onMouseMove={() => setSelected(i)}
-                    onClick={() => runRow(i)}
-                    className="ak-row"
-                  >
-                    <span className="ak-ico">{it.icon}</span>
-                    {fieldLast && !asking ? (
-                      <span className="ak-two min-w-0 flex-1">
-                        <span className="block truncate">{it.label}</span>
-                        {it.hint && <span className="ak-sub block truncate">{it.hint}</span>}
+                  {it.key ? (
+                    <kbd className="ak-key">{it.key}</kbd>
+                  ) : (
+                    asking &&
+                    active === i &&
+                    (it.ctrlRun ? (
+                      <span className="ak-keys">
+                        <kbd className="ak-key">Enter</kbd>
+                        <kbd className="ak-key">Ctrl Enter</kbd>
                       </span>
                     ) : (
-                      <>
-                        <span className="min-w-0 flex-1 truncate">{it.label}</span>
-                        {it.hint && <span className="ak-hint">{it.hint}</span>}
-                      </>
-                    )}
-                    {it.key ? (
-                      <kbd className="ak-key">{it.key}</kbd>
-                    ) : (
-                      asking &&
-                      active === i &&
-                      (it.ctrlRun ? (
-                        <span className="ak-keys">
-                          <kbd className="ak-key">Enter</kbd>
-                          <kbd className="ak-key">Ctrl Enter</kbd>
-                        </span>
-                      ) : (
-                        <kbd className="ak-key">Enter</kbd>
-                      ))
-                    )}
-                  </button>
-                </motion.li>
-              ))}
-            </motion.ul>
-          )
-        )}
+                      <kbd className="ak-key">Enter</kbd>
+                    ))
+                  )}
+                </button>
+              </motion.li>
+            ))}
+          </motion.ul>
+        )
+      )}
 
-        {handoffError && <p className="ak-err">{handoffError}</p>}
-        {fieldLast && <div className="contents">{field}</div>}
-        {footer}
-        <Timings />
-      </div>
-    </>
+      {handoffError && <p className="ak-err">{handoffError}</p>}
+      {footer}
+      <Timings />
+    </PanelShell>
   );
 }
 

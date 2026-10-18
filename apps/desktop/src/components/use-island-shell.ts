@@ -12,6 +12,7 @@ import {
   SHELL_ASK,
   SHELL_CARD,
   SHELL_COMPACT,
+  SHELL_GIT_MIN_H,
   SHELL_GLANCE,
   SHELL_IDLE,
   SHELL_NOTIFY,
@@ -48,6 +49,8 @@ export function shellGeom(opts: {
   askTab: string | null;
   agentsWide: boolean;
   boardWide: boolean;
+  /** When the Git dock is beside Ask, the island shell is this wide (repo list). */
+  gitListW?: number | null;
   /** Measured Settings height; falls back to 460. */
   settingsHeight?: number;
   reduced: boolean;
@@ -71,12 +74,18 @@ export function shellGeom(opts: {
     take = TAKE_A_ASK;
   } else if (opts.id === "agents") {
     width = opts.boardWide ? 680 : opts.agentsWide ? SHELL_AGENTS.width : SHELL_ASK.width;
-    height = Math.max(SHELL_COMPACT.height, opts.contentHeight + 18);
+    height = Math.max(SHELL_COMPACT.height, opts.contentHeight + 8);
     radius = SHELL_AGENTS.radius;
     take = TAKE_A_ASK;
   } else if (opts.id === "ask") {
-    width = SHELL_ASK.width;
-    height = Math.max(SHELL_COMPACT.height, opts.contentHeight + 18);
+    // Repos + side Git: narrow list; otherwise the full Ask width.
+    const listW = opts.gitListW;
+    const gitBeside = listW != null && opts.askTab === "repos";
+    width = gitBeside ? listW : SHELL_ASK.width;
+    // Soft floor when Git is beside — hug content above it, avoid a hard snap.
+    height = gitBeside
+      ? Math.max(SHELL_GIT_MIN_H, opts.contentHeight + 8)
+      : Math.max(SHELL_COMPACT.height, opts.contentHeight + 8);
     radius = SHELL_ASK.radius;
     take = TAKE_A_ASK;
   } else if (card || (panel && !bare)) {
@@ -88,7 +97,8 @@ export function shellGeom(opts: {
           : opts.id === "glance" || opts.id === "quiet-glance" || opts.id === "activities"
             ? SHELL_GLANCE.width
             : SHELL_CARD.width;
-    height = Math.max(78, opts.contentHeight + 16);
+    // Content already includes top/bottom pad; do not add another strip below.
+    height = Math.max(78, opts.contentHeight);
     radius = height > 40 ? 26 : 18;
     take = TAKE_A_CARD;
   } else if (compact) {

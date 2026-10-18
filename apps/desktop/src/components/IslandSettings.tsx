@@ -48,13 +48,16 @@ export function IslandSettings() {
 
   return (
     <div
-      className="ak !flex min-h-0 flex-col"
+      className="ak flex h-full min-h-0 flex-col overflow-hidden"
       style={{
-        maxHeight: `${SHELL_SETTINGS.height}px`,
+        // Definite height so flex children (sidebar + settings-scroll) become scrollports.
+        height: `${SHELL_SETTINGS.height}px`,
         width: SHELL_SETTINGS.width - 24,
       }}
     >
-      <PanelTabs current="settings" onPick={leave} coder={coder} working={working} alt={alt} />
+      <div className="ak-tabs-enter shrink-0">
+        <PanelTabs current="settings" onPick={leave} coder={coder} working={working} alt={alt} />
+      </div>
       <SettingsPanel />
     </div>
   );

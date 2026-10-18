@@ -7,6 +7,7 @@ import { type OpenChoice, parseChoose } from "./agent-questions";
 import { api, EVENTS, listen } from "./bridge";
 import { mask } from "./mask";
 import { claimsPlanReady, parsePlanDocument } from "./plan";
+import { dockTotal, readSeam, stacked } from "./seam";
 import type { AgentMode, AgentStarted } from "./types";
 
 export interface Step {
@@ -118,6 +119,8 @@ interface AgentsState {
   draftPrompt?: string | null;
   /** The repo open in the Git dock; "first" picks one once the list loads. */
   dock?: string | null;
+  /** Island list width while the Git dock is open beside it. */
+  listW?: number;
 }
 
 /** Sessions are kept in this window's storage, so the timeline comes back
@@ -781,8 +784,40 @@ export function interruptSession(id: string) {
   void api.agentStop(id);
 }
 
-/** Ctrl G: the Repos tab with the Git dock open on the repo that has changes. */
+/** Close the Git dock. Window stays at dock-max (no OS resize). */
+export function closeDock() {
+  useAgents.setState({ dock: null, listW: undefined });
+}
+
+/** Open or switch the repo shown in the Git dock. */
+export function setDock(path: string | null) {
+  if (path == null) {
+    closeDock();
+    return;
+  }
+  useAgents.setState({ dock: path });
+}
+
+/** Ctrl G: toggle the Git dock on the Repos tab (opens on the repo with changes). */
 export function openGit() {
-  useAgents.setState({ dock: useAgents.getState().dock ?? "first" });
-  setTab("repos");
+  const { dock } = useAgents.getState();
+  if (dock) {
+    closeDock();
+    return;
+  }
+  void showGit();
+}
+
+/** Open the Git tab (and dock) without toggling a dock that is already open.
+ * Layout only — the OS window stays at dock-max from launch (no set_size). */
+export async function showGit() {
+  const { dock, listW } = useAgents.getState();
+  const screenW = typeof window === "undefined" ? 1920 : window.screen.availWidth;
+  const side = !stacked(screenW);
+  const patch: Partial<AgentsState> & { tab: AskTab } = { tab: "repos" };
+  if (!dock) patch.dock = "first";
+  if (listW == null && side) {
+    patch.listW = readSeam(dockTotal(screenW));
+  }
+  useAgents.setState(patch);
 }

@@ -43,14 +43,16 @@ export const SHELL_COMPACT = {
 } as const;
 
 /** Glance card (~336) and suggestion (~372). */
-export const SHELL_GLANCE = { width: 336, radius: 26 } as const;
+export const SHELL_GLANCE = { width: 356, radius: 26 } as const;
 export const SHELL_CARD = { width: 372, radius: 26 } as const;
 export const SHELL_NOTIFY = { width: 340, radius: 26 } as const;
 
 /** Ask / Agents / Settings in-island sizes. */
 export const SHELL_ASK = { width: 452, radius: 26 } as const;
 export const SHELL_AGENTS = { width: 560, radius: 26 } as const;
-export const SHELL_SETTINGS = { width: 660, height: 460, nav: 176, radius: 26 } as const;
+export const SHELL_SETTINGS = { width: 720, height: 520, nav: 196, radius: 26 } as const;
+/** Soft floor for shell/git-dock height when the Git panel is beside the island. */
+export const SHELL_GIT_MIN_H = 440;
 
 /** Hover intent: wait so a pass-over does not open glance. */
 export const SHELL_HOVER_IN_MS = 380;
@@ -67,7 +69,7 @@ export const TAKE_A = { x: 3, y: -4, scale: 0.875 } as const;
 /** Take A on a tall card. */
 export const TAKE_A_CARD = { x: 10, y: 10, scale: 1 } as const;
 /** Take A in Ask / Settings (smaller, inset). */
-export const TAKE_A_ASK = { x: 13, y: 12, scale: 0.625 } as const;
+export const TAKE_A_ASK = { x: 13, y: 12, scale: 0.9 } as const;
 
 /** Shell grow / settle springs (for motionFor / SPRINGS). */
 export const GROW = { response: 0.46, damping: 0.78 } as const;

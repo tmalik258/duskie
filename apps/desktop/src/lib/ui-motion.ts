@@ -40,3 +40,31 @@ export const staggerChildReduced = {
     transition: { duration: 0.15, ease: EASE_OUT_STRONG },
   },
 } as const;
+
+/** Git dock beside Ask — slide from the seam (transform + opacity only). */
+export const gitDockHidden = {
+  opacity: 0,
+  transform: "translateX(-14px)",
+} as const;
+
+export const gitDockShown = {
+  opacity: 1,
+  transform: "translateX(0px)",
+} as const;
+
+/** Enter after the shell starts narrowing; exit a touch faster. */
+export const gitDockIn = {
+  duration: 0.22,
+  delay: 0.04,
+  ease: EASE_OUT_STRONG,
+} as const;
+
+export const gitDockOut = {
+  duration: 0.16,
+  ease: EASE_OUT_STRONG,
+} as const;
+
+export const gitDockReduced = {
+  duration: 0.12,
+  ease: EASE_OUT_STRONG,
+} as const;

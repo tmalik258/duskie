@@ -42,7 +42,73 @@ if (typeof location !== "undefined") {
   settings.theme = (q.get("theme") as Settings["theme"] | null) ?? settings.theme;
   if (q.get("voice") === "full") settings.voice.listeningStyle = "full";
   if (q.has("live")) settings.voice.live = true;
+  if (q.has("git")) {
+    settings.codeFolders = ["C:/code/shop"];
+    settings.savedProjects = ["C:/code/shop"];
+  }
 }
+
+const GIT_PARITY_REPO = "C:/code/shop";
+const gitParityStatus = () => [
+  { path: "apps/desktop/src/components/agents/GitDock.tsx", kind: "M", staged: true, unstaged: false },
+  { path: "apps/desktop/src/lib/mock.ts", kind: "M", staged: false, unstaged: true },
+  { path: "apps/desktop/tests/parity/helpers.ts", kind: "?", staged: false, unstaged: true },
+];
+const gitParityBranches = () => [
+  { name: "main", current: false, ahead: 0, behind: 2 },
+  { name: "feat/git-dock", current: true, ahead: 3, behind: 0 },
+  { name: "fix/island-width", current: false, ahead: 1, behind: 0 },
+];
+const gitParityLog = () => [
+  { hash: "b56ca02", subject: "Git dock parity fixtures", author: "You", when: "2 hours ago" },
+  { hash: "509e408", subject: "Prototype-aligned git bar", author: "You", when: "3 hours ago" },
+  { hash: "a5e488a", subject: "Repos tab seam", author: "Ayesha", when: "yesterday" },
+];
+const gitParityFileDiff = (file: string, staged: boolean) => ({
+  path: file,
+  status: "modified" as const,
+  added: staged ? 2 : 1,
+  removed: 1,
+  hunks: [
+    {
+      header: "@@ -1,4 +1,5 @@",
+      lines: [
+        " export function GitDock() {",
+        "-  return null;",
+        '+  return <section className="gd-dock-panel" />;',
+        "+  // parity mock hunk",
+      ],
+    },
+  ],
+});
+const gitParityReposOverview = () => ({
+  via: "gh" as const,
+  repos: [
+    {
+      name: "shop",
+      path: GIT_PARITY_REPO,
+      slug: "acme/shop",
+      branch: "feat/git-dock",
+      ahead: 3,
+      behind: 0,
+      changed: 3,
+      ci: "fail" as const,
+      reviews: 1,
+      prs: [
+        {
+          number: 42,
+          title: "Fix login redirect",
+          url: "https://github.com/acme/shop/pull/42",
+          branch: "feat/git-dock",
+          mine: true,
+          ci: "fail" as const,
+          failing: ["test (windows)"],
+          reviewRequested: false,
+        },
+      ],
+    },
+  ],
+});
 let mascot: MascotState = previewFlag("orphan") ? "working" : "idle";
 let suggestion: Suggestion | null = null;
 let epoch = 0;
@@ -530,56 +596,59 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
       { id: "local", name: "Local", installed: true, signedIn: true, limited: false, fix: null, local: true },
     ],
   }),
-  repos_overview: () => ({
-    via: "gh",
-    repos: [
-      {
-        name: "shop",
-        path: "C:/code/shop",
-        slug: "acme/shop",
-        branch: "fix-login",
-        ahead: 1,
-        behind: 3,
-        changed: 2,
-        ci: "fail",
-        reviews: 1,
-        prs: [
-          {
-            number: 42,
-            title: "Fix login redirect",
-            url: "https://github.com/acme/shop/pull/42",
-            branch: "fix-login",
-            mine: true,
-            ci: "fail",
-            failing: ["test (windows)", "https://github.com/acme/shop/actions/runs/1"],
-            reviewRequested: false,
-          },
-          {
-            number: 40,
-            title: "Cart totals in cents",
-            url: "https://github.com/acme/shop/pull/40",
-            branch: "cents",
-            mine: false,
-            ci: "pass",
-            failing: null,
-            reviewRequested: true,
-          },
-        ],
-      },
-      {
-        name: "site",
-        path: "C:/code/site",
-        slug: "acme/site",
-        branch: "main",
-        ahead: 0,
-        behind: 0,
-        changed: 0,
-        ci: "none",
-        reviews: 0,
-        prs: [],
-      },
-    ],
-  }),
+  repos_overview: () =>
+    previewFlag("git")
+      ? gitParityReposOverview()
+      : {
+          via: "gh",
+          repos: [
+            {
+              name: "shop",
+              path: "C:/code/shop",
+              slug: "acme/shop",
+              branch: "fix-login",
+              ahead: 1,
+              behind: 3,
+              changed: 2,
+              ci: "fail",
+              reviews: 1,
+              prs: [
+                {
+                  number: 42,
+                  title: "Fix login redirect",
+                  url: "https://github.com/acme/shop/pull/42",
+                  branch: "fix-login",
+                  mine: true,
+                  ci: "fail",
+                  failing: ["test (windows)", "https://github.com/acme/shop/actions/runs/1"],
+                  reviewRequested: false,
+                },
+                {
+                  number: 40,
+                  title: "Cart totals in cents",
+                  url: "https://github.com/acme/shop/pull/40",
+                  branch: "cents",
+                  mine: false,
+                  ci: "pass",
+                  failing: null,
+                  reviewRequested: true,
+                },
+              ],
+            },
+            {
+              name: "site",
+              path: "C:/code/site",
+              slug: "acme/site",
+              branch: "main",
+              ahead: 0,
+              behind: 0,
+              changed: 0,
+              ci: "none",
+              reviews: 0,
+              prs: [],
+            },
+          ],
+        },
   repo_pull: () => "Pulled 3 commits",
   repo_open: () => null,
   merge_state: () => ({
@@ -655,22 +724,33 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     settings = { ...settings, notifications: { ...settings.notifications, lessons: { entries } } };
     return null;
   },
-  git_status: () => [
-    { path: "src/app.ts", kind: "M", staged: true, unstaged: false },
-    { path: "src/util.ts", kind: "M", staged: false, unstaged: true },
-    { path: "README.md", kind: "?", staged: false, unstaged: true },
-  ],
+  git_status: () =>
+    previewFlag("git")
+      ? gitParityStatus()
+      : [
+          { path: "src/app.ts", kind: "M", staged: true, unstaged: false },
+          { path: "src/util.ts", kind: "M", staged: false, unstaged: true },
+          { path: "README.md", kind: "?", staged: false, unstaged: true },
+        ],
   git_stage: () => "Staged",
   git_unstage: () => "Unstaged",
   git_commit: () => "Committed",
   git_write_message: () => "Tidy the util helpers",
   git_amend: () => "Amended the last commit",
   git_last_commit_pushed: () => false,
-  git_log: () => [
-    { hash: "b56ca02", subject: "Proposals card with Skip and Approve per row", author: "You", when: "2 hours ago" },
-    { hash: "509e408", subject: "Agent card on hover", author: "You", when: "3 hours ago" },
-    { hash: "a5e488a", subject: "Meeting card on hover", author: "Ayesha", when: "yesterday" },
-  ],
+  git_log: () =>
+    previewFlag("git")
+      ? gitParityLog()
+      : [
+          {
+            hash: "b56ca02",
+            subject: "Proposals card with Skip and Approve per row",
+            author: "You",
+            when: "2 hours ago",
+          },
+          { hash: "509e408", subject: "Agent card on hover", author: "You", when: "3 hours ago" },
+          { hash: "a5e488a", subject: "Meeting card on hover", author: "Ayesha", when: "yesterday" },
+        ],
   git_stashes: () => mockStashes,
   git_stash_apply: (a) => {
     if (a.pop) mockStashes = mockStashes.filter((x) => x.name !== a.name);
@@ -680,6 +760,41 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     mockStashes = mockStashes.filter((x) => x.name !== a.name);
     return "Dropped the stash";
   },
+  git_fetch: () => "Fetched from the remote",
+  git_push: () => "Pushed to the remote",
+  git_branches: () =>
+    previewFlag("git")
+      ? gitParityBranches()
+      : [
+          { name: "main", current: false, ahead: 0, behind: 2 },
+          { name: "feat/git-dock", current: true, ahead: 3, behind: 0 },
+          { name: "fix/island-width", current: false, ahead: 1, behind: 0 },
+        ],
+  git_switch_branch: (a) => `Switched to ${String(a.name)}`,
+  git_create_branch: (a) => `Created and switched to ${String(a.name)}`,
+  git_file_diff: (a) => {
+    const file = String(a.file);
+    const staged = Boolean(a.staged);
+    if (previewFlag("git")) return gitParityFileDiff(file, staged);
+    return {
+      path: file,
+      status: "modified" as const,
+      added: staged ? 2 : 1,
+      removed: 1,
+      hunks: [
+        {
+          header: "@@ -12,4 +12,5 @@ export function resolveIslandState(",
+          lines: [
+            "   const dock = settings.git?.dockOpen ?? false;",
+            '-  return dock ? "wide" : "idle";',
+            '+  return dock ? "wide" : settings.island?.compact ? "compact" : "idle";',
+            "+  // keep in sync with Island.tsx",
+          ],
+        },
+      ],
+    };
+  },
+  git_stage_hunk: () => "Staged that hunk",
   island_width: () => undefined,
   gpu_memory: () => (new URLSearchParams(location.search).has("cpu") ? 0 : 8192),
   limits_paused: () =>

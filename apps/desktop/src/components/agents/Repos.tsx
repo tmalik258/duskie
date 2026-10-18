@@ -6,15 +6,14 @@
 // opens the Git dock for that repo (stage, commit, amend).
 
 import { useEffect, useState } from "react";
-import { setTab, startHere, startSession, useAgents } from "@/lib/agents";
+import { setDock, setTab, startHere, startSession, useAgents } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
-import { dockTotal, stacked } from "@/lib/seam";
+import { dockTotal, readSeam, stacked } from "@/lib/seam";
 import type { RepoRow, ReposOverview } from "@/lib/types";
 import { Tip } from "../Tip";
 import { GitDock } from "./GitDock";
-import { readSeam, Seam } from "./Seam";
 
 const CI_COLOR = { pass: "#30d158", fail: "#ff453a", pending: "#ff9f0a", none: "rgb(255 255 255 / 0.25)" } as const;
 const CI_LABEL = { pass: "Checks pass", fail: "Checks failing", pending: "Checks running", none: "No checks" } as const;
@@ -98,11 +97,9 @@ export function Repos({ maxHeight }: { maxHeight?: number }) {
   const now = useNow(10_000);
   const [open, setOpen] = useState<string | null>(null);
   const dock = useAgents((s) => s.dock ?? null);
-  const setGitPath = (path: string | null) => useAgents.setState({ dock: path });
   const screenW = typeof window === "undefined" ? 1920 : window.screen.availWidth;
   const side = !stacked(screenW);
   const total = dockTotal(screenW);
-  const [listW, setListW] = useState(() => readSeam(total));
   // Ctrl G with no repo chosen: the one with changes, else the first.
   const gitPath = dock === "first" ? ((data?.repos.find((r) => r.changed > 0) ?? data?.repos[0])?.path ?? null) : dock;
   const [note, setNote] = useState<Record<string, string>>({});
@@ -122,17 +119,25 @@ export function Repos({ maxHeight }: { maxHeight?: number }) {
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new answer means a fresh check
   useEffect(() => setChecked(Date.now()), [data]);
   const gitRepo = data?.repos.find((r) => r.path === gitPath) ?? null;
-  const wide = Boolean(gitPath) && side;
-  // Beside the list the dock needs room: the island grows while it is open.
+  // Keep listW while the dock is open (even if this tab unmounts). Island owns
+  // listW; closeDock() tears it down when the dock closes.
+  const wide = Boolean(dock) && side;
   useEffect(() => {
     if (!wide) return;
-    void api.islandWidth(total).catch(() => {});
-    return () => void api.islandWidth(0).catch(() => {});
+    const cur = useAgents.getState().listW;
+    if (cur != null) return;
+    useAgents.setState({ listW: readSeam(total) });
   }, [wide, total]);
+  // Resolve "first" once repos are known so the path stays stable.
+  useEffect(() => {
+    if (dock !== "first" || !gitPath) return;
+    setDock(gitPath);
+  }, [dock, gitPath]);
+  // Narrow screens: the dock replaces the list (no room beside).
   if (gitPath && !side) {
     return (
       <div className="ak-repos flex min-h-0 flex-col gap-2">
-        <GitDock path={gitPath} repo={gitRepo} onClose={() => setGitPath(null)} />
+        <GitDock path={gitPath} repo={gitRepo} repos={data?.repos} onPickRepo={setDock} onClose={() => setDock(null)} />
       </div>
     );
   }
@@ -168,7 +173,7 @@ export function Repos({ maxHeight }: { maxHeight?: number }) {
         ? "GitHub through Composio"
         : "GitHub not connected";
   const list = (
-    <section className="ak-repos" aria-label="Repos" style={wide ? { width: listW, flex: "none" } : undefined}>
+    <section className={`ak-repos${wide ? " ag-narrow" : ""}`} aria-label="Repos">
       <div className="ak-rh">
         <span>
           {data.repos.length} repo{data.repos.length === 1 ? "" : "s"} · {via}
@@ -188,6 +193,7 @@ export function Repos({ maxHeight }: { maxHeight?: number }) {
       <div className="ak-scroll ak-rlist" style={{ maxHeight: maxHeight ? maxHeight - 48 : undefined }}>
         {data.repos.map((r) => {
           const expanded = open === r.path;
+          const current = wide && r.path === gitPath;
           const failing = r.prs.find((p) => p.failing && p.mine) ?? r.prs.find((p) => p.failing);
           const review = r.prs.find((p) => p.reviewRequested);
           return (
@@ -196,7 +202,11 @@ export function Repos({ maxHeight }: { maxHeight?: number }) {
                 type="button"
                 className="ak-rrow"
                 aria-expanded={expanded}
-                onClick={() => setOpen(expanded ? null : r.path)}
+                aria-current={current ? "true" : undefined}
+                onClick={() => {
+                  if (wide) setDock(r.path);
+                  else setOpen(expanded ? null : r.path);
+                }}
               >
                 <Tip label={CI_LABEL[r.ci]} className="inline-flex shrink-0">
                   <span
@@ -262,7 +272,7 @@ export function Repos({ maxHeight }: { maxHeight?: number }) {
                       </button>
                     ))}
                   <div className="ak-rbtns">
-                    <button type="button" className="ak-chip primary chip" onClick={() => setGitPath(r.path)}>
+                    <button type="button" className="ak-chip primary chip" onClick={() => setDock(r.path)}>
                       Changes
                     </button>
                     {r.behind > 0 && (
@@ -295,12 +305,6 @@ export function Repos({ maxHeight }: { maxHeight?: number }) {
       </div>
     </section>
   );
-  if (!wide || !gitPath) return list;
-  return (
-    <div className="gd-split">
-      {list}
-      <Seam value={listW} total={total} onChange={setListW} />
-      <GitDock path={gitPath} repo={gitRepo} onClose={() => setGitPath(null)} />
-    </div>
-  );
+  // Side-by-side Git is rendered as a sibling of the island shell (Island.tsx).
+  return list;
 }

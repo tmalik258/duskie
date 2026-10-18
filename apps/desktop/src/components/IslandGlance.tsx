@@ -1,7 +1,8 @@
 "use client";
 
-// One hover glance: day head + actions, then optional sections (needs you,
-// away, activity, later, tip). Cached data shows at once and refreshes behind.
+// One hover glance: day head with quick actions beside it, then optional
+// sections (needs you, away, activity, later, tip). Cached data shows at
+// once and refreshes behind.
 
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { type ReactNode, useEffect, useState } from "react";
@@ -22,7 +23,7 @@ import { CardChips, CardHead, CardNote } from "./IslandCard";
 import { Tip } from "./Tip";
 
 /** Round quick-action button (porcelain chrome). */
-const qbClass = "rd-qb chip relative grid size-8 place-items-center overflow-hidden";
+const qbClass = "rd-qb chip relative grid size-9 place-items-center overflow-hidden";
 
 /** A meeting this close (or already on) takes the headline. */
 const MEETING_SOON_MIN = 60;
@@ -59,38 +60,40 @@ export function Glance({ paused }: { paused: boolean }) {
   const [focusOpen, setFocusOpen] = useState(false);
   const eyebrow = new Date(now).toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
   return (
-    <div className="rd-glance flex flex-col gap-2.5">
+    <div className="rd-glance">
       {crash && <CrashCard note={crash} onDone={() => void refreshCrash()} />}
-      <div className="rd-card-head">
-        <p className="rd-eyebrow">{eyebrow}</p>
-        <p className="rd-title">{head.title}</p>
+      <div className="rd-ghead-wrap">
+        <div className="rd-ghead">
+          <div className="rd-card-head">
+            <p className="rd-eyebrow">{eyebrow}</p>
+            <p className="rd-title">{head.title}</p>
+          </div>
+          <div className="rd-ghead-actions">
+            {head.join ? (
+              <button
+                type="button"
+                className="rd-gfoot-btn"
+                onClick={() => void api.openReference("page", head.join ?? "")}
+              >
+                Join
+              </button>
+            ) : null}
+            <QuickActions paused={paused} focusOpen={focusOpen} onFocusOpenChange={setFocusOpen} />
+          </div>
+        </div>
         <p className="rd-detail">{head.detail}</p>
       </div>
       {focusOpen && <FocusPicker onDone={() => setFocusOpen(false)} />}
       <NeedsYouSection sessions={sessions} />
       <AwaySection />
       {otherActivities.length > 0 && (
-        <div className="mt-3" style={{ marginLeft: "calc(var(--orb-indent, 0px) * -1)" }}>
+        <div style={{ marginLeft: "calc(var(--orb-indent, 0px) * -1)" }}>
           <ActivityProgress sources={["update", "browser", "file", "action", "open"]} />
         </div>
       )}
       <FullscreenSwitch />
       <LaterList />
       {head.quiet && <QuietTip />}
-      <div className="rd-gfoot">
-        {head.join ? (
-          <button
-            type="button"
-            className="rd-gfoot-btn"
-            onClick={() => void api.openReference("page", head.join ?? "")}
-          >
-            Join
-          </button>
-        ) : (
-          <span />
-        )}
-        <QuickActions paused={paused} focusOpen={focusOpen} onFocusOpenChange={setFocusOpen} />
-      </div>
     </div>
   );
 }
@@ -103,10 +106,7 @@ function QuietTip() {
   const [tip] = useState(pickTip);
   if (!on || later > 0 || !tip) return null;
   return (
-    <p
-      className="rd-list-row mt-1 flex items-baseline gap-2"
-      style={{ marginLeft: "calc(var(--orb-indent, 0px) * -1)" }}
-    >
+    <p className="rd-list-row flex items-baseline gap-2" style={{ marginLeft: "calc(var(--orb-indent, 0px) * -1)" }}>
       <span className="rd-eyebrow shrink-0">Tip</span>
       {tip}
     </p>
@@ -125,7 +125,7 @@ function FullscreenSwitch() {
       aria-checked={hide}
       onClick={() => void updateSettings({ hideInFullscreen: !hide })}
       style={{ marginLeft: "calc(var(--orb-indent, 0px) * -1)", width: "calc(100% + var(--orb-indent, 0px))" }}
-      className="rd-list-row chip mt-1 flex items-center gap-3 text-left"
+      className="rd-list-row chip flex items-center gap-3 text-left"
     >
       <span className="min-w-0 flex-1">
         <span className="block text-[13px] font-medium text-(--ink)">Hide while fullscreen</span>
@@ -224,13 +224,13 @@ function LaterList() {
   const shown = all ? items : items.slice(0, LATER_SHOWN);
   return (
     <div
-      className="mt-3 flex flex-col gap-1.5"
+      className="rd-sec-list"
       style={{
-        marginLeft: "calc(var(--orb-indent, 0px) * -1)",
+        marginLeft: "calc(var(--orb-indent, 0px) * -0.925)",
         width: "calc(100% + var(--orb-indent, 0px))",
       }}
     >
-      <div className="flex items-center justify-between text-[12px] text-(--ink-2)">
+      <div className="rd-sec">
         <span>{missed ? "You missed" : "Saved for later"}</span>
         <span className="flex items-center gap-3">
           {all && (
@@ -243,9 +243,7 @@ function LaterList() {
           </button>
         </span>
       </div>
-      <div
-        className={`flex flex-col gap-1.5 ${all ? "island-scroll max-h-[260px] overflow-y-auto overscroll-contain" : ""}`}
-      >
+      <div className={`rd-sec-list ${all ? "island-scroll max-h-[260px] overflow-y-auto overscroll-contain" : ""}`}>
         {shown.map((l, n) => (
           // biome-ignore lint/a11y/useSemanticElements: the row holds its own dismiss button, so it cannot be a button
           <div
@@ -307,7 +305,7 @@ function QuickActions({
   const shift = useShiftHeld();
   // Single row keeps the glance short, two rows stacked taller than the copy.
   return (
-    <div className="flex gap-1.5">
+    <div className="flex gap-2">
       <AskShiftAgentsButton shift={shift} />
       <FocusShiftPauseButton paused={paused} open={focusOpen} onOpenChange={onFocusOpenChange} shift={shift} />
       {update ? <UpdateButton /> : null}
@@ -373,7 +371,7 @@ function SettingsShiftHistoryButton({ shift }: { shift: boolean }) {
             exit={reduced ? undefined : { opacity: 0, scale: 0.7, rotate: history ? 20 : -20 }}
             transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
           >
-            <Ic name={history ? "clock" : "gear"} size={15} />
+            <Ic name={history ? "clock" : "gear"} size={16} />
           </motion.span>
         </AnimatePresence>
       </button>
@@ -411,7 +409,7 @@ function AskShiftAgentsButton({ shift }: { shift: boolean }) {
             exit={reduced ? undefined : { opacity: 0, scale: 0.7, rotate: agents ? 20 : -20 }}
             transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
           >
-            <Ic name={agents ? "term" : "ask"} size={15} />
+            <Ic name={agents ? "term" : "ask"} size={16} />
           </motion.span>
         </AnimatePresence>
       </button>
@@ -507,7 +505,7 @@ function FocusShiftPauseButton({
             exit={reduced ? undefined : { opacity: 0, scale: 0.7, rotate: pauseSide ? 20 : -20 }}
             transition={{ duration: 0.16, ease: [0.23, 1, 0.32, 1] }}
           >
-            <Icon name={icon} size={pauseSide ? 14 : 15} />
+            <Icon name={icon} size={pauseSide ? 15 : 16} />
           </motion.span>
         </AnimatePresence>
       </button>
@@ -541,7 +539,7 @@ function FocusPicker({ onDone }: { onDone: () => void }) {
   const nudge = (delta: number) => setMinutes((m) => Math.min(FOCUS_MAX, Math.max(FOCUS_MIN, m + delta)));
   return (
     <div
-      className="rise-in mt-3 rounded-[12px] bg-(--fill-2) p-3 shadow-[inset_0_0_0_1px_var(--line)]"
+      className="rise-in rounded-[12px] bg-(--fill-2) p-3 shadow-[inset_0_0_0_1px_var(--line)]"
       style={{ marginLeft: "calc(var(--orb-indent, 0px) * -1)" }}
     >
       <div className="flex items-start justify-between gap-3">
@@ -633,7 +631,7 @@ function UpdateButton() {
             className="size-4 animate-spin rounded-full border-2 border-white/25 border-t-white motion-reduce:animate-none"
           />
         ) : (
-          <Ic name="update" size={15} />
+          <Ic name="update" size={16} />
         )}
       </RoundButton>
       <span

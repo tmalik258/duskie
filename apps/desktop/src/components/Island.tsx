@@ -23,6 +23,7 @@ import { useCached } from "@/lib/cache";
 import { useNow, useSystemLook } from "@/lib/hooks";
 import { PILL_FRESH_MS } from "@/lib/peek";
 import { resolveIslandState } from "@/lib/resolve-island-state";
+import { DOCK_MIN, dockTotal, SEAM_W, stacked } from "@/lib/seam";
 import { connect, setHovered, stopLive, useDuskie, watchWaiting } from "@/lib/store";
 import { type CalendarToday, isPaused, type MascotState, type Settings, type Suggestion } from "@/lib/types";
 import { updateBusy, updateLabel } from "@/lib/updates";
@@ -31,6 +32,7 @@ import { ActivitiesCard } from "./ActivitiesCard";
 import { AgentCard } from "./AgentCard";
 import { Announcer } from "./Announcer";
 import { ASK_PAD, AskPanel } from "./AskPanel";
+import { GitSideDock } from "./agents/GitSideDock";
 import { Creature } from "./Creature";
 import { type BubbleItem, IslandBubbles } from "./IslandBubbles";
 import { IslandGuide, useGuide } from "./IslandGuide";
@@ -40,7 +42,15 @@ import { IslandSettings } from "./IslandSettings";
 import { FullVoice, openBoard, VoicePill, voiceShellWidth } from "./IslandVoice";
 import { IslandWelcome } from "./IslandWelcome";
 import { useBlockBrowserKeys, useFocusLeft, useIntent, useSuggestionKeys } from "./island-hooks";
-import { COMPACT, EXPANDED, OPEN_STATES, SHELL_HOVER_IN_MS, SHELL_HOVER_OUT_MS, TOP } from "./island-layout";
+import {
+  COMPACT,
+  EXPANDED,
+  OPEN_STATES,
+  SHELL_HOVER_IN_MS,
+  SHELL_HOVER_OUT_MS,
+  SHELL_SETTINGS,
+  TOP,
+} from "./island-layout";
 import { MeetingCard } from "./MeetingCard";
 import { NetCard } from "./NetCard";
 import { PreparingVoice } from "./PreparingVoice";
@@ -53,6 +63,12 @@ export function Island() {
   const askTab = useAgents((s) => s.tab);
   const agentsLayout = useAgents((s) => s.layout);
   const agentCurrent = useAgents((s) => s.current);
+  const gitListW = useAgents((s) => s.listW);
+  const gitDock = useAgents((s) => s.dock);
+  const screenW = typeof window === "undefined" ? 1920 : window.screen.availWidth;
+  // Keep the dock mounted while open (warm cache/state); only lay it beside on Repos.
+  const gitDockLive = asking && !!gitDock && gitListW != null && !stacked(screenW);
+  const gitBeside = gitDockLive && askTab === "repos";
   useEffect(listenToAgents, []);
   const view = useDuskie((s) => s.ask?.view);
   // The Ask panel itself (not Settings or the welcome shown in its place).
@@ -289,7 +305,7 @@ export function Island() {
   }, [quiet, rawHover]);
   const intent = useIntent(rawHover && !quiet, SHELL_HOVER_IN_MS);
 
-  // Fresh notification pill → unread count after PILL_FRESH_MS.
+  // Fresh timer still drives meeting notify pills; suggestions open as a card.
   const [notifyAt, setNotifyAt] = useState<number | null>(null);
   const suggestionId = suggestion?.id ?? null;
   useEffect(() => {
@@ -301,60 +317,11 @@ export function Island() {
     const id = setTimeout(() => setNotifyAt(null), PILL_FRESH_MS);
     return () => clearTimeout(id);
   }, [suggestionId]);
-  // A suggestion shows as a compact line first (the peek replaces the
-  // fresh-message pill); hover 220ms or holding Alt opens the card, leaving
-  // folds it back after 450ms, and a click inside keeps it open.
-  const notifyFresh = (meetingSoon !== null && !paused) || (false && notifyAt !== null);
-  const [peek, setPeek] = useState(false);
-  const [pinned, setPinned] = useState(false);
-  const [altHeld, setAltHeld] = useState(false);
-  const [peekFor, setPeekFor] = useState(suggestionId);
-  if (peekFor !== suggestionId) {
-    setPeekFor(suggestionId);
-    setPeek(false);
-    setPinned(false);
-  }
-  useEffect(() => {
-    if (!suggestionId) return;
-    const id = setTimeout(() => setPeek(rawHover), rawHover ? 220 : 450);
-    return () => clearTimeout(id);
-  }, [suggestionId, rawHover]);
-  useEffect(() => {
-    if (!suggestionId) return;
-    const down = (e: KeyboardEvent) => {
-      if (e.key === "Alt") setAltHeld(true);
-    };
-    const up = (e: KeyboardEvent) => {
-      if (e.key === "Alt") setAltHeld(false);
-    };
-    const blur = () => setAltHeld(false);
-    window.addEventListener("keydown", down);
-    window.addEventListener("keyup", up);
-    window.addEventListener("blur", blur);
-    return () => {
-      window.removeEventListener("keydown", down);
-      window.removeEventListener("keyup", up);
-      window.removeEventListener("blur", blur);
-    };
-  }, [suggestionId]);
-  // Keyboard users get the peek through focus: tabbing into the island opens it.
-  const [keyFocus, setKeyFocus] = useState(false);
-  useEffect(() => {
-    const into = (e: FocusEvent) =>
-      setKeyFocus(
-        e.target instanceof HTMLElement &&
-          e.target.matches(":focus-visible") &&
-          !e.target.matches("input, textarea, [contenteditable]"),
-      );
-    const out = () => setKeyFocus(false);
-    window.addEventListener("focusin", into);
-    window.addEventListener("focusout", out);
-    return () => {
-      window.removeEventListener("focusin", into);
-      window.removeEventListener("focusout", out);
-    };
-  }, []);
-  const suggestOpen = peek || pinned || altHeld || keyFocus;
+  // Full suggestion card as soon as it arrives — no fresh pill / compact peek
+  // that grew the island when the cursor arrived.
+  const suggestionFresh = notifyAt !== null;
+  const notifyFresh = (meetingSoon !== null && !paused) || suggestionFresh;
+  const suggestOpen = !!suggestion;
   // Until onboarding is done, hover shows the steps being waited on, or else
   // brings the welcome back; the idle card ("watching for moments") would
   // just flash on the way.
@@ -451,7 +418,8 @@ export function Island() {
     askOpens ||
     fullVoice ||
     preparingVoice ||
-    (hovered && (!voicePill || agentsOnly || updateWorking !== null || liveActivities.length > 0)) ||
+    // Pause stays a compact pill on hover (sleep mascot at rest), not glance.
+    (hovered && !paused && (!voicePill || agentsOnly || updateWorking !== null || liveActivities.length > 0)) ||
     guiding ||
     (OPEN_STATES.has(mascot) && !voicePill && mascot === "suggesting") ||
     successCard ||
@@ -459,10 +427,18 @@ export function Island() {
     (netShown && !voicePill) ||
     updateProgress?.phase === "failed" ||
     merging;
+  // Paused at rest: bare sleep sphere; hover reveals the compact paused pill.
+  const showPausedPill = paused && hovered && !asking && !voicePill;
   // At rest only the sphere shows. The shell keeps its size (so hover and the
   // orb position do not move) but loses its background.
   const bare =
-    !expanded && !chatting && !waiting && !voiceBusy && online && (mascot === "idle" || mascot === "sleeping");
+    !expanded &&
+    !chatting &&
+    !waiting &&
+    !voiceBusy &&
+    !showPausedPill &&
+    online &&
+    (mascot === "idle" || mascot === "sleeping");
   const busy = chatting || preparingVoice || voiceBusy || mascot === "noticing" || mascot === "working";
 
   // Hover while Thinking or Working: open Ask so the island is usable, not a dead pill.
@@ -494,7 +470,7 @@ export function Island() {
     mood?.id ??
     (asksYou && !voiceQuestion && hearing === null ? "curious" : null) ??
     (focusLeft !== null && !voiceQuestion && hearing === null && mascot !== "listening" ? "focus" : null) ??
-    (paused && !voiceQuestion && hearing === null ? "sleepy" : null) ??
+    (paused && !voiceQuestion && hearing === null ? "sleep" : null) ??
     (speaking && mascot !== "listening"
       ? "speak"
       : !online && (mascot === "idle" || mascot === "sleeping")
@@ -592,9 +568,18 @@ export function Island() {
       setSettled(false);
       return;
     }
+    setSettled(false);
     const id = setTimeout(() => setSettled(true), 600);
     return () => clearTimeout(id);
   }, [expanded, asking]);
+  // Dock open/close is a fresh shell morph — reset to GROW (not SETTLE).
+  useEffect(() => {
+    if (!asking) return;
+    setSettled(false);
+    // Hold GROW a beat longer while the dock slides in from the seam.
+    const id = setTimeout(() => setSettled(true), gitBeside ? 700 : 500);
+    return () => clearTimeout(id);
+  }, [gitBeside, asking]);
 
   const lastError = useDuskie((s) => (s.lastResult && !s.lastResult.ok ? s.lastResult.message : null));
   const peeking: Suggestion | null = suggestion && !suggestOpen ? suggestion : null;
@@ -664,8 +649,13 @@ export function Island() {
                               dim: "held while you were busy",
                               count: later,
                             }
-                          : paused
-                            ? { kind: "paused", label: "Paused", dim: pauseDim(settings.pause) }
+                          : showPausedPill
+                            ? {
+                                kind: "paused",
+                                label: "Paused",
+                                dim: pauseDim(settings.pause),
+                                onCancel: () => void api.sensorsResume(),
+                              }
                             : !online
                               ? {
                                   kind: "offline",
@@ -690,7 +680,7 @@ export function Island() {
     fullVoice,
     voicePill: voicePill !== null,
     suggestion: !!suggestion && suggestOpen,
-    suggestPeek: !!suggestion && !suggestOpen,
+    suggestPeek: !!suggestion && !suggestOpen && !suggestionFresh,
     waitingForYou: !!waiting && !waiting.minimized && !guiding,
     merging,
     updateCard: updateProgress?.phase === "failed" || (hovered && updateWorking !== null),
@@ -699,7 +689,7 @@ export function Island() {
     notifyCard: hovered && meetingSoon !== null && !paused,
     agentCard: hovered && agentsOnly && cardAgent !== null,
     focus: focusLeft !== null,
-    paused,
+    paused: showPausedPill,
     notifyFresh: !!notifyFresh && !busy && !expanded,
     unread: later,
     activitiesOpen: expanded && liveActivities.length > 0 && !suggestion,
@@ -719,7 +709,9 @@ export function Island() {
     askTab,
     agentsWide: agentCurrent !== null,
     boardWide: agentsLayout === "board" && wideScreen(),
-    settingsHeight: view === "settings" ? Math.max(460, contentHeight + 18) : undefined,
+    gitListW: gitBeside ? gitListW : null,
+    // Fixed shell size — IslandSettings uses the same height so inner panes can scroll.
+    settingsHeight: view === "settings" ? SHELL_SETTINGS.height + 18 : undefined,
     reduced,
     settled: settled || (!expanded && !asking),
   });
@@ -727,6 +719,8 @@ export function Island() {
   const height = layout.geom.height;
   const radius = layout.geom.radius;
   const transition = layout.transition;
+  const gitDockW = gitBeside && gitListW != null ? Math.max(DOCK_MIN, dockTotal(screenW) - gitListW) : 0;
+  const gitPairW = gitBeside ? width + SEAM_W + gitDockW : width;
 
   const overlayHit = useDuskie((s) => s.overlayHit);
   // Report the target shape as the interactive area; outside it the window
@@ -737,7 +731,7 @@ export function Island() {
   useEffect(() => {
     clearTimeout(hitRectTimer.current);
     hitRectTimer.current = setTimeout(() => {
-      const base = { x: (window.innerWidth - width) / 2, y: TOP, width, height };
+      const base = { x: (window.innerWidth - gitPairW) / 2, y: TOP, width: gitPairW, height };
       const rect = overlayHit
         ? {
             x: Math.min(base.x, overlayHit.x),
@@ -749,7 +743,7 @@ export function Island() {
       void api.islandSetHitRect(rect);
     }, 16);
     return () => clearTimeout(hitRectTimer.current);
-  }, [width, height, overlayHit]);
+  }, [gitPairW, height, overlayHit]);
 
   // A small squish when something gets the mascot's attention while compact.
   useEffect(() => {
@@ -805,7 +799,7 @@ export function Island() {
       animate={shown ? { opacity: 1, scale: 1, filter: "blur(0px)" } : { opacity: 0, scale: 0.92, filter: "blur(4px)" }}
       transition={reduced ? { duration: 0 } : { duration: shown ? 0.32 : 0.2, ease: [0.23, 1, 0.32, 1] }}
     >
-      <div className="relative">
+      <div className={`relative${gitBeside ? " flex items-stretch" : ""}`}>
         <motion.div
           className="island-shell relative overflow-hidden text-white"
           data-bare={layout.geom.bare}
@@ -822,9 +816,6 @@ export function Island() {
           // content up; the shell never scrolls.
           onScroll={(e) => {
             e.currentTarget.scrollTop = 0;
-          }}
-          onPointerDownCapture={() => {
-            if (suggestion && peek) setPinned(true);
           }}
           onPointerEnter={() => setHovered(true)}
           onPointerLeave={() => setHovered(false)}
@@ -881,6 +872,7 @@ export function Island() {
                         left: 12,
                         paddingTop: ASK_PAD.top,
                         paddingRight: ASK_PAD.x,
+                        paddingBottom: ASK_PAD.bottom,
                         "--ak-indent": `${layout.geom.contentPadLeft - 12}px`,
                       } as CSSProperties)
                     : {
@@ -922,6 +914,7 @@ export function Island() {
                   left: layout.geom.contentPadLeft,
                   paddingTop: EXPANDED.pad,
                   paddingRight: EXPANDED.pad,
+                  paddingBottom: 6,
                 }}
                 initial={reduced ? { opacity: 0 } : { opacity: 0, filter: "blur(6px)", y: 4 }}
                 animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
@@ -941,6 +934,8 @@ export function Island() {
                       left: layout.geom.contentPadLeft,
                       paddingTop: EXPANDED.pad,
                       paddingRight: EXPANDED.pad,
+                      // Tight inset only — clears the shell radius; height hugs content.
+                      paddingBottom: 6,
                       // Lists below the orb (You missed) reach back under it.
                       "--orb-indent": `${layout.geom.mascotSize + 14}px`,
                     } as CSSProperties
@@ -995,6 +990,9 @@ export function Island() {
             />
           </span>
         </motion.div>
+        <AnimatePresence initial={false}>
+          {gitDockLive && <GitSideDock key="git-side" height={height} visible={gitBeside} />}
+        </AnimatePresence>
       </div>
     </motion.div>
   );

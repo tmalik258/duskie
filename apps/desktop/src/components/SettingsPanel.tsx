@@ -186,7 +186,7 @@ export function SettingsPanel() {
         onScroll={(e) => {
           scrolled.current = e.currentTarget.scrollTop;
         }}
-        className="settings-scroll flex min-h-0 flex-auto flex-col gap-5 overflow-y-auto px-0.5 pb-3"
+        className="settings-scroll flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-0.5 pb-3"
       >
         {show("home") && <HomeTab onError={report} onOpenTab={open} />}
         {show("appearance") && <AppearanceTab onError={report} />}
@@ -214,9 +214,9 @@ export function SettingsPanel() {
 
   const current = GROUPS.flatMap((g) => g.items).find((i) => i.id === tab);
   return (
-    <div className="island-settings st-split flex min-h-0 flex-auto">
+    <div className="island-settings st-split flex min-h-0 flex-1 overflow-hidden">
       <nav aria-label="Settings sections" className="st-side">
-        <label className="st-search">
+        <label className="st-search shrink-0">
           <Ic name="search" size={14} />
           <input
             type="search"
@@ -228,28 +228,30 @@ export function SettingsPanel() {
           />
           <kbd>/</kbd>
         </label>
-        {GROUPS.map((g) => (
-          <div key={g.label} className="flex flex-col">
-            <p className="st-group">{g.label}</p>
-            {g.items.map((i) => (
-              <button
-                key={i.id}
-                type="button"
-                className="st-item"
-                aria-current={!searching && tab === i.id ? "page" : undefined}
-                onClick={() => {
-                  setQuery("");
-                  pick(i.id);
-                }}
-              >
-                <Ic name={i.icon} size={14} />
-                {i.label}
-              </button>
-            ))}
-          </div>
-        ))}
+        <div className="st-side-links">
+          {GROUPS.map((g) => (
+            <div key={g.label} className="flex flex-col">
+              <p className="st-group">{g.label}</p>
+              {g.items.map((i) => (
+                <button
+                  key={i.id}
+                  type="button"
+                  className="st-item"
+                  aria-current={!searching && tab === i.id ? "page" : undefined}
+                  onClick={() => {
+                    setQuery("");
+                    pick(i.id);
+                  }}
+                >
+                  <Ic name={i.icon} size={15} />
+                  {i.label}
+                </button>
+              ))}
+            </div>
+          ))}
+        </div>
       </nav>
-      <div className="flex min-h-0 min-w-0 flex-auto flex-col">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div className="shrink-0 pb-3">
           <p className="st-title">{searching ? "Search" : current?.label}</p>
           <p className="st-blurb">{searching ? `Settings matching "${query.trim()}"` : current?.blurb}</p>

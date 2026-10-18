@@ -1007,6 +1007,14 @@ export interface GitFile {
   unstaged: boolean;
 }
 
+/** One local branch in the Git dock's Branches tab. */
+export interface GitBranch {
+  name: string;
+  current: boolean;
+  ahead: number;
+  behind: number;
+}
+
 /** One commit in the Git dock's History tab. */
 export interface CommitRow {
   hash: string;

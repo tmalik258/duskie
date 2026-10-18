@@ -2,15 +2,20 @@
 
 // The one tab row for the open island: Ask, Agents and Repos as words, with
 // History and Settings as icons on the right. Ctrl Tab goes through all five.
+// The selected background is a shared layout pill that slides between tabs.
 
+import { motion } from "motion/react";
 import type { ReactNode } from "react";
 import type { AskTab } from "@/lib/agents";
-import { api } from "@/lib/bridge";
+import { useReduced } from "@/lib/use-reduced";
 import { KeyHint } from "./ask/parts";
 import { Ic } from "./Icon";
 import { Tip } from "./Tip";
 
 export type PanelTab = AskTab | "settings";
+
+/** Critically damped spring; matches GitTabs underline. */
+const PILL = { type: "spring", stiffness: 400, damping: 40, mass: 1 } as const;
 
 /** The Ctrl Tab order. Not a coder: no Agents or Repos. */
 export function tabOrder(coder: boolean): PanelTab[] {
@@ -21,6 +26,18 @@ export function nextTab(current: PanelTab, coder: boolean, back: boolean): Panel
   const order = tabOrder(coder);
   const i = Math.max(order.indexOf(current), 0);
   return order[(i + (back ? order.length - 1 : 1)) % order.length];
+}
+
+function TabPill() {
+  const reduced = useReduced();
+  return (
+    <motion.span
+      layoutId="ak-tab-pill"
+      className="ak-tab-pill"
+      aria-hidden="true"
+      transition={reduced ? { duration: 0 } : PILL}
+    />
+  );
 }
 
 export function PanelTabs({
@@ -57,6 +74,7 @@ export function PanelTabs({
           onClick={() => onPick(id)}
           className="ak-tab chip"
         >
+          {current === id && <TabPill />}
           <span className="ak-tab-ic" aria-hidden>
             <Ic name={icon} size={13} />
           </span>
@@ -76,6 +94,7 @@ export function PanelTabs({
               onClick={() => onPick("history")}
               className="ak-tab ak-tabi chip"
             >
+              {current === "history" && <TabPill />}
               <Ic name="clock" size={14} />
             </button>
           </Tip>
@@ -90,12 +109,8 @@ export function PanelTabs({
             onClick={() => onPick("settings")}
             className="ak-tab ak-tabi chip"
           >
+            {current === "settings" && <TabPill />}
             <Ic name="gear" size={14} />
-          </button>
-        </Tip>
-        <Tip label="Close (Esc)">
-          <button type="button" aria-label="Close" onClick={() => void api.askClose()} className="ak-tab ak-tabi chip">
-            <Ic name="x" size={14} />
           </button>
         </Tip>
       </span>

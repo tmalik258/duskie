@@ -41,6 +41,8 @@ export interface PillModel {
   /** Suggest: the likely option as a chip. */
   chip?: string;
   onChip?: () => void;
+  /** Paused: resume / cancel the pause. */
+  onCancel?: () => void;
 }
 
 const clock = (ms: number) => {
@@ -104,7 +106,23 @@ export function IslandPill({ model, onWidth }: { model: PillModel; onWidth: (w: 
       </span>
     );
   else if (kind === "paused")
-    trail = <span className="dot" style={{ background: "var(--warn)", boxShadow: "0 0 8px var(--warn)" }} />;
+    trail = (
+      <>
+        <button
+          type="button"
+          className="chip-s ic-only"
+          aria-label="Resume"
+          style={{ cursor: "pointer", color: "var(--warn)" }}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (model.onCancel) model.onCancel();
+            else void api.sensorsResume();
+          }}
+        >
+          <Ic name="play" size={12} />
+        </button>
+      </>
+    );
   else if (kind === "offline")
     trail = (
       <button

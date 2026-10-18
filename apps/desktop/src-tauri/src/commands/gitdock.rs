@@ -4,10 +4,11 @@
 
 use std::path::PathBuf;
 
-use duskie_actions::gitflow::{self, FileChange};
+use duskie_actions::gitflow::{self, BranchRow, FileChange};
 use serde::Serialize;
 
 use super::*;
+use crate::review;
 
 /// Characters of diff a model reads for a commit message.
 const MESSAGE_DIFF_CHARS: usize = 12_000;
@@ -109,6 +110,138 @@ pub async fn git_stash_drop(path: String, name: String) -> CmdResult<String> {
         gitflow::stash_drop(&PathBuf::from(path), &name)
             .map(|o| o.message)
             .map_err(err)
+    })
+    .await?
+}
+
+#[tauri::command]
+pub async fn git_fetch(path: String) -> CmdResult<String> {
+    off_ui(move || {
+        gitflow::fetch(&PathBuf::from(path))
+            .map(|o| o.message)
+            .map_err(err)
+    })
+    .await?
+}
+
+#[tauri::command]
+pub async fn git_push(path: String) -> CmdResult<String> {
+    off_ui(move || {
+        gitflow::push(&PathBuf::from(path))
+            .map(|o| o.message)
+            .map_err(err)
+    })
+    .await?
+}
+
+#[tauri::command]
+pub async fn git_branches(path: String) -> CmdResult<Vec<BranchRow>> {
+    off_ui(move || gitflow::branches(&PathBuf::from(path)).map_err(err)).await?
+}
+
+#[tauri::command]
+pub async fn git_switch_branch(path: String, name: String) -> CmdResult<String> {
+    off_ui(move || {
+        gitflow::switch_branch(&PathBuf::from(path), &name)
+            .map(|o| o.message)
+            .map_err(err)
+    })
+    .await?
+}
+
+#[tauri::command]
+pub async fn git_create_branch(path: String, name: String) -> CmdResult<String> {
+    off_ui(move || {
+        gitflow::create_branch(&PathBuf::from(path), &name)
+            .map(|o| o.message)
+            .map_err(err)
+    })
+    .await?
+}
+
+#[tauri::command]
+pub async fn git_file_diff(
+    path: String,
+    file: String,
+    staged: bool,
+) -> CmdResult<review::FileChange> {
+    off_ui(move || {
+        let path = PathBuf::from(path);
+        let diff = gitflow::diff_file(&path, &file, staged).map_err(err)?;
+        review::parse(&diff)
+            .into_iter()
+            .find(|f| f.path == file)
+            .ok_or_else(|| "That file has no diff to show.".to_owned())
+    })
+    .await?
+}
+
+/// Builds a one-hunk patch from a full file diff for `git apply --cached`.
+fn patch_for_hunk(diff: &str, index: usize) -> Result<String, String> {
+    let mut file_header = String::new();
+    let mut hunks: Vec<String> = Vec::new();
+    let mut current = String::new();
+    let mut in_hunk = false;
+    for line in diff.lines() {
+        if line.starts_with("diff --git ") {
+            if in_hunk {
+                hunks.push(current.trim_end().to_owned());
+                current.clear();
+                in_hunk = false;
+            }
+            file_header.clear();
+            file_header.push_str(line);
+            file_header.push('\n');
+            continue;
+        }
+        if file_header.is_empty() {
+            continue;
+        }
+        if line.starts_with("@@ ") {
+            if in_hunk {
+                hunks.push(current.trim_end().to_owned());
+                current.clear();
+            }
+            in_hunk = true;
+            current.push_str(line);
+            current.push('\n');
+        } else if in_hunk
+            && (line.starts_with(['+', '-', ' ']) || line.starts_with("\\ No newline"))
+        {
+            current.push_str(line);
+            current.push('\n');
+        } else if !in_hunk
+            && !line.starts_with("index ")
+            && !line.starts_with("similarity ")
+            && !line.starts_with("rename ")
+            && !line.starts_with("old mode ")
+            && !line.starts_with("new mode ")
+            && !line.starts_with("deleted file mode ")
+            && !line.starts_with("new file mode ")
+            && !line.starts_with("Binary files ")
+        {
+            file_header.push_str(line);
+            file_header.push('\n');
+        }
+    }
+    if in_hunk && !current.is_empty() {
+        hunks.push(current.trim_end().to_owned());
+    }
+    let hunk = hunks.get(index).ok_or("That hunk is not there any more.")?;
+    Ok(format!("{file_header}{hunk}\n"))
+}
+
+#[tauri::command]
+pub async fn git_stage_hunk(path: String, file: String, index: usize) -> CmdResult<String> {
+    off_ui(move || {
+        let path = PathBuf::from(path);
+        let diff = gitflow::diff_file(&path, &file, false).map_err(err)?;
+        if diff.trim().is_empty() {
+            return Err("That file has nothing unstaged to stage.".into());
+        }
+        let patch = patch_for_hunk(&diff, index)?;
+        gitflow::apply_cached(&path, &patch).map_err(err)?;
+        Ok("Staged that hunk".into())
     })
     .await?
 }

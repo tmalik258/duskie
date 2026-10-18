@@ -5,22 +5,13 @@
 // minimum, and the width is remembered.
 
 import { useEffect, useRef } from "react";
-import { clampIsland, defaultIsland, nudge, restore } from "@/lib/seam";
+import { clampIsland, defaultIsland, nudge, readSeam } from "@/lib/seam";
 
-const KEY = "duskie.seam";
-
-export function readSeam(total: number): number {
-  let saved: number | null = null;
-  try {
-    const raw = localStorage.getItem(KEY);
-    saved = raw ? Number(raw) : null;
-  } catch {}
-  return restore(Number.isFinite(saved) ? saved : null, total);
-}
+export { readSeam };
 
 function save(w: number) {
   try {
-    localStorage.setItem(KEY, String(w));
+    localStorage.setItem("duskie.seam", String(w));
   } catch {}
 }
 

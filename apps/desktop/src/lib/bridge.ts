@@ -33,6 +33,7 @@ import type {
   FileChange,
   Found,
   FoundSkill,
+  GitBranch,
   GitFile,
   HitRect,
   InboxStatus,
@@ -179,6 +180,11 @@ let tauriEventPromise: Promise<typeof import("@tauri-apps/api/event")> | null = 
 function getTauriEvent() {
   tauriEventPromise ??= import("@tauri-apps/api/event");
   return tauriEventPromise;
+}
+
+/** Kept for callers that still invoke it; usually a no-op (window sized at launch). */
+function setIslandWidth(width: number): Promise<void> {
+  return invoke<void>("island_width", { width });
 }
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -418,8 +424,16 @@ export const api = {
   gitStashes: (path: string) => invoke<StashRow[]>("git_stashes", { path }),
   gitStashApply: (path: string, name: string, pop: boolean) => invoke<string>("git_stash_apply", { path, name, pop }),
   gitStashDrop: (path: string, name: string) => invoke<string>("git_stash_drop", { path, name }),
-  /** Widens the island window for a dock beside it; 0 puts it back. */
-  islandWidth: (width: number) => invoke<void>("island_width", { width }),
+  gitFetch: (path: string) => invoke<string>("git_fetch", { path }),
+  gitPush: (path: string) => invoke<string>("git_push", { path }),
+  gitBranches: (path: string) => invoke<GitBranch[]>("git_branches", { path }),
+  gitSwitchBranch: (path: string, name: string) => invoke<string>("git_switch_branch", { path, name }),
+  gitCreateBranch: (path: string, name: string) => invoke<string>("git_create_branch", { path, name }),
+  gitFileDiff: (path: string, file: string, staged: boolean) =>
+    invoke<FileChange>("git_file_diff", { path, file, staged }),
+  gitStageHunk: (path: string, file: string, index: number) => invoke<string>("git_stage_hunk", { path, file, index }),
+  /** Widens the island window for a dock beside it; 0 puts it back. Skips no-ops. */
+  islandWidth: (width: number) => setIslandWidth(width),
   limitsPaused: () => invoke<LimitState[]>("limits_paused"),
   gpuMemory: () => invoke<number | null>("gpu_memory"),
   serversSave: (server: DirectServer, env: Record<string, string>) => invoke<string>("servers_save", { server, env }),

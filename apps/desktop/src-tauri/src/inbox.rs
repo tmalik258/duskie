@@ -34,8 +34,6 @@ const POLL: Duration = Duration::from_secs(2);
 /// Messages wait at most this long before one card gathers them.
 const SOON_EVERY: Duration = Duration::from_secs(10 * 60);
 const KEEP: usize = 300;
-/// "Not now" this many times in a row on one app moves it down a level.
-const DISMISSALS_TO_DEMOTE: u32 = 3;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -76,6 +74,7 @@ impl Level {
         }
     }
 
+    #[cfg(test)]
     fn lower(self) -> Self {
         match self {
             Level::Now => Level::Soon,
@@ -832,31 +831,6 @@ fn clip(s: &str, n: usize) -> String {
     } else {
         s.chars().take(n).collect::<String>() + "..."
     }
-}
-
-/// "Not now" on a notification card: three in a row for one app moves the
-/// app down a level, so its next ones interrupt less.
-pub fn on_dismiss(app: &AppHandle, from: &str) -> Option<String> {
-    if from.is_empty() {
-        return None;
-    }
-    let n = {
-        let mut i = inbox();
-        let n = i.dismissals.entry(from.to_owned()).or_default();
-        *n += 1;
-        *n
-    };
-    if n < DISMISSALS_TO_DEMOTE {
-        return None;
-    }
-    inbox().dismissals.remove(from);
-    let current = lock(&app.state::<AppState>().settings)
-        .notifications
-        .apps
-        .get(from)
-        .and_then(|l| Level::parse(l))
-        .unwrap_or(Level::Now);
-    set_level(app, from, current.lower()).ok()
 }
 
 /// Back to letting Duskie decide for this app.

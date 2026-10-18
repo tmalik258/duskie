@@ -9,7 +9,7 @@ import type { ReactNode } from "react";
 import { ChipKeys } from "./ask/parts";
 
 /** Pulls a block left under the mascot so it spans the full card width. */
-const FULL = {
+export const FULL = {
   marginLeft: "calc(var(--orb-indent, 0px) * -1)",
   width: "calc(100% + var(--orb-indent, 0px))",
 };
@@ -48,9 +48,9 @@ const DOT = { wait: "bg-[#ff9f0a]", done: "bg-[#30d158]" } as const;
 export function CardList({ label, action, rows }: { label?: string; action?: ReactNode; rows: CardRow[] }) {
   if (rows.length === 0) return null;
   return (
-    <div className="mt-3 flex flex-col gap-1.5" style={FULL}>
+    <div className="rd-sec-list" style={FULL}>
       {(label || action) && (
-        <div className="flex items-center justify-between text-[12px] text-[rgb(235_235_245/0.6)]">
+        <div className="rd-sec">
           <span>{label}</span>
           {action}
         </div>
@@ -61,14 +61,20 @@ export function CardList({ label, action, rows }: { label?: string; action?: Rea
           type="button"
           style={{ animationDelay: `${Math.min(n, 6) * 40}ms` }}
           onClick={r.onClick}
-          className="chip rise-in flex w-full shrink-0 items-center gap-3 rounded-xl bg-white/[0.07] px-3 py-1.5 text-left hover:bg-white/12"
+          className="chip rise-in rd-list-row"
         >
-          {r.dot && <span className={`size-1.5 shrink-0 rounded-full ${DOT[r.dot]}`} aria-hidden="true" />}
-          <span className="min-w-0 flex-1 overflow-hidden">
-            <span className="block truncate text-[13px] font-medium text-white">{r.title}</span>
-            {r.detail && <span className="block truncate text-[12px] text-[rgb(235_235_245/0.62)]">{r.detail}</span>}
+          {r.dot && (
+            <span
+              className={`dot shrink-0 ${DOT[r.dot]}`}
+              style={{ color: r.dot === "wait" ? "#ff9f0a" : "#30d158" }}
+              aria-hidden="true"
+            />
+          )}
+          <span className="t">
+            <span className="block truncate">{r.title}</span>
+            {r.detail && <span className="block truncate text-(--ink-3)">{r.detail}</span>}
           </span>
-          {r.right && <span className="shrink-0 text-[11px] text-white/45 tabular-nums">{r.right}</span>}
+          {r.right && <span className="r">{r.right}</span>}
         </button>
       ))}
     </div>
@@ -97,14 +103,14 @@ export interface CardOption {
  * quiet text button last (Not now, Clear all). */
 export function CardChips({ options, quiet }: { options: CardOption[]; quiet?: CardOption }) {
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-1.5" style={FULL}>
+    <div className="flex flex-wrap items-center gap-2" style={FULL}>
       {options.map((o, i) => (
         <button
           // biome-ignore lint/suspicious/noArrayIndexKey: labels can repeat and the list never reorders
           key={`${i}-${o.label}`}
           type="button"
           onClick={o.run}
-          className={`chip flex max-w-full min-h-8 items-center gap-2 rounded-full px-3 py-1.5 text-left text-[13px] font-medium tracking-[-0.01em] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff] ${
+          className={`chip flex max-w-full min-h-9 items-center gap-2 rounded-full px-3.5 py-1.5 text-left text-[13.5px] font-medium tracking-[-0.01em] transition-transform duration-120 active:scale-[0.97] motion-reduce:active:scale-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0a84ff] ${
             i === 0 ? "bg-white text-black hover:bg-white/90" : "bg-white/12 text-white hover:bg-white/20"
           }`}
         >
