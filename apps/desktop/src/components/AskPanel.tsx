@@ -74,7 +74,7 @@ export const ASK_ORB = 30;
 /** The mascot in Ask: 36 px, on the input line under the tabs. */
 export const ASK_MASCOT = { size: 36, x: 10, y: 40 } as const;
 /** Ask's padding inside the island: top, sides, bottom. */
-export const ASK_PAD = { top: 8, x: 10, bottom: 14 } as const;
+export const ASK_PAD = { top: 8, x: 10, bottom: 5 } as const;
 
 /** The "Hold Alt" hint shows in the first five sessions only. */
 const EARLY_SESSIONS = (() => {

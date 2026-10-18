@@ -21,6 +21,7 @@ import { interruptSession, listenToAgents, useAgents, wideScreen } from "@/lib/a
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow, useSystemLook } from "@/lib/hooks";
+import { PANEL_PAD } from "@/lib/islandSize";
 import { PILL_FRESH_MS } from "@/lib/peek";
 import { resolveIslandState } from "@/lib/resolve-island-state";
 import { DOCK_MIN, dockTotal, SEAM_W, stacked } from "@/lib/seam";
@@ -708,6 +709,7 @@ export function Island() {
     pillWidth: pillModel && pillMeasured ? pillMeasured : pillWidth,
     askTab,
     agentsWide: agentCurrent !== null,
+    agentsBoard: agentsLayout === "board",
     boardWide: agentsLayout === "board" && wideScreen(),
     gitListW: gitBeside ? gitListW : null,
     // Fixed shell size — IslandSettings uses the same height so inner panes can scroll.
@@ -721,6 +723,8 @@ export function Island() {
   const transition = layout.transition;
   const gitDockW = gitBeside && gitListW != null ? Math.max(DOCK_MIN, dockTotal(screenW) - gitListW) : 0;
   const gitPairW = gitBeside ? width + SEAM_W + gitDockW : width;
+  // Dock fills the island window below the top gap; shell stays content-sized.
+  const gitDockH = typeof window === "undefined" ? height : Math.max(height, window.innerHeight - TOP - PANEL_PAD);
 
   const overlayHit = useDuskie((s) => s.overlayHit);
   // Report the target shape as the interactive area; outside it the window
@@ -731,7 +735,8 @@ export function Island() {
   useEffect(() => {
     clearTimeout(hitRectTimer.current);
     hitRectTimer.current = setTimeout(() => {
-      const base = { x: (window.innerWidth - gitPairW) / 2, y: TOP, width: gitPairW, height };
+      const hitH = gitBeside ? gitDockH : height;
+      const base = { x: (window.innerWidth - gitPairW) / 2, y: TOP, width: gitPairW, height: hitH };
       const rect = overlayHit
         ? {
             x: Math.min(base.x, overlayHit.x),
@@ -743,7 +748,7 @@ export function Island() {
       void api.islandSetHitRect(rect);
     }, 16);
     return () => clearTimeout(hitRectTimer.current);
-  }, [gitPairW, height, overlayHit]);
+  }, [gitPairW, height, gitBeside, gitDockH, overlayHit]);
 
   // A small squish when something gets the mascot's attention while compact.
   useEffect(() => {
@@ -799,7 +804,7 @@ export function Island() {
       animate={shown ? { opacity: 1, scale: 1, filter: "blur(0px)" } : { opacity: 0, scale: 0.92, filter: "blur(4px)" }}
       transition={reduced ? { duration: 0 } : { duration: shown ? 0.32 : 0.2, ease: [0.23, 1, 0.32, 1] }}
     >
-      <div className={`relative${gitBeside ? " flex items-stretch" : ""}`}>
+      <div className={`relative${gitBeside ? " flex items-start" : ""}`}>
         <motion.div
           className="island-shell relative overflow-hidden text-white"
           data-bare={layout.geom.bare}
@@ -991,7 +996,7 @@ export function Island() {
           </span>
         </motion.div>
         <AnimatePresence initial={false}>
-          {gitDockLive && <GitSideDock key="git-side" height={height} visible={gitBeside} />}
+          {gitDockLive && <GitSideDock key="git-side" height={gitDockH} visible={gitBeside} />}
         </AnimatePresence>
       </div>
     </motion.div>

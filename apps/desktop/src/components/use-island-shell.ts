@@ -6,6 +6,8 @@ import { stateDef } from "@/lib/island-states";
 import { motionFor } from "@/lib/spring";
 import type { WashEvent } from "@/lib/wash";
 import {
+  BOARD_WIDE_WIDTH,
+  BOARD_WIDTH,
   GROW,
   SETTLE,
   SHELL_AGENTS,
@@ -48,6 +50,9 @@ export function shellGeom(opts: {
   pillWidth?: number;
   askTab: string | null;
   agentsWide: boolean;
+  /** Agents multi-session board (2 columns). */
+  agentsBoard: boolean;
+  /** Board on a tall screen (3 columns). */
   boardWide: boolean;
   /** When the Git dock is beside Ask, the island shell is this wide (repo list). */
   gitListW?: number | null;
@@ -73,7 +78,14 @@ export function shellGeom(opts: {
     radius = SHELL_SETTINGS.radius;
     take = TAKE_A_ASK;
   } else if (opts.id === "agents") {
-    width = opts.boardWide ? 680 : opts.agentsWide ? SHELL_AGENTS.width : SHELL_ASK.width;
+    // Board always gets room for its tiles — never fall back to Ask width.
+    width = opts.boardWide
+      ? BOARD_WIDE_WIDTH
+      : opts.agentsBoard
+        ? BOARD_WIDTH
+        : opts.agentsWide
+          ? SHELL_AGENTS.width
+          : SHELL_ASK.width;
     height = Math.max(SHELL_COMPACT.height, opts.contentHeight + 8);
     radius = SHELL_AGENTS.radius;
     take = TAKE_A_ASK;

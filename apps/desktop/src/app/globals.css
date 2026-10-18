@@ -1112,6 +1112,11 @@ body {
     system-ui,
     sans-serif;
 }
+/* Agents stays mounted across tabs; when shown, drop the wrapper so head /
+   meta / composer join .ak's gap (otherwise the plan row sits on the field). */
+.ak > [data-agents-host]:not([hidden]) {
+  display: contents;
+}
 .island-shell[data-color="atelier"] .ak {
   --ink: var(--c2);
   --i2: rgb(from var(--c2) r g b / 0.68);
@@ -5527,6 +5532,11 @@ button.ak-cchip:hover,
   scrollbar-width: none;
   min-height: 160px;
 }
+.files::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
 .fhead {
   display: flex;
   align-items: center;
@@ -5802,12 +5812,18 @@ button.ak-cchip:hover,
 }
 .diff {
   flex: 1;
-  overflow: auto;
+  overflow-x: hidden;
+  overflow-y: auto;
   font: 400 12px / 20px var(--mono);
   padding-bottom: 20px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--fill-3) transparent;
+  scrollbar-width: none;
   min-height: 240px;
+  min-width: 0;
+}
+.diff::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 .hunk-h {
   display: flex;
@@ -5826,8 +5842,9 @@ button.ak-cchip:hover,
 }
 .dl {
   display: grid;
-  grid-template-columns: 44px 16px max-content;
-  min-width: 100%;
+  grid-template-columns: 44px 16px minmax(0, 1fr);
+  width: 100%;
+  align-items: start;
 }
 .dl .n {
   color: var(--ink-4);
@@ -5854,7 +5871,8 @@ button.ak-cchip:hover,
   color: #f0b8ad;
 }
 .dl .c {
-  white-space: pre;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   padding-right: 20px;
   color: var(--ink-2);
 }
