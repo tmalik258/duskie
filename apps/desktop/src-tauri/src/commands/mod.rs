@@ -180,10 +180,10 @@ pub fn limits_paused() -> Vec<duskie_ai::limit::LimitState> {
 /// thread; usually a no-op because setup already sized the window.
 #[tauri::command]
 pub async fn island_width(app: AppHandle, width: f64) {
-    if let Some(w) = app.get_webview_window(crate::island::LABEL) {
-        if let Err(e) = crate::island::set_width(&w, width) {
-            log::warn!("could not resize the island: {e}");
-        }
+    if let Some(w) = app.get_webview_window(crate::island::LABEL)
+        && let Err(e) = crate::island::set_width(&w, width)
+    {
+        log::warn!("could not resize the island: {e}");
     }
 }
 
