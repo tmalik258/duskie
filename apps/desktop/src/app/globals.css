@@ -5236,6 +5236,31 @@ button.ak-cchip:hover,
 .gd-side-panel .gwin {
   height: 100%;
 }
+.ak-rv-dock {
+  overflow: auto;
+  padding: 12px 10px 14px;
+  border-radius: 16px;
+  background: rgb(11 12 11 / 0.94);
+  box-shadow:
+    0 40px 80px -30px rgb(0 0 0 / 0.9),
+    inset 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+.gd-diff-skel,
+.gd-hist-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px 10px 12px;
+}
+.gd-diff-skel .ak-rbar,
+.gd-hist-skel .ak-rbar {
+  height: 10px;
+  border-radius: 5px;
+  background: rgb(255 255 255 / 0.07);
+}
+.gd-hist-skel .crow-h {
+  pointer-events: none;
+}
 .gwin {
   --add-bg: rgb(156 199 154 / 0.1);
   --del-bg: rgb(222 134 118 / 0.1);

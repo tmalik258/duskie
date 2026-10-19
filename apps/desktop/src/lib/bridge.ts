@@ -117,6 +117,8 @@ export const EVENTS = {
   timing: "timing://recorded",
   islandDone: "island://done",
   islandFocus: "island://focus",
+  reviewFile: "review://file",
+  reviewDone: "review://done",
 } as const;
 
 export interface EventPayloads {
@@ -164,6 +166,8 @@ export interface EventPayloads {
   [EVENTS.guideKey]: number;
   [EVENTS.voiceWelcome]: WelcomeSpeech;
   [EVENTS.timing]: Timing;
+  [EVENTS.reviewFile]: { session: string; file: FileChange };
+  [EVENTS.reviewDone]: { session: string };
 }
 
 export function isTauri(): boolean {

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   answerQuestion,
   finishSession,
+  openReview,
   resumeSession,
   type Session,
   sendToSession,
@@ -651,9 +652,9 @@ export function Board({
             })
           }
           onReview={() => {
-            sessionView(target.id, { reviewing: true });
             setLayout("one");
             useAgents.setState({ current: target.id });
+            openReview(target.id);
           }}
           onRewind={() => {
             setLayout("one");

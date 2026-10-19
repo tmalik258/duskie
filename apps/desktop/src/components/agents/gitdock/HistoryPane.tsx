@@ -26,7 +26,20 @@ export function HistoryPane({ path, branch, rev }: { path: string; branch: strin
   if (!rows) {
     return (
       <div className="gbody single">
-        <p className="gempty shimmer-text">Reading the history</p>
+        <div className="gd-hist-skel" role="status" aria-busy="true" aria-label="Reading the history">
+          <p className="gempty shimmer-text">Reading the history</p>
+          {[72, 58, 66, 50, 62].map((w, i) => (
+            <div key={w} className="crow-h ak-rskel" aria-hidden="true" style={{ animationDelay: `${i * 90}ms` }}>
+              <span className="lane">
+                <i />
+              </span>
+              <span className="cbody">
+                <i className="ak-rbar" style={{ width: `${w}%` }} />
+                <i className="ak-rbar ak-rbar-s" style={{ width: "40%" }} />
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
     );
   }

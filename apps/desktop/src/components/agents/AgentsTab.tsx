@@ -22,6 +22,7 @@ import { answerText, type OpenChoice } from "@/lib/agent-questions";
 import {
   answerQuestion,
   COMPACT_AT,
+  closeReview,
   closeSession,
   dismissCompact,
   type Entry,
@@ -29,6 +30,7 @@ import {
   handOffSession,
   interruptSession,
   messageIndex,
+  openReview,
   readNewPrefs,
   readUsualAgent,
   renameSession,
@@ -52,6 +54,7 @@ import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
 import { Markdown } from "@/lib/markdown";
 import { extractChoices } from "@/lib/options";
+import { stacked } from "@/lib/seam";
 import { setAsk, setOverlayHit } from "@/lib/store";
 import type { AgentInfo, AgentMode, Agents, CursorChat, EditorList } from "@/lib/types";
 import { scrollIfActive } from "../ask/parts";
@@ -732,8 +735,12 @@ function SessionView({
     flushAgentsView();
   };
   const reviewing = s.view?.reviewing ?? false;
-  const setReviewing = (next: boolean) =>
-    sessionView(s.id, { draft: textRef.current, ...scrollState.current, reviewing: next });
+  const reviewStacked = reviewing && stacked(typeof window === "undefined" ? 1920 : window.screen.availWidth);
+  const setReviewing = (next: boolean) => {
+    sessionView(s.id, { draft: textRef.current, ...scrollState.current });
+    if (next) openReview(s.id);
+    else closeReview(s.id);
+  };
   const [rewindAt, setRewindAt] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   /** Bumped after rewind so the composer focuses and selects the restored draft. */
@@ -902,7 +909,7 @@ function SessionView({
         {working && s.activeMode !== s.mode && <span className="ak-note">Applies to next message</span>}
       </div>
 
-      {reviewing ? (
+      {reviewStacked ? (
         <Review session={s} maxHeight={maxHeight} onDone={() => setReviewing(false)} />
       ) : (
         <>

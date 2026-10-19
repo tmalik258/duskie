@@ -1180,7 +1180,13 @@ commands.agent_commands = () => [
   { name: "/rewind", description: "Go back to an earlier message, code included", group: "Session" },
   { name: "/release", description: "Cut a release (.claude/commands/release.md)", group: "This project" },
 ];
-commands.agent_changes = () => structuredClone(mockChanges);
+commands.agent_changes = (a) => {
+  const id = String(a.id ?? "");
+  const files = structuredClone(mockChanges);
+  for (const file of files) emit("review://file", { session: id, file });
+  emit("review://done", { session: id });
+  return files;
+};
 commands.agent_undo = (a) => {
   mockChanges = a.path ? mockChanges.filter((f) => f.path !== a.path) : [];
 };

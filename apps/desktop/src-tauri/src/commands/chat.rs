@@ -190,10 +190,14 @@ pub fn agent_answer(question: String, answer: crate::sessions::Answer) -> CmdRes
     crate::sessions::answer(&question, answer)
 }
 
-/// What the session changed, by file and hunk.
+/// What the session changed, by file and hunk. Emits `review://file` per file
+/// then `review://done` while building the list.
 #[tauri::command]
-pub async fn agent_changes(id: String) -> CmdResult<Vec<crate::review::FileChange>> {
-    tauri::async_runtime::spawn_blocking(move || crate::sessions::changes(&id))
+pub async fn agent_changes(
+    app: AppHandle,
+    id: String,
+) -> CmdResult<Vec<crate::review::FileChange>> {
+    tauri::async_runtime::spawn_blocking(move || crate::sessions::changes_emitting(&id, Some(&app)))
         .await
         .map_err(|e| e.to_string())?
 }

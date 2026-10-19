@@ -15,7 +15,7 @@ pub struct ReviewTurn {
 
 pub(super) static REVIEWS: Mutex<Option<HashMap<String, Vec<ReviewTurn>>>> = Mutex::new(None);
 pub(super) static WRITING: Mutex<Option<HashMap<String, bool>>> = Mutex::new(None);
-/// Codex (and others) may report a turn diff before the workspace snapshot settles.
+/// Set when a session stream reports a turn diff before the workspace snapshot settles.
 pub(super) static DIFF_HINT: Mutex<Option<HashMap<String, bool>>> = Mutex::new(None);
 static DECISION_LOCK: Mutex<()> = Mutex::new(());
 
@@ -29,8 +29,9 @@ fn take_diff_hint(id: &str) -> bool {
     with(&DIFF_HINT, |h| h.remove(id).unwrap_or(false))
 }
 
-/// Snapshot the workspace for this turn. Empty captures are retried / replaced when
-/// live changes (or a Codex turn-diff hint) show the agent did write files.
+/// Snapshot the workspace for this turn. Empty captures retry briefly when a
+/// turn-diff hint (or a live non-empty tree) suggests writes have not settled
+/// yet - never fill from a live full-tree diff.
 pub(super) fn capture_turn(id: &str) {
     let Some((before, path, entry, baseline)) = with(&SESSIONS, |s| {
         s.get(id).map(|h| {
@@ -70,13 +71,6 @@ pub(super) fn capture_turn(id: &str) {
     if files_error.0.is_empty() && files_error.1.is_none() && (hinted || live_nonempty(&baseline)) {
         std::thread::sleep(std::time::Duration::from_millis(200));
         files_error = snapshot_between(&before, &path);
-        if files_error.0.is_empty()
-            && files_error.1.is_none()
-            && let Some(live) = baseline.as_ref().and_then(|b| review::changes(b).ok())
-            && !live.is_empty()
-        {
-            files_error = (live, None);
-        }
     }
     let (files, error) = files_error;
     let fingerprints = before
@@ -158,6 +152,36 @@ pub fn latest_files(id: &str) -> Option<Vec<review::FileChange>> {
     })
 }
 
+/// Files from the most recent turn (may be empty) - used after `capture_turn`.
+pub(super) fn last_turn_files(id: &str) -> Vec<review::FileChange> {
+    with(&REVIEWS, |r| {
+        r.get(id)
+            .and_then(|turns| turns.last().map(|t| t.files.clone()))
+            .unwrap_or_default()
+    })
+}
+
+/// Merge every turn's files for this session; the latest turn wins per path.
+pub fn merged_files(id: &str) -> Vec<review::FileChange> {
+    with(&REVIEWS, |r| {
+        merge_turn_files(r.get(id).map(|t| t.as_slice()).unwrap_or(&[]))
+    })
+}
+
+/// Latest-path-wins merge over turn snapshots (pure; used by tests).
+pub(super) fn merge_turn_files(turns: &[ReviewTurn]) -> Vec<review::FileChange> {
+    let mut map: HashMap<String, review::FileChange> = HashMap::new();
+    let mut order: Vec<String> = Vec::new();
+    for turn in turns {
+        for f in &turn.files {
+            if map.insert(f.path.clone(), f.clone()).is_none() {
+                order.push(f.path.clone());
+            }
+        }
+    }
+    order.into_iter().filter_map(|p| map.remove(&p)).collect()
+}
+
 pub fn decide(
     id: &str,
     turn_id: &str,
@@ -233,4 +257,60 @@ pub fn decide(
     });
     save();
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::review::{FileChange, Hunk};
+
+    fn file(path: &str, header: &str) -> FileChange {
+        FileChange {
+            path: path.into(),
+            status: "modified".into(),
+            added: 1,
+            removed: 0,
+            hunks: vec![Hunk {
+                header: header.into(),
+                lines: vec!["+x".into()],
+            }],
+        }
+    }
+
+    fn turn(entry: usize, files: Vec<FileChange>) -> ReviewTurn {
+        ReviewTurn {
+            id: format!("t{entry}"),
+            entry,
+            files,
+            decisions: HashMap::new(),
+            error: None,
+            before: None,
+            fingerprints: HashMap::new(),
+        }
+    }
+
+    #[test]
+    fn merge_keeps_latest_path_only() {
+        let turns = [
+            turn(0, vec![file("a.rs", "@@ a0 @@"), file("b.rs", "@@ b0 @@")]),
+            turn(1, vec![file("a.rs", "@@ a1 @@")]),
+        ];
+        let merged = merge_turn_files(&turns);
+        assert_eq!(merged.len(), 2);
+        assert_eq!(merged[0].path, "a.rs");
+        assert_eq!(merged[0].hunks[0].header, "@@ a1 @@");
+        assert_eq!(merged[1].path, "b.rs");
+        assert_eq!(merged[1].hunks[0].header, "@@ b0 @@");
+    }
+
+    #[test]
+    fn merge_empty_turns_is_empty() {
+        assert!(merge_turn_files(&[]).is_empty());
+        assert!(merge_turn_files(&[turn(0, vec![])]).is_empty());
+    }
+
+    #[test]
+    fn latest_files_none_without_turns() {
+        assert!(latest_files("no-such-review-session").is_none());
+    }
 }

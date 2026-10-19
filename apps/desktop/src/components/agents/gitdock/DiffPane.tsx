@@ -96,7 +96,14 @@ export function DiffPane({
       </div>
       <div className="diff">
         {!file && <p className="gempty">Pick a file to see what changed.</p>}
-        {file && !shown && !error && <p className="gempty shimmer-text">Reading the diff</p>}
+        {file && !shown && !error && (
+          <div className="gd-diff-skel ak-rskel" role="status" aria-busy="true" aria-label="Reading the diff">
+            <p className="gempty shimmer-text">Reading the diff</p>
+            {[88, 64, 76, 52].map((w, i) => (
+              <i key={w} className="ak-rbar" style={{ width: `${w}%`, animationDelay: `${i * 80}ms` }} />
+            ))}
+          </div>
+        )}
         {file && !shown && error && <p className="gempty">{error}</p>}
         {shown?.hunks.map((h, i) => (
           // biome-ignore lint/suspicious/noArrayIndexKey: hunks have no id, and a header can repeat

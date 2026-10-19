@@ -123,7 +123,7 @@ interface AgentsState {
   draftPrompt?: string | null;
   /** The repo open in the Git dock; "first" picks one once the list loads. */
   dock?: string | null;
-  /** Island list width while the Git dock is open beside it. */
+  /** Island list width while a side dock (Git or Review) is open beside it. */
   listW?: number;
 }
 
@@ -863,9 +863,50 @@ export function interruptSession(id: string) {
   void api.agentStop(id);
 }
 
+/** Clear reviewing on every session (one Review dock at a time). */
+export function clearReviewing() {
+  const { sessions } = useAgents.getState();
+  for (const s of sessions) {
+    if (s.view?.reviewing) sessionView(s.id, { reviewing: false });
+  }
+}
+
+/** Session id currently open in the Review dock, if any. */
+export function reviewingSessionId(): string | null {
+  return useAgents.getState().sessions.find((s) => s.view?.reviewing)?.id ?? null;
+}
+
+/** Open Review beside Agents (wide) or stacked in the session column (narrow). */
+export function openReview(id: string) {
+  const { dock, listW, sessions } = useAgents.getState();
+  const screenW = typeof window === "undefined" ? 1920 : window.screen.availWidth;
+  const side = !stacked(screenW);
+  const patch: Partial<AgentsState> & { tab: AskTab } = { tab: "agents" };
+  if (dock) patch.dock = null;
+  if (side && listW == null) patch.listW = readSeam(dockTotal(screenW));
+  if (!side) patch.listW = undefined;
+  useAgents.setState(patch);
+  for (const s of sessions) {
+    if (s.id !== id && s.view?.reviewing) sessionView(s.id, { reviewing: false });
+  }
+  sessionView(id, { reviewing: true });
+}
+
+/** Close the Review dock for a session (or whichever is open). */
+export function closeReview(id?: string) {
+  const target = id ?? reviewingSessionId();
+  if (target) sessionView(target, { reviewing: false });
+  const { dock } = useAgents.getState();
+  if (!dock) useAgents.setState({ listW: undefined });
+}
+
 /** Close the Git dock. Window stays at dock-max (no OS resize). */
 export function closeDock() {
-  useAgents.setState({ dock: null, listW: undefined });
+  useAgents.setState({
+    dock: null,
+    // Keep seam width if Review is still open beside.
+    ...(reviewingSessionId() ? {} : { listW: undefined }),
+  });
 }
 
 /** Open or switch the repo shown in the Git dock. */
@@ -874,7 +915,14 @@ export function setDock(path: string | null) {
     closeDock();
     return;
   }
-  useAgents.setState({ dock: path });
+  clearReviewing();
+  const { listW } = useAgents.getState();
+  const screenW = typeof window === "undefined" ? 1920 : window.screen.availWidth;
+  const side = !stacked(screenW);
+  useAgents.setState({
+    dock: path,
+    ...(listW == null && side ? { listW: readSeam(dockTotal(screenW)) } : {}),
+  });
 }
 
 /** Ctrl G: toggle the Git dock on the Repos tab (opens on the repo with changes). */
@@ -890,6 +938,7 @@ export function openGit() {
 /** Open the Git tab (and dock) without toggling a dock that is already open.
  * Layout only - the OS window stays at dock-max from launch (no set_size). */
 export async function showGit() {
+  clearReviewing();
   const { dock, listW } = useAgents.getState();
   const screenW = typeof window === "undefined" ? 1920 : window.screen.availWidth;
   const side = !stacked(screenW);

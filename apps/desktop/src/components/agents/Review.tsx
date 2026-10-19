@@ -4,9 +4,9 @@
 // Undo, a whole file at once, or everything. Nothing is final until Done.
 // Keys: arrows move between changes, K keeps, U undoes.
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Session } from "@/lib/agents";
-import { api } from "@/lib/bridge";
+import { api, EVENTS, listen } from "@/lib/bridge";
 import type { FileChange } from "@/lib/types";
 
 type Hunk = FileChange["hunks"][number];
@@ -30,8 +30,8 @@ function numbered(h: Hunk): { n: number; kind: "add" | "del" | "ctxl"; text: str
   return out;
 }
 
-/** Placeholder file cards while git diffs are read (same idea as ReposLoading). */
-function ReviewLoading({ slow }: { slow?: boolean }) {
+/** Placeholder file cards while diffs stream in (same idea as ReposLoading). */
+export function ReviewLoading({ slow }: { slow?: boolean }) {
   return (
     <div className="ak-rv-load" role="status" aria-busy="true" aria-label="Reading changes">
       <div className="ak-rv-head">
@@ -57,30 +57,73 @@ function ReviewLoading({ slow }: { slow?: boolean }) {
   );
 }
 
+function upsertFile(list: FileChange[], file: FileChange): FileChange[] {
+  const i = list.findIndex((f) => f.path === file.path);
+  if (i < 0) return [...list, file];
+  const next = list.slice();
+  next[i] = file;
+  return next;
+}
+
 export function Review({ session, maxHeight, onDone }: { session: Session; maxHeight: number; onDone: () => void }) {
   const [files, setFiles] = useState<FileChange[] | null>(null);
+  const [finished, setFinished] = useState(false);
   const [active, setActive] = useState(0);
   // Changes kept, by "path:header". Undone ones leave the diff.
   const [kept, setKept] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [slow, setSlow] = useState(false);
+  const loadSeq = useRef(0);
 
   const load = useCallback(() => {
+    const seq = ++loadSeq.current;
     setFiles(null);
+    setFinished(false);
     setError(null);
     setSlow(false);
-    void api
+    return api
       .agentChanges(session.id)
       .then((f) => {
+        if (seq !== loadSeq.current) return;
         setFiles(f);
+        setFinished(true);
         setError(null);
       })
       .catch((e: unknown) => {
+        if (seq !== loadSeq.current) return;
         setError(String(e));
         setFiles([]);
+        setFinished(true);
       });
   }, [session.id]);
-  useEffect(load, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const unsubs: Array<() => void> = [];
+    void (async () => {
+      const offFile = await listen(EVENTS.reviewFile, (p) => {
+        if (p.session !== session.id || cancelled) return;
+        setFiles((prev) => upsertFile(prev ?? [], p.file));
+      });
+      const offDone = await listen(EVENTS.reviewDone, (p) => {
+        if (p.session !== session.id || cancelled) return;
+        setFinished(true);
+        setFiles((prev) => prev ?? []);
+      });
+      if (cancelled) {
+        offFile();
+        offDone();
+        return;
+      }
+      unsubs.push(offFile, offDone);
+      void load();
+    })();
+    return () => {
+      cancelled = true;
+      loadSeq.current++;
+      for (const off of unsubs) off();
+    };
+  }, [session.id, load]);
 
   useEffect(() => {
     if (files !== null || error) return;
@@ -90,8 +133,8 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
 
   // Nothing to review: leave immediately (button should not open this).
   useEffect(() => {
-    if (files !== null && files.length === 0 && !error) onDone();
-  }, [files, error, onDone]);
+    if (finished && files !== null && files.length === 0 && !error) onDone();
+  }, [finished, files, error, onDone]);
 
   const undo = useCallback(
     (path: string | null, hunk: number | null) =>
@@ -166,6 +209,7 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
         <b>Review changes</b>
         <span className="sub2">
           {list.length} {list.length === 1 ? "file" : "files"} · {changes} {changes === 1 ? "change" : "changes"}
+          {!finished && <span className="shimmer-text"> · loading</span>}
         </span>
         <span className="keys mono">↑↓ move · K keep · U undo</span>
       </div>

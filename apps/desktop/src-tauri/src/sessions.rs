@@ -271,12 +271,7 @@ async fn complete_turn(app: &AppHandle, id: &str, mut data: Value) {
     let sid = id.to_owned();
     match tokio::task::spawn_blocking(move || {
         turn_ended(&sid);
-        let live = review_count(&sid);
-        let turn_files = reviews::list(&sid)
-            .last()
-            .map(|t| t.files.len())
-            .unwrap_or(0);
-        live.max(turn_files)
+        review_count(&sid)
     })
     .await
     {
@@ -833,22 +828,26 @@ fn restart(app: &AppHandle, id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// When the agent finishes a turn: fingerprint what it changed, so an undo
-/// later can tell the user's own edits apart.
+/// When the agent finishes a turn: fingerprint only paths captured on that turn, so an undo later can tell the user's own edits apart.
 fn turn_ended(id: &str) {
     reviews::capture_turn(id);
     let Some(b) = with(&SESSIONS, |s| s.get(id).and_then(|h| h.baseline.clone())) else {
         save();
         return;
     };
-    let prints: HashMap<String, u64> = review::changes(&b)
-        .unwrap_or_default()
-        .iter()
-        .filter_map(|f| review::fingerprint(&b.root, &f.path).map(|h| (f.path.clone(), h)))
-        .collect();
+    let files = reviews::last_turn_files(id);
     with(&SESSIONS, |s| {
         if let Some(h) = s.get_mut(id) {
-            h.after = prints;
+            for f in &files {
+                match review::fingerprint(&b.root, &f.path) {
+                    Some(fp) => {
+                        h.after.insert(f.path.clone(), fp);
+                    }
+                    None => {
+                        h.after.remove(&f.path);
+                    }
+                }
+            }
         }
     });
     save();
@@ -871,10 +870,7 @@ fn branch(path: &Path) -> Option<String> {
 }
 
 fn review_count(id: &str) -> usize {
-    let baseline = with(&SESSIONS, |s| s.get(id).and_then(|h| h.baseline.clone()));
-    baseline
-        .and_then(|b| review::changes(&b).ok())
-        .map_or(0, |c| c.len())
+    reviews::merged_files(id).len()
 }
 
 /// Sends a follow-up or a steer to a running session, after a checkpoint
@@ -945,32 +941,45 @@ fn baseline(id: &str) -> Result<Baseline, String> {
     })
 }
 
-/// The changes to review, with secrets in them masked. Undo reads the files
-/// again, so masking here never changes what gets undone.
+/// Event name: one masked file while Review opens (`{ session, file }`).
+pub const REVIEW_FILE_EVENT: &str = "review://file";
+/// Event name: Review file stream finished (`{ session }`).
+pub const REVIEW_DONE_EVENT: &str = "review://done";
+
+/// The changes to review from this session's turn snapshots only, with secrets
+/// masked. Undo reads the files again, so masking here never changes what gets undone.
 pub fn changes(id: &str) -> Result<Vec<review::FileChange>, String> {
-    let b = baseline(id)?;
-    let after = with(&SESSIONS, |s| s.get(id).map(|h| h.after.clone())).unwrap_or_default();
-    let paths: Vec<String> = after.keys().cloned().collect();
-    let mut files = if !paths.is_empty() {
-        match review::changes_for(&b, Some(&paths)) {
-            Ok(f) if !f.is_empty() => f,
-            Ok(_) => reviews::latest_files(id).unwrap_or_default(),
-            Err(e) if e.contains("timed out") => reviews::latest_files(id).ok_or(e)?,
-            Err(e) => return Err(e),
+    changes_emitting(id, None)
+}
+
+/// Mask secrets in each file's hunk lines; returns paths in emit order.
+fn mask_review_files(files: &mut [review::FileChange]) -> Vec<String> {
+    let mut order = Vec::with_capacity(files.len());
+    for file in files.iter_mut() {
+        for line in file.hunks.iter_mut().flat_map(|h| h.lines.iter_mut()) {
+            if let Cow::Owned(m) = mask(line) {
+                *line = m;
+            }
         }
-    } else if let Some(snap) = reviews::latest_files(id) {
-        snap
-    } else {
-        review::changes(&b)?
-    };
-    for line in files
-        .iter_mut()
-        .flat_map(|f| f.hunks.iter_mut())
-        .flat_map(|h| h.lines.iter_mut())
-    {
-        if let Cow::Owned(m) = mask(line) {
-            *line = m;
+        order.push(file.path.clone());
+    }
+    order
+}
+
+/// Like [`changes`], optionally emitting each masked file then a done event.
+pub fn changes_emitting(
+    id: &str,
+    app: Option<&AppHandle>,
+) -> Result<Vec<review::FileChange>, String> {
+    let _ = baseline(id)?;
+    let mut files = reviews::merged_files(id);
+    let order = mask_review_files(&mut files);
+    if let Some(app) = app {
+        for (path, file) in order.iter().zip(files.iter()) {
+            debug_assert_eq!(path, &file.path);
+            let _ = app.emit(REVIEW_FILE_EVENT, json!({ "session": id, "file": file }));
         }
+        let _ = app.emit(REVIEW_DONE_EVENT, json!({ "session": id }));
     }
     Ok(files)
 }
@@ -2334,6 +2343,39 @@ fn shown_command(cmd: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::review::{FileChange, Hunk};
+
+    #[test]
+    fn mask_review_files_keeps_merge_order() {
+        let mut files = vec![
+            FileChange {
+                path: "a.rs".into(),
+                status: "modified".into(),
+                added: 1,
+                removed: 0,
+                hunks: vec![Hunk {
+                    header: "@@ a @@".into(),
+                    lines: vec!["+plain".into()],
+                }],
+            },
+            FileChange {
+                path: "b.rs".into(),
+                status: "modified".into(),
+                added: 1,
+                removed: 0,
+                hunks: vec![Hunk {
+                    header: "@@ b @@".into(),
+                    lines: vec!["+plain".into()],
+                }],
+            },
+        ];
+        assert_eq!(mask_review_files(&mut files), ["a.rs", "b.rs"]);
+    }
+
+    #[test]
+    fn changes_without_session_errors() {
+        assert!(changes("missing-session-for-review").is_err());
+    }
 
     #[tokio::test]
     async fn mocked_app_server_initializes_before_dependent_requests() {
