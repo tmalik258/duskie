@@ -228,7 +228,7 @@ export function UndoButton({ id }: { id: number }) {
   );
 }
 
-/** Moments Duskie always offers — not habits, so no Show less / skip score. */
+/** Moments Duskie always offers - not habits, so no Show less / skip score. */
 const ALWAYS_GLANCE = new Set(["files.screenshot", "clipboard.open-url", "system.back"]);
 
 export function Options({ suggestion }: { suggestion: Suggestion }) {

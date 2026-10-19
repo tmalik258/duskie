@@ -74,7 +74,7 @@ export function Composer({
           rows={4}
           value={message}
           placeholder={
-            amend ? "Keep the last message, or write a new one" : "Commit message — title, blank line, then why"
+            amend ? "Keep the last message, or write a new one" : "Commit message - title, blank line, then why"
           }
           aria-label="Commit message"
           onChange={(e) => setMessage(e.target.value)}

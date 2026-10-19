@@ -16,7 +16,7 @@ function activityIcon(source: string): IcName {
   if (source === "update") return "update";
   if (source === "open") return "open";
   if (source === "agent") return "term";
-  // chat / action / setup — a spark reads as “working”, not an upload.
+  // chat / action / setup - a spark reads as "working", not an upload.
   return "spark";
 }
 
