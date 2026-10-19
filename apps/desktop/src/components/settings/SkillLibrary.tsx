@@ -1,8 +1,8 @@
 "use client";
 
-// One library of skills for Claude Code, Codex and the local model. Skills
-// are copied, never run. Skills with scripts are marked and left unticked,
-// and a link or an update shows what would change before anything does.
+// One library of skills for Claude Code, Codex, Cursor and the local model.
+// Skills are copied, never run. Skills with scripts are marked and left
+// unticked, and a link or an update shows what would change before anything does.
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/bridge";
@@ -13,6 +13,7 @@ const ORIGIN: Record<SkillOrigin, string> = {
   claude: "Claude Code",
   claude_plugin: "Claude plugin",
   codex: "Codex",
+  cursor: "Cursor",
   duskie: "Duskie",
   url: "Link",
 };
@@ -20,6 +21,7 @@ const ORIGIN: Record<SkillOrigin, string> = {
 const TARGETS: [SkillTarget, string][] = [
   ["claude", "Claude Code"],
   ["codex", "Codex"],
+  ["cursor", "Cursor"],
   ["local", "Local model"],
 ];
 
@@ -213,7 +215,7 @@ export function SkillLibrary({ onError }: { onError: (e: string) => void }) {
             <span className="text-[13px]">
               <span className="font-medium">Not in the library yet</span>
               <span className="block text-[12px] text-(--muted)">
-                From Claude Code, Codex or plugins on this PC. Add them to manage where they sync.
+                From Claude Code, Codex, Cursor or plugins on this PC. Add them to manage where they sync.
               </span>
             </span>
             <Button small disabled={chosen.size === 0} onClick={() => void addFound()}>
@@ -239,7 +241,8 @@ export function SkillLibrary({ onError }: { onError: (e: string) => void }) {
         found.length === 0 &&
         !preview && (
           <p className="text-[13px] text-(--muted)">
-            Nothing in the library yet. Paste a GitHub link above, or install Claude Code / Codex skills on this PC.
+            Nothing in the library yet. Paste a GitHub link above, or install Claude Code, Codex or Cursor skills on
+            this PC.
           </p>
         )
       ) : (

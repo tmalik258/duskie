@@ -7,9 +7,18 @@ import { activityLabel, dismissLocal, useActivities, visibleActivities } from "@
 import { api } from "@/lib/bridge";
 import { useNow } from "@/lib/hooks";
 import type { Activity } from "@/lib/types";
-import { Ic } from "./Icon";
+import { Ic, type IcName } from "./Icon";
 
 const MB = 1_000_000;
+
+function activityIcon(source: string): IcName {
+  if (source === "browser" || source === "file") return "folder";
+  if (source === "update") return "update";
+  if (source === "open") return "open";
+  if (source === "agent") return "term";
+  // chat / action / setup — a spark reads as “working”, not an upload.
+  return "spark";
+}
 
 function sizeLine(a: Activity, now: number): string | null {
   if (a.total == null || a.transferred == null) return null;
@@ -43,9 +52,6 @@ export function ActivitiesCard() {
           const sub = sizeLine(a, now);
           return (
             <div key={a.id} className="act-row">
-              <span className="act-ic" aria-hidden>
-                <Ic name={a.source === "browser" || a.source === "file" ? "folder" : "update"} size={13} />
-              </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px]">{activityLabel(a, now, { elapsed: false })}</span>
                 {sub && <span className="act-sub block truncate">{sub}</span>}
@@ -54,6 +60,9 @@ export function ActivitiesCard() {
                     <i style={{ width: `${pct * 100}%` }} />
                   </span>
                 )}
+              </span>
+              <span className="act-ic" aria-hidden>
+                <Ic name={activityIcon(a.source)} size={13} />
               </span>
               <button
                 type="button"

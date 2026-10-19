@@ -1,5 +1,5 @@
-//! The skills library: skills found in Claude Code and Codex folders, copied
-//! into one place, then written back to each tool the user switched on.
+//! The skills library: skills found in Claude Code, Codex and Cursor folders,
+//! copied into one place, then written back to each tool the user switched on.
 //! Nothing in a skill runs here; files are only copied and hashed.
 
 use std::path::PathBuf;
@@ -16,6 +16,8 @@ fn target_dir(t: Target) -> Option<PathBuf> {
     match t {
         Target::Claude => Some(home().join(".claude").join("skills")),
         Target::Codex => Some(home().join(".codex").join("skills")),
+        // User skills only; never write Cursor's built-in skills-cursor folder.
+        Target::Cursor => Some(home().join(".cursor").join("skills")),
         // The library itself is what the local model reads.
         Target::Local => None,
     }
@@ -40,6 +42,7 @@ fn review_now(lib: &Library) -> Vec<Found> {
             library::scan(&h.join(".claude").join("skills"), Origin::Claude),
             library::scan_plugins(&h.join(".claude").join("plugins")),
             library::scan(&h.join(".codex").join("skills"), Origin::Codex),
+            library::scan(&h.join(".cursor").join("skills"), Origin::Cursor),
         ]
         .concat(),
     );

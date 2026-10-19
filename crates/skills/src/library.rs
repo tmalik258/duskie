@@ -1,7 +1,7 @@
-//! Agent skills (SKILL.md folders) shared between Claude Code, Codex and the
-//! local model. Duskie keeps one library of copies with a manifest; it writes
-//! copies, never links, into each tool's folder; it never runs anything on
-//! import or sync; and it never overwrites without a backup.
+//! Agent skills (SKILL.md folders) shared between Claude Code, Codex, Cursor
+//! and the local model. Duskie keeps one library of copies with a manifest; it
+//! writes copies, never links, into each tool's folder; it never runs anything
+//! on import or sync; and it never overwrites without a backup.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -18,6 +18,7 @@ pub enum Origin {
     /// A Claude Code plugin's skill: read only, never written to.
     ClaudePlugin,
     Codex,
+    Cursor,
     Duskie,
     Url,
 }
@@ -28,6 +29,7 @@ pub enum Origin {
 pub enum Target {
     Claude,
     Codex,
+    Cursor,
     Local,
 }
 
@@ -83,7 +85,7 @@ pub fn parse_github(url: &str) -> Option<GithubSkill> {
     })
 }
 
-pub const TARGETS: [Target; 3] = [Target::Claude, Target::Codex, Target::Local];
+pub const TARGETS: [Target; 4] = [Target::Claude, Target::Codex, Target::Cursor, Target::Local];
 
 /// Most files and bytes one skill may have.
 pub const MAX_FILES: usize = 200;
@@ -368,6 +370,7 @@ impl Library {
         let home = match found.origin {
             Origin::Claude => Some(Target::Claude),
             Origin::Codex => Some(Target::Codex),
+            Origin::Cursor => Some(Target::Cursor),
             _ => None,
         };
         // Keep what earlier syncs wrote, so their copies still count as ours.
@@ -467,6 +470,7 @@ impl Library {
         let origin = match target {
             Target::Claude => Origin::Claude,
             Target::Codex => Origin::Codex,
+            Target::Cursor => Origin::Cursor,
             Target::Local => Origin::Duskie,
         };
         scan(dir, origin)
@@ -610,6 +614,27 @@ mod tests {
                 .unwrap()
                 .contains("new")
         );
+    }
+
+    #[test]
+    fn cursor_origin_imports_and_syncs_home() {
+        let (lib_dir, cursor, codex) = (tmp("lib-cur"), tmp("cursor"), tmp("codex-cur"));
+        skill(&cursor, "land-it", "Land a PR.", false);
+        let lib = Library::new(&lib_dir);
+        let found = scan(&cursor, Origin::Cursor);
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].origin, Origin::Cursor);
+        lib.import(&found[0]).unwrap();
+        // Already at home: syncing Cursor writes nothing.
+        assert!(
+            lib.sync(Target::Cursor, &cursor)
+                .unwrap()
+                .written
+                .is_empty()
+        );
+        let r = lib.sync(Target::Codex, &codex).unwrap();
+        assert_eq!(r.written, ["land-it"]);
+        assert!(codex.join("land-it/SKILL.md").exists());
     }
 
     #[test]

@@ -599,8 +599,8 @@ export interface SkillInfo {
   mutedUntil: string | null;
 }
 
-export type SkillOrigin = "claude" | "claude_plugin" | "codex" | "duskie" | "url";
-export type SkillTarget = "claude" | "codex" | "local";
+export type SkillOrigin = "claude" | "claude_plugin" | "codex" | "cursor" | "duskie" | "url";
+export type SkillTarget = "claude" | "codex" | "cursor" | "local";
 
 /** A skill found on this PC that is not in the library yet. */
 export interface FoundSkill {
