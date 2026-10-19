@@ -228,8 +228,12 @@ export function UndoButton({ id }: { id: number }) {
   );
 }
 
+/** Moments Duskie always offers — not habits, so no Show less / skip score. */
+const ALWAYS_GLANCE = new Set(["files.screenshot", "clipboard.open-url", "system.back"]);
+
 export function Options({ suggestion }: { suggestion: Suggestion }) {
   const alwaysAt = suggestion.always?.findIndex(Boolean) ?? -1;
+  const canShowLess = !ALWAYS_GLANCE.has(suggestion.skillId);
   // Shift while hovered, or Shift+Alt anywhere, Rust polls; no hover required.
   const priv = useDuskie((s) => s.shiftHeld);
   return (
@@ -265,9 +269,11 @@ export function Options({ suggestion }: { suggestion: Suggestion }) {
             </button>
           </Tip>
         )}
-        <button type="button" onClick={() => showLess(suggestion)} className="rd-gfoot-btn chip">
-          Show less
-        </button>
+        {canShowLess && (
+          <button type="button" onClick={() => showLess(suggestion)} className="rd-gfoot-btn chip">
+            Show less
+          </button>
+        )}
         <button type="button" onClick={() => dismiss(suggestion)} className="rd-gfoot-btn chip">
           Dismiss
           <kbd className="ml-1.5 font-sans text-[11px] opacity-45">

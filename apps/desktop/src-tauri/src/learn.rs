@@ -67,12 +67,12 @@ pub fn tracked(skill_id: &str) -> bool {
         && !skill_id.starts_with("debug.")
         // Notifications learn per app instead (inbox.rs).
         && !skill_id.starts_with("notify.")
-        // Screenshots and copied links always interrupt; no mute, no score line.
+        // Screenshots, copied links, and welcome-back always interrupt; no mute, no score line.
         && !ALWAYS_SUGGEST.contains(&skill_id)
 }
 
 /// Always show these: no dismiss-streak mute, no "you skipped N of M" score.
-const ALWAYS_SUGGEST: &[&str] = &["files.screenshot", "clipboard.open-url"];
+const ALWAYS_SUGGEST: &[&str] = &["files.screenshot", "clipboard.open-url", "system.back"];
 
 /// Skills never offered as automatic: each time needs its own choice.
 /// A screenshot is already on the clipboard, so "always copy" adds nothing.
@@ -201,7 +201,9 @@ mod tests {
         assert!(!tracked(OFFER_SKILL));
         assert!(!tracked("files.screenshot"));
         assert!(!tracked("clipboard.open-url"));
+        assert!(!tracked("system.back"));
         assert!(!can_automate("files.screenshot"));
+        assert!(!can_automate("system.back"));
         assert!(can_automate("files.download"));
         assert!(!tracked("mcp.notify"));
     }
