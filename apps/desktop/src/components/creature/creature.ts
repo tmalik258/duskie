@@ -923,7 +923,8 @@ function boot() {
       el.className = "mz";
       el.style.width = el.style.height = `${this.size}px`;
       el.style.setProperty("--s", `${this.size}px`);
-      el.setAttribute("role", "img");
+      // Parent (Creature.tsx) already exposes role="img" + aria-label.
+      el.setAttribute("aria-hidden", "true");
       el.innerHTML = `<div class="mz-move"><canvas></canvas><div class="mz-eyes"><div class="mz-pair"><svg class="mz-eye" viewBox="0 0 20 30" aria-hidden="true"></svg><svg class="mz-eye" viewBox="0 0 20 30" aria-hidden="true"></svg></div><i class="mz-tape"></i><i class="mz-tape"></i></div><div class="mz-fx"></div></div>`;
       slot.replaceChildren(el);
       this.el = el;

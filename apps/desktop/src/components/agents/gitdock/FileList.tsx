@@ -54,7 +54,7 @@ export function FileList({
           </button>
         </span>
       </div>
-      <div className="files" role="listbox" aria-label="Changed files">
+      <div className="files" role="listbox" aria-label="Changed files" aria-multiselectable="true">
         {files.length === 0 && <p className="gempty">Nothing has changed.</p>}
         {groupByFolder(files).map((g) => (
           <div key={g.folder}>
@@ -62,42 +62,50 @@ export function FileList({
               <Ic name="folder" size={11} />
               <span>{g.folder}</span>
             </p>
-            {g.files.map((f) => (
-              <div
-                key={f.path}
-                role="option"
-                tabIndex={0}
-                aria-selected={selected === f.path}
-                className="frow"
-                onClick={() => onSelect(f.path)}
-                onKeyDown={(e) => {
-                  if (e.target !== e.currentTarget) return;
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    onSelect(f.path);
-                  }
-                }}
-              >
-                <button
-                  type="button"
-                  aria-pressed={f.staged && !f.unstaged}
-                  aria-label={`Stage ${f.path}`}
-                  className="stg"
-                  disabled={busy || f.kind === "U"}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onToggle(f);
+            {g.files.map((f) => {
+              const staged = f.staged && !f.unstaged;
+              const canStage = !busy && f.kind !== "U";
+              return (
+                <div
+                  key={f.path}
+                  role="option"
+                  tabIndex={0}
+                  aria-selected={selected === f.path}
+                  aria-checked={staged}
+                  aria-label={`${baseName(f.path)}, ${staged ? "staged" : "unstaged"}`}
+                  className="frow"
+                  onClick={() => onSelect(f.path)}
+                  onKeyDown={(e) => {
+                    if (e.target !== e.currentTarget) return;
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      onSelect(f.path);
+                    } else if (e.key === " " && canStage) {
+                      e.preventDefault();
+                      onToggle(f);
+                    }
                   }}
                 >
-                  <Ic name="check" size={11} weight={2} />
-                </button>
-                <span className={`st ${letter(f.kind)}`}>{letter(f.kind)}</span>
-                <span className="fpath" title={f.path}>
-                  {baseName(f.path)}
-                </span>
-                <ChangeBar stat={stats[f.path]} />
-              </div>
-            ))}
+                  {/* Decorative: staging is aria-checked on the option; Space toggles it. */}
+                  <span
+                    className="stg"
+                    aria-hidden="true"
+                    data-on={staged ? "true" : undefined}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (canStage) onToggle(f);
+                    }}
+                  >
+                    <Ic name="check" size={11} weight={2} />
+                  </span>
+                  <span className={`st ${letter(f.kind)}`}>{letter(f.kind)}</span>
+                  <span className="fpath" title={f.path}>
+                    {baseName(f.path)}
+                  </span>
+                  <ChangeBar stat={stats[f.path]} />
+                </div>
+              );
+            })}
           </div>
         ))}
       </div>
