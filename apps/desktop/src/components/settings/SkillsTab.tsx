@@ -44,7 +44,7 @@ export function SkillsTab({ onError }: { onError: (e: string) => void }) {
       </Section>
       <Section
         title="Library"
-        hint="Skills from Claude Code and Codex in one place, written back to each tool you pick."
+        hint="One list for skills from Claude Code, Codex, plugins or a link. Pick where each is written."
         keywords="library skills claude codex sync import plugin share"
       >
         <SkillLibrary onError={onError} />

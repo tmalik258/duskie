@@ -233,8 +233,8 @@ export function Options({ suggestion }: { suggestion: Suggestion }) {
   // Shift while hovered, or Shift+Alt anywhere, Rust polls; no hover required.
   const priv = useDuskie((s) => s.shiftHeld);
   return (
-    <div className="mt-2 flex flex-col gap-1" style={FULL}>
-      <div className="flex flex-wrap justify-center gap-1.5">
+    <div className="mt-2 flex min-w-0 flex-col gap-1" style={FULL}>
+      <div className="flex min-w-0 max-w-full flex-wrap justify-center gap-1.5">
         {suggestion.options.map((option, i) => {
           const openUrl = suggestion.actions[i] === "open_url";
           const label = priv && openUrl ? privateOpenLabel(option) : option;
@@ -249,7 +249,7 @@ export function Options({ suggestion }: { suggestion: Suggestion }) {
               transition={{ duration: 0.22, delay: 0.08 + i * 0.03, ease: [0.23, 1, 0.32, 1] }}
               className={`rd-opt chip gap-2 ${i === 0 ? "rd-opt-primary" : ""}`}
             >
-              <span className="whitespace-nowrap leading-snug">{label}</span>
+              <span className="min-w-0 truncate leading-snug">{label}</span>
               <kbd className={`shrink-0 font-sans text-[11px] leading-none ${i === 0 ? "opacity-40" : "opacity-45"}`}>
                 Alt {i + 1}
               </kbd>

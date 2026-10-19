@@ -469,14 +469,14 @@ body {
 .ak-send:active {
   transform: scale(0.97);
 }
-.ak-opt,
 .rd-opt {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  flex: 0 0 auto;
-  width: max-content;
+  /* Shrink + wrap instead of max-content forcing a single overflowing row. */
+  flex: 0 1 auto;
   max-width: 100%;
+  min-width: 0;
   min-height: 34px;
   padding: 0 12px;
   border-radius: 10px;
@@ -487,6 +487,7 @@ body {
   font-size: 13px;
   text-align: left;
   white-space: nowrap;
+  overflow: hidden;
   cursor: pointer;
 }
 .rd-opt:hover {
@@ -5679,20 +5680,6 @@ button.ak-cchip:hover,
 }
 .sumrow .field {
   padding-right: 44px;
-}
-.sumrow .cc {
-  position: absolute;
-  right: 9px;
-  top: 8px;
-  font: 500 11px / 14px var(--mono);
-  color: var(--ink-3);
-  font-variant-numeric: tabular-nums;
-}
-.sumrow .cc.warn {
-  color: var(--warn);
-}
-.sumrow .cc.over {
-  color: var(--err);
 }
 .msgbox {
   position: relative;

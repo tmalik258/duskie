@@ -1,8 +1,7 @@
 id: clipboard.open-url
 name: Open copied links
-description: Offer browsers for a copied link, the usual one for that site first. Shift+click or Shift+Alt+N opens it private. Off by default; links are copied often.
+description: Offer browsers for a copied link, the usual one for that site first. Shift+click or Shift+Alt+N opens it private.
 priority: 30
-enabled_by_default: false
 cooldown_secs: 5
 remember: "url:{{site}}"
 trigger:

@@ -110,6 +110,7 @@ export function SettingsPanel() {
   const ready = useDuskie((s) => s.ready);
   const [tab, setTab] = useState<SettingsTab>(() => recent()?.tab ?? "home");
   const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const scroller = useRef<HTMLDivElement | null>(null);
   const edges = useScrollEdge();
   const scrollerRef = useCallback(
@@ -129,6 +130,12 @@ export function SettingsPanel() {
     setTab(t);
     scroller.current?.scrollTo({ top: 0 });
   }, []);
+
+  // Focus search once the panel is ready to type into.
+  useEffect(() => {
+    if (!ready) return;
+    searchRef.current?.focus({ preventScroll: true });
+  }, [ready]);
 
   // Opened at a given tab (back from connecting an app): that tab, at its top.
   useEffect(() => {
@@ -219,6 +226,7 @@ export function SettingsPanel() {
         <label className="st-search shrink-0">
           <Ic name="search" size={14} />
           <input
+            ref={searchRef}
             type="search"
             value={query}
             onChange={(e) => setQuery(e.target.value)}

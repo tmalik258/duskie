@@ -385,8 +385,10 @@ export async function runOpen(open: () => Promise<boolean>, doneMessage: string)
     await api.activityOpenStart(id, label).catch(() => {});
     const opened = await open();
     const outcome = opened ? doneMessage.replace(/^Opened\b/i, "Launch requested for") : "Nothing opened";
+    // Finish on the backend before the done pill so a still-Running sync cannot
+    // flash "Opening…" again after the tick.
     finishActivity(id, true, outcome);
-    void api.activityOpenFinish(id, true, outcome).catch(() => {});
+    await api.activityOpenFinish(id, true, outcome).catch(() => {});
     if (mayFinishOpen(generation, id)) {
       useDuskie.setState({ running: null, mascot: "idle" });
       if (opened) showDone(outcome);
@@ -394,7 +396,7 @@ export async function runOpen(open: () => Promise<boolean>, doneMessage: string)
     return opened;
   } catch (e) {
     finishActivity(id, false, String(e));
-    void api.activityOpenFinish(id, false, String(e)).catch(() => {});
+    await api.activityOpenFinish(id, false, String(e)).catch(() => {});
     if (mayFinishOpen(generation, id))
       useDuskie.setState({
         running: null,

@@ -55,7 +55,7 @@ function Pick({
           className="mt-1"
           checked={checked}
           onChange={(e) => onChange(e.target.checked)}
-          aria-label={`Add ${name}`}
+          aria-label={`Add ${name} to library`}
         />
         <span className="min-w-0 text-[13px]">
           <span className="flex flex-wrap items-center gap-2 font-medium">
@@ -198,7 +198,7 @@ export function SkillLibrary({ onError }: { onError: (e: string) => void }) {
           </ul>
           <div className="flex gap-2">
             <Button small primary disabled={linkChosen.size === 0} onClick={addLinked}>
-              Add selected
+              Add to library
             </Button>
             <Button small onClick={() => setPreview(null)}>
               Cancel
@@ -211,10 +211,13 @@ export function SkillLibrary({ onError }: { onError: (e: string) => void }) {
         <div className="flex flex-col gap-2">
           <div className="flex items-center justify-between gap-3">
             <span className="text-[13px]">
-              {found.length} skill{found.length === 1 ? "" : "s"} found on this PC
+              <span className="font-medium">Not in the library yet</span>
+              <span className="block text-[12px] text-(--muted)">
+                From Claude Code, Codex or plugins on this PC. Add them to manage where they sync.
+              </span>
             </span>
             <Button small disabled={chosen.size === 0} onClick={() => void addFound()}>
-              Add selected
+              Add to library
             </Button>
           </div>
           <ul className="flex flex-col divide-y divide-(--border)">
@@ -233,62 +236,68 @@ export function SkillLibrary({ onError }: { onError: (e: string) => void }) {
       )}
 
       {lib.length === 0 ? (
-        <p className="text-[13px] text-(--muted)">No skills in your library yet.</p>
+        found.length === 0 &&
+        !preview && (
+          <p className="text-[13px] text-(--muted)">
+            Nothing in the library yet. Paste a GitHub link above, or install Claude Code / Codex skills on this PC.
+          </p>
+        )
       ) : (
-        <ul className="flex flex-col divide-y divide-(--border)">
-          {lib.map((s) => (
-            <li key={s.name} className="flex flex-col gap-2 py-2">
-              <div className="flex items-center justify-between gap-4">
-                <span className="min-w-0 text-[13px]">
-                  <span className="flex items-center gap-2 font-medium">
-                    {s.name} <Badge>{ORIGIN[s.origin]}</Badge>
-                    {s.hasScripts && <Badge>Has scripts</Badge>}
+        <div className="flex flex-col gap-2">
+          <span className="text-[13px] font-medium">In your library</span>
+          <ul className="flex flex-col divide-y divide-(--border)">
+            {lib.map((s) => (
+              <li key={s.name} className="flex flex-col gap-2 py-2">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="min-w-0 text-[13px]">
+                    <span className="flex items-center gap-2 font-medium">
+                      {s.name} <Badge>{ORIGIN[s.origin]}</Badge>
+                      {s.hasScripts && <Badge>Has scripts</Badge>}
+                    </span>
+                    <span className="block truncate text-[12px] text-(--muted)">
+                      {s.description}
+                      {s.commit ? ` (pinned at ${s.commit.slice(0, 7)})` : ""}
+                    </span>
                   </span>
-                  <span className="block truncate text-[12px] text-(--muted)">
-                    {s.description}
-                    {s.commit ? ` (pinned at ${s.commit.slice(0, 7)})` : ""}
-                  </span>
-                </span>
-                <span className="flex gap-2">
-                  {s.url && (
-                    <Button small disabled={busy} onClick={() => fetchLink(s.url ?? "")}>
-                      Check for update
+                  <span className="flex gap-2">
+                    {s.url && (
+                      <Button small disabled={busy} onClick={() => fetchLink(s.url ?? "")}>
+                        Check for update
+                      </Button>
+                    )}
+                    <Button small onClick={() => api.libraryRemove(s.name).then(setLib).catch(fail)}>
+                      Remove
                     </Button>
-                  )}
-                  <Button small onClick={() => api.libraryRemove(s.name).then(setLib).catch(fail)}>
-                    Remove
-                  </Button>
-                </span>
-              </div>
-              <div className="flex flex-wrap gap-3">
-                {TARGETS.map(([t, label]) => (
-                  <Segmented
-                    key={t}
-                    label={label}
-                    value={s.targets[t] === false ? "off" : "on"}
-                    options={[
-                      ["on", `${label} on`],
-                      ["off", "Off"],
-                    ]}
-                    onChange={(v) =>
-                      api
-                        .librarySetTarget(s.name, t, v === "on")
-                        .then(setLib)
-                        .catch(fail)
-                    }
-                  />
-                ))}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-      {lib.length > 0 && (
-        <div className="flex items-center gap-3">
-          <Button small onClick={sync}>
-            Sync now
-          </Button>
-          {note && <span className="text-[12px] text-(--muted)">{note}</span>}
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  {TARGETS.map(([t, label]) => (
+                    <Segmented
+                      key={t}
+                      label={label}
+                      value={s.targets[t] === false ? "off" : "on"}
+                      options={[
+                        ["on", `${label} on`],
+                        ["off", "Off"],
+                      ]}
+                      onChange={(v) =>
+                        api
+                          .librarySetTarget(s.name, t, v === "on")
+                          .then(setLib)
+                          .catch(fail)
+                      }
+                    />
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+          <div className="flex items-center gap-3">
+            <Button small onClick={sync}>
+              Sync now
+            </Button>
+            {note && <span className="text-[12px] text-(--muted)">{note}</span>}
+          </div>
         </div>
       )}
     </div>

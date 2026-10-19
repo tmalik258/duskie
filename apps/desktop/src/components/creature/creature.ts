@@ -448,9 +448,6 @@ function boot() {
     failed = true;
     return null;
   }
-  R.onRestore = () => {
-    for (const m of all) m.dirty = true;
-  };
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const lin = (h) => [1, 3, 5].map((i) => (parseInt(h.slice(i, i + 2), 16) / 255) ** 2.2);
   const rnd = (a, b) => a + Math.random() * (b - a);
@@ -1600,7 +1597,21 @@ function boot() {
       raf = requestAnimationFrame(frame);
     }
   };
-  document.addEventListener("visibilitychange", wake);
+  // Mark every creature dirty and run a frame (also used after WebGL restore).
+  const dirt = () => {
+    for (const m of all) m.dirty = true;
+    wake();
+  };
+  R.onRestore = dirt;
+  // Screen lock / sleep often clears canvas pixels without a context-loss event.
+  const onVisible = () => {
+    if (document.hidden) return;
+    dirt();
+    requestAnimationFrame(dirt); // GPU may need one more frame after unlock
+  };
+  document.addEventListener("visibilitychange", onVisible);
+  window.addEventListener("pageshow", onVisible);
+  window.addEventListener("focus", onVisible);
 
   Mascot.prototype.gaze = function (x, y) {
     lastPointer = performance.now();

@@ -201,7 +201,7 @@ export function HomeTab({ onError, onOpenTab }: { onError: (e: string) => void; 
 
 const TAB_NAMES: Record<string, string> = { ai: "AI", connections: "Apps", privacy: "Privacy" };
 
-/** Opt-in standup / timesheet card after the day ends. Off by default. */
+/** Standup / timesheet card after the day ends. On (Ask) by default. */
 function DaySummaryToggle({ onError }: { onError: (e: string) => void }) {
   const [skill, setSkill] = useState<SkillInfo | null>(null);
   useEffect(() => {
@@ -214,7 +214,7 @@ function DaySummaryToggle({ onError }: { onError: (e: string) => void }) {
   return (
     <Toggle
       label="End of day summary"
-      hint="Standup / timesheet card after your day ends. Off until you turn it on."
+      hint="Standup / timesheet card after your day ends. Asks before showing."
       checked={skill.enabled}
       onChange={(enabled) => {
         setSkill({ ...skill, enabled });
