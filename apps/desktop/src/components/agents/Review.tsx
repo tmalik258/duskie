@@ -31,12 +31,12 @@ function numbered(h: Hunk): { n: number; kind: "add" | "del" | "ctxl"; text: str
 }
 
 /** Placeholder file cards while git diffs are read (same idea as ReposLoading). */
-function ReviewLoading() {
+function ReviewLoading({ slow }: { slow?: boolean }) {
   return (
     <div className="ak-rv-load" role="status" aria-busy="true" aria-label="Reading changes">
       <div className="ak-rv-head">
         <b>Review changes</b>
-        <span className="shimmer-text">Reading diffs</span>
+        <span className="shimmer-text">{slow ? "Still reading diffs..." : "Reading diffs"}</span>
       </div>
       {[72, 54, 63].map((w, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: fixed placeholder rows
@@ -63,17 +63,30 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
   // Changes kept, by "path:header". Undone ones leave the diff.
   const [kept, setKept] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [slow, setSlow] = useState(false);
 
   const load = useCallback(() => {
+    setFiles(null);
+    setError(null);
+    setSlow(false);
     void api
       .agentChanges(session.id)
       .then((f) => {
         setFiles(f);
         setError(null);
       })
-      .catch((e: unknown) => setError(String(e)));
+      .catch((e: unknown) => {
+        setError(String(e));
+        setFiles([]);
+      });
   }, [session.id]);
   useEffect(load, [load]);
+
+  useEffect(() => {
+    if (files !== null || error) return;
+    const t = window.setTimeout(() => setSlow(true), 8000);
+    return () => window.clearTimeout(t);
+  }, [files, error]);
 
   // Nothing to review: leave immediately (button should not open this).
   useEffect(() => {
@@ -125,7 +138,26 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
     return () => window.removeEventListener("keydown", onKey);
   }, [sel, open.length, undo, keepAll]);
 
-  if (files === null) return <ReviewLoading />;
+  if (files === null && !error) return <ReviewLoading slow={slow} />;
+
+  if (error && list.length === 0) {
+    return (
+      <div className="ak-tl ak-in">
+        <div className="ak-rv-head">
+          <b>Review changes</b>
+        </div>
+        <p className="ak-err">{error}</p>
+        <div className="ak-chips">
+          <button type="button" onClick={load} className="ak-chip primary chip">
+            Retry
+          </button>
+          <button type="button" onClick={onDone} className="ak-chip chip">
+            Close
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   const changes = list.reduce((n, f) => n + f.hunks.length, 0);
   return (
@@ -133,9 +165,9 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
       <div className="ak-rv-head">
         <b>Review changes</b>
         <span className="sub2">
-          {list.length} {list.length === 1 ? "file" : "files"} ┬╖ {changes} {changes === 1 ? "change" : "changes"}
+          {list.length} {list.length === 1 ? "file" : "files"} · {changes} {changes === 1 ? "change" : "changes"}
         </span>
-        <span className="keys mono">ΓåæΓåô move ┬╖ K keep ┬╖ U undo</span>
+        <span className="keys mono">↑↓ move · K keep · U undo</span>
       </div>
       {error && <p className="ak-err">{error}</p>}
       <div className="ak-tl ak-scroll" style={{ maxHeight: maxHeight - 50 }}>
@@ -145,7 +177,7 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
               <span className="mono">{f.path}</span>
               {f.status !== "modified" && <span>{f.status}</span>}
               {f.added > 0 && <span className="add-n mono">+{f.added}</span>}
-              {f.removed > 0 && <span className="del-n mono">ΓêÆ{f.removed}</span>}
+              {f.removed > 0 && <span className="del-n mono">−{f.removed}</span>}
               <span className="acts">
                 <button
                   type="button"
@@ -165,7 +197,7 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
                 return (
                   <div key={key} className="ak-rv-hunk">
                     <p className="ak-rv-res">
-                      <span className="k">Γ£ô Kept</span>
+                      <span className="k">✓ Kept</span>
                       <span className="mono truncate">
                         {h.lines
                           .find((l) => l.startsWith("+"))

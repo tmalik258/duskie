@@ -52,7 +52,6 @@ import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
 import { Markdown } from "@/lib/markdown";
 import { extractChoices } from "@/lib/options";
-import { parsePlanDocument } from "@/lib/plan";
 import { setAsk, setOverlayHit } from "@/lib/store";
 import type { AgentInfo, AgentMode, Agents, CursorChat, EditorList } from "@/lib/types";
 import { scrollIfActive } from "../ask/parts";
@@ -862,6 +861,12 @@ function SessionView({
       break;
     }
   }
+  const planEntry = s.planEntry ?? null;
+  const planAboveFold = planEntry != null && planEntry < entryStart;
+  const onPlanDraft = (t: string) => {
+    setText(t);
+    setEditFocus((n) => n + 1);
+  };
 
   return (
     <>
@@ -918,13 +923,14 @@ function SessionView({
                 Show earlier ({entryStart} more)
               </button>
             )}
+            {planAboveFold && <PlanPanel session={s} onDraft={onPlanDraft} />}
             {visibleEntries.map((e, j) => {
               const i = entryStart + j;
               // Last agent prose (idle or still "working" after a clarifying ask).
               const lastText = e.kind === "text" && !s.question && i === lastAgentText;
-              // Full plan lives in PlanPanel, don't repeat the same prose above it.
-              const planCovers =
-                lastText && !!s.planDoc && e.kind === "text" && (parsePlanDocument(e.text)?.items.length ?? 0) >= 2;
+              // Full plan lives in PlanPanel under planEntry - hide that turn's prose.
+              const planCovers = planEntry === i && !!s.planDoc?.markdown && e.kind === "text";
+              const showPlanHere = planEntry === i || (planEntry == null && i === lastAgentText && s.mode === "plan");
               return (
                 <Fragment key={i}>
                   {!planCovers && (
@@ -950,27 +956,13 @@ function SessionView({
                       }}
                     />
                   )}
-                  {i === lastAgentText && (
-                    <PlanPanel
-                      session={s}
-                      onDraft={(t) => {
-                        setText(t);
-                        setEditFocus((n) => n + 1);
-                      }}
-                    />
-                  )}
+                  {showPlanHere && <PlanPanel session={s} onDraft={onPlanDraft} />}
                 </Fragment>
               );
             })}
-            {/* Plan with no agent text yet still needs a home. */}
-            {lastAgentText < 0 && (
-              <PlanPanel
-                session={s}
-                onDraft={(t) => {
-                  setText(t);
-                  setEditFocus((n) => n + 1);
-                }}
-              />
+            {/* Plan with no agent text yet still needs a home while planning. */}
+            {planEntry == null && lastAgentText < 0 && s.mode === "plan" && (
+              <PlanPanel session={s} onDraft={onPlanDraft} />
             )}
 
             {working && !s.question && (

@@ -145,6 +145,19 @@ pub fn list(id: &str) -> Vec<ReviewTurn> {
     turns
 }
 
+/// Latest non-empty turn snapshot files for a session (for fast Review open).
+pub fn latest_files(id: &str) -> Option<Vec<review::FileChange>> {
+    with(&REVIEWS, |r| {
+        r.get(id).and_then(|turns| {
+            turns
+                .iter()
+                .rev()
+                .find(|t| !t.files.is_empty())
+                .map(|t| t.files.clone())
+        })
+    })
+}
+
 pub fn decide(
     id: &str,
     turn_id: &str,

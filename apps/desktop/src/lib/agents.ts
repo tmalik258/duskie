@@ -54,6 +54,10 @@ export interface Session extends AgentStarted {
   plan: PlanItem[];
   /** Full plan write-up when parsed from prose or a Codex plan item. */
   planDoc?: PlanDoc | null;
+  /** Timeline index of the entry the Plan card is pinned to. */
+  planEntry?: number | null;
+  /** ready for Build, building, or finished (Built). */
+  planPhase?: "ready" | "building" | "built" | null;
   usage: { used: number; window: number; total?: number; at?: number } | null;
   /** The plan's usage limit, when the agent says it is close or reached. */
   limit?: { status: string; window: string; resetsAt: number | null; used: number | null } | null;
@@ -172,19 +176,57 @@ export function sessionView(id: string, patch: Partial<NonNullable<Session["view
 export async function setSessionMode(id: string, mode: AgentMode) {
   try {
     await api.agentSetMode(id, mode);
-    update(id, (s) => ({ ...s, mode }));
+    update(id, (s) => ({
+      ...s,
+      mode,
+      // Entering Plan for a new round: drop the previous card so it cannot flash stale.
+      ...(mode === "plan" && s.mode !== "plan" ? { plan: [], planDoc: null, planEntry: null, planPhase: null } : {}),
+    }));
   } catch (e) {
     update(id, (s) => ({ ...s, error: String(e) }));
   }
 }
 
+/** Last agent text entry index, or the last entry if none. */
+function lastTextEntry(entries: Entry[]): number | null {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    if (entries[i]?.kind === "text") return i;
+  }
+  return entries.length > 0 ? entries.length - 1 : null;
+}
+
 /** Replace the session checklist and optional full plan document. */
-export function setSessionPlan(id: string, plan: PlanItem[], planDoc?: PlanDoc | null) {
+export function setSessionPlan(id: string, plan: PlanItem[], planDoc?: PlanDoc | null, planEntry?: number | null) {
   update(id, (s) => ({
     ...s,
     plan,
     planDoc: planDoc === undefined ? s.planDoc : planDoc,
+    planEntry:
+      planEntry !== undefined
+        ? planEntry
+        : plan.length === 0 && (planDoc === null || planDoc === undefined)
+          ? null
+          : (s.planEntry ?? lastTextEntry(s.entries)),
+    // A new/updated plan document is ready to Build again.
+    planPhase:
+      plan.length === 0 && (planDoc === null || planDoc === undefined)
+        ? null
+        : s.planPhase === "building" || s.planPhase === "built"
+          ? s.planPhase
+          : "ready",
   }));
+}
+
+/** Clear plan card state (fresh Plan turn, rewind). */
+export function clearSessionPlan(id: string) {
+  update(id, (s) => ({ ...s, plan: [], planDoc: null, planEntry: null, planPhase: null }));
+}
+
+/** Leave Plan mode and start building without pasting the plan into chat. */
+export async function buildSessionPlan(id: string) {
+  await setSessionMode(id, "edit");
+  update(id, (s) => ({ ...s, planPhase: "building" }));
+  sendToSession(id, "Build the approved plan.");
 }
 
 function loadLayout(): AgentsLayout {
@@ -381,6 +423,9 @@ function addSession(started: AgentStarted, title: string, mode: AgentMode, first
     activeMode: mode,
     entries: [{ kind: "you", text: first }],
     plan: [],
+    planDoc: null,
+    planEntry: null,
+    planPhase: null,
     usage: null,
     question: null,
     error: null,
@@ -455,6 +500,8 @@ export async function rewindSession(id: string, entry: number): Promise<number> 
     entries: x.entries.slice(0, entry),
     plan: [],
     planDoc: null,
+    planEntry: null,
+    planPhase: null,
     note: `(I rewound this conversation to before my message "${said.slice(0, 80)}". The file changes made after it were undone. Ignore everything after that point and work from here.)`,
   }));
   return n;
@@ -554,17 +601,36 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
       return update(id, (s) => ({ ...s, stuck: true }));
     case "model":
       return update(id, (s) => ({ ...s, localModel: String(e.name ?? "") }));
-    case "plan":
-      return update(id, (s) => ({ ...s, plan: (e.items as PlanItem[]) ?? [] }));
+    case "plan": {
+      const items = (e.items as PlanItem[]) ?? [];
+      return update(id, (s) => {
+        const planDoc = s.planDoc?.markdown
+          ? { ...s.planDoc, items: items.length > 0 ? items : s.planDoc.items }
+          : s.planDoc;
+        return { ...s, plan: items, planDoc };
+      });
+    }
     case "plan_doc": {
-      const doc = parsePlanDocument(String(e.text ?? ""));
-      if (!doc)
-        return update(id, (s) => ({ ...s, planDoc: { title: "Plan", items: s.plan, markdown: String(e.text ?? "") } }));
-      return update(id, (s) => ({
-        ...s,
-        plan: doc.items.length > 0 ? doc.items : s.plan,
-        planDoc: doc,
-      }));
+      const raw = String(e.text ?? "");
+      const doc = parsePlanDocument(raw);
+      return update(id, (s) => {
+        const planEntry = lastTextEntry(s.entries);
+        if (!doc) {
+          return {
+            ...s,
+            planDoc: { title: "Plan", items: s.plan, markdown: raw },
+            planEntry,
+            planPhase: s.planPhase === "building" ? "building" : "ready",
+          };
+        }
+        return {
+          ...s,
+          plan: doc.items.length > 0 ? doc.items : s.plan,
+          planDoc: doc,
+          planEntry,
+          planPhase: s.planPhase === "building" ? "building" : "ready",
+        };
+      });
     }
     case "usage":
       return update(id, (s) => {
@@ -624,18 +690,29 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
         // Plan mode often answers in prose without turn/plan/updated, lift the doc.
         let plan = s.plan;
         let planDoc = s.planDoc;
-        // Only the newest answer of this turn, and only when it says the plan
-        // is ready. Older entries are never scanned, so an old plan is not
-        // lifted again on a later turn.
-        if ((s.mode === "plan" || s.activeMode === "plan") && (plan.length === 0 || !planDoc)) {
+        let planEntry = s.planEntry ?? null;
+        if (s.mode === "plan" || s.activeMode === "plan") {
           const last = entries.at(-1);
           if (last?.kind === "text" && claimsPlanReady(last.text)) {
-            const doc = parsePlanDocument(last.text);
-            if (doc && doc.items.length > 0) {
+            const raw = last.text;
+            const doc = parsePlanDocument(raw);
+            const existingLen = planDoc?.markdown?.length ?? 0;
+            // Do not replace a fuller file/response plan with shorter chat prose.
+            if (doc && doc.items.length > 0 && doc.markdown.length >= existingLen) {
               plan = doc.items;
               planDoc = doc;
+              planEntry = entries.length - 1;
+            } else if (!planDoc && raw.trim()) {
+              // Keep the full answer even when it is not a numbered checklist.
+              planDoc = { title: "Plan", items: plan, markdown: raw };
+              planEntry = entries.length - 1;
             }
           }
+        }
+        const built = s.planPhase === "building" && !e.error;
+        if (built) {
+          plan = plan.map((p) => ({ ...p, status: "completed" as const }));
+          if (planDoc) planDoc = { ...planDoc, items: plan };
         }
         return {
           ...s,
@@ -646,6 +723,8 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
           entries,
           plan,
           planDoc,
+          planEntry,
+          planPhase: built ? "built" : s.planPhase === "building" && e.error ? "ready" : s.planPhase,
         };
       });
     case "ended":

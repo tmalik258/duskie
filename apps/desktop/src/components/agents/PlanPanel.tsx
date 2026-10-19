@@ -1,24 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { type Session, sendToSession, setSessionMode, setSessionPlan } from "@/lib/agents";
+import { Ic } from "@/components/Icon";
+import { buildSessionPlan, type Session, sendToSession, setSessionPlan } from "@/lib/agents";
 import { Markdown } from "@/lib/markdown";
 import { claimsPlanReady, looksLikeQuestionPlan, parsePlanDocument, planFromSession } from "@/lib/plan";
 
-/** Full plan document for Plan mode, title, step write-ups, assumptions, not just todos. */
+/** Full plan document for Plan mode - raw markdown from the agent, not a compressed checklist. */
 export function PlanPanel({ session: s, onDraft }: { session: Session; onDraft?: (text: string) => void }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const plan = s.plan;
   const doc = s.planDoc;
+  const phase = s.planPhase ?? (hasPlan(s) ? "ready" : null);
   const lastText = [...s.entries].reverse().find((e) => e.kind === "text");
-  const readyClaim = lastText?.kind === "text" && claimsPlanReady(lastText.text) && plan.length === 0;
-  const showEmpty = s.mode === "plan" && plan.length === 0 && readyClaim && s.status === "idle";
+  const readyClaim = lastText?.kind === "text" && claimsPlanReady(lastText.text) && !doc?.markdown && plan.length === 0;
+  const showEmpty = s.mode === "plan" && !doc?.markdown && plan.length === 0 && readyClaim && s.status === "idle";
+  const hasBody = !!doc?.markdown || plan.length > 0;
 
   useEffect(() => {
     if (s.mode !== "plan") return;
+    if (s.planDoc?.markdown) return;
     const { items, doc: next } = planFromSession(s.plan, s.entries);
-    if (items.length === 0) return;
+    if (items.length === 0 && !next) return;
     const bad = looksLikeQuestionPlan(s.plan);
     const richer =
       items.length > s.plan.length || bad || (items.some((p) => !!p.detail) && !s.plan.some((p) => !!p.detail));
@@ -30,7 +34,7 @@ export function PlanPanel({ session: s, onDraft }: { session: Session; onDraft?:
     if (!editing) setDraft(doc?.markdown ?? plan.map((p, i) => `${i + 1}. ${p.text}`).join("\n"));
   }, [editing, doc, plan]);
 
-  if (plan.length === 0 && !showEmpty) return null;
+  if (!hasBody && !showEmpty) return null;
 
   const saveEdits = () => {
     const parsed = parsePlanDocument(draft);
@@ -45,18 +49,12 @@ export function PlanPanel({ session: s, onDraft }: { session: Session; onDraft?:
             .trim(),
         )
         .filter((t) => t.length > 0)
-        .slice(0, 12)
         .map((text) => ({ text, status: "pending" as const }));
-    if (items.length === 0) return;
-    setSessionPlan(s.id, items, parsed);
+    const nextDoc = parsed ?? { title: "Plan", items, markdown: draft.trim() };
+    if (!nextDoc.markdown.trim() && items.length === 0) return;
+    setSessionPlan(s.id, items.length > 0 ? items : plan, nextDoc, s.planEntry ?? null);
     setEditing(false);
     sendToSession(s.id, `Please revise the plan to:\n\n${draft.trim()}`);
-  };
-
-  const implement = async () => {
-    await setSessionMode(s.id, "edit");
-    const body = doc?.markdown || plan.map((p, i) => `${i + 1}. ${p.text}${p.detail ? ` ${p.detail}` : ""}`).join("\n");
-    sendToSession(s.id, `Implement the plan.\n\n${body}`);
   };
 
   const askForPlan = () => {
@@ -66,7 +64,7 @@ export function PlanPanel({ session: s, onDraft }: { session: Session; onDraft?:
     );
   };
 
-  if (plan.length === 0) {
+  if (!hasBody) {
     return (
       <div className="ak-plan-doc ak-in">
         <div className="ak-plan-doc-h">
@@ -86,15 +84,22 @@ export function PlanPanel({ session: s, onDraft }: { session: Session; onDraft?:
   }
 
   const done = plan.filter((p) => p.status === "completed").length;
-  const at = Math.min(done + 1, plan.length);
+  const at = plan.length > 0 ? Math.min(done + 1, plan.length) : 0;
   const title = doc?.title || "Plan";
+  const showReadyActions = s.mode === "plan" && s.status === "idle" && phase !== "building" && phase !== "built";
 
   return (
     <div className="ak-plan-doc ak-in">
       <div className="ak-plan-doc-h">
         <span>Plan</span>
         <span>
-          {at} of {plan.length}
+          {phase === "built"
+            ? "Built"
+            : phase === "building"
+              ? "Building"
+              : plan.length > 0
+                ? `${at} of ${plan.length}`
+                : title}
         </span>
       </div>
       {editing ? (
@@ -102,37 +107,52 @@ export function PlanPanel({ session: s, onDraft }: { session: Session; onDraft?:
           className="ak-plan-edit"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
-          rows={Math.min(22, Math.max(10, draft.split("\n").length + 2))}
+          rows={Math.min(28, Math.max(10, draft.split("\n").length + 2))}
           aria-label="Edit plan"
         />
       ) : (
         <div className="ak-plan-doc-body">
-          <p className="ak-plan-doc-title">{title}</p>
-          <ol className="ak-plan-doc-steps">
-            {plan.map((p, i) => (
-              <li key={p.text} className="ak-plan-step" data-s={p.status}>
-                <div className="ak-plan-step-h">
-                  <span className="ak-cb" aria-hidden="true" />
-                  <span className="ak-plan-step-n">{i + 1}.</span>
-                  <span className="ak-plan-step-t">{p.text}</span>
-                </div>
-                {p.detail && (
-                  <div className="ak-plan-step-d">
-                    <Markdown text={p.detail} />
-                  </div>
-                )}
-              </li>
-            ))}
-          </ol>
-          {doc?.assumptions && (
-            <p className="ak-plan-doc-notes">
-              <span>Assumptions</span>
-              {doc.assumptions}
-            </p>
+          {doc?.markdown ? (
+            <div className="ak-plan-md">
+              <Markdown text={doc.markdown} />
+            </div>
+          ) : (
+            <>
+              <p className="ak-plan-doc-title">{title}</p>
+              <ol className="ak-plan-doc-steps">
+                {plan.map((p, i) => (
+                  <li key={`${p.status}:${p.text}`} className="ak-plan-step" data-s={p.status}>
+                    <div className="ak-plan-step-h">
+                      <span className="ak-cb" aria-hidden="true" />
+                      <span className="ak-plan-step-n">{i + 1}.</span>
+                      <span className="ak-plan-step-t">{p.text}</span>
+                    </div>
+                    {p.detail && (
+                      <div className="ak-plan-step-d">
+                        <Markdown text={p.detail} />
+                      </div>
+                    )}
+                  </li>
+                ))}
+              </ol>
+            </>
           )}
         </div>
       )}
-      {s.mode === "plan" && s.status === "idle" && (
+      {phase === "built" ? (
+        <div className="ak-chips mt-1.5">
+          <button type="button" className="ak-chip chip ak-plan-built" disabled aria-label="Built">
+            <Ic name="check" size={12} />
+            Built
+          </button>
+        </div>
+      ) : phase === "building" ? (
+        <div className="ak-chips mt-1.5">
+          <button type="button" className="ak-chip chip" disabled aria-busy="true">
+            Building...
+          </button>
+        </div>
+      ) : showReadyActions ? (
         <div className="ak-chips mt-1.5">
           {editing ? (
             <>
@@ -145,8 +165,8 @@ export function PlanPanel({ session: s, onDraft }: { session: Session; onDraft?:
             </>
           ) : (
             <>
-              <button type="button" className="ak-chip primary chip" onClick={() => void implement()}>
-                Implement
+              <button type="button" className="ak-chip primary chip" onClick={() => void buildSessionPlan(s.id)}>
+                Build
               </button>
               <button type="button" className="ak-chip chip" onClick={() => setEditing(true)}>
                 Edit
@@ -157,7 +177,11 @@ export function PlanPanel({ session: s, onDraft }: { session: Session; onDraft?:
             </>
           )}
         </div>
-      )}
+      ) : null}
     </div>
   );
+}
+
+function hasPlan(s: Session): boolean {
+  return !!s.planDoc?.markdown || s.plan.length > 0;
 }

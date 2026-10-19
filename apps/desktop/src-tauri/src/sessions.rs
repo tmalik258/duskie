@@ -8,6 +8,7 @@
 //! for approvals as JSON-RPC requests.
 
 mod local;
+mod plans;
 pub mod reviews;
 
 use duskie_sensors::classify::mask;
@@ -149,11 +150,11 @@ fn codex_turn_params(
     // Clarifying choices become Duskie's selectable list when written as OPTION lines.
     // Plan mode also needs a structured collaboration plan Duskie can show and edit.
     let instructions = if mode == Mode::Plan {
-        "You are in Plan mode (read-only). Produce a concrete step-by-step plan the user can review before any changes. \
+        "You are in Plan mode (read-only). Produce a plan the user can review before any changes. \
 When the user must choose first, ask in one short sentence, then end with up to six lines each starting with OPTION: and a short label in their words. \
 When several choices may all apply, use OPTION_MULTI: lines instead (checkboxes + Confirm). \
-After they answer (or when no choice is needed), update the collaboration plan with clear actionable steps, then say the plan is ready for review. \
-Never say the plan is ready without those steps in the plan. Do not implement or write files in Plan mode."
+After they answer (or when no choice is needed), put the plan in the collaboration plan document and say the plan is ready for review. \
+Never say the plan is ready without that document. Do not implement or write files in Plan mode."
     } else {
         "When the user must choose before you continue, ask in one short sentence, \
 then end with up to six lines each starting with OPTION: and a short label in their words. \
@@ -947,7 +948,21 @@ fn baseline(id: &str) -> Result<Baseline, String> {
 /// The changes to review, with secrets in them masked. Undo reads the files
 /// again, so masking here never changes what gets undone.
 pub fn changes(id: &str) -> Result<Vec<review::FileChange>, String> {
-    let mut files = review::changes(&baseline(id)?)?;
+    let b = baseline(id)?;
+    let after = with(&SESSIONS, |s| s.get(id).map(|h| h.after.clone())).unwrap_or_default();
+    let paths: Vec<String> = after.keys().cloned().collect();
+    let mut files = if !paths.is_empty() {
+        match review::changes_for(&b, Some(&paths)) {
+            Ok(f) if !f.is_empty() => f,
+            Ok(_) => reviews::latest_files(id).unwrap_or_default(),
+            Err(e) if e.contains("timed out") => reviews::latest_files(id).ok_or(e)?,
+            Err(e) => return Err(e),
+        }
+    } else if let Some(snap) = reviews::latest_files(id) {
+        snap
+    } else {
+        review::changes(&b)?
+    };
     for line in files
         .iter_mut()
         .flat_map(|f| f.hunks.iter_mut())
@@ -1449,7 +1464,7 @@ async fn run_claude(
                     return Err(why_stopped("Claude Code", &lock(&stderr)));
                 };
                 let Ok(v) = serde_json::from_str::<Value>(&line) else { continue };
-                for data in claude_events(&v) {
+                for data in claude_events(&v, Some(path)) {
                     if data["kind"] == "session" {
                         let resume = data["resume"].as_str().map(str::to_owned);
                         with(&SESSIONS, |s| if let Some(h) = s.get_mut(id) { h.resume = resume });
@@ -1471,7 +1486,8 @@ async fn run_claude(
 }
 
 /// What one stream-json line means for the island.
-pub fn claude_events(v: &Value) -> Vec<Value> {
+/// `project` is the session cwd, used to find Claude plan files on disk.
+pub fn claude_events(v: &Value, project: Option<&Path>) -> Vec<Value> {
     let mut out = Vec::new();
     match v["type"].as_str() {
         Some("system") if v["subtype"] == "init" => {
@@ -1515,12 +1531,11 @@ pub fn claude_events(v: &Value) -> Vec<Value> {
                     out.push(json!({ "kind": "plan", "items": items }));
                     continue;
                 }
-                // The agent's own signal that its plan is ready: no need to
-                // guess from the wording of the answer.
-                if name == "ExitPlanMode"
-                    && let Some(plan) = b["input"]["plan"].as_str()
-                {
-                    out.push(json!({ "kind": "plan_doc", "text": plan }));
+                // Ready for review: prefer inline plan text, else the plan file on disk.
+                if name == "ExitPlanMode" {
+                    if let Some(plan) = plans::read_exit_plan(&b["input"], project) {
+                        out.push(json!({ "kind": "plan_doc", "text": plan }));
+                    }
                     continue;
                 }
                 // The agent's own multiple-choice question, with its options.
@@ -1529,6 +1544,27 @@ pub fn claude_events(v: &Value) -> Vec<Value> {
                         "kind": "choose", "id": b["id"], "questions": b["input"]["questions"],
                     }));
                     continue;
+                }
+                // Writing the plan file is itself the document when ExitPlanMode has no text.
+                if matches!(name, "Write" | "Edit" | "write_file") {
+                    let path = b["input"]["file_path"]
+                        .as_str()
+                        .or_else(|| b["input"]["path"].as_str())
+                        .unwrap_or_default();
+                    if plans::is_plan_file_path(path) {
+                        let from_input = b["input"]["content"]
+                            .as_str()
+                            .or_else(|| b["input"]["new_string"].as_str())
+                            .map(str::trim)
+                            .filter(|t| !t.is_empty())
+                            .map(str::to_owned);
+                        let from_disk = std::fs::read_to_string(path)
+                            .ok()
+                            .filter(|t| !t.trim().is_empty());
+                        if let Some(text) = from_input.or(from_disk) {
+                            out.push(json!({ "kind": "plan_doc", "text": text }));
+                        }
+                    }
                 }
                 let (label, detail) = describe_tool(name, &b["input"]);
                 out.push(json!({
@@ -2727,7 +2763,7 @@ mod tests {
             r#"{"type":"assistant","message":{"content":[{"type":"text","text":"ok"},{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"C:\\code\\app\\src\\main.rs"}}]}}"#,
         )
         .unwrap();
-        let ev = claude_events(&tool);
+        let ev = claude_events(&tool, None);
         assert_eq!(ev[0]["label"], "Edit main.rs");
         assert_eq!(ev[0]["state"], "running");
 
@@ -2735,13 +2771,16 @@ mod tests {
             r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t2","name":"TodoWrite","input":{"todos":[{"content":"Add retries","status":"in_progress"}]}}]}}"#,
         )
         .unwrap();
-        assert_eq!(claude_events(&todo)[0]["items"][0]["text"], "Add retries");
+        assert_eq!(
+            claude_events(&todo, None)[0]["items"][0]["text"],
+            "Add retries"
+        );
 
         let plan: Value = serde_json::from_str(
             r##"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t3","name":"ExitPlanMode","input":{"plan":"# Plan\n1. Add retries"}}]}}"##,
         )
         .unwrap();
-        let ev = claude_events(&plan);
+        let ev = claude_events(&plan, None);
         assert_eq!(ev.len(), 1, "the plan is not also a step");
         assert_eq!(ev[0]["kind"], "plan_doc");
         assert!(ev[0]["text"].as_str().unwrap().contains("Add retries"));
@@ -2750,7 +2789,7 @@ mod tests {
             r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t4","name":"AskUserQuestion","input":{"questions":[{"question":"Which database?","header":"DB","multiSelect":false,"options":[{"label":"SQLite","description":"local"},{"label":"Postgres","description":"server"}]}]}}]}}"#,
         )
         .unwrap();
-        let ev = claude_events(&ask);
+        let ev = claude_events(&ask, None);
         assert_eq!(ev.len(), 1);
         assert_eq!(ev[0]["kind"], "choose");
         assert_eq!(ev[0]["questions"][0]["options"][1]["label"], "Postgres");
@@ -2759,19 +2798,19 @@ mod tests {
             r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","is_error":true}]}}"#,
         )
         .unwrap();
-        assert_eq!(claude_events(&result)[0]["state"], "failed");
+        assert_eq!(claude_events(&result, None)[0]["state"], "failed");
 
         let said: Value = serde_json::from_str(
             r#"{"type":"assistant","message":{"content":[],"usage":{"input_tokens":10,"cache_read_input_tokens":90}}}"#,
         )
         .unwrap();
-        assert_eq!(claude_events(&said)[0]["used"], 100);
+        assert_eq!(claude_events(&said, None)[0]["used"], 100);
 
         let done: Value = serde_json::from_str(
             r#"{"type":"result","is_error":false,"result":"x","usage":{"input_tokens":10,"cache_read_input_tokens":90}}"#,
         )
         .unwrap();
-        let ev = claude_events(&done);
+        let ev = claude_events(&done, None);
         assert_eq!(ev[0]["kind"], "turn");
         assert!(ev[0]["error"].is_null());
 
@@ -2779,7 +2818,7 @@ mod tests {
             r#"{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","rateLimitType":"five_hour","resetsAt":1760000000,"utilization":0.8}}"#,
         )
         .unwrap();
-        let ev = claude_events(&limit);
+        let ev = claude_events(&limit, None);
         assert_eq!(ev[0]["kind"], "limit");
         assert_eq!(ev[0]["status"], "allowed_warning");
         assert_eq!(ev[0]["window"], "five_hour");

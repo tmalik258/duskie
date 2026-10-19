@@ -2000,6 +2000,24 @@ select.ak-mi option {
 .ak-plan-doc-body {
   min-width: 0;
 }
+.ak-plan-md {
+  min-width: 0;
+  max-height: min(60vh, 420px);
+  overflow: auto;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--ink);
+}
+.ak-plan-built {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.72;
+  cursor: default;
+}
+.ak-plan-built:disabled {
+  cursor: default;
+}
 .ak-plan-doc-steps {
   list-style: none;
   margin: 0;

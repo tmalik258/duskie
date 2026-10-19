@@ -246,6 +246,11 @@ export function SettingsPanel() {
                   type="button"
                   className="st-item"
                   aria-current={!searching && tab === i.id ? "page" : undefined}
+                  onMouseDown={(e) => {
+                    // Keep the nav from scrolling when the last item is focused.
+                    e.preventDefault();
+                    e.currentTarget.focus({ preventScroll: true });
+                  }}
                   onClick={() => {
                     setQuery("");
                     pick(i.id);
