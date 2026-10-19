@@ -229,7 +229,16 @@ export function UndoButton({ id }: { id: number }) {
 }
 
 /** Moments Duskie always offers - not habits, so no Show less / skip score. */
-const ALWAYS_GLANCE = new Set(["files.screenshot", "clipboard.open-url", "system.back"]);
+const ALWAYS_GLANCE = new Set([
+  "files.screenshot",
+  "clipboard.open-url",
+  "system.back",
+  "dev.open-in-browser",
+  "system.update",
+  "system.health",
+  "browser.pair",
+  "recipes.offer",
+]);
 
 export function Options({ suggestion }: { suggestion: Suggestion }) {
   const alwaysAt = suggestion.always?.findIndex(Boolean) ?? -1;

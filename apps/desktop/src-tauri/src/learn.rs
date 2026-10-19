@@ -67,12 +67,21 @@ pub fn tracked(skill_id: &str) -> bool {
         && !skill_id.starts_with("debug.")
         // Notifications learn per app instead (inbox.rs).
         && !skill_id.starts_with("notify.")
-        // Screenshots, copied links, and welcome-back always interrupt; no mute, no score line.
+        // Always-interrupt / self / setup / ephemeral pings: no mute, no score line.
         && !ALWAYS_SUGGEST.contains(&skill_id)
 }
 
 /// Always show these: no dismiss-streak mute, no "you skipped N of M" score.
-const ALWAYS_SUGGEST: &[&str] = &["files.screenshot", "clipboard.open-url", "system.back"];
+const ALWAYS_SUGGEST: &[&str] = &[
+    "files.screenshot",
+    "clipboard.open-url",
+    "system.back",
+    "dev.open-in-browser",
+    "system.update",
+    "system.health",
+    "browser.pair",
+    "recipes.offer",
+];
 
 /// Skills never offered as automatic: each time needs its own choice.
 /// A screenshot is already on the clipboard, so "always copy" adds nothing.
@@ -202,9 +211,16 @@ mod tests {
         assert!(!tracked("files.screenshot"));
         assert!(!tracked("clipboard.open-url"));
         assert!(!tracked("system.back"));
+        assert!(!tracked("dev.open-in-browser"));
+        assert!(!tracked("system.update"));
+        assert!(!tracked("system.health"));
+        assert!(!tracked("browser.pair"));
+        assert!(!tracked("recipes.offer"));
         assert!(!can_automate("files.screenshot"));
         assert!(!can_automate("system.back"));
+        assert!(!can_automate("dev.open-in-browser"));
         assert!(can_automate("files.download"));
+        assert!(tracked("dev.port-conflict"));
         assert!(!tracked("mcp.notify"));
     }
 
