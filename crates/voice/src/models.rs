@@ -75,7 +75,26 @@ pub const VOICE: Model = Model {
     skip: &[],
 };
 
-pub const MODELS: [Model; 3] = [WAKE, SPEECH, VOICE];
+/// Parakeet TDT 0.6B v2 (int8): writes the final text of each question.
+/// Far more accurate than the live model (about 2% word errors in tests
+/// against 9% for it), and about 0.4 s for a question.
+pub const FINAL: Model = Model {
+    id: "final",
+    label: "Final transcript",
+    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8.tar.bz2",
+    sha256: "157c157bc51155e03e37d2466522a3a737dd9c72bb25f36eb18912964161e1ad",
+    size: 482_468_385,
+    dir: "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8",
+    files: &[
+        "encoder.int8.onnx",
+        "decoder.int8.onnx",
+        "joiner.int8.onnx",
+        "tokens.txt",
+    ],
+    skip: &[],
+};
+
+pub const MODELS: [Model; 4] = [WAKE, SPEECH, FINAL, VOICE];
 
 /// Tells your voice from others (CAM++, trained on VoxCeleb). A single
 /// file, fetched only when you teach Duskie your voice.
