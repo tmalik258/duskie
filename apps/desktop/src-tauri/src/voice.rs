@@ -821,7 +821,9 @@ fn on_heard(app: &AppHandle, heard: Heard) {
                 text.clear();
             }
             mascot::dispatch(app, MascotEvent::Cancelled);
-            *lock(&SPEECH_ENDED) = (!text.is_empty()).then(std::time::Instant::now);
+            let ended = (!text.is_empty()).then(std::time::Instant::now);
+            *lock(&SPEECH_ENDED) = ended;
+            *lock(&WORDS_FROM) = ended;
             emit_heard(app, text, true);
             v.opened_by_voice.store(false, Ordering::SeqCst);
         }
@@ -862,6 +864,8 @@ fn emit_heard(app: &AppHandle, text: String, done: bool) {
 
 /// When the last spoken question ended, until its answer is first heard.
 static SPEECH_ENDED: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+/// The same moment, kept until the answer's first words arrive.
+static WORDS_FROM: Mutex<Option<std::time::Instant>> = Mutex::new(None);
 
 fn emit_pause(app: &AppHandle, text: String) {
     let by_voice = voice(app).opened_by_voice.load(Ordering::SeqCst);
@@ -938,6 +942,13 @@ fn with_answer(app: &AppHandle, id: &str, f: impl FnOnce(&Speaker, u64)) {
 }
 
 pub fn answer_text(app: &AppHandle, id: &str, text: &str) {
+    if !text.trim().is_empty()
+        && lock(&voice(app).asked_by_voice).as_deref() == Some(id)
+        && let Some(ended) = lock(&WORDS_FROM).take()
+    {
+        let ms = ended.elapsed().as_millis() as u64;
+        crate::timings::record(app, crate::timings::SPEECH_TO_FIRST_WORD, ms);
+    }
     with_answer(app, id, |s, u| s.push(u, text));
 }
 

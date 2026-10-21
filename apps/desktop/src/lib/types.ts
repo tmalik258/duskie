@@ -332,7 +332,7 @@ export interface AskOpen {
 
 /** One measured moment, for the timings overlay. */
 export interface Timing {
-  name: "open_to_ready" | "enter_to_first_word" | "speech_to_first_sound";
+  name: "open_to_ready" | "enter_to_first_word" | "speech_to_first_word" | "speech_to_first_sound";
   ms: number;
 }
 
