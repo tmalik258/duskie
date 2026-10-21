@@ -7,31 +7,40 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/bridge";
 import { filterRows, groupsOf, type LearnedSort, lean, reasonFor, sortRows, splitKey } from "@/lib/learned";
-import { useDuskie } from "@/lib/store";
+import { playSound } from "@/lib/sound";
+import { uiVolume, useDuskie } from "@/lib/store";
 import type { LessonRow } from "@/lib/types";
 import { Button, Field, Segmented } from "./ui";
 
 export function NotificationProfile({ onError }: { onError: (e: string) => void }) {
   const profile = useDuskie((s) => s.settings.notifications.profile);
+  const kit = useDuskie((s) => s.settings.soundKit);
   return (
-    <Field
-      label="Profile"
-      hint={
-        profile === "calm"
-          ? "A small pill for most things. Sound only for urgent ones."
-          : "Quieter things come as a small pill with a soft sound."
-      }
-    >
-      <Segmented
-        label="Notification profile"
-        value={profile}
-        options={[
-          ["normal", "Normal"],
-          ["calm", "Calm"],
-        ]}
-        onChange={(p) => void api.attentionSetProfile(p).catch((e) => onError(String(e)))}
-      />
-    </Field>
+    <>
+      <Field
+        label="Profile"
+        hint={
+          profile === "calm"
+            ? "A small pill for most things. Sound only for urgent ones."
+            : "Quieter things come as a small pill with a soft sound."
+        }
+      >
+        <Segmented
+          label="Notification profile"
+          value={profile}
+          options={[
+            ["normal", "Normal"],
+            ["calm", "Calm"],
+          ]}
+          onChange={(p) => void api.attentionSetProfile(p).catch((e) => onError(String(e)))}
+        />
+      </Field>
+      <Field label="Notification sound" hint="What a notification sounds like when it plays one.">
+        <Button small onClick={() => playSound("notification", Math.max(uiVolume(), 0.4), kit)}>
+          Play sound
+        </Button>
+      </Field>
+    </>
   );
 }
 
