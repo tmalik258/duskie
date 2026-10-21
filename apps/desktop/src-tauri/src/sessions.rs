@@ -53,9 +53,10 @@ pub enum Mode {
 
 /// What Debug mode asks of the agent before the user's own words.
 const DEBUG_BRIEF: &str = "Debug mode. Find the cause before changing behavior: \
-1. Add temporary debug logs, each tagged [dbg file:line], where the state goes wrong. \
-2. Reproduce the bug and read the logs. 3. Fix the cause, not the symptom. \
-4. Remove every [dbg] log you added and say so. Never leave debug logs behind.\n\n";
+1. Add temporary debug logs, each printing a line that starts with [dbg file:line], where the state goes wrong. \
+For each one, write a line in your reply: PROBE file:line - what it logs. \
+2. Reproduce the bug and read the logs. 3. When you know it, write a line: CAUSE: one sentence. Fix the cause, not the symptom. \
+4. Remove every [dbg] log you added, then write a line: PROBES REMOVED. Never leave debug logs behind.\n\n";
 
 impl Mode {
     fn claude(self) -> &'static str {

@@ -68,6 +68,7 @@ import { Select } from "../settings/ui";
 import { Tip } from "../Tip";
 import { Board } from "./Board";
 import { ChatControls, DEFAULT_EFFORT, defaultModel, ModeChip } from "./Controls";
+import { DebugPanel } from "./DebugPanel";
 import { PlanPanel } from "./PlanPanel";
 import { ProjectPicker } from "./ProjectPicker";
 import { Review } from "./Review";
@@ -963,6 +964,7 @@ function SessionView({
               </button>
             )}
             {planAboveFold && <PlanPanel session={s} onDraft={onPlanDraft} />}
+            {(s.activeMode ?? s.mode) === "debug" && <DebugPanel session={s} />}
             {visibleEntries.map((e, j) => {
               const i = entryStart + j;
               // Last agent prose (idle or still "working" after a clarifying ask).
