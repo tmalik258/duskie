@@ -6,6 +6,7 @@
 import { motion, useReducedMotion } from "motion/react";
 import { bubblesOf } from "@/lib/peek";
 import { motionFor, SPRINGS } from "@/lib/spring";
+import { Ic, type IcName } from "./Icon";
 
 export interface BubbleItem {
   id: string;
@@ -16,6 +17,8 @@ export interface BubbleItem {
   sub?: string;
   /** Initial or short mark in the round badge. */
   mark?: string;
+  /** Icon in the round badge, instead of a mark. */
+  icon?: IcName;
   /** Download or install progress, 0..1, drawn along the bottom edge. */
   progress?: number | null;
   tone?: "err";
@@ -50,7 +53,7 @@ export function IslandBubbles({ items, onOpen }: { items: BubbleItem[]; onOpen?:
                   className={`grid size-[26px] flex-none place-items-center rounded-full bg-[rgb(242_240_235_/_0.07)] font-mono text-[10px] font-semibold ${it.tone === "err" ? "text-(--err)" : "text-(--c4)"}`}
                   aria-hidden="true"
                 >
-                  {it.mark ?? it.label.slice(0, 1).toUpperCase()}
+                  {it.icon ? <Ic name={it.icon} size={12} /> : (it.mark ?? it.label.slice(0, 1).toUpperCase())}
                 </span>
                 <span className="flex min-w-0 flex-col leading-[1.15]">
                   <b className="truncate text-[11.5px] font-semibold">{it.label}</b>

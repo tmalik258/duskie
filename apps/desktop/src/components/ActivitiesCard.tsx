@@ -12,7 +12,7 @@ import { Ic, type IcName } from "./Icon";
 const MB = 1_000_000;
 
 function activityIcon(source: string): IcName {
-  if (source === "browser" || source === "file") return "folder";
+  if (source === "browser" || source === "file") return "dl";
   if (source === "update") return "update";
   if (source === "open") return "open";
   if (source === "agent") return "term";
@@ -21,7 +21,13 @@ function activityIcon(source: string): IcName {
 }
 
 function sizeLine(a: Activity, now: number): string | null {
-  if (a.total == null || a.transferred == null) return null;
+  if (a.phase === "failed") return a.outcome ?? "Failed";
+  if (a.phase === "awaitingUser") return "Paused, waiting for you";
+  if (a.transferred == null) return null;
+  if (a.total == null) {
+    const secs = Math.max(0, Math.round((now - a.startedAt) / 1000));
+    return `${Math.round(a.transferred / MB)} MB received  ·  ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+  }
   const secs = Math.max(1, (now - a.startedAt) / 1000);
   const rate = a.transferred / secs;
   const left = rate > 0 ? Math.max(0, (a.total - a.transferred) / rate) : null;
@@ -44,7 +50,9 @@ export function ActivitiesCard() {
       <div className="rd-card-head">
         <p className="rd-eyebrow">Activities</p>
         <p className="rd-title">{running.length === 1 ? "1 running" : `${running.length} running`}</p>
-        <p className="rd-detail">Nothing else in the background</p>
+        <p className="rd-detail">
+          {list.length > 1 ? `${list.length} in the background` : "Nothing else in the background"}
+        </p>
       </div>
       <div className="flex flex-col gap-1.5" style={{ marginLeft: "calc(var(--orb-indent, 0px) * -1)" }}>
         {list.map((a) => {
@@ -52,17 +60,19 @@ export function ActivitiesCard() {
           const sub = sizeLine(a, now);
           return (
             <div key={a.id} className="act-row">
+              <span className="act-ic" aria-hidden>
+                <Ic name={activityIcon(a.source)} size={13} />
+              </span>
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-[13px]">{activityLabel(a, now, { elapsed: false })}</span>
+                <span className="block truncate text-[13px]">
+                  {a.label || activityLabel(a, now, { elapsed: false })}
+                </span>
                 {sub && <span className="act-sub block truncate">{sub}</span>}
                 {pct !== null && (
                   <span className="act-bar" aria-hidden>
                     <i style={{ width: `${pct * 100}%` }} />
                   </span>
                 )}
-              </span>
-              <span className="act-ic" aria-hidden>
-                <Ic name={activityIcon(a.source)} size={13} />
               </span>
               <button
                 type="button"

@@ -770,7 +770,7 @@ export function Island() {
     return {
       id: a.id,
       label: a.label || a.source,
-      mark: ["browser", "file"].includes(a.source) ? "\u2193" : undefined,
+      icon: ["browser", "file"].includes(a.source) ? "dl" : undefined,
       sub:
         a.phase === "failed"
           ? "Failed"
