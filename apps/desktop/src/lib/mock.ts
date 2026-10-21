@@ -685,6 +685,8 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
         theirs: 'title="Repos"\nhint="Where clones go and how often to check."',
       },
     ],
+    // The Git dock preview shows the Merge tab only with ?conflicts.
+    ...(previewFlag("git") && !previewFlag("conflicts") ? { files: [] } : {}),
   }),
   merge_keep: () => null,
   merge_end: (a) => ({

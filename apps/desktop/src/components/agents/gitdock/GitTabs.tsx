@@ -6,7 +6,7 @@
 import { motion, useReducedMotion } from "motion/react";
 import { useLayoutEffect, useRef, useState } from "react";
 
-export type GitTab = "changes" | "history" | "pr" | "stashes";
+export type GitTab = "changes" | "history" | "pr" | "stashes" | "merge";
 
 const TABS: [GitTab, string][] = [
   ["changes", "Changes"],
@@ -23,29 +23,33 @@ export function GitTabs({
   onTab,
   changes,
   stashes,
+  conflicts = 0,
 }: {
   tab: GitTab;
   onTab: (t: GitTab) => void;
   changes: number;
   stashes: number;
+  /** Files with merge conflicts; the Merge tab shows only while there are some. */
+  conflicts?: number;
 }) {
   const reduce = useReducedMotion();
   const refs = useRef<Partial<Record<GitTab, HTMLButtonElement | null>>>({});
   const [box, setBox] = useState<{ x: number; w: number } | null>(null);
-  const counts: Partial<Record<GitTab, number>> = { changes, stashes };
+  const counts: Partial<Record<GitTab, number>> = { changes, stashes, merge: conflicts };
+  const tabs: [GitTab, string][] = conflicts > 0 ? [["merge", "Merge"], ...TABS] : TABS;
 
   // Counts change a tab's width, so measure again when they do.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: changes and stashes resize the tabs
+  // biome-ignore lint/correctness/useExhaustiveDependencies: counts resize the tabs
   useLayoutEffect(() => {
     const el = refs.current[tab];
     if (!el) return;
     const next = { x: el.offsetLeft, w: el.offsetWidth };
     setBox((b) => (b && b.x === next.x && b.w === next.w ? b : next));
-  }, [tab, changes, stashes]);
+  }, [tab, changes, stashes, conflicts]);
 
   return (
     <div className="gtabs" role="tablist" aria-label="Git views">
-      {TABS.map(([k, label]) => {
+      {tabs.map(([k, label]) => {
         const n = counts[k] ?? 0;
         return (
           <button

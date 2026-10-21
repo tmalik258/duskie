@@ -172,7 +172,7 @@ pub fn main_branch(path: &Path) -> String {
 /// Marks a result whose merge stopped on conflicts: the island opens them.
 pub const MERGE_AT: &str = "git-merge:";
 /// The stash message for changes put aside while the branch updates.
-const UPDATE_STASH: &str = "sidekick: update";
+pub(crate) const UPDATE_STASH: &str = "sidekick: update";
 
 fn dirty(path: &Path) -> Result<bool, ActionError> {
     Ok(
@@ -278,7 +278,7 @@ pub fn update_branch(path: &Path) -> Result<Outcome, ActionError> {
 }
 
 /// Files the open merge left with conflicts.
-fn conflicted(path: &Path) -> Vec<String> {
+pub(crate) fn conflicted(path: &Path) -> Vec<String> {
     git(path, &["diff", "--name-only", "--diff-filter=U"])
         .unwrap_or_default()
         .lines()

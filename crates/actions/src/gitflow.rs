@@ -759,27 +759,35 @@ pub fn push(path: &Path) -> Result<Outcome, ActionError> {
 }
 
 /// Pulls then pushes, like an editor's Sync. Your uncommitted changes are put
-/// aside and back. A pull that hits conflicts is undone, so nothing changes.
+/// aside and back. A pull that hits conflicts stops there for the Merge tab.
 pub fn sync(path: &Path) -> Result<Outcome, ActionError> {
     repo(path)?;
     let dirty = !git(path, &["status", "--porcelain", "--untracked-files=no"])?
         .trim()
         .is_empty();
     if dirty {
-        git(path, &["stash", "push", "--quiet", "-m", "duskie: sync"])?;
+        git(
+            path,
+            &["stash", "push", "--quiet", "-m", crate::dev::UPDATE_STASH],
+        )?;
     }
-    let pulled = git(path, &["pull", "--no-rebase", "--no-edit", "--quiet"]);
-    if pulled.is_err() {
+    if let Err(e) = git(path, &["pull", "--no-rebase", "--no-edit", "--quiet"]) {
+        // Conflicts stay for the Merge tab; it finishes or undoes the merge
+        // and puts your changes back either way.
+        if !crate::dev::conflicted(path).is_empty() {
+            return Err(ActionError::Failed(
+                "The pull has conflicts. Solve them in the Merge tab, then push.".into(),
+            ));
+        }
         let _ = git(path, &["merge", "--abort"]);
+        if dirty {
+            let _ = git(path, &["stash", "pop", "--quiet"]);
+        }
+        return Err(e);
     }
     if dirty && let Err(e) = git(path, &["stash", "pop", "--quiet"]) {
         return Err(ActionError::Failed(format!(
             "Your changes clash with the new commits; they are kept in Stashes ({e})"
-        )));
-    }
-    if let Err(e) = pulled {
-        return Err(ActionError::Failed(format!(
-            "Pull hit conflicts, so nothing changed. Merge in your editor. ({e})"
         )));
     }
     git(path, &["push"])?;

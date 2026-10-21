@@ -3,15 +3,16 @@
 // The Git dock host: the bar, the tabs and the active pane. Full screen opens
 // the editor; Esc closes the dock (or an open menu first).
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/bridge";
 import { fetchGitCached, gitCacheKey, invalidateGitPath, peekGitCache } from "@/lib/git-cache";
-import type { RepoRow, StashRow } from "@/lib/types";
+import type { MergeState, RepoRow, StashRow } from "@/lib/types";
 import { Editor } from "./Editor";
 import { ChangesPane } from "./gitdock/ChangesPane";
 import { GitBar } from "./gitdock/GitBar";
 import { type GitTab, GitTabs } from "./gitdock/GitTabs";
 import { HistoryPane } from "./gitdock/HistoryPane";
+import { MergePane } from "./gitdock/MergePane";
 import { PrPane } from "./gitdock/PrPane";
 import { StashesPane } from "./gitdock/StashesPane";
 
@@ -51,6 +52,28 @@ export function GitDock({
       .then(setStashes)
       .catch(() => {});
   }, [tab, path, rev, stashKey]);
+
+  // A pull that stopped on conflicts opens the Merge tab; it goes once solved.
+  const [merge, setMerge] = useState<MergeState | null>(null);
+  const hadMerge = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rev means something changed, so read conflicts again
+  useEffect(() => {
+    let live = true;
+    void api
+      .mergeState(path)
+      .then((m) => {
+        if (!live) return;
+        const open = m.files.length > 0 ? m : null;
+        setMerge(open);
+        if (open && !hadMerge.current) setTab("merge");
+        if (!open) setTab((t) => (t === "merge" ? "changes" : t));
+        hadMerge.current = open !== null;
+      })
+      .catch(() => live && setMerge(null));
+    return () => {
+      live = false;
+    };
+  }, [path, rev]);
 
   // Esc closes the dock; the editor and an open menu handle their own Esc.
   useEffect(() => {
@@ -94,7 +117,24 @@ export function GitDock({
           }}
           onClose={onClose}
         />
-        <GitTabs tab={tab} onTab={setTab} changes={changed} stashes={stashes.length} />
+        <GitTabs
+          tab={tab}
+          onTab={setTab}
+          changes={changed}
+          stashes={stashes.length}
+          conflicts={merge?.files.length ?? 0}
+        />
+        {tab === "merge" && merge && (
+          <MergePane
+            path={path}
+            state={merge}
+            onChanged={bump}
+            onOpen={(file) => {
+              setAt({ path: file });
+              setFull(true);
+            }}
+          />
+        )}
         {tab === "changes" && (
           <ChangesPane
             path={path}
