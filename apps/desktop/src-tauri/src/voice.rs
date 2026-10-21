@@ -88,6 +88,8 @@ struct Key {
     /// The microphone opens only once onboarding is done; until then
     /// Duskie speaks the welcome but never listens.
     listen: bool,
+    /// What was learned from your voice (JSON), if you taught it.
+    profile: Option<String>,
 }
 
 struct Runtime {
@@ -281,6 +283,7 @@ pub fn refresh(app: &AppHandle) {
         speed: settings.speed,
         name,
         listen: onboarded && listen,
+        profile: crate::voice_enroll::profile(&v.models, settings.only_me).map(|p| p.to_json()),
     };
     if lock(&v.runtime).as_ref().is_some_and(|r| r.key == key) {
         return;
@@ -296,6 +299,7 @@ pub fn refresh(app: &AppHandle) {
             && r.key.interrupt == key.interrupt
             && r.key.listen == key.listen
             && r.key.name == key.name
+            && r.key.profile == key.profile
     });
     if same_ears {
         std::thread::spawn(move || {
@@ -694,6 +698,10 @@ fn build(app: &AppHandle, key: Key, settings: &VoiceSettings) -> Runtime {
                 models: v.models.clone(),
                 wake_word: settings.wake_word,
                 interrupt: settings.interrupt,
+                profile: key
+                    .profile
+                    .as_deref()
+                    .and_then(duskie_voice::Profile::from_json),
             },
             move |heard| on_heard(&handle, heard),
         ) {

@@ -423,6 +423,8 @@ pub struct VoiceSettings {
     pub live: bool,
     /// Keep Live conversations in Ask history (text only, never audio).
     pub live_history: bool,
+    /// Only the voice you taught Duskie wakes it. Needs a taught voice.
+    pub only_me: bool,
 }
 
 /// Settings saved before the v1.0 voice model had no `model` field.
@@ -450,6 +452,7 @@ impl Default for VoiceSettings {
             fixes: String::new(),
             live: false,
             live_history: true,
+            only_me: false,
         }
     }
 }

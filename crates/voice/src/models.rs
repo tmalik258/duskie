@@ -77,6 +77,19 @@ pub const VOICE: Model = Model {
 
 pub const MODELS: [Model; 3] = [WAKE, SPEECH, VOICE];
 
+/// Tells your voice from others (CAM++, trained on VoxCeleb). A single
+/// file, fetched only when you teach Duskie your voice.
+pub const SPEAKER: Model = Model {
+    id: "speaker",
+    label: "Your voice",
+    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_en_voxceleb_16k.onnx",
+    sha256: "357a834f702b80161e5b981182c038e18553c1f2ca752ed6cec2052365d4129b",
+    size: 29_596_978,
+    dir: "speaker-campplus-en-16k",
+    files: &["campplus.onnx"],
+    skip: &[],
+};
+
 /// Folders of models that were replaced, removed once their successor is in.
 const RETIRED: &[(&str, Model)] = &[
     ("kokoro-int8-en-v0_19", VOICE),
@@ -101,6 +114,11 @@ impl Model {
 
     pub fn file(&self, root: &Path, name: &str) -> String {
         self.path(root).join(name).to_string_lossy().into_owned()
+    }
+
+    /// A bare model file rather than an archive.
+    fn single_file(&self) -> bool {
+        self.url.ends_with(".onnx")
     }
 
     pub fn installed(&self, root: &Path) -> bool {
@@ -190,6 +208,12 @@ fn download(
 /// Unpacks into a temporary folder first, so a half-unpacked model never
 /// looks installed.
 fn unpack(model: &Model, archive: &Path, root: &Path) -> Result<()> {
+    if model.single_file() {
+        let target = model.path(root);
+        fs::create_dir_all(&target)?;
+        fs::rename(archive, target.join(model.files[0]))?;
+        return Ok(());
+    }
     let staging = root.join(format!(".unpack-{}", model.id));
     let _ = fs::remove_dir_all(&staging);
     fs::create_dir_all(&staging)?;
@@ -291,8 +315,21 @@ mod tests {
     }
 
     #[test]
+    fn a_single_model_file_is_moved_into_place() {
+        let dir = std::env::temp_dir().join(format!("duskie-single-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+        let part = dir.join("speaker.part");
+        fs::write(&part, "onnx").unwrap();
+        unpack(&SPEAKER, &part, &dir).unwrap();
+        assert!(SPEAKER.installed(&dir));
+        assert!(!part.exists());
+        fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[test]
     fn hashes_are_pinned() {
-        for m in MODELS {
+        for m in MODELS.into_iter().chain([SPEAKER]) {
             assert_eq!(m.sha256.len(), 64, "{}", m.id);
             assert!(
                 m.url

@@ -117,6 +117,35 @@ pub async fn voice_test(app: AppHandle) -> CmdResult<()> {
         .map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+pub fn voice_enroll_state(app: AppHandle) -> crate::voice_enroll::EnrollState {
+    crate::voice_enroll::state(&app)
+}
+
+/// Records one take (the name, or sentence `sentence`) from the microphone.
+#[tauri::command]
+pub async fn voice_enroll_record(
+    app: AppHandle,
+    sentence: Option<usize>,
+) -> CmdResult<crate::voice_enroll::EnrollState> {
+    tauri::async_runtime::spawn_blocking(move || crate::voice_enroll::record(&app, sentence))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Learns from the takes and drops them.
+#[tauri::command]
+pub async fn voice_enroll_finish(app: AppHandle) -> CmdResult<crate::voice_enroll::EnrollState> {
+    tauri::async_runtime::spawn_blocking(move || crate::voice_enroll::finish(&app))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+#[tauri::command]
+pub fn voice_enroll_reset(app: AppHandle) -> crate::voice_enroll::EnrollState {
+    crate::voice_enroll::reset(&app)
+}
+
 /// A key was pressed in Ask; keeps the mic closed while the user types.
 #[tauri::command]
 pub fn voice_typing(app: AppHandle, has_text: bool) {

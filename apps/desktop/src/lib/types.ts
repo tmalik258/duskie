@@ -137,6 +137,17 @@ export interface VoiceSettings {
   live?: boolean;
   /** Keep Live conversations in Ask history, as text. */
   liveHistory?: boolean;
+  /** Only the voice you taught Duskie wakes it. */
+  onlyMe?: boolean;
+}
+
+/** Teaching Duskie your voice: takes so far, kept in memory only. */
+export interface EnrollState {
+  taught: boolean;
+  nameTakes: number;
+  sentenceTakes: number;
+  namesNeeded: number;
+  sentences: string[];
 }
 
 export interface VoiceStatus {
@@ -538,6 +549,7 @@ export const DEFAULT_SETTINGS: Settings = {
     interrupt: true,
     live: false,
     liveHistory: true,
+    onlyMe: false,
     voice: "f4",
     speed: 1,
   },

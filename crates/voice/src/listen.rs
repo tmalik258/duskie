@@ -12,11 +12,12 @@ use std::time::Duration;
 
 use sherpa_onnx::{
     KeywordSpotter, KeywordSpotterConfig, OnlineModelConfig, OnlineRecognizer,
-    OnlineRecognizerConfig, OnlineStream, OnlineTransducerModelConfig,
+    OnlineRecognizerConfig, OnlineStream, OnlineTransducerModelConfig, SpeakerEmbeddingExtractor,
 };
 
 use crate::audio::Mic;
-use crate::models::{SPEECH, WAKE};
+use crate::enroll::Profile;
+use crate::models::{SPEAKER, SPEECH, WAKE};
 use crate::{MIC_RATE, Result, VoiceError};
 
 #[derive(Debug, Clone, PartialEq)]
@@ -52,6 +53,8 @@ pub struct ListenerConfig {
     pub wake_word: bool,
     /// Talking over Duskie's voice stops it and starts listening.
     pub interrupt: bool,
+    /// What you taught Duskie about your voice, if you did.
+    pub profile: Option<Profile>,
 }
 
 /// Audio kept from before the wake phrase was recognised, so the first
@@ -145,6 +148,38 @@ pub struct Engine {
     /// Listening started by talking over the speakers: audio is heard even
     /// though the speakers were playing a moment ago.
     barged: bool,
+    /// Your voiceprint: a wake in another voice is ignored.
+    you: Option<(SpeakerEmbeddingExtractor, Vec<f32>)>,
+}
+
+/// The keyword bar, tuned with the wake bench (10 voices, two speeds, 100
+/// everyday sentences): with the boost below it caught 92% alone and 95%
+/// with the transcript, with no false wakes. Lower gained nothing more.
+/// Teaching Duskie your voice sets your own.
+pub const WAKE_THRESHOLD: f32 = 0.05;
+
+pub(crate) fn spotter_config(models: &Path, threshold: f32) -> KeywordSpotterConfig {
+    KeywordSpotterConfig {
+        model_config: model(
+            models,
+            &WAKE,
+            WAKE.files[0],
+            WAKE.files[1],
+            WAKE.files[2],
+            1,
+        ),
+        max_active_paths: 4,
+        keywords_score: 2.5,
+        keywords_threshold: threshold,
+        num_trailing_blanks: 1,
+        keywords_buf: Some(crate::text::wake_keywords(
+            std::fs::read(WAKE.path(models).join("bpe.model"))
+                .ok()
+                .map(|b| crate::text::read_vocab(&b))
+                .as_ref(),
+        )),
+        ..Default::default()
+    }
 }
 
 fn model(
@@ -179,39 +214,32 @@ impl Engine {
         Self::with_wake(models, wake_word, wake_word)
     }
 
+    /// Uses what was learned when you taught Duskie your voice: your own
+    /// wake bar, and only your voice wakes it.
+    pub fn with_profile(models: &Path, wake_word: bool, profile: Option<&Profile>) -> Result<Self> {
+        let threshold = profile.map_or(WAKE_THRESHOLD, |p| p.threshold);
+        let mut engine = Self::tuned(models, wake_word, wake_word, threshold)?;
+        if let Some(p) = profile.filter(|p| !p.print.is_empty())
+            && SPEAKER.installed(models)
+        {
+            engine.you = Some((crate::enroll::extractor(models)?, p.print.clone()));
+        }
+        Ok(engine)
+    }
+
     /// `keyword`: the small keyword model. `transcript`: the speech model
     /// runs all the time and wakes on "hey Duskie" in what it hears.
     pub fn with_wake(models: &Path, keyword: bool, transcript: bool) -> Result<Self> {
+        Self::tuned(models, keyword, transcript, WAKE_THRESHOLD)
+    }
+
+    fn tuned(models: &Path, keyword: bool, transcript: bool, threshold: f32) -> Result<Self> {
         let wake_word = keyword;
         if !SPEECH.installed(models) || (wake_word && !WAKE.installed(models)) {
             return Err(VoiceError::MissingModels);
         }
         let spotter = if wake_word {
-            let config = KeywordSpotterConfig {
-                model_config: model(
-                    models,
-                    &WAKE,
-                    WAKE.files[0],
-                    WAKE.files[1],
-                    WAKE.files[2],
-                    1,
-                ),
-                max_active_paths: 4,
-                // Tuned with the wake bench (10 voices, two speeds, 100
-                // everyday sentences): this boost and bar caught 92% alone
-                // and 95% with the transcript, with no false wakes. Lower
-                // gained nothing more.
-                keywords_score: 2.5,
-                keywords_threshold: 0.05,
-                num_trailing_blanks: 1,
-                keywords_buf: Some(crate::text::wake_keywords(
-                    std::fs::read(WAKE.path(models).join("bpe.model"))
-                        .ok()
-                        .map(|b| crate::text::read_vocab(&b))
-                        .as_ref(),
-                )),
-                ..Default::default()
-            };
+            let config = spotter_config(models, threshold);
             let spotter = KeywordSpotter::create(&config)
                 .ok_or_else(|| VoiceError::Engine("wake word model did not load".into()))?;
             let stream = spotter.create_stream();
@@ -255,6 +283,7 @@ impl Engine {
             interrupt: false,
             barge: Barge::default(),
             barged: false,
+            you: None,
         })
     }
 
@@ -353,7 +382,7 @@ impl Engine {
         if !self.listening {
             let spotted = self.spot(chunk);
             if !self.transcript_wake {
-                if spotted {
+                if spotted && self.is_you() {
                     out.push(Heard::Wake);
                     self.start_listening();
                 }
@@ -362,7 +391,7 @@ impl Engine {
             // The transcript already holds the wake audio, so listening
             // just carries on from here.
             let text = self.decode(chunk);
-            if spotted || crate::text::find_wake(&text).is_some() {
+            if (spotted || crate::text::find_wake(&text).is_some()) && self.is_you() {
                 out.push(Heard::Wake);
                 // The keyword model may still hold the phrase; it must not
                 // fire on it later.
@@ -415,6 +444,23 @@ impl Engine {
             out.push(Heard::Final(text));
         }
         out
+    }
+
+    /// Whether the voice just heard is yours. Without a voiceprint anyone
+    /// may wake it.
+    fn is_you(&mut self) -> bool {
+        let Some((extractor, print)) = &self.you else {
+            return true;
+        };
+        let audio: Vec<f32> = self.recent.iter().copied().collect();
+        let yours = crate::enroll::embed(extractor, &audio)
+            .is_none_or(|e| crate::enroll::similarity(&e, print) >= crate::enroll::SAME_VOICE);
+        if !yours {
+            // Someone else said it: forget the phrase so it cannot fire later.
+            self.fresh_spotter();
+            self.recognizer.reset(&self.stream);
+        }
+        yours
     }
 
     /// A new keyword stream: a reset keeps audio it has buffered, which
@@ -488,7 +534,11 @@ impl Listener {
         let thread = std::thread::Builder::new()
             .name("sidekick-listener".into())
             .spawn(move || {
-                let mut engine = match Engine::new(&config.models, config.wake_word) {
+                let mut engine = match Engine::with_profile(
+                    &config.models,
+                    config.wake_word,
+                    config.profile.as_ref(),
+                ) {
                     Ok(mut e) => {
                         e.set_interrupt(config.interrupt);
                         e

@@ -1221,6 +1221,8 @@ commands.ask_close = () => {
   }
   emit("ask://close", { reason: "close" });
 };
+// `?settings` opens Settings once the island has loaded (visual checks).
+if (previewFlag("settings")) setTimeout(() => commands.ask_open?.({ view: "settings" }), 800);
 commands.ask_open = (a) => {
   welcomeDeferred = false;
   emit("ask://open", {
@@ -1742,6 +1744,33 @@ commands.voice_welcome_step = (a) => speakWelcome(Number(a.step) || 0);
 commands.voice_say = () => undefined;
 commands.voice_read = () => undefined;
 commands.voice_test = () => undefined;
+const enroll = {
+  taught: false,
+  nameTakes: 0,
+  sentenceTakes: 0,
+  namesNeeded: 5,
+  sentences: [
+    "What is on my calendar this afternoon?",
+    "Remind me to call the bank tomorrow morning.",
+    "Turn on night light and play some quiet music.",
+  ],
+};
+commands.voice_enroll_state = () => ({ ...enroll });
+commands.voice_enroll_record = async (a) => {
+  await new Promise((r) => setTimeout(r, 600));
+  if (a.sentence == null) enroll.nameTakes = Math.min(enroll.namesNeeded, enroll.nameTakes + 1);
+  else enroll.sentenceTakes = Math.min(enroll.sentences.length, enroll.sentenceTakes + 1);
+  return { ...enroll };
+};
+commands.voice_enroll_finish = async () => {
+  await new Promise((r) => setTimeout(r, 900));
+  Object.assign(enroll, { taught: true, nameTakes: 0, sentenceTakes: 0 });
+  return { ...enroll };
+};
+commands.voice_enroll_reset = () => {
+  Object.assign(enroll, { taught: false, nameTakes: 0, sentenceTakes: 0 });
+  return { ...enroll };
+};
 commands.search = (a) => [
   {
     source: "file",

@@ -83,6 +83,8 @@ pub struct AppState {
     /// Ranking picks per skill and app, from earlier decisions.
     pub decisions: Mutex<crate::decide::Cache>,
     pub voice: crate::voice::Voice,
+    /// Voice takes being recorded to teach Duskie your voice (memory only).
+    pub enroll: Mutex<crate::voice_enroll::Takes>,
     pub calendar: duskie_sensors::Calendar,
     /// Claude Code permission requests waiting on the island.
     pub approvals: duskie_sensors::Approvals,

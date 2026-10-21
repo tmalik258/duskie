@@ -78,6 +78,7 @@ mod tray;
 mod undo;
 mod updates;
 mod voice;
+mod voice_enroll;
 mod web;
 mod windows;
 mod workspace;
@@ -274,6 +275,10 @@ pub fn run() {
             commands::voice_typing,
             commands::voice_stop,
             commands::voice_test,
+            commands::voice_enroll_state,
+            commands::voice_enroll_record,
+            commands::voice_enroll_finish,
+            commands::voice_enroll_reset,
             commands::voice_welcome,
             commands::voice_welcome_step,
             commands::voice_say,
@@ -448,6 +453,7 @@ fn setup(app: &AppHandle) -> Result<(), Box<dyn Error>> {
         }),
         ai_workdir: data_dir.join("claude-workspace"),
         voice: voice::Voice::new(data_dir.join("voice-models")),
+        enroll: Mutex::default(),
         calendar: calendar.clone(),
         approvals: approvals.clone(),
         scratch_dir,

@@ -24,6 +24,7 @@ import {
 import { SetupItems } from "../SetupChecklist";
 import { Tip } from "../Tip";
 import { Button, Field, Section, Segmented, Select, StatusDot, Switch, TextField, Toggle } from "./ui";
+import { VoiceEnroll } from "./VoiceEnroll";
 
 /** Shown instead of On/Off while a model cannot be used. */
 const NOT_READY: Record<AiProviderId, string> = {
@@ -764,6 +765,9 @@ function VoiceSection({ voice, onError }: { voice: VoiceSettings; onError: (e: s
         checked={voice.wakeWord}
         onChange={(wakeWord) => void set({ wakeWord })}
       />
+      {voice.enabled && voice.wakeWord && missing === 0 && (
+        <VoiceEnroll name={name} voice={voice} set={(p) => void set(p)} onError={onError} />
+      )}
       <div className="flex items-center justify-between gap-4 text-[14px]">
         <div className="min-w-0">
           <p>While you talk</p>

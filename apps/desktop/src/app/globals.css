@@ -7282,3 +7282,27 @@ button.ak-cchip:hover,
     transition: none;
   }
 }
+
+/* Teach your voice: step dots */
+.ve-dots {
+  display: flex;
+  gap: 4px;
+}
+.ve-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--text) 18%, transparent);
+  transition: background 200ms ease;
+}
+.ve-dots span.on {
+  background: var(--accent);
+}
+.ve-dots span.now {
+  background: color-mix(in oklab, var(--accent) 55%, transparent);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ve-dots span {
+    transition: none;
+  }
+}
