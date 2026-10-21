@@ -31,9 +31,11 @@ import {
   interruptSession,
   messageIndex,
   openReview,
+  pauseSession,
   readNewPrefs,
   readUsualAgent,
   renameSession,
+  resumePaused,
   resumeSession,
   rewindSession,
   type Session,
@@ -62,7 +64,7 @@ import { Ic, Icon } from "../Icon";
 import { Select } from "../settings/ui";
 import { Tip } from "../Tip";
 import { Board } from "./Board";
-import { ChatControls, DEFAULT_EFFORT, defaultModel } from "./Controls";
+import { ChatControls, DEFAULT_EFFORT, defaultModel, ModeChip } from "./Controls";
 import { PlanPanel } from "./PlanPanel";
 import { ProjectPicker } from "./ProjectPicker";
 import { Review } from "./Review";
@@ -412,41 +414,20 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
           )}
           <div className="ag-comp">
             <div className="ag-comp-top">
-              {choices.length <= 3 ? (
-                <fieldset className="ag-tabs" aria-label="Agent">
-                  {choices.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      aria-pressed={pickedAgent === c.id}
-                      onClick={() => pickAgent(c.id)}
-                      title={pickerNote(c) || c.name}
-                    >
-                      <AgentMark agent={c.name} sm />
-                      {c.name === "Local (Ollama)" ? "Local" : c.name}
-                    </button>
-                  ))}
-                </fieldset>
-              ) : (
-                <span className="ak-mi b">
-                  <Select
-                    variant="plain"
-                    overlay
-                    label="Agent"
-                    value={pickedAgent}
-                    onChange={pickAgent}
-                    options={[...choices, ...missing].map((c) => ({
-                      value: c.id,
-                      label: c.name,
-                      sub: pickerNote(c),
-                      icon: AGENT_MARKS[c.id]?.[0] ?? "C",
-                      color: AGENT_MARKS[c.id]?.[1] ?? "#d97757",
-                      image: AGENT_IMAGES[c.id],
-                    }))}
-                  />
-                </span>
-              )}
-              <ModeSwitch mode={mode} onChange={pickMode} />
+              <fieldset className="ag-tabs" aria-label="Agent">
+                {choices.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    aria-pressed={pickedAgent === c.id}
+                    onClick={() => pickAgent(c.id)}
+                    title={pickerNote(c) || c.name}
+                  >
+                    <AgentMark agent={c.name} sm />
+                    {c.name === "Local (Ollama)" ? "Local" : c.name}
+                  </button>
+                ))}
+              </fieldset>
               <span className="ag-proj">
                 <ProjectPicker
                   projects={projects ?? []}
@@ -483,7 +464,22 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
                 effort={effort}
                 onModel={pickModel}
                 onEffort={pickEffort}
-                keys={busy ? "Starting..." : "Enter start"}
+                lead={<ModeChip mode={mode} onChange={pickMode} />}
+                tail={
+                  <>
+                    <span className="ag-note">{busy ? "Starting..." : MODES.find((m) => m.id === mode)?.note}</span>
+                    <button
+                      type="button"
+                      className="ag-send"
+                      aria-label="Start"
+                      title="Start (Enter)"
+                      disabled={busy || !prompt.trim()}
+                      onClick={go}
+                    >
+                      <Ic name="send" size={13} />
+                    </button>
+                  </>
+                }
               />
             </div>
           </div>
@@ -599,42 +595,6 @@ function FixLine({ agent }: { agent: AgentInfo }) {
         </button>
       )}
     </p>
-  );
-}
-
-function ModeSwitch({ mode, onChange, agent }: { mode: AgentMode; onChange?: (m: AgentMode) => void; agent?: string }) {
-  return (
-    <fieldset aria-label="Mode" className="ak-seg border-0">
-      {MODES.map((m) => (
-        <Tip
-          key={m.id}
-          label={
-            agent === "Codex"
-              ? {
-                  plan: "Codex Plan collaboration mode in a read-only sandbox",
-                  ask: "Workspace access; untrusted commands require approval",
-                  edit: "Workspace files and commands allowed; asks for escalation",
-                  full: "Full access without sandbox or approval prompts",
-                }[m.id]
-              : agent === "Local"
-                ? m.id === "plan"
-                  ? "Read-only tools"
-                  : "Every edit requires approval; commands are unavailable"
-                : m.note
-          }
-        >
-          <button
-            type="button"
-            aria-pressed={mode === m.id}
-            disabled={!onChange}
-            onClick={() => onChange?.(m.id)}
-            className="chip"
-          >
-            {m.label}
-          </button>
-        </Tip>
-      ))}
-    </fieldset>
   );
 }
 
@@ -891,57 +851,84 @@ function SessionView({
   return (
     <>
       <div className="ag-sh">
-        <Tip label="All agents">
-          <button
-            type="button"
-            aria-label="All agents"
-            onClick={() => useAgents.setState({ current: null })}
-            className="ag-back"
-          >
-            <span className="flip">
-              <Ic name="chevr" size={13} />
-            </span>
-          </button>
-        </Tip>
         <AgentMark agent={s.agent} />
         <div className="min-w-0 flex-1">
           <NameField id={s.id} title={s.title} />
           <p className="ag-sh-sub">
-            {s.agent} in <span className="mono">{s.project}</span>
+            {s.agent}
+            <span className="sep" />
+            {s.project}
             {s.branch && (
               <>
-                {" "}
-                on <span className="mono">{s.branch}</span>
+                <span className="sep" />
+                <span className="mono truncate">{s.branch}</span>
               </>
             )}
-            , {MODE_WORD[s.mode] ?? s.mode}
           </p>
         </div>
-        {working ? (
-          <button type="button" onClick={() => interruptSession(s.id)} className="ak-stop chip">
-            Stop <kbd>Esc</kbd>
-          </button>
-        ) : (
-          <Tip label="Close session">
+        {s.usage && s.usage.window > 0 && <ContextRing used={s.usage.used} window={s.usage.window} />}
+        <span className="ag-acts">
+          <SessionMemory id={s.id} live={active && s.status !== "ended" && s.status !== "failed" && !s.restored} />
+          {s.changes > 0 && (
+            <Tip label="Review changes (Alt 1)">
+              <button
+                type="button"
+                aria-label="Review changes"
+                onClick={() => setReviewing(true)}
+                className="ak-ibtn chip"
+              >
+                <Ic name="diff" size={14} />
+              </button>
+            </Tip>
+          )}
+          <Tip label="Continue in a terminal (Alt 2)">
             <button
               type="button"
-              aria-label="Close session"
-              onClick={() => closeSession(s.id)}
+              aria-label="Continue in a terminal"
+              onClick={() => void api.agentTerminal(s.id)}
               className="ak-ibtn chip"
             >
-              <Ic name="x" size={13} />
+              <Ic name="term" size={14} />
             </button>
           </Tip>
-        )}
+          {working && (
+            <Tip label={s.paused ? "Resume" : "Pause"}>
+              <button
+                type="button"
+                aria-label={s.paused ? "Resume" : "Pause"}
+                onClick={() => (s.paused ? resumePaused(s.id) : pauseSession(s.id))}
+                className="ak-ibtn chip"
+              >
+                <Ic name={s.paused ? "play" : "pause"} size={13} />
+              </button>
+            </Tip>
+          )}
+          {working ? (
+            <Tip label="Stop (Esc)">
+              <button
+                type="button"
+                aria-label="Stop"
+                onClick={() => interruptSession(s.id)}
+                className="ak-ibtn chip danger"
+              >
+                <Ic name="stop" size={13} />
+              </button>
+            </Tip>
+          ) : (
+            <Tip label="Close session">
+              <button
+                type="button"
+                aria-label="Close session"
+                onClick={() => closeSession(s.id)}
+                className="ak-ibtn chip"
+              >
+                <Ic name="x" size={13} />
+              </button>
+            </Tip>
+          )}
+        </span>
       </div>
-      <div className="ak-meta ag-sh-meta">
-        <SessionMemory id={s.id} live={active && s.status !== "ended" && s.status !== "failed" && !s.restored} />
-        <div className="ak-modes">
-          <ModeSwitch agent={s.agent} mode={s.mode} onChange={(mode) => void setSessionMode(s.id, mode)} />
-          <span className="keys mono">Ctrl+.</span>
-        </div>
-        {working && s.activeMode !== s.mode && <span className="ak-note">Applies to next message</span>}
-      </div>
+      {working && s.activeMode !== s.mode && <p className="ak-note ag-sh-note">New mode applies to the next message</p>}
 
       {reviewStacked ? (
         <Review session={s} maxHeight={maxHeight} onDone={() => setReviewing(false)} />
@@ -1731,6 +1718,7 @@ export function Composer({
           effort={s.effort}
           onModel={(m) => tuneSession(s.id, m, s.effort ?? null)}
           onEffort={(e) => tuneSession(s.id, s.model ?? null, e)}
+          lead={<ModeChip mode={s.mode} onChange={(mode) => void setSessionMode(s.id, mode)} />}
           usage={s.usage}
           panel={panel}
           onRefresh={
@@ -1900,16 +1888,16 @@ function SessionList({ sessions }: { sessions: Session[] }) {
                   <span className="ag-sub block truncate">
                     {s.project} · {MODE_WORD[s.mode] ?? s.mode} · {ago(now - s.turnAt)}
                   </span>
-                  {g === "Running" && s.plan.length > 0 && (
-                    <span className="ag-prog" aria-hidden="true">
-                      <i
-                        style={{
-                          width: `${Math.round((s.plan.filter((p) => p.status === "completed").length / s.plan.length) * 100)}%`,
-                        }}
-                      />
-                    </span>
-                  )}
                 </span>
+                {g === "Running" && s.plan.length > 0 && (
+                  <span className="ag-prog" aria-hidden="true">
+                    <i
+                      style={{
+                        width: `${Math.round((s.plan.filter((p) => p.status === "completed").length / s.plan.length) * 100)}%`,
+                      }}
+                    />
+                  </span>
+                )}
                 <span className="ag-st" data-g={g}>
                   {g === "Needs you"
                     ? "Needs you"

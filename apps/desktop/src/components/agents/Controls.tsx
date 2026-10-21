@@ -11,6 +11,7 @@ import { CLAUDE_MODELS, CODEX_MODELS, FAST_CLAUDE_MODEL } from "@/lib/ai-models"
 import { api } from "@/lib/bridge";
 import { setOverlayHit, useDuskie } from "@/lib/store";
 import type { LimitState } from "@/lib/types";
+import { Ic, type IcName } from "../Icon";
 import { Select, type SelectOption } from "../settings/ui";
 import { AGENT_IMAGES, AGENT_MARKS } from "./AgentsTab";
 
@@ -72,6 +73,68 @@ const Brain = () => (
     />
   </svg>
 );
+
+export type ModeId = "plan" | "ask" | "edit" | "full";
+
+/** The agent modes, with the icon and note each shows in the composer bar. */
+export const MODE_INFO: { id: ModeId; label: string; note: string; icon: IcName }[] = [
+  { id: "plan", label: "Plan", note: "Reads and plans, changes nothing", icon: "file" },
+  { id: "ask", label: "Ask", note: "Asks before every change", icon: "warn" },
+  { id: "edit", label: "Edit", note: "Edits files, asks before commands", icon: "diff" },
+  { id: "full", label: "Full", note: "Does everything without asking", icon: "bolt" },
+];
+
+/** The mode as one chip with its icon; the menu lists every mode with its note. */
+export function ModeChip({ mode, onChange }: { mode: ModeId; onChange?: (m: ModeId) => void }) {
+  const cur = MODE_INFO.find((m) => m.id === mode) ?? MODE_INFO[2];
+  if (!onChange)
+    return (
+      <span className="ak-cchip ak-mode">
+        <Ic name={cur.icon} size={12} />
+        {cur.label}
+      </span>
+    );
+  return (
+    <Pop
+      label="Mode (Ctrl .)"
+      className="ak-mode"
+      chip={
+        <>
+          <Ic name={cur.icon} size={12} />
+          {cur.label}
+          <Caret />
+        </>
+      }
+    >
+      {(close) => (
+        <>
+          <div className="ak-pop-h">
+            <span>Mode</span>
+            <kbd className="mono">Ctrl .</kbd>
+          </div>
+          {MODE_INFO.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className="ak-mode-opt"
+              aria-pressed={m.id === mode}
+              onClick={() => {
+                onChange(m.id);
+                close();
+              }}
+            >
+              <Ic name={m.icon} size={13} />
+              <span>
+                <b>{m.label}</b>
+                <small>{m.note}</small>
+              </span>
+            </button>
+          ))}
+        </>
+      )}
+    </Pop>
+  );
+}
 
 /** A chip that opens a popover above itself (portaled so the island shell
  *  does not clip it; same pattern as the model Select overlay). */
@@ -328,6 +391,8 @@ export function ChatControls({
   localModel,
   panel,
   onRefresh,
+  lead,
+  tail,
 }: {
   agent: string;
   model: string | null | undefined;
@@ -343,6 +408,10 @@ export function ChatControls({
   localModel?: string;
   panel?: { name: string; at: number };
   onRefresh?: () => void;
+  /** Shown before the model chip (the mode chip). */
+  lead?: ReactNode;
+  /** Shown at the end of the bar, in place of the usage chip (note and send). */
+  tail?: ReactNode;
 }) {
   const models = modelsFor(agent);
   const [mark, color] = markOf(agent);
@@ -395,6 +464,7 @@ export function ChatControls({
 
   return (
     <div className="ak-ctl">
+      {lead}
       {panel?.name === "model" && (
         <Pop label="Choose model" requested={panel.at} chip="Choose model">
           {(close) => (
@@ -501,44 +571,58 @@ export function ChatControls({
         </Pop>
       )}
       <span className="flex-1" />
-      {local ? (
-        <span className="ak-cchip ak-cquiet">
-          <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3">
-            <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
-            <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" strokeWidth="1.3" />
-          </svg>
-          On this PC {"\u00b7"} no limits
-        </span>
-      ) : (
-        (usageText || panel?.name === "usage") && (
-          <Pop
-            label="Usage"
-            requested={panel?.name === "usage" ? panel.at : undefined}
-            className="ak-cusage"
-            chip={
-              <>
-                <span className="ak-ring" aria-hidden="true">
-                  <i className="ak-cring" style={{ "--p": ringPct } as CSSProperties} />
-                </span>
-                {usageText || "Usage"}
-              </>
-            }
-          >
-            {() => (
-              <UsageBody
-                usage={usage}
-                ctxPct={ctxPct}
-                plans={plans}
-                now={now}
-                agent={agent}
-                onCompact={onCompact}
-                onRefresh={onRefresh}
-              />
-            )}
-          </Pop>
-        )
+      {!tail && (
+        <>
+          {local ? (
+            <span className="ak-cchip ak-cquiet">
+              <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3">
+                <rect
+                  x="3.5"
+                  y="7"
+                  width="9"
+                  height="6.5"
+                  rx="1.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.3"
+                />
+                <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+              </svg>
+              On this PC {"\u00b7"} no limits
+            </span>
+          ) : (
+            (usageText || panel?.name === "usage") && (
+              <Pop
+                label="Usage"
+                requested={panel?.name === "usage" ? panel.at : undefined}
+                className="ak-cusage"
+                chip={
+                  <>
+                    <span className="ak-ring" aria-hidden="true">
+                      <i className="ak-cring" style={{ "--p": ringPct } as CSSProperties} />
+                    </span>
+                    {usageText || "Usage"}
+                  </>
+                }
+              >
+                {() => (
+                  <UsageBody
+                    usage={usage}
+                    ctxPct={ctxPct}
+                    plans={plans}
+                    now={now}
+                    agent={agent}
+                    onCompact={onCompact}
+                    onRefresh={onRefresh}
+                  />
+                )}
+              </Pop>
+            )
+          )}
+        </>
       )}
       {keys && <span className="ckeys mono">{keys}</span>}
+      {tail}
     </div>
   );
 }
