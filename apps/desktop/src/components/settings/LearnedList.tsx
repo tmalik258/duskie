@@ -9,8 +9,8 @@ import { api } from "@/lib/bridge";
 import { filterRows, groupsOf, type LearnedSort, lean, reasonFor, sortRows, splitKey } from "@/lib/learned";
 import { playSound } from "@/lib/sound";
 import { uiVolume, useDuskie } from "@/lib/store";
-import type { LessonRow } from "@/lib/types";
-import { Button, Field, Segmented } from "./ui";
+import type { LearnedLevel, LessonRow } from "@/lib/types";
+import { Button, Field, Segmented, Select } from "./ui";
 
 export function NotificationProfile({ onError }: { onError: (e: string) => void }) {
   const profile = useDuskie((s) => s.settings.notifications.profile);
@@ -107,10 +107,20 @@ export function LearnedList({ onError }: { onError: (e: string) => void }) {
                   <span className="min-w-0 flex-1 truncate">
                     <span className="font-medium">{name}</span>{" "}
                     <span className="text-(--muted)">
-                      {group}, {lean(r.shift) === "more" ? "more" : lean(r.shift) === "less" ? "less" : "usual"}.{" "}
-                      {reasonFor(r.shift)}
+                      {group}. {reasonFor(r.shift)}
                     </span>
                   </span>
+                  <Select
+                    label={`Level for ${name}`}
+                    value={levelOf(r.shift)}
+                    options={LEVELS}
+                    onChange={(level) =>
+                      void api
+                        .attentionSetLevel(r.key, level as LearnedLevel)
+                        .then(refresh)
+                        .catch((e) => onError(String(e)))
+                    }
+                  />
                   <Button small aria-label={`Reset ${name}`} onClick={() => reset(r.key)}>
                     Reset
                   </Button>
@@ -122,4 +132,17 @@ export function LearnedList({ onError }: { onError: (e: string) => void }) {
       )}
     </div>
   );
+}
+
+const LEVELS: [LearnedLevel, string][] = [
+  ["more", "More"],
+  ["usual", "Usual"],
+  ["less", "Less"],
+  ["silent", "Silent"],
+];
+
+function levelOf(shift: number): LearnedLevel {
+  if (shift <= -40) return "silent";
+  const l = lean(shift);
+  return l === "neutral" ? "usual" : l;
 }

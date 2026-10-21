@@ -1,14 +1,13 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { useState } from "react";
 import { latestActivity, useActivities } from "@/lib/activities";
 import { api } from "@/lib/bridge";
 import { useNow } from "@/lib/hooks";
 import type { NetNotice } from "@/lib/net";
 import { playSound } from "@/lib/sound";
-import { installUpdate, notePick, uiVolume, useDuskie } from "@/lib/store";
+import { installUpdate, notePick, showDone, uiVolume, useDuskie } from "@/lib/store";
 import type { MascotState, Suggestion } from "@/lib/types";
 import { Ic } from "./Icon";
 import { FULL } from "./IslandCard";
@@ -304,47 +303,36 @@ export function Options({ suggestion }: { suggestion: Suggestion }) {
             Why this?
           </button>
         )}
-        <button type="button" onClick={() => dismiss(suggestion)} className="rd-gfoot-btn chip">
+        <button type="button" onClick={() => dismiss(suggestion)} className="rd-gfoot-btn rd-dz chip">
+          <DismissFill key={suggestion.id} />
           Dismiss
           <kbd className="ml-1.5 font-sans text-[11px] opacity-45">
             <i className="alt-pre">Alt </i>0
           </kbd>
         </button>
       </div>
-      <Countdown key={suggestion.id} />
     </div>
   );
 }
 
-/** An outline around the island that sweeps away when the suggestion closes
- * on its own. Rust restarts that clock while the island is hovered, so the
- * outline refills. With reduced motion it fades instead of sweeping. */
-function Countdown() {
+/** A fill inside Dismiss that drains while the card waits to close on its
+ * own. Rust restarts that clock while the island is hovered, so it refills.
+ * With reduced motion it stays still. */
+function DismissFill() {
   const secs = useDuskie((s) => s.settings.collapseAfterSecs);
   const hovered = useDuskie((s) => s.hovered);
   const reduced = useReducedMotion() ?? false;
-  const [shell, setShell] = useState<HTMLElement | null>(null);
-  useEffect(() => setShell(document.querySelector<HTMLElement>(".island-shell")), []);
-  if (!secs || !shell) return null;
-  const radius = Number.parseFloat(getComputedStyle(shell).borderRadius) || 26;
-  const run = hovered ? { duration: 0 } : { duration: secs, ease: "linear" as const };
-  return createPortal(
-    <svg className="rd-outline" aria-hidden>
-      <motion.rect
-        key={hovered ? "held" : "running"}
-        x="0.75"
-        y="0.75"
-        style={{ width: "calc(100% - 1.5px)", height: "calc(100% - 1.5px)" }}
-        rx={radius - 0.75}
-        pathLength={100}
-        strokeDasharray="100 100"
-        data-held={hovered || undefined}
-        initial={reduced ? { opacity: 1 } : { strokeDashoffset: 0 }}
-        animate={reduced ? { opacity: hovered ? 1 : 0 } : { strokeDashoffset: hovered ? 0 : 100 }}
-        transition={run}
-      />
-    </svg>,
-    shell,
+  if (!secs || reduced) return null;
+  return (
+    <motion.i
+      key={hovered ? "held" : "running"}
+      className="rd-dz-fill"
+      aria-hidden
+      style={{ originX: 0 }}
+      initial={{ scaleX: 1 }}
+      animate={{ scaleX: hovered ? 1 : 0 }}
+      transition={hovered ? { duration: 0 } : { duration: secs, ease: "linear" }}
+    />
   );
 }
 
@@ -409,8 +397,13 @@ export function dismiss(suggestion: Suggestion) {
 /** Quieter next time; counts toward scoring (Dismiss does not). */
 export function showLess(suggestion: Suggestion) {
   playSound("toggle_off", uiVolume(), useDuskie.getState().settings.soundKit);
-  void api.attentionShowLess(suggestion.skillId);
+  const key = suggestion.skillId;
+  void api.attentionShowLess(key);
   void api.suggestionDismiss(suggestion.id, "user");
+  showDone(`Fewer like this${suggestion.source ? ` from ${suggestion.source}` : ""}`, () => {
+    void api.attentionUndoShowLess(key);
+    useDuskie.setState({ donePill: null, doneUndo: null });
+  });
 }
 
 /** Hover with intent: a short delay in (or longer when the pill has actions), a grace period out. */

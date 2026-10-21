@@ -724,6 +724,8 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     })),
   attention_acted: () => null,
   attention_show_less: () => null,
+  attention_undo_show_less: () => null,
+  attention_set_level: () => null,
   attention_reset: (args) => {
     const entries = { ...settings.notifications.lessons.entries };
     const scope = String(args.scope);

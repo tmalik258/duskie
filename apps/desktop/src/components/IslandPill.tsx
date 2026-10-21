@@ -85,6 +85,19 @@ export function IslandPill({ model, onWidth }: { model: PillModel; onWidth: (w: 
         </button>
       </>
     );
+  else if (kind === "done" && model.chip && model.onChip)
+    trail = (
+      <button
+        type="button"
+        className="chip-s"
+        onClick={(e) => {
+          e.stopPropagation();
+          model.onChip?.();
+        }}
+      >
+        {model.chip}
+      </button>
+    );
   else if (kind === "done" && model.onOpen)
     trail = (
       <button

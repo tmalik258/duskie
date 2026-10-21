@@ -8,10 +8,11 @@
 import type { ReactNode } from "react";
 import { ChipKeys } from "./ask/parts";
 
-/** Pulls a block left under the mascot so it spans the full card width. */
+/** Pulls a block left under the mascot so it spans the full card width,
+ * leaving the same gap on the left as the card's right padding. */
 export const FULL = {
-  marginLeft: "calc(var(--orb-indent, 0px) * -1)",
-  width: "calc(100% + var(--orb-indent, 0px))",
+  marginLeft: "calc(var(--orb-indent, 0px) * -1 + 10px)",
+  width: "calc(100% + var(--orb-indent, 0px) - 10px)",
 };
 
 export function CardHead({ title, detail, right }: { title: ReactNode; detail?: ReactNode; right?: ReactNode }) {

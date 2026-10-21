@@ -1047,6 +1047,9 @@ export interface MessageDiff {
 }
 
 /** One learned sender or source, as Settings lists it. */
+/** A level picked for a sender or source in Settings (attention::Lean). */
+export type LearnedLevel = "more" | "usual" | "less" | "silent";
+
 export interface LessonRow {
   key: string;
   /** Points added to or taken from the score; negative means less. */

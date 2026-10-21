@@ -216,6 +216,8 @@ pub fn run() {
             commands::attention_lessons,
             commands::attention_acted,
             commands::attention_show_less,
+            commands::attention_undo_show_less,
+            commands::attention_set_level,
             commands::attention_reset,
             commands::attention_set_profile,
             commands::mcp_validate_stdio,

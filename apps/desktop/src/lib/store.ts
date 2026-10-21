@@ -84,6 +84,8 @@ interface DuskieState {
   voiceQuestion: string | null;
   /** A short "done" line in the compact island ("Hotspot is on"). */
   donePill: string | null;
+  /** Undo for the done pill, when what just happened can be taken back. */
+  doneUndo: (() => void) | null;
   /** When Focus mode ends (ms since epoch), or null when not focusing. */
   focusUntil: number | null;
   /** Where the conversation is saved, so it can be picked up later. */
@@ -228,6 +230,7 @@ export const useDuskie = create<DuskieState>(() => ({
   askForm: { text: "", hits: null },
   voiceQuestion: null,
   donePill: null,
+  doneUndo: null,
   focusUntil: null,
   conversation: crypto.randomUUID(),
   hearing: null,
@@ -357,10 +360,13 @@ export async function installUpdate(): Promise<void> {
 
 let doneTimer: ReturnType<typeof setTimeout> | undefined;
 /** Shows a compact done pill for a moment: nothing needs you. */
-export function showDone(text: string) {
+export function showDone(text: string, undo?: () => void) {
   clearTimeout(doneTimer);
-  useDuskie.setState({ donePill: text, voiceQuestion: null });
-  doneTimer = setTimeout(() => useDuskie.setState({ donePill: null }), DONE_PILL_MS);
+  useDuskie.setState({ donePill: text, doneUndo: undo ?? null, voiceQuestion: null });
+  doneTimer = setTimeout(
+    () => useDuskie.setState({ donePill: null, doneUndo: null }),
+    undo ? DONE_PILL_MS * 2 : DONE_PILL_MS,
+  );
 }
 
 /**

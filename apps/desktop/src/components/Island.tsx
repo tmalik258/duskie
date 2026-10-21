@@ -285,6 +285,7 @@ export function Island() {
     if (r?.undoId != null || r?.path) return null;
     return r?.message ?? "Done";
   });
+  const doneUndo = useDuskie((s) => s.doneUndo);
   // Success that still needs Undo or Open folder: keep the expanded card.
   const successCard = useDuskie((s) => {
     if (s.ask || s.mascot !== "success") return false;
@@ -594,7 +595,7 @@ export function Island() {
           : mascot === "error"
             ? { kind: "error", label: shortError(lastError) }
             : donePill !== null
-              ? { kind: "done", label: donePill }
+              ? { kind: "done", label: donePill, ...(doneUndo ? { chip: "Undo", onChip: doneUndo } : {}) }
               : asksYou && askingTitle && voiceQuestion === null
                 ? {
                     kind: "waiting",
