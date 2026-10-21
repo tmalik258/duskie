@@ -74,13 +74,19 @@ const Brain = () => (
   </svg>
 );
 
-export type ModeId = "plan" | "ask" | "edit" | "full";
+export type ModeId = "plan" | "ask" | "edit" | "debug" | "full";
 
 /** The agent modes, with the icon and note each shows in the composer bar. */
 export const MODE_INFO: { id: ModeId; label: string; note: string; icon: IcName }[] = [
   { id: "plan", label: "Plan", note: "Reads and plans, changes nothing", icon: "file" },
   { id: "ask", label: "Ask", note: "Asks before every change", icon: "warn" },
   { id: "edit", label: "Edit", note: "Edits files, asks before commands", icon: "diff" },
+  {
+    id: "debug",
+    label: "Debug",
+    note: "Adds temporary logs, finds the cause, fixes it, then removes the logs",
+    icon: "bug",
+  },
   { id: "full", label: "Full", note: "Does everything without asking", icon: "bolt" },
 ];
 

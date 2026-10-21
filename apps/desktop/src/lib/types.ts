@@ -850,7 +850,7 @@ export interface RoutineItem {
 
 /** Coding agents on this PC, and which one gets handoffs. */
 /** How much an agent may do without asking. */
-export type AgentMode = "plan" | "ask" | "edit" | "full";
+export type AgentMode = "plan" | "ask" | "edit" | "debug" | "full";
 
 export interface AgentStarted {
   id: string;

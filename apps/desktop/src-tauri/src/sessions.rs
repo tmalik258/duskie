@@ -45,16 +45,24 @@ pub enum Mode {
     Ask,
     /// Edits files on its own; asks before commands.
     Edit,
+    /// Like Edit, plus temporary debug logs that are removed when done.
+    Debug,
     /// Does everything without asking.
     Full,
 }
+
+/// What Debug mode asks of the agent before the user's own words.
+const DEBUG_BRIEF: &str = "Debug mode. Find the cause before changing behavior: \
+1. Add temporary debug logs, each tagged [dbg file:line], where the state goes wrong. \
+2. Reproduce the bug and read the logs. 3. Fix the cause, not the symptom. \
+4. Remove every [dbg] log you added and say so. Never leave debug logs behind.\n\n";
 
 impl Mode {
     fn claude(self) -> &'static str {
         match self {
             Mode::Plan => "plan",
             Mode::Ask => "default",
-            Mode::Edit => "acceptEdits",
+            Mode::Edit | Mode::Debug => "acceptEdits",
             Mode::Full => "bypassPermissions",
         }
     }
@@ -64,7 +72,7 @@ impl Mode {
         match self {
             Mode::Plan => ("read-only", "never"),
             Mode::Ask => ("workspace-write", "untrusted"),
-            Mode::Edit => ("workspace-write", "on-request"),
+            Mode::Edit | Mode::Debug => ("workspace-write", "on-request"),
             Mode::Full => ("danger-full-access", "never"),
         }
     }
@@ -661,7 +669,12 @@ pub async fn start_tuned(
     });
     save();
     with(&reviews::WRITING, |w| w.insert(id.clone(), true));
-    let _ = tx.send(Cmd::Send(prompt.to_owned()));
+    let first = if mode == Mode::Debug {
+        format!("{DEBUG_BRIEF}{prompt}")
+    } else {
+        prompt.to_owned()
+    };
+    let _ = tx.send(Cmd::Send(first));
     crate::activity::report(
         app,
         &format!("agent:{id}"),
@@ -1989,7 +2002,7 @@ fn plain_args(agent: Agent, mode: Mode, text: &str, again: bool) -> Vec<String> 
             }
             match mode {
                 Mode::Full => a.push("--allow-all-tools".into()),
-                Mode::Edit | Mode::Ask => {
+                Mode::Edit | Mode::Debug | Mode::Ask => {
                     a.extend(["--allow-all-tools", "--deny-tool", "shell"].map(String::from))
                 }
                 Mode::Plan => a.extend(
@@ -2007,7 +2020,7 @@ fn plain_args(agent: Agent, mode: Mode, text: &str, again: bool) -> Vec<String> 
         _ => {
             // Cursor streams each step as JSON, so its sessions are as live as Codex.
             a.extend(["--output-format", "stream-json"].map(String::from));
-            if matches!(mode, Mode::Full | Mode::Edit) {
+            if matches!(mode, Mode::Full | Mode::Edit | Mode::Debug) {
                 a.push("--force".into());
             }
         }
@@ -2454,7 +2467,7 @@ mod tests {
     #[test]
     fn codex_turn_settings_include_real_plan_and_restore_default() {
         let path = Path::new("C:/project");
-        for mode in [Mode::Plan, Mode::Ask, Mode::Edit, Mode::Full] {
+        for mode in [Mode::Plan, Mode::Ask, Mode::Edit, Mode::Debug, Mode::Full] {
             let params = codex_turn_params(
                 "protocol-test",
                 "t",

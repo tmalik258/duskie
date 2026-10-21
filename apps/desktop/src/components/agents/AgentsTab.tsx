@@ -76,10 +76,11 @@ const MODES: { id: AgentMode; label: string; note: string }[] = [
   { id: "plan", label: "Plan", note: "Reads and plans, changes nothing" },
   { id: "ask", label: "Ask", note: "Asks before every change" },
   { id: "edit", label: "Edit", note: "Edits files, asks before commands" },
+  { id: "debug", label: "Debug", note: "Adds temporary logs, finds the cause, fixes it, then removes the logs" },
   { id: "full", label: "Full", note: "Does everything without asking" },
 ];
 
-/** Next Plan → Ask → Edit → Full (wraps). Bound to Ctrl+. in the composer. */
+/** Next Plan → Ask → Edit → Debug → Full (wraps). Bound to Ctrl+. in the composer. */
 function nextAgentMode(mode: AgentMode): AgentMode {
   const i = MODES.findIndex((m) => m.id === mode);
   return MODES[(i + 1) % MODES.length].id;
@@ -1500,7 +1501,7 @@ export function Composer({
       return;
     }
     const mode = c.name.slice(1) as AgentMode;
-    if (["plan", "ask", "edit", "full"].includes(mode)) {
+    if (["plan", "ask", "edit", "debug", "full"].includes(mode)) {
       void setSessionMode(s.id, mode);
       return;
     }
@@ -1519,7 +1520,7 @@ export function Composer({
         onReview();
         break;
       case "/permissions":
-        if (["plan", "ask", "edit", "full"].includes(args)) void setSessionMode(s.id, args as AgentMode);
+        if (["plan", "ask", "edit", "debug", "full"].includes(args)) void setSessionMode(s.id, args as AgentMode);
         else
           setNotice(
             `Selected: ${s.mode}. Use the mode buttons above or Ctrl+. to cycle. Codex Edit allows workspace commands and asks for escalation; Full disables the sandbox.`,
@@ -1848,7 +1849,7 @@ function groupOf(s: Session): Group {
   return "Done";
 }
 
-const MODE_WORD: Record<string, string> = { plan: "Plan", ask: "Ask", edit: "Edit", full: "Full" };
+const MODE_WORD: Record<string, string> = { plan: "Plan", ask: "Ask", edit: "Edit", debug: "Debug", full: "Full" };
 
 function ago(ms: number): string {
   const m = Math.max(0, Math.round(ms / 60_000));
