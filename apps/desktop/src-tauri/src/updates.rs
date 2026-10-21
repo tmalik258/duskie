@@ -86,6 +86,8 @@ pub struct Available {
     pub version: String,
     pub current: String,
     pub url: String,
+    /// First line of the release notes, plain text, for the update card.
+    pub summary: String,
 }
 
 /// The update found by the last check, kept until it is installed.
@@ -99,11 +101,12 @@ pub fn found() -> Option<Available> {
 /// or None when this is the newest.
 pub async fn check(app: &AppHandle) -> Result<Option<Available>, String> {
     let current = app.package_info().version.to_string();
-    let (tag, url) = latest().await?;
+    let (tag, url, summary) = latest().await?;
     let next = is_newer(&tag, &current).then(|| Available {
         version: tag.trim_start_matches('v').to_owned(),
         current,
         url,
+        summary,
     });
     let mut announce = false;
     if let Ok(mut f) = FOUND.lock() {
@@ -330,7 +333,7 @@ async fn download_bytes(
     Ok(bytes)
 }
 
-async fn latest() -> Result<(String, String), String> {
+async fn latest() -> Result<(String, String, String), String> {
     let client = reqwest::Client::builder()
         .user_agent("Duskie")
         .timeout(Duration::from_secs(15))
@@ -353,7 +356,46 @@ async fn latest() -> Result<(String, String), String> {
         .filter(|u| u.starts_with(RELEASES))
         .unwrap_or(RELEASES)
         .to_owned();
-    Ok((tag, url))
+    Ok((tag, url, summary_of(body["body"].as_str().unwrap_or(""))))
+}
+
+/// The first real line of release notes as plain text: no headings, list
+/// marks, links or emphasis, at most 90 characters.
+pub fn summary_of(notes: &str) -> String {
+    let line = notes
+        .lines()
+        .map(|l| {
+            l.trim()
+                .trim_start_matches(['#', '-', '*', '>', ' '])
+                .trim()
+        })
+        .find(|l| {
+            !l.is_empty()
+                && !l.eq_ignore_ascii_case("what's changed")
+                && !l.eq_ignore_ascii_case("changes")
+        })
+        .unwrap_or("");
+    let mut out = String::new();
+    let mut in_link_url = false;
+    let mut prev = ' ';
+    for c in line.chars() {
+        match c {
+            '*' | '_' | '`' | '[' => {}
+            ']' => {}
+            '(' if prev == ']' => in_link_url = true,
+            ')' if in_link_url => in_link_url = false,
+            _ if in_link_url => {}
+            _ => out.push(c),
+        }
+        prev = c;
+    }
+    let out = out.trim().to_owned();
+    if out.chars().count() > 90 {
+        let cut: String = out.chars().take(89).collect();
+        format!("{}...", cut.trim_end())
+    } else {
+        out
+    }
 }
 
 pub fn start(app: &AppHandle) {
@@ -372,6 +414,18 @@ pub fn start(app: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn summary_is_first_plain_line() {
+        assert_eq!(
+            super::summary_of(
+                "## What's changed\n\n- **Faster** wash, [Git review](https://x/y) and activities\n- more"
+            ),
+            "Faster wash, Git review and activities"
+        );
+        assert_eq!(super::summary_of(""), "");
+        assert!(super::summary_of(&"a".repeat(200)).ends_with("..."));
+    }
+
     use super::*;
 
     #[tokio::test]

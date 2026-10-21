@@ -403,6 +403,8 @@ export interface UpdateInfo {
   version: string;
   current: string;
   url: string;
+  /** First line of the release notes, plain text; may be empty. */
+  summary: string;
 }
 
 export interface UpdateProgress {

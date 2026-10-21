@@ -19,6 +19,10 @@ export function UpdateCard({ activityId, startedAt }: { activityId: string | nul
     const s = Math.round((progress.total - progress.done) / rate);
     left = s >= 60 ? `${Math.floor(s / 60)} min left` : `${s} s left`;
   }
+  // What is new and how big, as the release describes it.
+  const detail = [info?.summary, progress.total ? `${Math.round(progress.total / 1_048_576)} MB` : null]
+    .filter(Boolean)
+    .join(". ");
   return (
     <div className="rd-glance flex flex-col gap-2.5">
       <div className="rd-card-head">
@@ -31,7 +35,7 @@ export function UpdateCard({ activityId, startedAt }: { activityId: string | nul
             .replace(/\.\.\.$/, "")
             .replace(/ · \d+%$/, "")}
         </p>
-        <p className="rd-detail">Duskie restarts on its own once it is ready.</p>
+        <p className="rd-detail">{detail ? `${detail}.` : "Duskie restarts on its own once it is ready."}</p>
       </div>
       <div className="flex flex-col gap-1.5" style={{ marginLeft: "calc(var(--orb-indent, 0px) * -1)" }}>
         <span className="act-bar" aria-hidden>

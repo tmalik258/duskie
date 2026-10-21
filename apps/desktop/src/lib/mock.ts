@@ -330,7 +330,12 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
   net_status: () => !previewFlag("offline"),
   update_status: () =>
     previewFlag("update")
-      ? { version: "0.2.0", current: "0.1.0", url: "https://github.com/tmalik258/duskie/releases" }
+      ? {
+          version: "0.2.0",
+          current: "0.1.0",
+          url: "https://github.com/tmalik258/duskie/releases",
+          summary: "Faster wash, Git review and activities",
+        }
       : null,
   activity_open_start: () => undefined,
   activity_open_finish: () => undefined,
@@ -366,7 +371,12 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
   update_progress: () => mockUpdateProgress,
   // The preview pretends a release is out, so the update UI can be seen.
   update_check: () => {
-    const update = { version: "0.2.0", current: "0.1.0", url: "https://github.com/tmalik258/duskie/releases" };
+    const update = {
+      version: "0.2.0",
+      current: "0.1.0",
+      url: "https://github.com/tmalik258/duskie/releases",
+      summary: "Faster wash, Git review and activities",
+    };
     emit("update://available", update);
     return update;
   },
