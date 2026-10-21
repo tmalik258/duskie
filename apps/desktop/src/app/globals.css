@@ -4657,7 +4657,7 @@ button.ak-cchip:hover,
   color: #f2f0eb;
 }
 .ag-comp textarea::placeholder {
-  color: rgb(242 240 235 / 0.38);
+  color: rgb(242 240 235 / 0.44);
 }
 .ag-comp-foot {
   display: flex;
@@ -6694,7 +6694,7 @@ button.ak-cchip:hover,
   width: 26px;
   height: 26px;
   border-radius: 8px;
-  color: rgb(242 240 235 / 0.55);
+  color: rgb(242 240 235 / 0.6);
 }
 .ag-back:hover {
   background: rgb(242 240 235 / 0.07);
