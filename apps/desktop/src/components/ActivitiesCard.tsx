@@ -48,15 +48,14 @@ export function ActivitiesCard() {
   const failed = list.filter((a) => a.phase === "failed").length;
   const title =
     running.length > 0 || failed === 0 ? `${running.length} running` : failed === 1 ? "1 failed" : `${failed} failed`;
-  const others = list.length - (running.length > 0 ? running.length : failed);
   const detail =
-    running.length === 0 && failed > 0
-      ? "Clear it with the x, or try again from where you started it"
-      : others > 0
-        ? `${others} more below`
-        : list.length > 1
-          ? `${list.length} in the background`
-          : "Nothing else in the background";
+    list.length === 0
+      ? "Idle"
+      : running.length === 0 && failed > 0
+        ? "Clear it with the x, or try again from where you started it"
+        : list.length === 1
+          ? "See below"
+          : `${list.length} jobs, see below`;
   return (
     <div className="rd-glance flex flex-col gap-2.5">
       <div className="rd-card-head">
