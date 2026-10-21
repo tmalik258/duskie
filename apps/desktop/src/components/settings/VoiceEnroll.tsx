@@ -70,16 +70,21 @@ export function VoiceEnroll({
       .catch(() => undefined);
   };
 
+  // Taught under another name: the wake word is not tuned for this one yet.
+  const renamed = state.taught && !!state.taughtFor && state.taughtFor.toLowerCase() !== name.toLowerCase();
+
   if (!active) {
     return (
       <>
         <div className="flex items-center justify-between gap-4 text-[14px]">
           <div className="min-w-0">
             <p>Teach {name} your voice</p>
-            <p className="text-[12px] text-(--muted)">
-              {state.taught
-                ? `Done. ${name} knows how you say its name.`
-                : `Say "${name}" a few times and read three short lines. About a minute. Recordings are never kept.`}
+            <p className={`text-[12px] ${renamed ? "text-amber-300" : "text-(--muted)"}`}>
+              {renamed
+                ? `Learned for "${state.taughtFor}". Teach it "${name}" so it hears the new name.`
+                : state.taught
+                  ? `Done. ${name} knows how you say its name.`
+                  : `Say "${name}" a few times and read three short lines. About a minute. Recordings are never kept.`}
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
@@ -94,12 +99,12 @@ export function VoiceEnroll({
                 Forget
               </Button>
             )}
-            <Button small primary={!state.taught} onClick={() => setActive(true)}>
-              {state.taught ? "Teach again" : "Start"}
+            <Button small primary={!state.taught || renamed} onClick={() => setActive(true)}>
+              {state.taught && !renamed ? "Teach again" : "Start"}
             </Button>
           </div>
         </div>
-        {state.taught && (
+        {state.taught && !renamed && (
           <Toggle
             label="Only my voice wakes it"
             hint="Others saying the name are ignored. Turn off if it misses you."

@@ -26,7 +26,7 @@ fn learns_one_voice_and_tells_it_from_others() {
         .map(|i| say(&tts, "m1", "Duskie", 0.9 + i as f32 * 0.05))
         .collect();
     let sentences: Vec<_> = SENTENCES.iter().map(|s| say(&tts, "m1", s, 1.0)).collect();
-    let profile = learn(&root, &names, &sentences).expect("learns");
+    let profile = learn(&root, "Duskie", &names, &sentences).expect("learns");
     eprintln!("bar {}", profile.threshold);
 
     let extractor = duskie_voice::enroll::test_extractor(&root);

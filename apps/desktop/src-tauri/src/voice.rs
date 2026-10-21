@@ -281,9 +281,10 @@ pub fn refresh(app: &AppHandle) {
         interrupt: settings.interrupt,
         voice: settings.voice.clone(),
         speed: settings.speed,
-        name,
+        name: name.clone(),
         listen: onboarded && listen,
-        profile: crate::voice_enroll::profile(&v.models, settings.only_me).map(|p| p.to_json()),
+        profile: crate::voice_enroll::profile(&v.models, &name, settings.only_me)
+            .map(|p| p.to_json()),
     };
     if lock(&v.runtime).as_ref().is_some_and(|r| r.key == key) {
         return;

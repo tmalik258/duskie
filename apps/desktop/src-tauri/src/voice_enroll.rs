@@ -25,6 +25,9 @@ pub struct Takes {
 pub struct EnrollState {
     /// A voice was taught and is in use.
     pub taught: bool,
+    /// The name the voice was taught with. Differs from the current name
+    /// after a rename, until the new name is taught.
+    pub taught_for: Option<String>,
     pub name_takes: usize,
     pub sentence_takes: usize,
     pub names_needed: usize,
@@ -40,10 +43,14 @@ fn path(models: &Path) -> PathBuf {
     models.with_file_name("voice-profile.json")
 }
 
-/// What was learned. `only_me` off keeps the bar but drops the print, so
-/// any voice wakes it.
-pub fn profile(models: &Path, only_me: bool) -> Option<Profile> {
+/// What was learned, for the assistant called `name`. A renamed assistant
+/// has no profile until its new name is taught. `only_me` off keeps the bar
+/// but drops the print, so any voice wakes it.
+pub fn profile(models: &Path, name: &str, only_me: bool) -> Option<Profile> {
     let mut p = Profile::from_json(&std::fs::read_to_string(path(models)).ok()?)?;
+    if !p.name.eq_ignore_ascii_case(name) {
+        return None;
+    }
     if !only_me || !models::SPEAKER.installed(models) {
         p.print.clear();
     }
@@ -62,6 +69,7 @@ pub fn state(app: &AppHandle) -> EnrollState {
     let t = lock(takes(app));
     EnrollState {
         taught: path(&models_dir(app)).exists(),
+        taught_for: taught_name(app),
         name_takes: t.names.len(),
         sentence_takes: t.sentences.len(),
         names_needed: NAME_TAKES,
@@ -134,11 +142,20 @@ pub fn finish(app: &AppHandle) -> Result<EnrollState, String> {
             std::mem::take(&mut t.sentences),
         )
     };
-    let learned = enroll::learn(&models, &names, &sentences).map_err(|e| e.to_string())?;
+    let name = lock(&app.state::<AppState>().settings)
+        .assistant_name
+        .clone();
+    let learned = enroll::learn(&models, &name, &names, &sentences).map_err(|e| e.to_string())?;
     drop((names, sentences));
     std::fs::write(path(&models), learned.to_json()).map_err(|e| e.to_string())?;
     crate::voice::refresh(app);
     Ok(state(app))
+}
+
+/// The name the saved voice was taught with, if any.
+pub fn taught_name(app: &AppHandle) -> Option<String> {
+    let p = Profile::from_json(&std::fs::read_to_string(path(&models_dir(app))).ok()?)?;
+    Some(p.name)
 }
 
 /// Drops takes in progress and forgets a taught voice.

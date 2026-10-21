@@ -32,17 +32,21 @@ const BARS: [f32; 6] = [0.3, 0.25, 0.2, 0.15, 0.1, WAKE_THRESHOLD];
 /// What was learned. Stored as JSON in the app data folder.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Profile {
+    /// The name it was taught with. A new name needs a new teaching.
+    pub name: String,
     pub threshold: f32,
     pub print: Vec<f32>,
 }
 
 impl Profile {
     pub fn to_json(&self) -> String {
-        serde_json::json!({ "threshold": self.threshold, "print": self.print }).to_string()
+        serde_json::json!({ "name": self.name, "threshold": self.threshold, "print": self.print })
+            .to_string()
     }
 
     pub fn from_json(text: &str) -> Option<Self> {
         let v: serde_json::Value = serde_json::from_str(text).ok()?;
+        let name = v.get("name")?.as_str()?.to_owned();
         let threshold = v.get("threshold")?.as_f64()? as f32;
         let print = v
             .get("print")?
@@ -50,12 +54,21 @@ impl Profile {
             .iter()
             .map(|x| x.as_f64().map(|f| f as f32))
             .collect::<Option<Vec<_>>>()?;
-        (threshold > 0.0 && threshold < 1.0).then_some(Self { threshold, print })
+        (threshold > 0.0 && threshold < 1.0).then_some(Self {
+            name,
+            threshold,
+            print,
+        })
     }
 }
 
 /// Learns your bar and voiceprint from 16 kHz mono clips.
-pub fn learn(models: &Path, names: &[Vec<f32>], sentences: &[Vec<f32>]) -> Result<Profile> {
+pub fn learn(
+    models: &Path,
+    name: &str,
+    names: &[Vec<f32>],
+    sentences: &[Vec<f32>],
+) -> Result<Profile> {
     if names.len() < NAME_TAKES || sentences.len() < SENTENCE_TAKES {
         return Err(VoiceError::Engine("a few takes are missing".into()));
     }
@@ -75,6 +88,7 @@ pub fn learn(models: &Path, names: &[Vec<f32>], sentences: &[Vec<f32>]) -> Resul
         ));
     }
     Ok(Profile {
+        name: name.to_owned(),
         threshold,
         print: average(&prints),
     })
@@ -181,11 +195,13 @@ mod tests {
     #[test]
     fn profile_round_trips_and_rejects_nonsense() {
         let p = Profile {
+            name: "Duskie".into(),
             threshold: 0.2,
             print: vec![0.6, 0.8],
         };
         assert_eq!(Profile::from_json(&p.to_json()), Some(p));
         assert_eq!(Profile::from_json("{\"threshold\":2,\"print\":[]}"), None);
+        assert_eq!(Profile::from_json("{\"threshold\":0.2,\"print\":[]}"), None);
         assert_eq!(Profile::from_json("not json"), None);
     }
 
@@ -202,6 +218,6 @@ mod tests {
     #[test]
     fn learning_needs_every_take() {
         let dir = std::env::temp_dir();
-        assert!(learn(&dir, &[vec![0.0; 10]], &[]).is_err());
+        assert!(learn(&dir, "Duskie", &[vec![0.0; 10]], &[]).is_err());
     }
 }

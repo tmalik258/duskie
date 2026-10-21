@@ -1105,7 +1105,7 @@ export function AskPanel() {
       <div className="ak-right">
         {inHistory ? (
           <fieldset className="ak-seg border-0" aria-label="Show">
-            {(["all", "chats", "agents"] as const).map((k) => (
+            {(["all", "chats", "agents", "live"] as const).map((k) => (
               <button
                 key={k}
                 type="button"
@@ -1332,7 +1332,7 @@ function commandItem(c: Command): Item {
   };
 }
 
-type HistoryKind = "all" | "chats" | "agents";
+type HistoryKind = "all" | "chats" | "agents" | "live";
 
 interface HistoryRow {
   id: string;
@@ -1360,7 +1360,7 @@ function historyRows(
   };
   const all: (HistoryRow & { at: number })[] = [];
   if (kind !== "agents") {
-    for (const c of chats) {
+    for (const c of kind === "live" ? chats.filter((c) => c.live) : chats) {
       const at = Date.parse(c.updated) || 0;
       all.push({
         id: `chat:${c.id}`,
@@ -1377,7 +1377,7 @@ function historyRows(
       });
     }
   }
-  if (kind !== "chats") {
+  if (kind !== "chats" && kind !== "live") {
     for (const s of sessions) {
       all.push({
         id: `agent:${s.id}`,

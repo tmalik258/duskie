@@ -1744,8 +1744,16 @@ commands.voice_welcome_step = (a) => speakWelcome(Number(a.step) || 0);
 commands.voice_say = () => undefined;
 commands.voice_read = () => undefined;
 commands.voice_test = () => undefined;
-const enroll = {
+const enroll: {
+  taught: boolean;
+  taughtFor: string | null;
+  nameTakes: number;
+  sentenceTakes: number;
+  namesNeeded: number;
+  sentences: string[];
+} = {
   taught: false,
+  taughtFor: null,
   nameTakes: 0,
   sentenceTakes: 0,
   namesNeeded: 5,
@@ -1764,11 +1772,11 @@ commands.voice_enroll_record = async (a) => {
 };
 commands.voice_enroll_finish = async () => {
   await new Promise((r) => setTimeout(r, 900));
-  Object.assign(enroll, { taught: true, nameTakes: 0, sentenceTakes: 0 });
+  Object.assign(enroll, { taught: true, taughtFor: "Duskie", nameTakes: 0, sentenceTakes: 0 });
   return { ...enroll };
 };
 commands.voice_enroll_reset = () => {
-  Object.assign(enroll, { taught: false, nameTakes: 0, sentenceTakes: 0 });
+  Object.assign(enroll, { taught: false, taughtFor: null, nameTakes: 0, sentenceTakes: 0 });
   return { ...enroll };
 };
 commands.search = (a) => [

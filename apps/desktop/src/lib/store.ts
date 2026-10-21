@@ -1376,6 +1376,7 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
           error,
           handoff,
           cost: cost ?? undefined,
+          live: wasLive || undefined,
           tool: null,
           streaming: false,
           tookMs: t.startedAt ? Date.now() - t.startedAt : undefined,

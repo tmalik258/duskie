@@ -144,6 +144,8 @@ export interface VoiceSettings {
 /** Teaching Duskie your voice: takes so far, kept in memory only. */
 export interface EnrollState {
   taught: boolean;
+  /** The name it was taught with; differs after a rename. */
+  taughtFor?: string | null;
   nameTakes: number;
   sentenceTakes: number;
   namesNeeded: number;
@@ -283,6 +285,8 @@ export interface Turn extends ChatMessage {
   proposals?: Proposal[];
   /** What the answer cost in US dollars (Anthropic API only). */
   cost?: number;
+  /** Answered Live: spoken as it was heard, so Live history can filter it. */
+  live?: boolean;
   /** When the question was sent (ms since 1970), and how long the answer took. */
   startedAt?: number;
   tookMs?: number;
@@ -834,6 +838,8 @@ export interface ChatSummary {
   id: string;
   title: string;
   updated: string;
+  /** At least one answer was a Live answer. */
+  live?: boolean;
 }
 
 /** Shortcut actions besides Ask, in the order Settings shows them. */
