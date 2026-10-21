@@ -1900,7 +1900,7 @@ if (typeof window !== "undefined") {
         mode,
         title,
         status,
-        entries: [],
+        entries: [{ kind: "you", text: `${title}. Keep the change small and run the tests.` }],
         plan: [],
         usage: null,
         question: null,

@@ -2922,8 +2922,8 @@ select.ak-mi option {
   display: flex;
   align-items: center;
   gap: 10px;
-  min-height: 40px;
-  padding-left: 50px;
+  min-height: 34px;
+  padding: 0 4px;
   font-size: 12px;
   color: var(--i3);
 }
@@ -2977,7 +2977,7 @@ select.ak-mi option {
   display: flex;
   flex-direction: column;
   gap: 9px;
-  min-height: 196px;
+  min-height: 168px;
   padding: 12px 13px 11px;
   border-radius: 18px;
   text-align: left;
@@ -6944,4 +6944,7 @@ button.ak-cchip:hover,
 .rd-opts > .rd-opt {
   flex: 1 1 auto;
   padding: 0 10px;
+}
+.ak-tasked {
+  color: rgb(235 235 245 / 0.6);
 }

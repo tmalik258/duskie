@@ -34,6 +34,12 @@ function state(s: Session): [string, string] {
 }
 
 /** The last few steps, tagged like the transcript; the running one shimmers. */
+/** What it was asked to do, for a tile with nothing newer to show. */
+function firstAsk(s: Session): string {
+  const first = s.entries.find((e) => e.kind === "you");
+  return first?.kind === "you" ? first.text : "";
+}
+
 function lastSteps(s: Session): { tag: string; text: string; live: boolean }[] {
   const out: { tag: string; text: string; live: boolean }[] = [];
   for (let i = s.entries.length - 1; i >= 0 && out.length < 3; i--) {
@@ -168,6 +174,8 @@ function Tile({ s, n, focused }: { s: Session; n: number; focused: boolean }) {
             )}
           </div>
         </>
+      ) : lastSteps(s).length === 0 && firstAsk(s) ? (
+        <p className="ak-tsay ak-tclamp ak-tasked">{plain(firstAsk(s))}</p>
       ) : (
         <ul className="ak-tlog">
           {lastSteps(s).map((t, i) => (
