@@ -384,7 +384,7 @@ export async function runOpen(open: () => Promise<boolean>, doneMessage: string)
   try {
     await api.activityOpenStart(id, label).catch(() => {});
     const opened = await open();
-    const outcome = opened ? doneMessage.replace(/^Opened\b/i, "Launch requested for") : "Nothing opened";
+    const outcome = opened ? doneMessage : "Nothing opened";
     // Finish on the backend before the done pill so a still-Running sync cannot
     // flash "Opening…" again after the tick.
     finishActivity(id, true, outcome);

@@ -164,7 +164,10 @@ export function Island() {
     activityNow,
     keepProblems,
   );
-  const foreground = liveActivities.filter((a) => !["browser", "file"].includes(a.source));
+  // A finished open already showed its done pill; holding it as a pill or a
+  // bubble too would bring "Opening..." and the spinner back after the tick.
+  const doneOpen = (a: (typeof liveActivities)[number]) => a.source === "open" && a.phase === "completed";
+  const foreground = liveActivities.filter((a) => !["browser", "file"].includes(a.source) && !doneOpen(a));
   const backgroundAll = liveActivities.filter((a) => ["browser", "file"].includes(a.source));
   const background = backgroundAll.filter((a) => !terminal(a));
   const pausedDownloads = background.filter((a) => a.phase === "awaitingUser").length;
@@ -795,7 +798,7 @@ export function Island() {
       : []),
     ...(sideOpen
       ? liveActivities
-          .filter((a) => a !== displayedActivity)
+          .filter((a) => a !== displayedActivity && !doneOpen(a))
           .slice(0, 4)
           .map(activityBubble)
       : []),
