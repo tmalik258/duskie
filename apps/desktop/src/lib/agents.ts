@@ -121,6 +121,8 @@ interface AgentsState {
   draftPath?: string | null;
   /** What New's box starts with ("Ask an agent to fix it"). */
   draftPrompt?: string | null;
+  /** New agents waiting for a free slot, oldest first. */
+  queued: QueuedStart[];
   /** The repo open in the Git dock; "first" picks one once the list loads. */
   dock?: string | null;
   /** Island list width while a side dock (Git or Review) is open beside it. */
@@ -243,6 +245,7 @@ export const useAgents = create<AgentsState>(() => ({
   current: null,
   layout: typeof window === "undefined" ? "one" : loadLayout(),
   focus: null,
+  queued: [],
   ...loadView(),
 }));
 
@@ -417,6 +420,25 @@ function update(id: string, fn: (s: Session) => Session) {
   useAgents.setState((st) => ({ sessions: st.sessions.map((s) => (s.id === id ? fn(s) : s)) }));
 }
 
+/** How many agents run at once; the next one waits in Queued. */
+export const SLOTS = 4;
+
+/** A new agent waiting for a free slot. */
+export interface QueuedStart {
+  id: string;
+  agent: string;
+  path: string;
+  prompt: string;
+  mode: AgentMode;
+  model: string | null;
+  effort: string | null;
+  at: number;
+}
+
+export const runningCount = (sessions: Session[]) => sessions.filter((s) => s.status === "working").length;
+
+/** Starts the agent now, or queues it when every slot is busy. Returns the
+ *  session id, or the queue id when it waits. */
 export async function startSession(
   agent: string,
   path: string,
@@ -425,13 +447,68 @@ export async function startSession(
   model: string | null = null,
   effort: string | null = null,
 ): Promise<string> {
+  const st = useAgents.getState();
+  if (runningCount(st.sessions) + starting >= SLOTS) {
+    const id = `queued:${Date.now()}`;
+    useAgents.setState({ queued: [...st.queued, { id, agent, path, prompt, mode, model, effort, at: Date.now() }] });
+    return id;
+  }
+  return startNow(agent, path, prompt, mode, model, effort);
+}
+
+export function cancelQueued(id: string) {
+  useAgents.setState((st) => ({ queued: st.queued.filter((q) => q.id !== id) }));
+}
+
+/** Starts in flight, so two finishing agents do not both pull the same slot. */
+let starting = 0;
+
+async function startNow(
+  agent: string,
+  path: string,
+  prompt: string,
+  mode: AgentMode,
+  model: string | null,
+  effort: string | null,
+  focus = true,
+): Promise<string> {
+  starting += 1;
+  try {
+    return await startOne(agent, path, prompt, mode, model, effort, focus);
+  } finally {
+    starting -= 1;
+  }
+}
+
+// A freed slot starts the oldest queued agent.
+if (typeof window !== "undefined") {
+  useAgents.subscribe((st) => {
+    const next = st.queued[0];
+    if (!next || runningCount(st.sessions) + starting >= SLOTS) return;
+    useAgents.setState({ queued: st.queued.slice(1) });
+    // Started in the background: it joins the list without taking over the view.
+    void startNow(next.agent, next.path, next.prompt, next.mode, next.model, next.effort, false).catch((e: unknown) =>
+      console.warn("queued agent did not start", e),
+    );
+  });
+}
+
+async function startOne(
+  agent: string,
+  path: string,
+  prompt: string,
+  mode: AgentMode,
+  model: string | null,
+  effort: string | null,
+  focus: boolean,
+): Promise<string> {
   const started = await api.agentStart(agent, path, prompt, mode, model, effort);
-  addSession(started, prompt, mode, prompt);
+  addSession(started, prompt, mode, prompt, focus);
   update(started.id, (s) => ({ ...s, model, effort }));
   return started.id;
 }
 
-function addSession(started: AgentStarted, title: string, mode: AgentMode, first: string) {
+function addSession(started: AgentStarted, title: string, mode: AgentMode, first: string, focus = true) {
   const session: Session = {
     ...started,
     mode,
@@ -451,7 +528,11 @@ function addSession(started: AgentStarted, title: string, mode: AgentMode, first
     tookMs: null,
     changes: 0,
   };
-  useAgents.setState((st) => ({ sessions: [session, ...st.sessions], current: started.id, tab: "agents" }));
+  useAgents.setState((st) =>
+    focus
+      ? { sessions: [session, ...st.sessions], current: started.id, tab: "agents" }
+      : { sessions: [session, ...st.sessions] },
+  );
 }
 
 /** Hands a stuck session to the agent that gets handoffs, with what was

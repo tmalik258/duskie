@@ -22,6 +22,7 @@ import { answerText, type OpenChoice } from "@/lib/agent-questions";
 import {
   answerQuestion,
   COMPACT_AT,
+  cancelQueued,
   closeReview,
   closeSession,
   dismissCompact,
@@ -38,7 +39,9 @@ import {
   resumePaused,
   resumeSession,
   rewindSession,
+  runningCount,
   type Session,
+  SLOTS,
   type Step,
   sendToSession,
   sessionView,
@@ -367,6 +370,7 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
   useEffect(() => {
     requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
   }, []);
+  const full = runningCount(sessions) >= SLOTS;
   const go = () => {
     if (!prompt.trim() || !pickedPath || busy || (picked && !ready(picked))) return;
     setBusy(true);
@@ -467,12 +471,18 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
                 lead={<ModeChip mode={mode} onChange={pickMode} />}
                 tail={
                   <>
-                    <span className="ag-note">{busy ? "Starting..." : MODES.find((m) => m.id === mode)?.note}</span>
+                    <span className="ag-note">
+                      {busy
+                        ? "Starting..."
+                        : full
+                          ? `${SLOTS} running, this one queues`
+                          : MODES.find((m) => m.id === mode)?.note}
+                    </span>
                     <button
                       type="button"
                       className="ag-send"
-                      aria-label="Start"
-                      title="Start (Enter)"
+                      aria-label={full ? "Queue" : "Start"}
+                      title={full ? "Queue (Enter)" : "Start (Enter)"}
                       disabled={busy || !prompt.trim()}
                       onClick={go}
                     >
@@ -1828,7 +1838,7 @@ function ChoiceCard({ open, agent, onAnswer }: { open: OpenChoice; agent: string
 
 type Group = "Needs you" | "Running" | "Ready to review" | "Done" | "Stopped";
 // Oldest news at the top; what needs you sits next to the composer.
-const GROUPS: Group[] = ["Stopped", "Done", "Ready to review", "Running", "Needs you"];
+const GROUPS: (Group | "Queued")[] = ["Stopped", "Done", "Queued", "Ready to review", "Running", "Needs you"];
 
 function groupOf(s: Session): Group {
   if (s.status === "waiting" || s.question || s.choose) return "Needs you";
@@ -1852,11 +1862,13 @@ function SessionList({ sessions }: { sessions: Session[] }) {
   const now = useNow(30_000);
   const running = sessions.filter((s) => s.status === "working").length;
   const need = sessions.filter((s) => groupOf(s) === "Needs you").length;
+  const queued = useAgents((st) => st.queued);
   return (
     <div className="ag-home">
       <div className="ag-bar">
         <span className="ag-count">
-          {running} of {sessions.length} running
+          {running} of {SLOTS} running
+          {queued.length > 0 && <> · {queued.length} queued</>}
           {need > 0 && <span className="ag-need"> · {need} need you</span>}
         </span>
         <button
@@ -1868,6 +1880,38 @@ function SessionList({ sessions }: { sessions: Session[] }) {
         </button>
       </div>
       {GROUPS.map((g) => {
+        if (g === "Queued")
+          return queued.length === 0 ? null : (
+            <div key={g} className="ag-group">
+              <p className="ak-group">
+                {g} <span className="ag-n">{queued.length}</span>
+              </p>
+              {queued.map((q) => (
+                <div key={q.id} className="ag-row ag-qrow">
+                  <AgentMark agent={q.agent} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{q.prompt}</span>
+                    <span className="ag-sub block truncate">
+                      {q.path.split(/[\\/]/).pop()} · {MODE_WORD[q.mode] ?? q.mode} · starts when a slot frees
+                    </span>
+                  </span>
+                  <span className="ag-st" data-g={g}>
+                    Queued
+                  </span>
+                  <Tip label="Remove from the queue">
+                    <button
+                      type="button"
+                      aria-label="Remove from the queue"
+                      onClick={() => cancelQueued(q.id)}
+                      className="ak-ibtn chip"
+                    >
+                      <Ic name="x" size={12} />
+                    </button>
+                  </Tip>
+                </div>
+              ))}
+            </div>
+          );
         const list = sessions.filter((s) => groupOf(s) === g).sort((a, b) => a.turnAt - b.turnAt);
         if (list.length === 0) return null;
         return (
