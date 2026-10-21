@@ -255,6 +255,12 @@ try {
       ["Storage"],
       ["Privacy"],
       ["Skills and automations", "Skills"],
+      ["Sounds"],
+      ["Notifications"],
+      ["Voice"],
+      ["Code and Git"],
+      ["Updates"],
+      ["Setup"],
     ];
     for (const names of tabs) {
       const label = names[0];

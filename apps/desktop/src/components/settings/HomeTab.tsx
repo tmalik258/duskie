@@ -44,7 +44,19 @@ const END_OF_DAY: [string, string][] = [16, 17, 18, 19, 20, 21, 22].map((h) => [
   `${h > 12 ? h - 12 : h} pm`,
 ]);
 
-export function HomeTab({ onError, onOpenTab }: { onError: (e: string) => void; onOpenTab: (tab: string) => void }) {
+export type HomePart = "general" | "sounds" | "notifications" | "code" | "updates" | "setup";
+
+export function HomeTab({
+  onError,
+  onOpenTab,
+  part,
+}: {
+  onError: (e: string) => void;
+  onOpenTab: (tab: string) => void;
+  /** One sidebar section; all of them when searching. */
+  part?: HomePart;
+}) {
+  const on = (p: HomePart) => !part || part === p;
   const settings = useDuskie((s) => s.settings);
   const mascot = useDuskie((s) => s.mascot);
   const [info, setInfo] = useState<AppInfo | null>(null);
@@ -56,107 +68,126 @@ export function HomeTab({ onError, onOpenTab }: { onError: (e: string) => void; 
 
   return (
     <>
-      <Section title="Setup" keywords="install checklist get started tools">
-        <LeftElsewhere onOpenTab={onOpenTab} />
-        <SetupChecklist groups={["tools"]} onOpenTab={onOpenTab} />
-      </Section>
-      <Section
-        title="Notifications"
-        hint="Windows stays quiet. Only what matters comes up on the island."
-        keywords="notifications inbox do not disturb silence important digest vip whatsapp slack"
-      >
-        <NotificationInbox onError={onError} />
-      </Section>
-      <Section title="Today" keywords="time tracking hours apps">
-        <TimeToday />
-      </Section>
-      <Section
-        collapsible
-        summary="Folders where your projects live"
-        title="Your code"
-        keywords="code folders repos git projects end of day wsl"
-      >
-        <CodeFolders chosen={settings.codeFolders} onChange={(codeFolders) => save({ codeFolders })} />
-        <CloneRules rules={settings.cloneRules ?? {}} onChange={(cloneRules) => save({ cloneRules })} />
-        <DaySummaryToggle onError={onError} />
-        <Field label="My day ends at">
-          <Select
-            label="My day ends at"
-            value={String(settings.endOfDayHour)}
-            options={END_OF_DAY}
-            onChange={(v) => save({ endOfDayHour: Number(v) })}
+      {on("general") && (
+        <Section title="Startup" keywords="launch login windows start">
+          <Toggle
+            label="Launch on login"
+            checked={settings.launchAtLogin}
+            onChange={(launchAtLogin) => save({ launchAtLogin })}
           />
-        </Field>
-      </Section>
-      <Section
-        collapsible
-        summary="Launch on login, updates"
-        title="Startup and updates"
-        keywords="launch login windows start update version"
-      >
-        <Toggle
-          label="Launch on login"
-          checked={settings.launchAtLogin}
-          onChange={(launchAtLogin) => save({ launchAtLogin })}
-        />
-        <Toggle
-          label="Tell me about new versions"
-          checked={settings.checkUpdates}
-          onChange={(checkUpdates) => save({ checkUpdates })}
-        />
-        <UpdateRow version={info?.version ?? ""} onError={onError} />
-      </Section>
-      <Section
-        collapsible
-        summary={settings.muted ? "Muted" : "On"}
-        title="Sound"
-        hint={
-          settings.soundKit === SYNTH_KIT
-            ? "Soft sounds made by Duskie itself."
-            : "Sounds by SND (snd.dev), designed by Dentsu Inc. and Starryworks Inc."
-        }
-        keywords="volume mute audio cue kit voice"
-      >
-        <Field label="Sounds">
-          <Select
-            label="Sounds"
-            value={settings.soundKit}
-            options={SOUND_KITS}
-            onChange={(soundKit) => save({ soundKit })}
+        </Section>
+      )}
+      {on("setup") && (
+        <Section title="Setup" keywords="install checklist get started tools">
+          <LeftElsewhere onOpenTab={onOpenTab} />
+          <SetupChecklist groups={["tools"]} onOpenTab={onOpenTab} />
+        </Section>
+      )}
+      {on("notifications") && (
+        <Section
+          title="Notifications"
+          hint="Windows stays quiet. Only what matters comes up on the island."
+          keywords="notifications inbox do not disturb silence important digest vip whatsapp slack"
+        >
+          <NotificationInbox onError={onError} />
+        </Section>
+      )}
+      {on("general") && (
+        <Section title="Your day" keywords="end of day summary evening hours">
+          <DaySummaryToggle onError={onError} />
+          <Field label="My day ends at">
+            <Select
+              label="My day ends at"
+              value={String(settings.endOfDayHour)}
+              options={END_OF_DAY}
+              onChange={(v) => save({ endOfDayHour: Number(v) })}
+            />
+          </Field>
+        </Section>
+      )}
+      {on("general") && (
+        <Section title="Today" keywords="time tracking hours apps">
+          <TimeToday />
+        </Section>
+      )}
+      {on("code") && (
+        <Section
+          collapsible={!part}
+          summary="Folders where your projects live"
+          title="Your code"
+          keywords="code folders repos git projects end of day wsl"
+        >
+          <CodeFolders chosen={settings.codeFolders} onChange={(codeFolders) => save({ codeFolders })} />
+          <CloneRules rules={settings.cloneRules ?? {}} onChange={(cloneRules) => save({ cloneRules })} />
+        </Section>
+      )}
+      {on("updates") && (
+        <Section title="Updates" keywords="update version new release">
+          <Toggle
+            label="Tell me about new versions"
+            checked={settings.checkUpdates}
+            onChange={(checkUpdates) => save({ checkUpdates })}
           />
-        </Field>
-        <KitStatus kit={settings.soundKit} />
-        <Toggle label="Mute all sounds" checked={settings.muted} onChange={(muted) => save({ muted })} />
-        <Slider
-          label="Master volume"
-          value={settings.masterVolume}
-          onChange={(masterVolume) => save({ masterVolume })}
-        />
-        <details className="text-[13px]">
-          <summary className="cursor-pointer text-(--muted)">Each sound</summary>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
-            {CUES.map((cue) => (
-              <div key={cue} className="flex items-center gap-2">
-                <Slider
-                  label={cue}
-                  value={settings.cueVolumes[cue] ?? 1}
-                  onChange={(v) => save({ cueVolumes: { ...settings.cueVolumes, [cue]: v } })}
-                />
-                <Button small onClick={() => playCue(cue, cueVolume(settings, cue), settings.soundKit)}>
-                  Test
-                </Button>
-              </div>
-            ))}
-          </div>
-        </details>
-      </Section>
-      <Section collapsible summary="What Duskie did, with Undo" title="History" keywords="undo actions recent">
-        <RecentActions onError={onError} />
-      </Section>
-      <Section collapsible summary="Export or restore your settings" title="Backup" keywords="export import restore">
-        <Backup onError={onError} />
-      </Section>
-      {info && (
+          <UpdateRow version={info?.version ?? ""} onError={onError} />
+        </Section>
+      )}
+      {on("sounds") && (
+        <Section
+          collapsible={!part}
+          summary={settings.muted ? "Muted" : "On"}
+          title="Sound"
+          hint={
+            settings.soundKit === SYNTH_KIT
+              ? "Soft sounds made by Duskie itself."
+              : "Sounds by SND (snd.dev), designed by Dentsu Inc. and Starryworks Inc."
+          }
+          keywords="volume mute audio cue kit voice"
+        >
+          <Field label="Sounds">
+            <Select
+              label="Sounds"
+              value={settings.soundKit}
+              options={SOUND_KITS}
+              onChange={(soundKit) => save({ soundKit })}
+            />
+          </Field>
+          <KitStatus kit={settings.soundKit} />
+          <Toggle label="Mute all sounds" checked={settings.muted} onChange={(muted) => save({ muted })} />
+          <Slider
+            label="Master volume"
+            value={settings.masterVolume}
+            onChange={(masterVolume) => save({ masterVolume })}
+          />
+          <details className="text-[13px]">
+            <summary className="cursor-pointer text-(--muted)">Each sound</summary>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {CUES.map((cue) => (
+                <div key={cue} className="flex items-center gap-2">
+                  <Slider
+                    label={cue}
+                    value={settings.cueVolumes[cue] ?? 1}
+                    onChange={(v) => save({ cueVolumes: { ...settings.cueVolumes, [cue]: v } })}
+                  />
+                  <Button small onClick={() => playCue(cue, cueVolume(settings, cue), settings.soundKit)}>
+                    Test
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </details>
+        </Section>
+      )}
+      {on("general") && (
+        <Section collapsible summary="What Duskie did, with Undo" title="History" keywords="undo actions recent">
+          <RecentActions onError={onError} />
+        </Section>
+      )}
+      {on("general") && (
+        <Section collapsible summary="Export or restore your settings" title="Backup" keywords="export import restore">
+          <Backup onError={onError} />
+        </Section>
+      )}
+      {info && on("updates") && (
         <Section collapsible summary={info.version} title="About" keywords="version database path">
           <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
             <dt className="text-(--muted)">Version</dt>

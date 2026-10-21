@@ -38,54 +38,63 @@ const NOT_READY: Record<AiProviderId, string> = {
   xai: "No key",
 };
 
-export function AiTab({ onError }: { onError: (e: string) => void }) {
+export function AiTab({ onError, part }: { onError: (e: string) => void; part?: "models" | "voice" }) {
+  const on = (p: "models" | "voice") => !part || part === p;
   const ai = useDuskie((s) => s.settings.ai);
   const voice = useDuskie((s) => s.settings.voice);
   const { data: gpu } = useCached<number | null>("gpu-memory", api.gpuMemory);
   return (
     <>
-      {gpu !== undefined && gpu !== null && gpu < 4096 && (
+      {on("models") && gpu !== undefined && gpu !== null && gpu < 4096 && (
         <p className="text-[13px] text-(--muted)" role="note">
           This PC has no graphics card with about 4 GB of memory, so local chat and Live mode use a cloud provider. Add
           a key below or sign in to Claude Code.
         </p>
       )}
-      <Section
-        title="Models"
-        hint="Ask tries them top to bottom. Drag to reorder."
-        keywords="ai claude codex ollama anthropic local model provider order qwen hooks mcp coding agent"
-      >
-        <Providers ai={ai} onError={onError} />
-      </Section>
-      <Section
-        title="Privacy"
-        hint="Chats on this PC only use Ollama and are never handed to Claude Code, Codex or the web."
-        keywords="private local only ollama offline this pc lock cloud"
-      >
-        <Toggle
-          label="New chats on this PC only"
-          hint="Each chat can still turn it off with the lock in Ask (Alt P)."
-          checked={ai.localOnly}
-          onChange={(localOnly) =>
-            void updateSettings({ ai: { ...ai, localOnly } }).catch((e: unknown) => onError(String(e)))
-          }
-        />
-      </Section>
-      <Section
-        title="Voice"
-        hint="Runs on this PC. Audio is never saved or sent."
-        keywords="microphone speak talk wake word hey duskie supertonic conversation"
-      >
-        <VoiceSection voice={voice} onError={onError} />
-      </Section>
-      <Section
-        collapsible
-        summary={ai.decisions ? "Best option first" : "Off"}
-        title="Ranking"
-        keywords="semif decisions t1 order options"
-      >
-        <Ranking ai={ai} onError={onError} />
-      </Section>
+      {on("models") && (
+        <Section
+          title="Models"
+          hint="Ask tries them top to bottom. Drag to reorder."
+          keywords="ai claude codex ollama anthropic local model provider order qwen hooks mcp coding agent"
+        >
+          <Providers ai={ai} onError={onError} />
+        </Section>
+      )}
+      {on("models") && (
+        <Section
+          title="Privacy"
+          hint="Chats on this PC only use Ollama and are never handed to Claude Code, Codex or the web."
+          keywords="private local only ollama offline this pc lock cloud"
+        >
+          <Toggle
+            label="New chats on this PC only"
+            hint="Each chat can still turn it off with the lock in Ask (Alt P)."
+            checked={ai.localOnly}
+            onChange={(localOnly) =>
+              void updateSettings({ ai: { ...ai, localOnly } }).catch((e: unknown) => onError(String(e)))
+            }
+          />
+        </Section>
+      )}
+      {on("voice") && (
+        <Section
+          title="Voice"
+          hint="Runs on this PC. Audio is never saved or sent."
+          keywords="microphone speak talk wake word hey duskie supertonic conversation"
+        >
+          <VoiceSection voice={voice} onError={onError} />
+        </Section>
+      )}
+      {on("models") && (
+        <Section
+          collapsible
+          summary={ai.decisions ? "Best option first" : "Off"}
+          title="Ranking"
+          keywords="semif decisions t1 order options"
+        >
+          <Ranking ai={ai} onError={onError} />
+        </Section>
+      )}
     </>
   );
 }

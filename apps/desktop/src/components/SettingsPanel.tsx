@@ -33,12 +33,20 @@ const GROUPS: { label: string; items: { id: SettingsTab; label: string; icon: Ic
         icon: "palette",
         blurb: "The look of Duskie, the island and the wash behind it.",
       },
+      { id: "sounds", label: "Sounds", icon: "bell", blurb: "Soft cues for what happens, and how loud." },
+      {
+        id: "notifications",
+        label: "Notifications",
+        icon: "spark",
+        blurb: "Windows stays quiet. Only what matters comes up on the island.",
+      },
     ],
   },
   {
     label: "Intelligence",
     items: [
       { id: "ai", label: "AI models", icon: "cpu", blurb: "Which brain answers, and which one writes code." },
+      { id: "voice", label: "Voice", icon: "mic", blurb: "Runs on this PC. Audio is never saved or sent." },
       { id: "memory", label: "Memory", icon: "brain", blurb: "What Duskie knows about you. All of it is editable." },
       {
         id: "skills",
@@ -50,7 +58,15 @@ const GROUPS: { label: string; items: { id: SettingsTab; label: string; icon: Ic
   },
   {
     label: "Connections",
-    items: [{ id: "connections", label: "Apps", icon: "plug", blurb: "Accounts Duskie can read from and act in." }],
+    items: [
+      { id: "connections", label: "Apps", icon: "plug", blurb: "Accounts Duskie can read from and act in." },
+      {
+        id: "code",
+        label: "Code and Git",
+        icon: "branch",
+        blurb: "Where your projects live, and the editor they open in.",
+      },
+    ],
   },
   {
     label: "System",
@@ -58,6 +74,8 @@ const GROUPS: { label: string; items: { id: SettingsTab; label: string; icon: Ic
       { id: "shortcuts", label: "Shortcuts", icon: "key", blurb: "Click a shortcut, then press the new keys." },
       { id: "privacy", label: "Privacy", icon: "shield", blurb: "What Duskie notices, and what it never looks at." },
       { id: "storage", label: "Storage", icon: "disk", blurb: "What takes space on this PC." },
+      { id: "updates", label: "Updates", icon: "update", blurb: "New versions, and what this one is." },
+      { id: "setup", label: "Setup", icon: "check", blurb: "Tools that make Duskie better, one click each." },
     ],
   },
 ];
@@ -72,16 +90,20 @@ export const SETTINGS_TABS = [
   { id: "storage", label: "Storage" },
   { id: "privacy", label: "Privacy" },
   { id: "skills", label: "Skills" },
+  { id: "sounds", label: "Sounds" },
+  { id: "notifications", label: "Notifications" },
+  { id: "voice", label: "Voice" },
+  { id: "code", label: "Code and Git" },
+  { id: "updates", label: "Updates" },
+  { id: "setup", label: "Setup" },
 ] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
 
 /** Old tab ids (links from setup items and older builds) to the new ones. */
 const MOVED: Record<string, SettingsTab> = {
   general: "home",
-  setup: "home",
   today: "home",
   about: "home",
-  voice: "ai",
   browser: "connections",
   apps: "connections",
   calendar: "connections",
@@ -195,10 +217,24 @@ export function SettingsPanel() {
         }}
         className="settings-scroll flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-0.5 pb-3"
       >
-        {show("home") && <HomeTab onError={report} onOpenTab={open} />}
+        {searching ? (
+          <HomeTab onError={report} onOpenTab={open} />
+        ) : (
+          (["home", "sounds", "notifications", "code", "updates", "setup"] as const).includes(tab as "home") && (
+            <HomeTab
+              onError={report}
+              onOpenTab={open}
+              part={tab === "home" ? "general" : (tab as "sounds" | "notifications" | "code" | "updates" | "setup")}
+            />
+          )
+        )}
         {show("appearance") && <AppearanceTab onError={report} />}
-        {show("ai") && <AiTab onError={report} />}
-        {show("connections") && <ConnectionsTab onError={report} />}
+        {(searching || tab === "ai" || tab === "voice") && (
+          <AiTab onError={report} part={searching ? undefined : tab === "voice" ? "voice" : "models"} />
+        )}
+        {(show("connections") || (!searching && tab === "code")) && (
+          <ConnectionsTab onError={report} part={searching ? undefined : tab === "code" ? "code" : "apps"} />
+        )}
         {show("privacy") && <PrivacyTab onError={report} />}
         {show("memory") && <MemoryTab onError={report} />}
         {show("shortcuts") && <ShortcutsTab onError={report} />}
