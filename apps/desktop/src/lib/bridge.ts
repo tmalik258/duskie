@@ -500,8 +500,10 @@ export const api = {
   voiceStop: () => invoke<void>("voice_stop"),
   voiceTest: () => invoke<void>("voice_test"),
   voiceEnrollState: () => invoke<EnrollState>("voice_enroll_state"),
-  voiceEnrollRecord: (sentence?: number) => invoke<EnrollState>("voice_enroll_record", { sentence: sentence ?? null }),
-  voiceEnrollFinish: () => invoke<EnrollState>("voice_enroll_finish"),
+  voiceEnrollRecord: (sentence?: number, more = false) =>
+    invoke<EnrollState>("voice_enroll_record", { sentence: sentence ?? null, more }),
+  voiceEnrollFinish: (more = false) => invoke<EnrollState>("voice_enroll_finish", { more }),
+  voiceEnrollCancel: () => invoke<EnrollState>("voice_enroll_cancel"),
   voiceEnrollReset: () => invoke<EnrollState>("voice_enroll_reset"),
   voiceWelcome: () => invoke<WelcomeSpeech>("voice_welcome"),
   voiceWelcomeStep: (step: number) => invoke<void>("voice_welcome_step", { step }),

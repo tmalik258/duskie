@@ -4,7 +4,8 @@ import type { EnrollState, VoiceSettings } from "@/lib/types";
 import { Button, Toggle } from "./ui";
 
 /** Teach Duskie your voice: say its name a few times, read three short
- * sentences. Takes stay in memory; only the learned numbers are kept. */
+ * sentences. Takes stay in memory; only the learned numbers are kept.
+ * "Add samples" reads the sentences again to sharpen a taught voice. */
 export function VoiceEnroll({
   name,
   voice,
@@ -18,6 +19,7 @@ export function VoiceEnroll({
 }) {
   const [state, setState] = useState<EnrollState | null>(null);
   const [active, setActive] = useState(false);
+  const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState<"recording" | "learning" | null>(null);
   const [note, setNote] = useState<string | null>(null);
 
@@ -29,20 +31,25 @@ export function VoiceEnroll({
   }, []);
 
   if (!state) return null;
-  const namesLeft = state.nameTakes < state.namesNeeded;
-  const sentence = namesLeft ? null : state.sentenceTakes;
-  const done = !namesLeft && state.sentenceTakes >= state.sentences.length;
-  const total = state.namesNeeded + state.sentences.length;
-  const step = state.nameTakes + state.sentenceTakes;
+  const namesLeft = !adding && state.nameTakes < state.namesNeeded;
+  const sentence = namesLeft ? null : adding ? state.moreTakes : state.sentenceTakes;
+  const done = adding
+    ? state.moreTakes >= state.sentences.length
+    : !namesLeft && state.sentenceTakes >= state.sentences.length;
+  const total = adding ? state.sentences.length : state.namesNeeded + state.sentences.length;
+  const step = adding ? state.moreTakes : state.nameTakes + state.sentenceTakes;
 
   const record = () => {
     setBusy("recording");
     setNote(null);
     api
-      .voiceEnrollRecord(sentence ?? undefined)
+      .voiceEnrollRecord(sentence ?? undefined, adding)
       .then((s) => {
         setState(s);
-        if (!(s.nameTakes < s.namesNeeded) && s.sentenceTakes >= s.sentences.length) learn();
+        const finished = adding
+          ? s.moreTakes >= s.sentences.length
+          : !(s.nameTakes < s.namesNeeded) && s.sentenceTakes >= s.sentences.length;
+        if (finished) learn();
         else setBusy(null);
       })
       .catch((e) => {
@@ -53,7 +60,7 @@ export function VoiceEnroll({
   const learn = () => {
     setBusy("learning");
     api
-      .voiceEnrollFinish()
+      .voiceEnrollFinish(adding)
       .then((s) => {
         setState(s);
         setActive(false);
@@ -61,7 +68,22 @@ export function VoiceEnroll({
       .catch((e) => onError(`Teaching your voice: ${e}`))
       .finally(() => setBusy(null));
   };
+  const start = (more: boolean) => {
+    setAdding(more);
+    setNote(null);
+    setActive(true);
+  };
+  // Cancel keeps the taught voice; only the takes in progress go.
   const stop = () => {
+    setActive(false);
+    setNote(null);
+    api
+      .voiceEnrollCancel()
+      .then(setState)
+      .catch(() => undefined);
+  };
+  const forget = () => {
+    set({ onlyMe: false });
     setActive(false);
     setNote(null);
     api
@@ -83,23 +105,22 @@ export function VoiceEnroll({
               {renamed
                 ? `Learned for "${state.taughtFor}". Teach it "${name}" so it hears the new name.`
                 : state.taught
-                  ? `Done. ${name} knows how you say its name.`
+                  ? `Done. ${name} knows how you say its name. Trained on ${state.samples} ${state.samples === 1 ? "sample" : "samples"}.`
                   : `Say "${name}" a few times and read three short lines. About a minute. Recordings are never kept.`}
             </p>
           </div>
           <div className="flex shrink-0 gap-2">
             {state.taught && (
-              <Button
-                small
-                onClick={() => {
-                  set({ onlyMe: false });
-                  stop();
-                }}
-              >
+              <Button small onClick={forget}>
                 Forget
               </Button>
             )}
-            <Button small primary={!state.taught || renamed} onClick={() => setActive(true)}>
+            {state.taught && !renamed && (
+              <Button small onClick={() => start(true)}>
+                Add samples
+              </Button>
+            )}
+            <Button small primary={!state.taught || renamed} onClick={() => start(false)}>
               {state.taught && !renamed ? "Teach again" : "Start"}
             </Button>
           </div>
@@ -120,7 +141,7 @@ export function VoiceEnroll({
     <div className="ve rounded-xl bg-(--surface) p-3 text-[14px]" aria-live="polite">
       <div className="flex items-center justify-between gap-3">
         <p className="text-[12px] text-(--muted)">
-          Step {Math.min(step + 1, total)} of {total}
+          {adding ? "Adding samples" : "Teaching"} · Step {Math.min(step + 1, total)} of {total}
         </p>
         <div className="ve-dots" aria-hidden>
           {Array.from({ length: total }, (_, i) => (

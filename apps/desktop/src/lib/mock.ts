@@ -1751,11 +1751,15 @@ const enroll: {
   sentenceTakes: number;
   namesNeeded: number;
   sentences: string[];
+  samples: number;
+  moreTakes: number;
 } = {
   taught: false,
   taughtFor: null,
   nameTakes: 0,
   sentenceTakes: 0,
+  samples: 0,
+  moreTakes: 0,
   namesNeeded: 5,
   sentences: [
     "What is on my calendar this afternoon?",
@@ -1766,17 +1770,27 @@ const enroll: {
 commands.voice_enroll_state = () => ({ ...enroll });
 commands.voice_enroll_record = async (a) => {
   await new Promise((r) => setTimeout(r, 600));
-  if (a.sentence == null) enroll.nameTakes = Math.min(enroll.namesNeeded, enroll.nameTakes + 1);
+  if (a.more) enroll.moreTakes = Math.min(enroll.sentences.length, enroll.moreTakes + 1);
+  else if (a.sentence == null) enroll.nameTakes = Math.min(enroll.namesNeeded, enroll.nameTakes + 1);
   else enroll.sentenceTakes = Math.min(enroll.sentences.length, enroll.sentenceTakes + 1);
   return { ...enroll };
 };
-commands.voice_enroll_finish = async () => {
+commands.voice_enroll_finish = async (a) => {
   await new Promise((r) => setTimeout(r, 900));
-  Object.assign(enroll, { taught: true, taughtFor: "Duskie", nameTakes: 0, sentenceTakes: 0 });
+  if (a?.more) {
+    enroll.samples = Math.min(12, enroll.samples + enroll.moreTakes);
+    enroll.moreTakes = 0;
+  } else {
+    Object.assign(enroll, { taught: true, taughtFor: "Duskie", nameTakes: 0, sentenceTakes: 0, samples: 3 });
+  }
+  return { ...enroll };
+};
+commands.voice_enroll_cancel = () => {
+  Object.assign(enroll, { nameTakes: 0, sentenceTakes: 0, moreTakes: 0 });
   return { ...enroll };
 };
 commands.voice_enroll_reset = () => {
-  Object.assign(enroll, { taught: false, taughtFor: null, nameTakes: 0, sentenceTakes: 0 });
+  Object.assign(enroll, { taught: false, taughtFor: null, nameTakes: 0, sentenceTakes: 0, samples: 0, moreTakes: 0 });
   return { ...enroll };
 };
 commands.search = (a) => [

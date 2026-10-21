@@ -20,6 +20,9 @@ use crate::{MIC_RATE, Result, VoiceError};
 /// Name takes needed, and sentence takes.
 pub const NAME_TAKES: usize = 5;
 pub const SENTENCE_TAKES: usize = 3;
+/// Voiceprints kept. Newer takes push out the oldest, so the print follows
+/// how your voice sounds now.
+pub const MAX_SAMPLES: usize = 12;
 /// Sentences to read, short and with varied sounds.
 pub const SENTENCES: [&str; SENTENCE_TAKES] = [
     "What is on my calendar this afternoon?",
@@ -44,12 +47,26 @@ pub struct Profile {
     pub name: String,
     /// Keyword bar for the wake word model.
     pub threshold: f32,
+    /// The voiceprint: the average of `samples`. Empty when the voice lock
+    /// is off.
     pub print: Vec<f32>,
+    /// One voiceprint per take, newest last.
+    pub samples: Vec<Vec<f32>>,
 }
 
 impl Profile {
+    pub fn from_samples(name: &str, threshold: f32, samples: Vec<Vec<f32>>) -> Option<Self> {
+        let print = average(&samples)?;
+        Some(Self {
+            name: name.to_owned(),
+            threshold,
+            print,
+            samples,
+        })
+    }
+
     pub fn to_json(&self) -> String {
-        serde_json::json!({ "name": self.name, "threshold": self.threshold, "print": self.print })
+        serde_json::json!({ "name": self.name, "threshold": self.threshold, "samples": self.samples })
             .to_string()
     }
 
@@ -57,17 +74,26 @@ impl Profile {
         let v: serde_json::Value = serde_json::from_str(text).ok()?;
         let name = v.get("name")?.as_str()?.to_owned();
         let threshold = v.get("threshold")?.as_f64()? as f32;
-        let print = v
-            .get("print")?
-            .as_array()?
-            .iter()
-            .map(|x| x.as_f64().map(|f| f as f32))
-            .collect::<Option<Vec<_>>>()?;
-        (threshold > 0.0 && threshold < 1.0).then_some(Self {
-            name,
-            threshold,
-            print,
-        })
+        let vector = |x: &serde_json::Value| {
+            x.as_array()?
+                .iter()
+                .map(|f| f.as_f64().map(|f| f as f32))
+                .collect::<Option<Vec<f32>>>()
+        };
+        // Profiles saved before samples were kept hold one print.
+        let samples = match v.get("samples") {
+            Some(list) => list
+                .as_array()?
+                .iter()
+                .map(vector)
+                .collect::<Option<Vec<_>>>()?,
+            None => vec![vector(v.get("print")?)?],
+        };
+        if !(threshold > 0.0 && threshold < 1.0) {
+            return None;
+        }
+        let samples: Vec<Vec<f32>> = samples.into_iter().rev().take(MAX_SAMPLES).rev().collect();
+        Self::from_samples(&name, threshold, samples)
     }
 
     /// Whether `voice` (an embedding from [`embed`]) is yours.
@@ -100,11 +126,27 @@ pub fn learn(
             "could not hear your voice clearly".into(),
         ));
     }
-    Ok(Profile {
-        name: name.to_owned(),
-        threshold,
-        print: average(&prints),
-    })
+    Profile::from_samples(name, threshold, prints)
+        .ok_or_else(|| VoiceError::Engine("could not hear your voice clearly".into()))
+}
+
+/// Adds takes to a learned profile: their voiceprints join the kept ones,
+/// and the oldest go once there are more than [`MAX_SAMPLES`].
+pub fn add_samples(models: &Path, profile: &Profile, sentences: &[Vec<f32>]) -> Result<Profile> {
+    if !SPEAKER.installed(models) {
+        return Err(VoiceError::MissingModels);
+    }
+    let extractor = extractor(models)?;
+    let mut samples = profile.samples.clone();
+    samples.extend(sentences.iter().filter_map(|clip| embed(&extractor, clip)));
+    if samples.len() == profile.samples.len() {
+        return Err(VoiceError::Engine(
+            "could not hear your voice clearly".into(),
+        ));
+    }
+    let samples: Vec<Vec<f32>> = samples.into_iter().rev().take(MAX_SAMPLES).rev().collect();
+    Profile::from_samples(&profile.name, profile.threshold, samples)
+        .ok_or_else(|| VoiceError::Engine("could not hear your voice clearly".into()))
 }
 
 /// The firmest bar at which the wake model still hears all but one take.
@@ -190,14 +232,18 @@ fn unit(v: &[f32]) -> Vec<f32> {
     v.iter().map(|x| x / n).collect()
 }
 
-fn average(prints: &[Vec<f32>]) -> Vec<f32> {
-    let mut sum = vec![0.0; prints[0].len()];
+fn average(prints: &[Vec<f32>]) -> Option<Vec<f32>> {
+    let first = prints.first()?;
+    let mut sum = vec![0.0; first.len()];
     for p in prints {
+        if p.len() != sum.len() {
+            return None;
+        }
         for (s, x) in sum.iter_mut().zip(p) {
             *s += x;
         }
     }
-    unit(&sum)
+    Some(unit(&sum))
 }
 
 #[doc(hidden)]
@@ -227,17 +273,28 @@ mod tests {
 
     #[test]
     fn profile_round_trips_and_rejects_nonsense() {
-        let p = Profile {
-            name: "Duskie".into(),
-            threshold: 0.2,
-            print: vec![0.6, 0.8],
-        };
+        let p = Profile::from_samples("Duskie", 0.2, vec![vec![0.6, 0.8]]).unwrap();
         assert!(p.matches(&[0.6, 0.8]));
         assert!(!p.matches(&[0.8, -0.6]));
         assert_eq!(Profile::from_json(&p.to_json()), Some(p));
-        assert_eq!(Profile::from_json("{\"threshold\":2,\"print\":[]}"), None);
-        assert_eq!(Profile::from_json("{\"threshold\":0.2,\"print\":[]}"), None);
+        assert_eq!(Profile::from_json("{\"threshold\":2,\"samples\":[]}"), None);
+        assert_eq!(
+            Profile::from_json("{\"threshold\":0.2,\"samples\":[]}"),
+            None
+        );
         assert_eq!(Profile::from_json("not json"), None);
+    }
+
+    #[test]
+    fn old_profiles_hold_one_print_and_samples_are_capped() {
+        let old = Profile::from_json("{\"name\":\"Duskie\",\"threshold\":0.2,\"print\":[0.6,0.8]}")
+            .unwrap();
+        assert_eq!(old.samples, vec![vec![0.6, 0.8]]);
+        let many: Vec<Vec<f32>> = (0..MAX_SAMPLES + 3).map(|i| vec![1.0, i as f32]).collect();
+        let p = Profile::from_samples("Duskie", 0.2, many.clone()).unwrap();
+        let back = Profile::from_json(&p.to_json()).unwrap();
+        assert_eq!(back.samples.len(), MAX_SAMPLES);
+        assert_eq!(back.samples.last(), many.last());
     }
 
     #[test]
@@ -254,7 +311,7 @@ mod tests {
         assert!((similarity(&[1.0, 0.0], &[2.0, 0.0]) - 1.0).abs() < 1e-6);
         assert!(similarity(&[1.0, 0.0], &[0.0, 1.0]).abs() < 1e-6);
         assert_eq!(similarity(&[1.0], &[1.0, 0.0]), 0.0);
-        let avg = average(&[vec![1.0, 0.0], vec![0.0, 1.0]]);
+        let avg = average(&[vec![1.0, 0.0], vec![0.0, 1.0]]).unwrap();
         assert!((avg[0] - avg[1]).abs() < 1e-6);
         assert!((similarity(&avg, &avg) - 1.0).abs() < 1e-6);
     }

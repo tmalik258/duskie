@@ -6,18 +6,21 @@ use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use duskie_voice::Profile;
 use duskie_voice::enroll::{self, NAME_TAKES, SENTENCE_TAKES, SENTENCES};
-use duskie_voice::{MIC_RATE, Profile, audio::Mic, models};
+use duskie_voice::{MIC_RATE, audio::Mic, models};
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
 
 use crate::state::{AppState, lock};
 
-/// Takes recorded so far: the name, then the sentences.
+/// Takes recorded so far: the name, then the sentences. `more` holds the
+/// sentences of an "Add samples" round, kept apart from a teaching.
 #[derive(Default)]
 pub struct Takes {
     names: Vec<Vec<f32>>,
     sentences: Vec<Vec<f32>>,
+    more: Vec<Vec<f32>>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -32,6 +35,10 @@ pub struct EnrollState {
     pub sentence_takes: usize,
     pub names_needed: usize,
     pub sentences: Vec<&'static str>,
+    /// Voiceprints kept for the taught voice.
+    pub samples: usize,
+    /// Sentences recorded so far in an "Add samples" round.
+    pub more_takes: usize,
 }
 
 /// Quieter than this, a take holds no voice.
@@ -66,25 +73,36 @@ fn models_dir(app: &AppHandle) -> PathBuf {
 }
 
 pub fn state(app: &AppHandle) -> EnrollState {
+    let saved = std::fs::read_to_string(path(&models_dir(app)))
+        .ok()
+        .and_then(|text| Profile::from_json(&text));
     let t = lock(takes(app));
     EnrollState {
-        taught: path(&models_dir(app)).exists(),
-        taught_for: taught_name(app),
+        taught: saved.is_some(),
+        taught_for: saved.as_ref().map(|p| p.name.clone()),
         name_takes: t.names.len(),
         sentence_takes: t.sentences.len(),
         names_needed: NAME_TAKES,
         sentences: SENTENCES.to_vec(),
+        samples: saved.map_or(0, |p| p.samples.len()),
+        more_takes: t.more.len(),
     }
 }
 
-/// Records one take: the name (`sentence` None) or that sentence.
-pub fn record(app: &AppHandle, sentence: Option<usize>) -> Result<EnrollState, String> {
+/// Records one take: the name (`sentence` None) or that sentence. `more`
+/// records for an "Add samples" round instead of a teaching.
+pub fn record(app: &AppHandle, sentence: Option<usize>, more: bool) -> Result<EnrollState, String> {
     let seconds = if sentence.is_some() { 5.0 } else { 2.5 };
     let clip = capture(Duration::from_secs_f32(seconds))?;
     let clip = trim(&clip).ok_or("Didn't catch that. Try again a little closer to the mic.")?;
     {
         let mut t = lock(takes(app));
         match sentence {
+            _ if more => {
+                if sentence.is_some_and(|i| i < SENTENCE_TAKES && t.more.len() == i) {
+                    t.more.push(clip);
+                }
+            }
             None if t.names.len() < NAME_TAKES => t.names.push(clip),
             Some(i) if i < SENTENCE_TAKES && t.sentences.len() == i => t.sentences.push(clip),
             _ => {}
@@ -127,38 +145,51 @@ fn trim(audio: &[f32]) -> Option<Vec<f32>> {
 }
 
 /// Learns from the takes, saves the result and drops the takes. Fetches
-/// the small voice model first if needed.
-pub fn finish(app: &AppHandle) -> Result<EnrollState, String> {
+/// the small voice model first if needed. `more` adds the "Add samples"
+/// takes to the voice already taught.
+pub fn finish(app: &AppHandle, more: bool) -> Result<EnrollState, String> {
     let models = models_dir(app);
     if !models::SPEAKER.installed(&models) {
         let cancel = std::sync::atomic::AtomicBool::new(false);
         models::install(&models::SPEAKER, &models, &cancel, |_, _| {})
             .map_err(|e| e.to_string())?;
     }
-    let (names, sentences) = {
-        let mut t = lock(takes(app));
-        (
-            std::mem::take(&mut t.names),
-            std::mem::take(&mut t.sentences),
-        )
-    };
     let name = lock(&app.state::<AppState>().settings)
         .assistant_name
         .clone();
-    let learned = enroll::learn(&models, &name, &names, &sentences).map_err(|e| e.to_string())?;
-    drop((names, sentences));
-    std::fs::write(path(&models), learned.to_json()).map_err(|e| e.to_string())?;
+    if more {
+        let extra = std::mem::take(&mut lock(takes(app)).more);
+        let saved = std::fs::read_to_string(path(&models))
+            .ok()
+            .and_then(|text| Profile::from_json(&text))
+            .filter(|p| p.name.eq_ignore_ascii_case(&name))
+            .ok_or("Teach the current name first.")?;
+        let learned = enroll::add_samples(&models, &saved, &extra).map_err(|e| e.to_string())?;
+        std::fs::write(path(&models), learned.to_json()).map_err(|e| e.to_string())?;
+    } else {
+        let (names, sentences) = {
+            let mut t = lock(takes(app));
+            (
+                std::mem::take(&mut t.names),
+                std::mem::take(&mut t.sentences),
+            )
+        };
+        let learned =
+            enroll::learn(&models, &name, &names, &sentences).map_err(|e| e.to_string())?;
+        drop((names, sentences));
+        std::fs::write(path(&models), learned.to_json()).map_err(|e| e.to_string())?;
+    }
     crate::voice::refresh(app);
     Ok(state(app))
 }
 
-/// The name the saved voice was taught with, if any.
-pub fn taught_name(app: &AppHandle) -> Option<String> {
-    let p = Profile::from_json(&std::fs::read_to_string(path(&models_dir(app))).ok()?)?;
-    Some(p.name)
+/// Drops takes in progress. A taught voice stays.
+pub fn cancel(app: &AppHandle) -> EnrollState {
+    *lock(takes(app)) = Takes::default();
+    state(app)
 }
 
-/// Drops takes in progress and forgets a taught voice.
+/// Forgets a taught voice and drops takes in progress.
 pub fn reset(app: &AppHandle) -> EnrollState {
     *lock(takes(app)) = Takes::default();
     let _ = std::fs::remove_file(path(&models_dir(app)));
