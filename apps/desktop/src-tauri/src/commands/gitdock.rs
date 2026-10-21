@@ -44,6 +44,17 @@ pub async fn git_unstage(path: String, files: Vec<String>) -> CmdResult<String> 
     .await?
 }
 
+/// Discards unstaged changes into a stash, so they can come back.
+#[tauri::command]
+pub async fn git_discard(path: String, files: Vec<String>) -> CmdResult<String> {
+    off_ui(move || {
+        gitflow::discard(&PathBuf::from(path), &files)
+            .map(|o| o.message)
+            .map_err(err)
+    })
+    .await?
+}
+
 /// Commits what is staged. Unlike the Ask action it never sweeps in
 /// unstaged changes: the dock shows exactly what will be committed.
 #[tauri::command]

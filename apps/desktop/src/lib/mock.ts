@@ -744,6 +744,7 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
         ],
   git_stage: () => "Staged",
   git_unstage: () => "Unstaged",
+  git_discard: () => "Discarded your changes. They are in Stashes if you need them.",
   git_commit: () => "Committed",
   git_write_message: () => "Tidy the util helpers",
   git_amend: () => "Amended the last commit",

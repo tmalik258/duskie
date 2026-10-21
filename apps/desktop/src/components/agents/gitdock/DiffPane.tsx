@@ -87,7 +87,24 @@ export function DiffPane({
             <span className="text-(--ok)">+{shown.added}</span> <span className="text-(--err)">-{shown.removed}</span>
           </span>
         )}
-        {staged && <span className="pill-st">Staged</span>}
+        {file && file.kind !== "U" && (
+          <button
+            type="button"
+            className="btn sm"
+            disabled={busy || staging}
+            onClick={() => {
+              setStaging(true);
+              void (staged ? api.gitUnstage(path, [file.path]) : api.gitStage(path, [file.path]))
+                .catch((e: unknown) => setError(String(e)))
+                .finally(() => {
+                  setStaging(false);
+                  onChanged();
+                });
+            }}
+          >
+            {staged ? "Unstage file" : "Stage file"}
+          </button>
+        )}
         {file && file.kind !== "D" && (
           <button type="button" className="btn ghost sm" onClick={() => onOpen(file.path)}>
             Open

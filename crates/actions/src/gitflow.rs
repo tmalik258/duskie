@@ -436,6 +436,37 @@ pub fn unstage(path: &Path, files: &[String]) -> Result<Outcome, ActionError> {
     }))
 }
 
+/// Drops unstaged changes, but never for good: they go to a stash the user
+/// can put back from Stashes. Staged changes stay staged. No files means all.
+pub fn discard(path: &Path, files: &[String]) -> Result<Outcome, ActionError> {
+    repo(path)?;
+    // Git refuses --keep-index with a file list, so named files go whole.
+    let mut args = vec![
+        "stash",
+        "push",
+        "--include-untracked",
+        "-m",
+        "Discarded from Duskie",
+    ];
+    if files.is_empty() {
+        args.insert(2, "--keep-index");
+    } else {
+        args.push("--");
+        for f in files {
+            args.push(safe_file(f)?);
+        }
+    }
+    git(path, &args)?;
+    Ok(Outcome::msg(if files.is_empty() {
+        "Discarded your changes. They are in Stashes if you need them.".to_owned()
+    } else {
+        format!(
+            "Discarded {} file(s). They are in Stashes if you need them.",
+            files.len()
+        )
+    }))
+}
+
 /// Replaces the last commit with what is staged now. A new message is
 /// optional; without one the old message stays. The caller warns before a
 /// force push is needed (the commit was already pushed).
@@ -997,7 +1028,26 @@ mod tests {
         assert_eq!(stashes(&dir).unwrap().len(), 1);
         stash_apply(&dir, "stash@{0}", true).unwrap();
         assert!(dir.join("new.txt").exists());
+        // Discard keeps a way back.
+        discard(&dir, &["new.txt".to_owned()]).unwrap();
+        assert!(!dir.join("new.txt").exists());
+        stash_apply(&dir, "stash@{0}", true).unwrap();
+        assert!(dir.join("new.txt").exists());
         std::fs::remove_file(dir.join("new.txt")).unwrap();
+        // Discard all keeps what is staged.
+        std::fs::write(dir.join("b.txt"), "staged\n").unwrap();
+        run(&dir, &["add", "b.txt"]);
+        std::fs::write(dir.join("a.txt"), "dirty\n").unwrap();
+        discard(&dir, &[]).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.join("a.txt"))
+                .unwrap()
+                .trim_end(),
+            "one"
+        );
+        assert!(dir.join("b.txt").exists());
+        stash_drop(&dir, "stash@{0}").unwrap();
+        run(&dir, &["reset", "-q", "--hard"]);
         std::fs::write(dir.join("a.txt"), "two\n").unwrap();
         run(&dir, &["stash", "push", "-q", "-m", "wip"]);
         let list = stashes(&dir).unwrap();

@@ -40,7 +40,9 @@ export function ChangesPane({
 
   const toggle = (f: GitFile) =>
     void act(() => (f.staged && !f.unstaged ? api.gitUnstage(path, [f.path]) : api.gitStage(path, [f.path])));
-  const toggleAll = () => void act(() => (counts.all ? api.gitUnstage(path, []) : api.gitStage(path, [])));
+  const stageAll = () => void act(() => api.gitStage(path, []));
+  const unstageAll = () => void act(() => api.gitUnstage(path, []));
+  const discardAll = () => void act(() => api.gitDiscard(path, []));
 
   return (
     <div className="gbody">
@@ -53,7 +55,9 @@ export function ChangesPane({
           busy={busy}
           onSelect={setSel}
           onToggle={toggle}
-          onToggleAll={toggleAll}
+          onStageAll={stageAll}
+          onUnstageAll={unstageAll}
+          onDiscardAll={discardAll}
         />
         {note && (
           <p className="hint px-3" role="status">

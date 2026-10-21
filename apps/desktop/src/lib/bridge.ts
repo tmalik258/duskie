@@ -420,6 +420,7 @@ export const api = {
   gitStatus: (path: string) => invoke<GitFile[]>("git_status", { path }),
   gitStage: (path: string, files: string[]) => invoke<string>("git_stage", { path, files }),
   gitUnstage: (path: string, files: string[]) => invoke<string>("git_unstage", { path, files }),
+  gitDiscard: (path: string, files: string[]) => invoke<string>("git_discard", { path, files }),
   gitCommit: (path: string, message: string) => invoke<string>("git_commit", { path, message }),
   gitWriteMessage: (path: string) => invoke<string>("git_write_message", { path }),
   gitAmend: (path: string, message?: string) => invoke<string>("git_amend", { path, message }),

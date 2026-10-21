@@ -6790,3 +6790,23 @@ button.ak-cchip:hover,
 .ag-sh-meta {
   justify-content: flex-end;
 }
+
+/* Git dock file rows: a small bar and the line counts. */
+.cnums {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+}
+.cnums .cbar {
+  width: 14px;
+}
+.cnums .a {
+  color: var(--ok);
+}
+.cnums .d {
+  color: var(--err);
+}
+.fhead .btn.danger {
+  color: var(--err);
+}
