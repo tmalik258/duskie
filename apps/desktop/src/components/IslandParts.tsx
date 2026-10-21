@@ -1,7 +1,8 @@
 "use client";
 
 import { motion, useReducedMotion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { latestActivity, useActivities } from "@/lib/activities";
 import { api } from "@/lib/bridge";
 import { useNow } from "@/lib/hooks";
@@ -315,24 +316,35 @@ export function Options({ suggestion }: { suggestion: Suggestion }) {
   );
 }
 
-/** A hairline that runs out when the suggestion closes on its own. Rust
- * restarts that clock while the island is hovered, so the line refills. */
+/** An outline around the island that sweeps away when the suggestion closes
+ * on its own. Rust restarts that clock while the island is hovered, so the
+ * outline refills. With reduced motion it fades instead of sweeping. */
 function Countdown() {
   const secs = useDuskie((s) => s.settings.collapseAfterSecs);
   const hovered = useDuskie((s) => s.hovered);
   const reduced = useReducedMotion() ?? false;
-  if (!secs || reduced) return null;
-  return (
-    <span className="mx-2 mt-1 block h-px overflow-hidden rounded-full bg-[rgb(242_240_235_/_0.06)]" aria-hidden>
-      <motion.i
+  const [shell, setShell] = useState<HTMLElement | null>(null);
+  useEffect(() => setShell(document.querySelector<HTMLElement>(".island-shell")), []);
+  if (!secs || !shell) return null;
+  const radius = Number.parseFloat(getComputedStyle(shell).borderRadius) || 26;
+  const run = hovered ? { duration: 0 } : { duration: secs, ease: "linear" as const };
+  return createPortal(
+    <svg className="rd-outline" aria-hidden>
+      <motion.rect
         key={hovered ? "held" : "running"}
-        className="block h-full bg-(--c4)"
-        style={{ originX: 0 }}
-        initial={{ scaleX: 1 }}
-        animate={{ scaleX: hovered ? 1 : 0 }}
-        transition={{ duration: hovered ? 0 : secs, ease: "linear" }}
+        x="0.75"
+        y="0.75"
+        style={{ width: "calc(100% - 1.5px)", height: "calc(100% - 1.5px)" }}
+        rx={radius - 0.75}
+        pathLength={100}
+        strokeDasharray="100 100"
+        data-held={hovered || undefined}
+        initial={reduced ? { opacity: 1 } : { strokeDashoffset: 0 }}
+        animate={reduced ? { opacity: hovered ? 1 : 0 } : { strokeDashoffset: hovered ? 0 : 100 }}
+        transition={run}
       />
-    </span>
+    </svg>,
+    shell,
   );
 }
 

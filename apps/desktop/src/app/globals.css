@@ -6949,3 +6949,24 @@ button.ak-cchip:hover,
 .ak-tasked {
   color: rgb(235 235 245 / 0.6);
 }
+
+/* Suggestion countdown: the island's outline sweeps away, hover refills it. */
+.rd-outline {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+.rd-outline rect {
+  fill: none;
+  stroke: rgb(242 240 235 / 0.55);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  transition: stroke 0.2s ease;
+}
+.rd-outline rect[data-held] {
+  stroke: var(--c4);
+}
