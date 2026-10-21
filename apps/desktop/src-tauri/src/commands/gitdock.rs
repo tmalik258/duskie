@@ -103,6 +103,17 @@ pub async fn git_stash_apply(path: String, name: String, pop: bool) -> CmdResult
     .await?
 }
 
+/// Stashes every uncommitted change in the repo.
+#[tauri::command]
+pub async fn git_stash_push(path: String) -> CmdResult<String> {
+    off_ui(move || {
+        gitflow::stash_push(&PathBuf::from(path))
+            .map(|o| o.message)
+            .map_err(err)
+    })
+    .await?
+}
+
 /// Deletes a stash. The dock asks with a hold first.
 #[tauri::command]
 pub async fn git_stash_drop(path: String, name: String) -> CmdResult<String> {

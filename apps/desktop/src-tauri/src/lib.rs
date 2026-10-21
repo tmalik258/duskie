@@ -236,6 +236,7 @@ pub fn run() {
             commands::git_stashes,
             commands::git_stash_apply,
             commands::git_stash_drop,
+            commands::git_stash_push,
             commands::git_fetch,
             commands::git_push,
             commands::git_branches,

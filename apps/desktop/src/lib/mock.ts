@@ -766,6 +766,13 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
     if (a.pop) mockStashes = mockStashes.filter((x) => x.name !== a.name);
     return a.pop ? "Popped the stash" : "Applied the stash. A copy stays in Stashes.";
   },
+  git_stash_push: () => {
+    mockStashes = [
+      { name: "stash@{0}", message: "On main: Stashed from Duskie", when: "just now" },
+      ...mockStashes.map((x, i) => ({ ...x, name: `stash@{${i + 1}}` })),
+    ];
+    return "Stashed your changes. They are in Stashes.";
+  },
   git_stash_drop: (a) => {
     mockStashes = mockStashes.filter((x) => x.name !== a.name);
     return "Dropped the stash";

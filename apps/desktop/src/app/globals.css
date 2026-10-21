@@ -3622,12 +3622,15 @@ select.ak-mi option {
   padding: 14px 4px 10px 50px;
 }
 .ak-repo {
-  border-radius: 14px;
+  margin-bottom: 6px;
+  border-radius: 12px;
+  background: rgb(255 255 255 / 0.04);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.05);
   transition: background 160ms;
 }
 .ak-repo:hover,
 .ak-repo[data-open="true"] {
-  background: rgb(255 255 255 / 0.05);
+  background: rgb(255 255 255 / 0.065);
 }
 .ak-rrow {
   display: grid;
@@ -3635,8 +3638,64 @@ select.ak-mi option {
   gap: 10px;
   align-items: center;
   width: 100%;
-  padding: 10px;
+  padding: 9px 8px 9px 12px;
   text-align: left;
+}
+.ak-rmain {
+  min-width: 0;
+  text-align: left;
+}
+.ak-rt {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.ak-rt .ak-rn {
+  flex: none;
+  max-width: 60%;
+}
+.ak-rt .ak-rb {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ak-rs {
+  display: block;
+  margin-top: 2px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: var(--i3);
+}
+.ak-racts {
+  display: flex;
+  gap: 4px;
+}
+.ak-rbtn {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: #f5f5f7;
+  background: rgb(255 255 255 / 0.08);
+  transition: background-color 0.12s ease;
+}
+.ak-rbtn:hover:not(:disabled) {
+  background: rgb(255 255 255 / 0.14);
+}
+.ak-rbtn:disabled {
+  opacity: 0.4;
+}
+.ak-rfoot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px 2px;
+  font-size: 12px;
+  color: var(--i3);
 }
 .ak-rdot {
   width: 8px;
@@ -3646,7 +3705,7 @@ select.ak-mi option {
 .ak-rn {
   display: block;
   font-size: 13.5px;
-  font-weight: 600;
+  font-weight: 500;
   color: #f5f5f7;
   white-space: nowrap;
   overflow: hidden;

@@ -428,6 +428,7 @@ export const api = {
   gitStashes: (path: string) => invoke<StashRow[]>("git_stashes", { path }),
   gitStashApply: (path: string, name: string, pop: boolean) => invoke<string>("git_stash_apply", { path, name, pop }),
   gitStashDrop: (path: string, name: string) => invoke<string>("git_stash_drop", { path, name }),
+  gitStashPush: (path: string) => invoke<string>("git_stash_push", { path }),
   gitFetch: (path: string) => invoke<string>("git_fetch", { path }),
   gitPush: (path: string) => invoke<string>("git_push", { path }),
   gitBranches: (path: string) => invoke<GitBranch[]>("git_branches", { path }),

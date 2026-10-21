@@ -599,6 +599,25 @@ pub fn stash_drop(path: &Path, name: &str) -> Result<Outcome, ActionError> {
     Ok(Outcome::msg("Dropped the stash"))
 }
 
+/// Puts every uncommitted change, untracked files too, away in a new stash.
+pub fn stash_push(path: &Path) -> Result<Outcome, ActionError> {
+    repo(path)?;
+    if git(path, &["status", "--porcelain"])?.trim().is_empty() {
+        return Ok(Outcome::msg("Nothing to stash"));
+    }
+    git(
+        path,
+        &[
+            "stash",
+            "push",
+            "--include-untracked",
+            "-m",
+            "Stashed from Duskie",
+        ],
+    )?;
+    Ok(Outcome::msg("Stashed your changes. They are in Stashes."))
+}
+
 // ---- Branches, fetch, push ----------------------------------------------------
 
 /// One local branch in the Git dock's Branches tab.
@@ -971,6 +990,14 @@ mod tests {
         run(&dir, &["add", "."]);
         run(&dir, &["commit", "-q", "-m", "first"]);
         assert_eq!(log(&dir, 10).unwrap()[0].subject, "first");
+        assert_eq!(stash_push(&dir).unwrap().message, "Nothing to stash");
+        std::fs::write(dir.join("new.txt"), "untracked\n").unwrap();
+        stash_push(&dir).unwrap();
+        assert!(!dir.join("new.txt").exists());
+        assert_eq!(stashes(&dir).unwrap().len(), 1);
+        stash_apply(&dir, "stash@{0}", true).unwrap();
+        assert!(dir.join("new.txt").exists());
+        std::fs::remove_file(dir.join("new.txt")).unwrap();
         std::fs::write(dir.join("a.txt"), "two\n").unwrap();
         run(&dir, &["stash", "push", "-q", "-m", "wip"]);
         let list = stashes(&dir).unwrap();
