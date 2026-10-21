@@ -45,14 +45,24 @@ export function ActivitiesCard() {
   const now = useNow(1000);
   const list = visibleActivities([...state.activities, ...state.local], now, true);
   const running = list.filter((a) => a.phase !== "completed" && a.phase !== "failed");
+  const failed = list.filter((a) => a.phase === "failed").length;
+  const title =
+    running.length > 0 || failed === 0 ? `${running.length} running` : failed === 1 ? "1 failed" : `${failed} failed`;
+  const others = list.length - (running.length > 0 ? running.length : failed);
+  const detail =
+    running.length === 0 && failed > 0
+      ? "Clear it with the x, or try again from where you started it"
+      : others > 0
+        ? `${others} more below`
+        : list.length > 1
+          ? `${list.length} in the background`
+          : "Nothing else in the background";
   return (
     <div className="rd-glance flex flex-col gap-2.5">
       <div className="rd-card-head">
         <p className="rd-eyebrow">Activities</p>
-        <p className="rd-title">{running.length === 1 ? "1 running" : `${running.length} running`}</p>
-        <p className="rd-detail">
-          {list.length > 1 ? `${list.length} in the background` : "Nothing else in the background"}
-        </p>
+        <p className="rd-title">{title}</p>
+        <p className="rd-detail">{detail}</p>
       </div>
       <div className="flex flex-col gap-1.5" style={{ marginLeft: "calc(var(--orb-indent, 0px) * -1)" }}>
         {list.map((a) => {
