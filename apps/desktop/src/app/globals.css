@@ -347,7 +347,7 @@ body {
   color: var(--ink, var(--c2));
 }
 .rd-qb {
-  border-radius: 12px;
+  border-radius: 9px;
   background: var(--fill-2, rgb(242 240 235 / 0.08));
   color: rgb(from var(--c2) r g b / 0.9);
   box-shadow:

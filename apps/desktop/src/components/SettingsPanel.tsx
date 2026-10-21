@@ -50,7 +50,7 @@ const GROUPS: { label: string; items: { id: SettingsTab; label: string; icon: Ic
       { id: "memory", label: "Memory", icon: "brain", blurb: "What Duskie knows about you. All of it is editable." },
       {
         id: "skills",
-        label: "Skills and automations",
+        label: "Skills",
         icon: "bolt",
         blurb: "What Duskie offers, and what it now does on its own.",
       },
@@ -292,8 +292,10 @@ export function SettingsPanel() {
                     pick(i.id);
                   }}
                 >
-                  <Ic name={i.icon} size={15} />
-                  {i.label}
+                  <span className="inline-flex shrink-0">
+                    <Ic name={i.icon} size={15} />
+                  </span>
+                  <span className="truncate">{i.label}</span>
                 </button>
               ))}
             </div>

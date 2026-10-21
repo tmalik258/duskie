@@ -23,7 +23,7 @@ import { CardChips, CardHead, CardNote } from "./IslandCard";
 import { Tip } from "./Tip";
 
 /** Round quick-action button (porcelain chrome). */
-const qbClass = "rd-qb chip relative grid size-9 place-items-center overflow-hidden";
+const qbClass = "rd-qb chip relative grid size-7 place-items-center overflow-hidden";
 
 /** A meeting this close (or already on) takes the headline. */
 const MEETING_SOON_MIN = 60;
@@ -305,7 +305,7 @@ function QuickActions({
   const shift = useShiftHeld();
   // Single row keeps the glance short, two rows stacked taller than the copy.
   return (
-    <div className="flex gap-2">
+    <div className="flex gap-1">
       <AskShiftAgentsButton shift={shift} />
       <FocusShiftPauseButton paused={paused} open={focusOpen} onOpenChange={onFocusOpenChange} shift={shift} />
       {update ? <UpdateButton /> : null}
