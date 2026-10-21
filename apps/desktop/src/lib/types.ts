@@ -1019,6 +1019,8 @@ export interface GitBranch {
   current: boolean;
   ahead: number;
   behind: number;
+  /** Tracks a remote branch; without one, Push publishes it. */
+  upstream: boolean;
 }
 
 /** One commit in the Git dock's History tab. */

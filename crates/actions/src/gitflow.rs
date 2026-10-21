@@ -659,6 +659,8 @@ pub struct BranchRow {
     pub current: bool,
     pub ahead: u64,
     pub behind: u64,
+    /// Whether it tracks a remote branch; without one, Push publishes it.
+    pub upstream: bool,
 }
 
 fn safe_branch(name: &str) -> Result<&str, ActionError> {
@@ -673,7 +675,7 @@ fn safe_branch(name: &str) -> Result<&str, ActionError> {
     Ok(name)
 }
 
-fn track_counts(path: &Path, branch: &str) -> (u64, u64) {
+fn track_counts(path: &Path, branch: &str) -> Option<(u64, u64)> {
     let Ok(upstream) = git(
         path,
         &[
@@ -682,11 +684,11 @@ fn track_counts(path: &Path, branch: &str) -> (u64, u64) {
             &format!("{branch}@{{upstream}}"),
         ],
     ) else {
-        return (0, 0);
+        return None;
     };
     let upstream = upstream.trim();
     if upstream.is_empty() {
-        return (0, 0);
+        return None;
     }
     let Ok(counts) = git(
         path,
@@ -697,12 +699,12 @@ fn track_counts(path: &Path, branch: &str) -> (u64, u64) {
             &format!("{branch}...{upstream}"),
         ],
     ) else {
-        return (0, 0);
+        return Some((0, 0));
     };
     let mut parts = counts.trim().split('\t');
     let ahead = parts.next().unwrap_or("0").parse().unwrap_or(0);
     let behind = parts.next().unwrap_or("0").parse().unwrap_or(0);
-    (ahead, behind)
+    Some((ahead, behind))
 }
 
 /// Every local branch, newest commit first, with upstream ahead/behind when set.
@@ -723,12 +725,14 @@ pub fn branches(path: &Path) -> Result<Vec<BranchRow>, ActionError> {
         .map(str::trim)
         .filter(|n| !n.is_empty())
         .map(|name| {
-            let (ahead, behind) = track_counts(path, name);
+            let counts = track_counts(path, name);
+            let (ahead, behind) = counts.unwrap_or((0, 0));
             BranchRow {
                 name: name.to_owned(),
                 current: name == current,
                 ahead,
                 behind,
+                upstream: counts.is_some(),
             }
         })
         .collect())
@@ -752,6 +756,36 @@ pub fn push(path: &Path) -> Result<Outcome, ActionError> {
         git(path, &["push", "-u", "origin", "HEAD"])?;
         Ok(Outcome::msg("Pushed and set the upstream branch"))
     }
+}
+
+/// Pulls then pushes, like an editor's Sync. Your uncommitted changes are put
+/// aside and back. A pull that hits conflicts is undone, so nothing changes.
+pub fn sync(path: &Path) -> Result<Outcome, ActionError> {
+    repo(path)?;
+    let dirty = !git(path, &["status", "--porcelain", "--untracked-files=no"])?
+        .trim()
+        .is_empty();
+    if dirty {
+        git(path, &["stash", "push", "--quiet", "-m", "duskie: sync"])?;
+    }
+    let pulled = git(path, &["pull", "--no-rebase", "--no-edit", "--quiet"]);
+    if pulled.is_err() {
+        let _ = git(path, &["merge", "--abort"]);
+    }
+    if dirty && let Err(e) = git(path, &["stash", "pop", "--quiet"]) {
+        return Err(ActionError::Failed(format!(
+            "Your changes clash with the new commits; they are kept in Stashes ({e})"
+        )));
+    }
+    if let Err(e) = pulled {
+        return Err(ActionError::Failed(format!(
+            "Pull hit conflicts, so nothing changed. Merge in your editor. ({e})"
+        )));
+    }
+    git(path, &["push"])?;
+    Ok(Outcome::msg(
+        "Synced: pulled the new commits and pushed yours",
+    ))
 }
 
 /// Checks out an existing local branch.

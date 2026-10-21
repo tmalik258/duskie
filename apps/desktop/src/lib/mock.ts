@@ -55,9 +55,9 @@ const gitParityStatus = () => [
   { path: "apps/desktop/tests/parity/helpers.ts", kind: "?", staged: false, unstaged: true },
 ];
 const gitParityBranches = () => [
-  { name: "main", current: false, ahead: 0, behind: 2 },
-  { name: "feat/git-dock", current: true, ahead: 3, behind: 0 },
-  { name: "fix/island-width", current: false, ahead: 1, behind: 0 },
+  { name: "main", current: false, ahead: 0, behind: 2, upstream: true },
+  { name: "feat/git-dock", current: true, ahead: 3, behind: 0, upstream: true },
+  { name: "fix/island-width", current: false, ahead: 1, behind: 0, upstream: true },
 ];
 const gitParityLog = () => [
   { hash: "b56ca02", subject: "Git dock parity fixtures", author: "You", when: "2 hours ago" },
@@ -782,13 +782,14 @@ const commands: Record<string, (args: Record<string, unknown>) => unknown> = {
   },
   git_fetch: () => "Fetched from the remote",
   git_push: () => "Pushed to the remote",
+  git_sync: () => "Synced: pulled the new commits and pushed yours",
   git_branches: () =>
     previewFlag("git")
       ? gitParityBranches()
       : [
-          { name: "main", current: false, ahead: 0, behind: 2 },
-          { name: "feat/git-dock", current: true, ahead: 3, behind: 0 },
-          { name: "fix/island-width", current: false, ahead: 1, behind: 0 },
+          { name: "main", current: false, ahead: 0, behind: 2, upstream: true },
+          { name: "feat/git-dock", current: true, ahead: 3, behind: 0, upstream: true },
+          { name: "fix/island-width", current: false, ahead: 1, behind: 0, upstream: true },
         ],
   git_switch_branch: (a) => `Switched to ${String(a.name)}`,
   git_create_branch: (a) => `Created and switched to ${String(a.name)}`,

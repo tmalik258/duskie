@@ -242,6 +242,7 @@ pub fn run() {
             commands::git_stash_push,
             commands::git_fetch,
             commands::git_push,
+            commands::git_sync,
             commands::git_branches,
             commands::git_switch_branch,
             commands::git_create_branch,

@@ -69,6 +69,7 @@ export function GitBar({ path, repo, repos, onPickRepo, rev, onChanged, onPr, on
   const branch = current?.name ?? repo?.branch ?? "";
   const ahead = current?.ahead ?? repo?.ahead ?? 0;
   const behind = current?.behind ?? repo?.behind ?? 0;
+  const upstream = current?.upstream ?? true;
   const pr = repo?.prs.find((p) => p.branch === branch) ?? null;
   const web = pr?.url ?? (repo?.slug ? `https://github.com/${repo.slug}` : null);
 
@@ -84,7 +85,7 @@ export function GitBar({ path, repo, repos, onPickRepo, rev, onChanged, onPr, on
         onCreate={(name) => void run(() => api.gitCreateBranch(path, name))}
       />
       <span className="gsep" />
-      <SyncGroup path={path} ahead={ahead} behind={behind} busy={busy} run={(w) => void run(w)} />
+      <SyncGroup path={path} ahead={ahead} behind={behind} upstream={upstream} busy={busy} run={(w) => void run(w)} />
       {pr && (
         <button type="button" className="prchip" onClick={onPr} aria-label={`Pull request ${pr.number}`}>
           <Ic name="pr" size={13} />

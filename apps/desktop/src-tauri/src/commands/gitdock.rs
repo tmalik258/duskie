@@ -157,6 +157,16 @@ pub async fn git_push(path: String) -> CmdResult<String> {
 }
 
 #[tauri::command]
+pub async fn git_sync(path: String) -> CmdResult<String> {
+    off_ui(move || {
+        gitflow::sync(&PathBuf::from(path))
+            .map(|o| o.message)
+            .map_err(err)
+    })
+    .await?
+}
+
+#[tauri::command]
 pub async fn git_branches(path: String) -> CmdResult<Vec<BranchRow>> {
     off_ui(move || gitflow::branches(&PathBuf::from(path)).map_err(err)).await?
 }
