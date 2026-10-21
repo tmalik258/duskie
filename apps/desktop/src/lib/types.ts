@@ -396,6 +396,10 @@ export interface Suggestion {
   compact?: boolean;
   /** Shows without a sound. */
   silent?: boolean;
+  /** Where it came from, for "From Calendar, 2 min ago". */
+  source?: string;
+  /** When it was first raised (Unix ms). */
+  at?: number;
 }
 
 /** A newer Duskie release than the one running. */

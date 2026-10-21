@@ -6939,10 +6939,9 @@ button.ak-cchip:hover,
   font-size: 11px;
   opacity: 0.5;
 }
-.rd-opt {
-  box-shadow: inset 0 0 0 1px rgb(242 240 235 / 0.16);
-  background: rgb(242 240 235 / 0.05);
-}
-.rd-opt:hover {
-  background: rgb(242 240 235 / 0.1);
+
+/* Suggestion options side by side; they stretch to fill the row and wrap when long. */
+.rd-opts > .rd-opt {
+  flex: 1 1 auto;
+  padding: 0 10px;
 }

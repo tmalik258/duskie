@@ -1972,7 +1972,9 @@ if (typeof window !== "undefined") {
       beginActivity(label);
       go("working");
     },
-    __mockSuggest: (s: Suggestion) => {
+    __mockSuggest: (raw: Suggestion) => {
+      // Mock suggestions come from Slack, raised a few minutes back.
+      const s = { source: "Slack", at: Date.now() - 4 * 60_000, ...raw };
       suggestion = s;
       emit("suggestion://new", s);
     },

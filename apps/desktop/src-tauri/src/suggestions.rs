@@ -435,16 +435,40 @@ fn show_or_queue(app: &AppHandle, proposal: Proposal) {
         });
         return;
     }
-    show(app, proposal);
+    show(app, proposal, Instant::now());
 }
 
-fn show(app: &AppHandle, proposal: Proposal) {
+fn unix_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u64)
+}
+
+/// A friendly name for where a skill's suggestion comes from, by its group.
+pub fn source_of(skill_id: &str) -> &'static str {
+    match skill_id.split('.').next().unwrap_or_default() {
+        "dev" => "Your code",
+        "system" => "Windows",
+        "files" => "Files",
+        "clipboard" | "clip" => "Clipboard",
+        "browser" => "Browser",
+        "calendar" => "Calendar",
+        "mail" => "Mail",
+        "notify" => "Notifications",
+        "focus" => "Focus",
+        "mcp" => "Your servers",
+        "recipes" => "Recipes",
+        _ => "Duskie",
+    }
+}
+
+fn show(app: &AppHandle, proposal: Proposal, since: Instant) {
     if mascot::dispatch(app, MascotEvent::SkillMatched).is_none() {
         // Raced with another state change; try again shortly.
         let app = app.clone();
         lock(&app.state::<AppState>().queue).push_front(Queued {
             proposal,
-            at: Instant::now(),
+            at: since,
         });
         schedule_next(&app, NEXT_AFTER_DISMISS);
         return;
@@ -475,6 +499,8 @@ fn show(app: &AppHandle, proposal: Proposal) {
         },
         compact: proposal.compact,
         silent: proposal.silent,
+        source: source_of(&proposal.skill_id).into(),
+        at: unix_ms().saturating_sub(since.elapsed().as_millis() as u64),
     };
     let priority = proposal.priority;
     let auto = proposal.trust == Trust::Auto
@@ -1095,7 +1121,7 @@ fn schedule_next(app: &AppHandle, after: Duration) {
             queue.pop_front()
         };
         if let Some(q) = next {
-            show(&app, q.proposal);
+            show(&app, q.proposal, q.at);
         }
     });
 }

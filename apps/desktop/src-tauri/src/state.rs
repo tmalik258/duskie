@@ -138,6 +138,10 @@ pub struct Suggestion {
     pub compact: bool,
     /// Shows without a sound.
     pub silent: bool,
+    /// Where it came from, for the card's "From Calendar, 2 min ago" line.
+    pub source: String,
+    /// When it was first raised (Unix ms), so a queued one shows its real age.
+    pub at: u64,
 }
 
 pub struct Active {

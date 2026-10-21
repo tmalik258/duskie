@@ -69,7 +69,7 @@ export function AgentCard({ id }: { id: string }) {
             <button
               key={o.label}
               type="button"
-              className="rd-btn rd-opt"
+              className="rd-opt"
               title={o.description}
               onClick={() => sendToSession(s.id, answerText(choice, [[o.label]]))}
             >
@@ -80,10 +80,10 @@ export function AgentCard({ id }: { id: string }) {
       )}
       {s.question && (
         <div className="rd-answers">
-          <button type="button" className="rd-btn rd-opt" onClick={() => answerQuestion(s.id, "allow")}>
+          <button type="button" className="rd-opt" onClick={() => answerQuestion(s.id, "allow")}>
             Allow
           </button>
-          <button type="button" className="rd-btn rd-opt" onClick={() => answerQuestion(s.id, "deny")}>
+          <button type="button" className="rd-opt" onClick={() => answerQuestion(s.id, "deny")}>
             Deny
           </button>
         </div>

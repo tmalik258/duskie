@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from "motion/react";
 import { useState } from "react";
 import { latestActivity, useActivities } from "@/lib/activities";
 import { api } from "@/lib/bridge";
+import { useNow } from "@/lib/hooks";
 import type { NetNotice } from "@/lib/net";
 import { playSound } from "@/lib/sound";
 import { installUpdate, notePick, uiVolume, useDuskie } from "@/lib/store";
@@ -152,6 +153,7 @@ export function ExpandedContent({
     <div className="flex flex-col">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
+          {suggestion?.source && <SourceLine source={suggestion.source} at={suggestion.at} />}
           <p className="font-display text-[15px] leading-5 font-semibold tracking-[-0.015em] text-white">
             {suggestion?.title ?? TITLE[mascot]}
           </p>
@@ -223,6 +225,17 @@ export function UndoButton({ id }: { id: number }) {
   );
 }
 
+/** "From Calendar, 2 min ago" above a suggestion's title. */
+function SourceLine({ source, at }: { source: string; at?: number }) {
+  const now = useNow(30_000);
+  const mins = at ? Math.floor((now - at) / 60_000) : 0;
+  return (
+    <p className="rd-eyebrow mb-0.5">
+      From {source}, {mins < 1 ? "just now" : mins < 60 ? `${mins} min ago` : `${Math.floor(mins / 60)} h ago`}
+    </p>
+  );
+}
+
 /** Moments Duskie always offers - not habits, so no Show less / skip score. */
 const ALWAYS_GLANCE = new Set([
   "files.screenshot",
@@ -243,7 +256,7 @@ export function Options({ suggestion }: { suggestion: Suggestion }) {
   const [why, setWhy] = useState(false);
   return (
     <div className="mt-2.5 flex min-w-0 flex-col gap-1.5" style={FULL}>
-      <div className="flex min-w-0 max-w-full flex-col gap-1.5">
+      <div className="rd-opts flex min-w-0 max-w-full flex-wrap gap-1.5">
         {suggestion.options.map((option, i) => {
           const openUrl = suggestion.actions[i] === "open_url";
           const label = priv && openUrl ? privateOpenLabel(option) : option;
@@ -256,7 +269,7 @@ export function Options({ suggestion }: { suggestion: Suggestion }) {
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.22, delay: 0.08 + i * 0.03, ease: [0.23, 1, 0.32, 1] }}
-              className={`rd-opt rd-opt-row chip gap-2 ${i === 0 ? "rd-opt-primary" : ""}`}
+              className={`rd-opt chip gap-2 ${i === 0 ? "rd-opt-primary" : ""}`}
             >
               <span className="min-w-0 truncate leading-snug">{label}</span>
               <kbd className={`shrink-0 font-sans text-[11px] leading-none ${i === 0 ? "opacity-40" : "opacity-45"}`}>
@@ -271,7 +284,7 @@ export function Options({ suggestion }: { suggestion: Suggestion }) {
           {suggestion.why}
         </p>
       )}
-      <div className="flex flex-wrap items-center justify-center gap-x-2.5 gap-y-0.5">
+      <div className="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 px-1">
         {alwaysAt >= 0 && (
           <Tip label={`From now on, "${suggestion.options[alwaysAt]}" without asking. Undo in Settings > Skills.`}>
             <button type="button" onClick={() => always(suggestion, alwaysAt)} className="rd-gfoot-btn chip">
@@ -284,6 +297,7 @@ export function Options({ suggestion }: { suggestion: Suggestion }) {
             Show less
           </button>
         )}
+        <span className="ml-auto" />
         {suggestion.why && (
           <button type="button" aria-expanded={why} onClick={() => setWhy((v) => !v)} className="rd-gfoot-btn chip">
             Why this?
