@@ -282,9 +282,7 @@ pub fn refresh(app: &AppHandle) {
         voice: settings.voice.clone(),
         speed: settings.speed,
         name: name.clone(),
-        // Teaching your voice records from the same mic; the listener would
-        // hear "Duskie" in the takes and wake.
-        listen: onboarded && listen && !crate::voice_enroll::busy(app),
+        listen: onboarded && listen,
         profile: crate::voice_enroll::profile(&v.models, &name, settings.only_me)
             .map(|p| p.to_json()),
     };
@@ -361,7 +359,8 @@ const ECHO_CHECK: std::time::Duration = std::time::Duration::from_millis(50);
 const ECHO_TAIL: std::time::Duration = std::time::Duration::from_millis(400);
 
 /// Keeps the microphone deaf while Duskie's own voice plays, so a line
-/// like "just say Hey Duskie" never wakes it. Runs for the whole process.
+/// like "just say Hey Duskie" never wakes it, and while you teach it your
+/// voice. Runs for the whole process.
 /// Only changes are sent (and the current state to a newly built listener):
 /// a push to talk right after speaking unmutes and must stay unmuted.
 pub fn start_echo_guard(app: &AppHandle) {
@@ -388,6 +387,9 @@ pub fn start_echo_guard(app: &AppHandle) {
                     let _ = app.emit(SPEAKING_EVENT, talking);
                 }
                 let greeting = lock(&v.greeter).as_ref().is_some_and(Speaker::busy);
+                // Teaching your voice records from the same mic: the takes
+                // say "Duskie" and must not wake it.
+                let teaching = crate::voice_enroll::busy(&app);
                 let runtime = lock(&v.runtime);
                 let Some(listener) = runtime.as_ref().and_then(|r| r.listener.as_ref()) else {
                     told = None;
@@ -398,7 +400,9 @@ pub fn start_echo_guard(app: &AppHandle) {
                         .as_ref()
                         .and_then(|r| r.speaker.as_ref())
                         .is_some_and(Speaker::busy);
-                let muted = if speaking {
+                let muted = if teaching {
+                    true
+                } else if speaking {
                     quiet_since = None;
                     true
                 } else {

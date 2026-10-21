@@ -28,7 +28,7 @@ pub struct Takes {
     more_from: Option<usize>,
 }
 
-/// Teaching is under way; the wake word listener stays off meanwhile.
+/// Teaching is under way; the wake word listener is muted meanwhile.
 pub fn busy(app: &AppHandle) -> bool {
     let t = lock(takes(app));
     t.recording || !t.names.is_empty() || !t.sentences.is_empty() || !t.more.is_empty()
@@ -116,17 +116,11 @@ pub fn state(app: &AppHandle) -> EnrollState {
 pub fn record(app: &AppHandle, sentence: Option<usize>, more: bool) -> Result<EnrollState, String> {
     let seconds = if sentence.is_some() { 5.0 } else { 2.5 };
     lock(takes(app)).recording = true;
-    crate::voice::refresh(app);
+    // Gives the echo guard a beat to mute the wake word listener.
+    std::thread::sleep(Duration::from_millis(150));
     let clip = capture(Duration::from_secs_f32(seconds));
     lock(takes(app)).recording = false;
-    let clip = match clip.map(|c| trim(&c)) {
-        Ok(Some(clip)) => clip,
-        failed => {
-            crate::voice::refresh(app);
-            failed?;
-            return Err("Didn't catch that. Try again a little closer to the mic.".into());
-        }
-    };
+    let clip = trim(&clip?).ok_or("Didn't catch that. Try again a little closer to the mic.")?;
     {
         let mut t = lock(takes(app));
         match sentence {
@@ -222,7 +216,6 @@ pub fn finish(app: &AppHandle, more: bool) -> Result<EnrollState, String> {
 /// Drops takes in progress. A taught voice stays.
 pub fn cancel(app: &AppHandle) -> EnrollState {
     *lock(takes(app)) = Takes::default();
-    crate::voice::refresh(app);
     state(app)
 }
 
