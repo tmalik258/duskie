@@ -231,6 +231,9 @@ export function Island() {
       };
     }),
   );
+  // Focus mode: a compact pill with the focus face and the time left.
+  const focusUntil = useDuskie((s) => (s.ask ? null : s.focusUntil));
+  const focusLeft = useFocusLeft(focusUntil);
   const askingCount = useAgents((s) => s.sessions.filter((x) => x.status === "waiting").length);
   const working = asking
     ? null
@@ -239,7 +242,8 @@ export function Island() {
       skillWorking ??
       chatWorking ??
       agentWorking ??
-      downloadWorking);
+      // In Focus a download waits in a bubble beside the pill.
+      (focusLeft !== null ? null : downloadWorking));
   // Prefer an exact label match. Multi-download and update-without-activity
   // labels are synthetic, so fall back to the owning row when find misses.
   const displayedActivity = working
@@ -280,9 +284,6 @@ export function Island() {
     const r = s.lastResult;
     return !!(r && (r.undoId != null || r.path));
   });
-  // Focus mode: a compact pill with the focus face and the time left.
-  const focusUntil = useDuskie((s) => (s.ask ? null : s.focusUntil));
-  const focusLeft = useFocusLeft(focusUntil);
   const reduced = useReducedMotion() ?? false;
   const look = useSystemLook();
   const now = useNow(15_000);
@@ -762,13 +763,39 @@ export function Island() {
           },
         ]
       : [];
+  // Bubbles sit beside any open state, so nothing in flight is hidden by it.
+  const sideOpen = busy || !["idle", "quiet-glance", "glance", "activities"].includes(registryId);
+  const activityBubble = (a: (typeof liveActivities)[number]): BubbleItem => {
+    const frac = a.total && a.transferred != null ? a.transferred / a.total : null;
+    return {
+      id: a.id,
+      label: a.label || a.source,
+      mark: ["browser", "file"].includes(a.source) ? "\u2193" : undefined,
+      sub:
+        a.phase === "failed"
+          ? "Failed"
+          : a.phase === "awaitingUser"
+            ? "Paused"
+            : frac !== null
+              ? `${Math.round(frac * 100)}%`
+              : a.transferred != null
+                ? `${Math.round(a.transferred / 1e6)} MB`
+                : "Working",
+      progress: a.phase === "failed" ? null : frac,
+      tone: a.phase === "failed" ? "err" : undefined,
+    };
+  };
   const bubbleItems = [
     ...agentBubble,
-    ...(busy && suggestion
-      ? [{ id: suggestion.id, label: suggestion.title || "Suggestion" }]
-      : busy
-        ? liveActivities.slice(1, 5).map((a) => ({ id: a.id, label: a.label || a.source }))
-        : []),
+    ...(sideOpen && suggestion && registryId !== "suggestion" && registryId !== "suggest-peek"
+      ? [{ id: suggestion.id, label: suggestion.title || "Suggestion", sub: suggestion.detail || undefined }]
+      : []),
+    ...(sideOpen
+      ? liveActivities
+          .filter((a) => a !== displayedActivity)
+          .slice(0, 4)
+          .map(activityBubble)
+      : []),
   ];
 
   return (
