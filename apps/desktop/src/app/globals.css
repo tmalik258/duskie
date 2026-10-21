@@ -7013,3 +7013,10 @@ button.ak-cchip:hover,
   margin-left: auto;
   padding: 0 7px;
 }
+
+/* Delete a past chat from the history list. */
+.ak-del {
+  flex: none;
+  padding: 0 7px;
+  color: var(--ink-3, rgb(242 240 235 / 0.5));
+}

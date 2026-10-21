@@ -454,7 +454,14 @@ export function AskPanel() {
   const clipFilter = clips !== null ? q : "";
   const asking = q.length > 0 && !slash && clips === null && !inHistory;
   const shownClips = clips?.filter((c) => !clipFilter || c.text.toLowerCase().includes(clipFilter)) ?? [];
-  const history = historyRows(chats, agentSessions, historyKind, inHistory ? q : "");
+  const history = historyRows(chats, agentSessions, historyKind, inHistory ? q : "", (id) => {
+    void api.chatDelete(id).then(() => api.chatsList().then(setChats));
+  });
+  const clearChats = () => {
+    void Promise.all(chats.map((c) => api.chatDelete(c.id)))
+      .then(() => api.chatsList())
+      .then(setChats);
+  };
   // With a conversation going, the body keeps showing it while you type
   // the next question; commands show only before the first one.
   const inChat = turns.length > 0;
@@ -1191,7 +1198,12 @@ export function AskPanel() {
         </div>
       ) : inHistory ? (
         <div key="history" className="ak-scroll ak-in" style={{ maxHeight: scrollMax }}>
-          <HistoryList rows={history} active={Math.min(pick, Math.max(history.length - 1, 0))} onHover={setPick} />
+          <HistoryList
+            rows={history}
+            active={Math.min(pick, Math.max(history.length - 1, 0))}
+            onHover={setPick}
+            onClear={clearChats}
+          />
         </div>
       ) : showHits && hits ? (
         <div key="hits" className="ak-scroll ak-in" style={{ maxHeight: scrollMax }}>
@@ -1321,7 +1333,13 @@ interface HistoryRow {
 }
 
 /** Past chats and agent sessions, newest first, under Today / Yesterday / Earlier. */
-function historyRows(chats: ChatSummary[], sessions: Session[], kind: HistoryKind, q: string): HistoryRow[] {
+function historyRows(
+  chats: ChatSummary[],
+  sessions: Session[],
+  kind: HistoryKind,
+  q: string,
+  removeChat: (id: string) => void,
+): HistoryRow[] {
   const day = (ms: number) => {
     const d = new Date(ms);
     const today = new Date();
@@ -1343,6 +1361,7 @@ function historyRows(chats: ChatSummary[], sessions: Session[], kind: HistoryKin
           setTab("ask");
           void openChat(c.id);
         },
+        remove: () => removeChat(c.id),
       });
     }
   }
@@ -1371,28 +1390,52 @@ function historyRows(chats: ChatSummary[], sessions: Session[], kind: HistoryKin
     .map(({ at: _, ...r }) => r);
 }
 
-function HistoryList({ rows, active, onHover }: { rows: HistoryRow[]; active: number; onHover: (i: number) => void }) {
+function HistoryList({
+  rows,
+  active,
+  onHover,
+  onClear,
+}: {
+  rows: HistoryRow[];
+  active: number;
+  onHover: (i: number) => void;
+  onClear?: () => void;
+}) {
   if (rows.length === 0) return <p className="ak-group py-2">Nothing here yet.</p>;
   return (
     <ul className="ak-list" aria-label="History">
       {rows.map((r, i) => (
         <li key={r.id} ref={scrollIfActive(i === active)}>
           {(i === 0 || rows[i - 1].group !== r.group) && <p className="ak-group">{r.group}</p>}
-          <button
-            type="button"
-            data-sel={i === active}
-            onMouseMove={() => onHover(i)}
-            onClick={r.open}
-            className="ak-row"
-          >
-            <span className="ak-ico">
-              <Ic name={r.agent ? "cpu" : "spark"} size={12} />
-            </span>
-            <span className="min-w-0 flex-1 truncate">{r.title}</span>
-            <span className="ak-hint">{r.meta}</span>
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              data-sel={i === active}
+              onMouseMove={() => onHover(i)}
+              onClick={r.open}
+              className="ak-row min-w-0 flex-1"
+            >
+              <span className="ak-ico">
+                <Ic name={r.agent ? "cpu" : "spark"} size={12} />
+              </span>
+              <span className="min-w-0 flex-1 truncate">{r.title}</span>
+              <span className="ak-hint">{r.meta}</span>
+            </button>
+            {r.remove && (
+              <button type="button" aria-label={`Delete ${r.title}`} className="chip ak-del" onClick={r.remove}>
+                <Ic name="x" size={12} />
+              </button>
+            )}
+          </div>
         </li>
       ))}
+      {onClear && rows.some((r) => r.remove) && (
+        <li className="flex justify-end pt-1">
+          <button type="button" className="chip" onClick={onClear}>
+            Clear chats
+          </button>
+        </li>
+      )}
     </ul>
   );
 }
