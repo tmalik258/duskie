@@ -4558,10 +4558,117 @@ button.ak-cchip:hover,
   flex-direction: column;
   gap: 2px;
 }
+.ag-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 2px 0 6px 10px;
+}
 .ag-count {
   font-size: 12.5px;
   color: rgb(242 240 235 / 0.44);
-  margin: 0 4px 4px;
+}
+.ag-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  margin-left: auto;
+  padding: 0 10px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #0b0c0b;
+  background: #f2f0eb;
+}
+.ag-new:hover {
+  background: #fff;
+}
+/* New session composer: agent tabs and project on top, prompt, then mode and model. */
+.ag-comp {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 10px 8px;
+  border-radius: 14px;
+  background: rgb(242 240 235 / 0.04);
+  box-shadow: inset 0 0 0 1px rgb(242 240 235 / 0.08);
+  transition: box-shadow 0.15s ease;
+}
+.ag-comp:focus-within {
+  box-shadow: inset 0 0 0 1px rgb(242 240 235 / 0.18);
+}
+.ag-comp-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.ag-tabs {
+  display: flex;
+  gap: 2px;
+  min-width: 0;
+  border: 0;
+}
+.ag-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 9px 0 6px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  color: rgb(242 240 235 / 0.6);
+  white-space: nowrap;
+  transition:
+    background-color 0.12s ease,
+    color 0.12s ease;
+}
+.ag-tabs button:hover {
+  color: #f2f0eb;
+}
+.ag-tabs button[aria-pressed="true"] {
+  color: #f2f0eb;
+  background: rgb(242 240 235 / 0.08);
+  box-shadow: inset 0 0 0 1px rgb(242 240 235 / 0.1);
+}
+.ag-comp-top .ak-seg {
+  margin-left: auto;
+}
+.ag-proj {
+  min-width: 0;
+  max-width: 11rem;
+  padding: 0 4px;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgb(242 240 235 / 0.12);
+  font-size: 12.5px;
+}
+.ag-comp textarea {
+  width: 100%;
+  min-height: 44px;
+  padding: 2px 4px;
+  resize: none;
+  background: none;
+  outline: none;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: #f2f0eb;
+}
+.ag-comp textarea::placeholder {
+  color: rgb(242 240 235 / 0.38);
+}
+.ag-comp-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  min-width: 0;
+}
+.ag-comp-foot > :last-child {
+  flex: 1 1 auto;
+  min-width: 0;
 }
 .ag-need {
   color: #d9a55b;
@@ -6568,4 +6675,59 @@ button.ak-cchip:hover,
   .rv-keys {
     display: none;
   }
+}
+
+/* Agent session header: back, who and where, review. */
+.ag-sh {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 8px;
+  padding: 8px 10px 8px 6px;
+  border-radius: 12px;
+  background: rgb(242 240 235 / 0.035);
+  box-shadow: inset 0 0 0 1px rgb(242 240 235 / 0.07);
+}
+.ag-back {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  color: rgb(242 240 235 / 0.55);
+}
+.ag-back:hover {
+  background: rgb(242 240 235 / 0.07);
+  color: #f2f0eb;
+}
+.ag-back .flip {
+  display: inline-flex;
+  transform: rotate(180deg);
+}
+.ag-sh-sub {
+  margin-top: 1px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  color: rgb(242 240 235 / 0.48);
+}
+.ag-sh-sub .mono {
+  font-size: 11.5px;
+}
+.ag-sh-rev {
+  flex: none;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: #f2f0eb;
+  background: rgb(242 240 235 / 0.08);
+  box-shadow: inset 0 0 0 1px rgb(242 240 235 / 0.12);
+}
+.ag-sh-rev:hover {
+  background: rgb(242 240 235 / 0.14);
+}
+.ag-sh-meta {
+  justify-content: flex-end;
 }

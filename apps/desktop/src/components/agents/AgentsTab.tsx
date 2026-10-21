@@ -313,7 +313,7 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
   const [effort, setEffort] = useState<string | null>(
     seedTune.effort ?? (seedAgent === lastAgentId ? lastEffort : null) ?? null,
   );
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   // Ready agents first; the rest stay listed with what they need.
   const all = agents?.list ?? [];
   const choices = [...all.filter(ready), ...all.filter((a) => !ready(a) && a.installed)];
@@ -396,48 +396,6 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
         <NoAgentsReady sessions={sessions.length} cursor={cursor.length} missing={missing} />
       ) : (
         <>
-          <div className="ak-meta">
-            {choices.length + missing.length > 1 ? (
-              <span className="ak-mi b">
-                <Select
-                  variant="plain"
-                  overlay
-                  label="Agent"
-                  value={pickedAgent}
-                  onChange={pickAgent}
-                  options={[...choices, ...missing].map((c) => ({
-                    value: c.id,
-                    label: c.name,
-                    sub: pickerNote(c),
-                    icon: AGENT_MARKS[c.id]?.[0] ?? "C",
-                    color: AGENT_MARKS[c.id]?.[1] ?? "#d97757",
-                    image: AGENT_IMAGES[c.id],
-                  }))}
-                />
-              </span>
-            ) : (
-              <span className="ak-mi b">
-                {choices[0]?.name ?? "Claude Code"}
-                {choices[0] && usageLine(choices[0].name) && (
-                  <em className="ml-1.5 font-normal not-italic opacity-70">{usageLine(choices[0].name)}</em>
-                )}
-              </span>
-            )}
-            <span className="ak-mi max-w-44">
-              <ProjectPicker
-                projects={projects ?? []}
-                path={pickedPath}
-                onChange={(next) => {
-                  setPath(next);
-                  useAgents.setState({ draftPath: next });
-                }}
-              />
-            </span>
-            <div className="ak-modes">
-              <ModeSwitch mode={mode} onChange={pickMode} />
-              <span className="keys mono">Ctrl+.</span>
-            </div>
-          </div>
           {picked && !ready(picked) && <FixLine agent={picked} />}
           {picked?.local && ready(picked) && (
             <p className="ak-local">
@@ -445,34 +403,82 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
               Review.
             </p>
           )}
-          <div className="ak-composer ak-two">
-            <div className="ak-row">
-              <input
-                ref={inputRef}
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key === ".") {
-                    e.preventDefault();
-                    pickMode(nextAgentMode(mode));
-                    return;
-                  }
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    go();
-                  }
-                }}
-                placeholder="What should it do?"
+          <div className="ag-comp">
+            <div className="ag-comp-top">
+              {choices.length <= 3 ? (
+                <fieldset className="ag-tabs" aria-label="Agent">
+                  {choices.map((c) => (
+                    <button
+                      key={c.id}
+                      type="button"
+                      aria-pressed={pickedAgent === c.id}
+                      onClick={() => pickAgent(c.id)}
+                      title={pickerNote(c) || c.name}
+                    >
+                      <AgentMark agent={c.name} sm />
+                      {c.name === "Local (Ollama)" ? "Local" : c.name}
+                    </button>
+                  ))}
+                </fieldset>
+              ) : (
+                <span className="ak-mi b">
+                  <Select
+                    variant="plain"
+                    overlay
+                    label="Agent"
+                    value={pickedAgent}
+                    onChange={pickAgent}
+                    options={[...choices, ...missing].map((c) => ({
+                      value: c.id,
+                      label: c.name,
+                      sub: pickerNote(c),
+                      icon: AGENT_MARKS[c.id]?.[0] ?? "C",
+                      color: AGENT_MARKS[c.id]?.[1] ?? "#d97757",
+                      image: AGENT_IMAGES[c.id],
+                    }))}
+                  />
+                </span>
+              )}
+              <ModeSwitch mode={mode} onChange={pickMode} />
+              <span className="ag-proj">
+                <ProjectPicker
+                  projects={projects ?? []}
+                  path={pickedPath}
+                  onChange={(next) => {
+                    setPath(next);
+                    useAgents.setState({ draftPath: next });
+                  }}
+                />
+              </span>
+            </div>
+            <textarea
+              ref={inputRef}
+              rows={2}
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key === ".") {
+                  e.preventDefault();
+                  pickMode(nextAgentMode(mode));
+                  return;
+                }
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  go();
+                }
+              }}
+              placeholder="What should it do? / for commands, @ for files"
+            />
+            <div className="ag-comp-foot">
+              <ChatControls
+                agent={pickedAgent}
+                model={model}
+                effort={effort}
+                onModel={pickModel}
+                onEffort={pickEffort}
+                keys={busy ? "Starting..." : "Enter start"}
               />
             </div>
-            <ChatControls
-              agent={pickedAgent}
-              model={model}
-              effort={effort}
-              onModel={pickModel}
-              onEffort={pickEffort}
-              keys={busy ? "Starting..." : "Enter start"}
-            />
           </div>
           {error && <p className="ak-err">{error}</p>}
         </>
@@ -877,8 +883,33 @@ function SessionView({
 
   return (
     <>
-      <div className="ak-head">
-        <NameField id={s.id} title={s.title} />
+      <div className="ag-sh">
+        <Tip label="All agents">
+          <button
+            type="button"
+            aria-label="All agents"
+            onClick={() => useAgents.setState({ current: null })}
+            className="ag-back"
+          >
+            <span className="flip">
+              <Ic name="chevr" size={13} />
+            </span>
+          </button>
+        </Tip>
+        <AgentMark agent={s.agent} />
+        <div className="min-w-0 flex-1">
+          <NameField id={s.id} title={s.title} />
+          <p className="ag-sh-sub">
+            {s.agent} in <span className="mono">{s.project}</span>
+            {s.branch && (
+              <>
+                {" "}
+                on <span className="mono">{s.branch}</span>
+              </>
+            )}
+            , {MODE_WORD[s.mode] ?? s.mode}
+          </p>
+        </div>
         {working ? (
           <button type="button" onClick={() => interruptSession(s.id)} className="ak-stop chip">
             Stop <kbd>Esc</kbd>
@@ -896,11 +927,7 @@ function SessionView({
           </Tip>
         )}
       </div>
-      <SessionChips sessions={sessions} current={s.id} />
-      <div className="ak-meta">
-        <span className="ak-mi b">{s.agent}</span>
-        <span className="ak-mi">{s.project}</span>
-        {s.branch && <span className="ak-mi">⎇ {s.branch}</span>}
+      <div className="ak-meta ag-sh-meta">
         <SessionMemory id={s.id} live={active && s.status !== "ended" && s.status !== "failed" && !s.restored} />
         <div className="ak-modes">
           <ModeSwitch agent={s.agent} mode={s.mode} onChange={(mode) => void setSessionMode(s.id, mode)} />
@@ -1805,7 +1832,8 @@ function ChoiceCard({ open, agent, onAnswer }: { open: OpenChoice; agent: string
 }
 
 type Group = "Needs you" | "Running" | "Ready to review" | "Done" | "Stopped";
-const GROUPS: Group[] = ["Needs you", "Running", "Ready to review", "Done", "Stopped"];
+// Oldest news at the top; what needs you sits next to the composer.
+const GROUPS: Group[] = ["Stopped", "Done", "Ready to review", "Running", "Needs you"];
 
 function groupOf(s: Session): Group {
   if (s.status === "waiting" || s.question || s.choose) return "Needs you";
@@ -1831,12 +1859,21 @@ function SessionList({ sessions }: { sessions: Session[] }) {
   const need = sessions.filter((s) => groupOf(s) === "Needs you").length;
   return (
     <div className="ag-home">
-      <p className="ag-count">
-        {running} of {sessions.length} running
-        {need > 0 && <span className="ag-need"> · {need} need you</span>}
-      </p>
+      <div className="ag-bar">
+        <span className="ag-count">
+          {running} of {sessions.length} running
+          {need > 0 && <span className="ag-need"> · {need} need you</span>}
+        </span>
+        <button
+          type="button"
+          className="ag-new"
+          onClick={() => document.querySelector<HTMLTextAreaElement>(".ag-comp textarea")?.focus()}
+        >
+          <Ic name="plus" size={12} /> New
+        </button>
+      </div>
       {GROUPS.map((g) => {
-        const list = sessions.filter((s) => groupOf(s) === g).sort((a, b) => b.turnAt - a.turnAt);
+        const list = sessions.filter((s) => groupOf(s) === g).sort((a, b) => a.turnAt - b.turnAt);
         if (list.length === 0) return null;
         return (
           <div key={g} className="ag-group">
