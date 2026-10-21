@@ -2512,28 +2512,71 @@ select.ak-mi option {
   white-space: nowrap;
 }
 .ak-term {
-  border-radius: 12px;
-  background: #0e0e12;
-  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.08);
-  overflow: hidden;
   margin-left: 50px;
+  border-radius: 10px;
+  transition: background-color 160ms ease;
+}
+.ak-term[data-open="true"] {
+  background: rgb(0 0 0 / 0.28);
+  box-shadow: inset 0 0 0 0.5px rgb(255 255 255 / 0.07);
+}
+.ak-term .ak-term-h {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-width: 0;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  color: var(--i3);
+  text-align: left;
+  transition: color 140ms ease, background-color 140ms ease;
+}
+.ak-term .ak-term-h:hover {
+  color: var(--i2);
+  background: rgb(255 255 255 / 0.04);
+}
+.ak-term[data-open="true"] .ak-term-h {
+  padding: 6px 10px 4px;
+}
+.ak-term[data-open="true"] .ak-term-h:hover {
+  background: none;
+}
+.ak-term-c {
+  flex: none;
+  opacity: 0.7;
+  transition: transform 160ms ease;
+}
+.ak-term-n {
+  flex: none;
+}
+.ak-term-last {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  padding-left: 8px;
+  border-left: 1px solid rgb(255 255 255 / 0.1);
+  font-size: 10.5px;
+  color: rgb(235 235 245 / 0.38);
 }
 .ak-term pre {
   margin: 0;
-  padding: 7px 10px 8px;
+  padding: 2px 10px 9px 28px;
+  max-height: 220px;
   font-size: 11px;
   line-height: 1.6;
-  color: var(--i3);
+  color: var(--i2);
   white-space: pre-wrap;
   word-break: break-word;
 }
-.ak-term button {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 0 10px 7px;
-  font-size: 11px;
-  color: var(--i2);
+@media (prefers-reduced-motion: reduce) {
+  .ak-term,
+  .ak-term-c {
+    transition: none;
+  }
 }
 .ak-um-wrap {
   align-self: flex-end;

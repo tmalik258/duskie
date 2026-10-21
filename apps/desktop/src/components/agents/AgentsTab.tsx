@@ -1280,18 +1280,23 @@ function EntryRow({
   );
 }
 
-/** A command's output: collapsed to a line count until opened. */
+/** A command's output: one quiet line with its last line as a preview, opened in place. */
 function Output({ step }: { step: Step }) {
   const [open, setOpen] = useState(false);
-  const lines = (step.output ?? "").split("\n");
+  const text = (step.output ?? "").replace(/\s+$/, "");
+  const lines = text.split("\n");
   const count = lines.length;
+  const last = [...lines].reverse().find((l) => l.trim()) ?? "";
   return (
-    <div className="ak-term ak-in">
-      <button type="button" onClick={() => setOpen((o) => !o)} className="chip flex items-center gap-1.5">
-        <Icon name="chevron" size={12} className={open ? "" : "-rotate-90"} />
-        {open ? "Show less" : `${count} ${count === 1 ? "line" : "lines"}`}
+    <div className="ak-term ak-in" data-open={open}>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="ak-term-h">
+        <Icon name="chevron" size={11} className={`ak-term-c ${open ? "" : "-rotate-90"}`} />
+        <span className="ak-term-n">
+          Output · {count} {count === 1 ? "line" : "lines"}
+        </span>
+        {!open && last && <span className="ak-term-last mono">{last.trim()}</span>}
       </button>
-      {open && <pre className="mono">{step.output ?? ""}</pre>}
+      {open && <pre className="mono ak-scroll">{text}</pre>}
     </div>
   );
 }
