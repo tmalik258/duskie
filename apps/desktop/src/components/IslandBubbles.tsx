@@ -4,6 +4,7 @@
 // Redesign path only; sits beside the capsule.
 
 import { motion, useReducedMotion } from "motion/react";
+import { type ReactNode, useState } from "react";
 import { bubblesOf } from "@/lib/peek";
 import { motionFor, SPRINGS } from "@/lib/spring";
 import { Ic, type IcName } from "./Icon";
@@ -24,22 +25,36 @@ export interface BubbleItem {
   tone?: "err";
 }
 
-export function IslandBubbles({ items, onOpen }: { items: BubbleItem[]; onOpen?: (id: string) => void }) {
+export function IslandBubbles({
+  items,
+  onOpen,
+  openId,
+  peek,
+}: {
+  items: BubbleItem[];
+  onOpen?: (id: string) => void;
+  /** The bubble whose peek card is open. */
+  openId?: string | null;
+  /** The peek card, shown beside the open bubble. */
+  peek?: ReactNode;
+}) {
   const reduced = useReducedMotion() ?? false;
-  const { shown, more } = bubblesOf(items);
+  const [all, setAll] = useState(false);
+  const { shown, more } = bubblesOf(items, all ? items.length : undefined);
   if (shown.length === 0) return null;
   const spring = motionFor(SPRINGS.pop, reduced);
 
   return (
     <ul className="pointer-events-auto absolute top-0 left-full ml-1.5 m-0 flex list-none flex-col gap-1.5 p-0">
       {shown.map((it) => (
-        <li key={it.id} className="m-0 p-0">
+        <li key={it.id} className="relative m-0 p-0">
           <motion.button
             type="button"
             className="relative h-[38px] max-w-[170px] overflow-hidden whitespace-nowrap rounded-[19px] border-0 bg-[rgb(from_var(--c1)_r_g_b_/_0.95)] pr-2.5 pl-[5px] text-left text-[12.5px] text-(--c2) shadow-[0_14px_30px_-12px_rgb(0_0_0_/_0.85),inset_0_0_0_1px_rgb(242_240_235_/_0.07)]"
             initial={reduced ? false : { opacity: 0, x: -6, scale: 0.96 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             transition={spring}
+            aria-expanded={openId === it.id}
             onClick={() => onOpen?.(it.id)}
           >
             {it.ring ? (
@@ -70,9 +85,20 @@ export function IslandBubbles({ items, onOpen }: { items: BubbleItem[]; onOpen?:
               </span>
             )}
           </motion.button>
+          {openId === it.id && peek}
         </li>
       ))}
-      {more > 0 && <li className="m-0 px-2 text-[11px] text-(--muted)">+{more} more</li>}
+      {more > 0 && (
+        <li className="m-0 p-0">
+          <button
+            type="button"
+            className="h-[26px] rounded-[13px] border-0 bg-[rgb(from_var(--c1)_r_g_b_/_0.95)] px-2.5 text-[11px] text-(--c2)"
+            onClick={() => setAll(true)}
+          >
+            +{more} more
+          </button>
+        </li>
+      )}
     </ul>
   );
 }
@@ -98,5 +124,51 @@ function Ring({ mark, done, total }: { mark: string; done: number; total: number
       </svg>
       {mark}
     </span>
+  );
+}
+
+/** A notification opened from its bubble: what it is, where it came from, and its actions. */
+export function BubblePeek({
+  eyebrow,
+  title,
+  detail,
+  actions,
+  onDismiss,
+}: {
+  eyebrow?: string;
+  title: string;
+  detail?: string;
+  actions: { label: string; run: () => void }[];
+  onDismiss: () => void;
+}) {
+  const reduced = useReducedMotion() ?? false;
+  return (
+    <motion.div
+      role="dialog"
+      aria-label={title}
+      className="bub-peek"
+      initial={reduced ? false : { opacity: 0, scale: 0.95, x: -6 }}
+      animate={{ opacity: 1, scale: 1, x: 0 }}
+      transition={motionFor(SPRINGS.pop, reduced)}
+    >
+      {eyebrow && <div className="bub-peek-eye">{eyebrow}</div>}
+      <div className="bub-peek-title">{title}</div>
+      {detail && <div className="bub-peek-detail">{detail}</div>}
+      <div className="bub-peek-acts">
+        {actions.map((a, i) => (
+          <button
+            key={a.label}
+            type="button"
+            className={`chip rd-opt${i === 0 ? " rd-opt-primary" : ""}`}
+            onClick={a.run}
+          >
+            {a.label}
+          </button>
+        ))}
+        <button type="button" className="chip bub-peek-x" aria-label="Dismiss" onClick={onDismiss}>
+          <Ic name="x" size={13} />
+        </button>
+      </div>
+    </motion.div>
   );
 }

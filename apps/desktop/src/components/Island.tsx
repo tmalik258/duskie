@@ -35,9 +35,9 @@ import { ASK_PAD, AskPanel } from "./AskPanel";
 import { GitSideDock } from "./agents/GitSideDock";
 import { ReviewSideDock } from "./agents/ReviewSideDock";
 import { Creature } from "./Creature";
-import { type BubbleItem, IslandBubbles } from "./IslandBubbles";
+import { type BubbleItem, BubblePeek, IslandBubbles } from "./IslandBubbles";
 import { IslandGuide, useGuide } from "./IslandGuide";
-import { CompactTrailing, ExpandedContent } from "./IslandParts";
+import { CompactTrailing, choose, dismiss, ExpandedContent } from "./IslandParts";
 import { IslandPill, type PillModel } from "./IslandPill";
 import { IslandSettings } from "./IslandSettings";
 import { FullVoice, openBoard, VoicePill, voiceShellWidth } from "./IslandVoice";
@@ -143,6 +143,7 @@ export function Island() {
   const questionId = useAgents((s) => s.sessions.find((x) => x.question)?.question?.id ?? null);
   const fullscreen = useDuskie((s) => s.fullscreen);
   const [dndOn, setDndOn] = useState(false);
+  const [peekId, setPeekId] = useState<string | null>(null);
   useEffect(() => {
     if (!questionId) return;
     let live = true;
@@ -791,6 +792,12 @@ export function Island() {
       tone: a.phase === "failed" ? "err" : undefined,
     };
   };
+  // A bubble opens its peek card; an agent's bubble opens the board instead.
+  const openBubble = (id: string) => {
+    if (id.startsWith("agent-")) return openBoard();
+    setPeekId((cur) => (cur === id ? null : id));
+  };
+  const peekSuggestion = suggestion && peekId === suggestion.id ? suggestion : null;
   const bubbleItems = [
     ...agentBubble,
     ...(sideOpen && suggestion && registryId !== "suggestion" && registryId !== "suggest-peek"
@@ -980,7 +987,33 @@ export function Island() {
             )}
           </AnimatePresence>
         </motion.div>
-        {bubbleItems.length > 0 && <IslandBubbles items={bubbleItems} />}
+        {bubbleItems.length > 0 && (
+          <IslandBubbles
+            items={bubbleItems}
+            openId={peekId}
+            onOpen={openBubble}
+            peek={
+              peekSuggestion && (
+                <BubblePeek
+                  eyebrow={peekSuggestion.source ? `From ${peekSuggestion.source}` : undefined}
+                  title={peekSuggestion.title || "Suggestion"}
+                  detail={peekSuggestion.detail || undefined}
+                  actions={peekSuggestion.options.slice(0, 2).map((label, i) => ({
+                    label,
+                    run: () => {
+                      setPeekId(null);
+                      choose(peekSuggestion, i);
+                    },
+                  }))}
+                  onDismiss={() => {
+                    setPeekId(null);
+                    dismiss(peekSuggestion);
+                  }}
+                />
+              )
+            }
+          />
+        )}
         {/* Outside the shell, so its clipping never cuts Duskie's arms or hops. */}
         <motion.div
           className="pointer-events-none absolute top-0 left-0 z-2"
