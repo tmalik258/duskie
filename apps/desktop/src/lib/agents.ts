@@ -61,6 +61,8 @@ export interface Session extends AgentStarted {
   usage: { used: number; window: number; total?: number; at?: number } | null;
   /** The plan's usage limit, when the agent says it is close or reached. */
   limit?: { status: string; window: string; resetsAt: number | null; used: number | null } | null;
+  /** When it started waiting on you. */
+  waitingSince?: number;
   /** Paused from its card: stopped after the current step, resumes on request. */
   paused?: boolean;
   /** "Not now" on the compact offer, until the context is compacted. */
@@ -123,6 +125,8 @@ interface AgentsState {
   draftPrompt?: string | null;
   /** New agents waiting for a free slot, oldest first. */
   queued: QueuedStart[];
+  /** Cards put off with Later: session id to the moment it was waiting from. */
+  later: Record<string, number>;
   /** The repo open in the Git dock; "first" picks one once the list loads. */
   dock?: string | null;
   /** Island list width while a side dock (Git or Review) is open beside it. */
@@ -246,6 +250,7 @@ export const useAgents = create<AgentsState>(() => ({
   layout: typeof window === "undefined" ? "one" : loadLayout(),
   focus: null,
   queued: [],
+  later: {},
   ...loadView(),
 }));
 
@@ -417,8 +422,26 @@ export const startHere = (path: string, prompt?: string | null) =>
   useAgents.setState({ tab: "agents", current: null, draftPath: path, draftPrompt: prompt ?? null });
 
 function update(id: string, fn: (s: Session) => Session) {
-  useAgents.setState((st) => ({ sessions: st.sessions.map((s) => (s.id === id ? fn(s) : s)) }));
+  useAgents.setState((st) => ({
+    sessions: st.sessions.map((s) => {
+      if (s.id !== id) return s;
+      const next = fn(s);
+      // Notes when it started waiting on you, for "Waiting 3 min".
+      if (next.status === "waiting" && s.status !== "waiting") return { ...next, waitingSince: Date.now() };
+      return next;
+    }),
+  }));
 }
+
+/** "Later" on an agent's card: hides it until the agent does something new. */
+export function laterCard(id: string) {
+  const s = useAgents.getState().sessions.find((x) => x.id === id);
+  if (s) useAgents.setState((st) => ({ later: { ...st.later, [id]: s.waitingSince ?? s.turnAt } }));
+}
+
+/** True while the card was put off and the agent has not moved on since. */
+export const cardLater = (later: Record<string, number>, s: Session) =>
+  later[s.id] !== undefined && later[s.id] === (s.waitingSince ?? s.turnAt);
 
 /** How many agents run at once; the next one waits in Queued. */
 export const SLOTS = 4;

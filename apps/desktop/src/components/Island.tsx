@@ -17,7 +17,7 @@ import {
   useActivities,
   visibleActivities,
 } from "@/lib/activities";
-import { interruptSession, listenToAgents, useAgents, wideScreen } from "@/lib/agents";
+import { cardLater, interruptSession, listenToAgents, useAgents, wideScreen } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow, useSystemLook } from "@/lib/hooks";
@@ -210,7 +210,10 @@ export function Island() {
   const meetingSoon = soonMeeting(updateNow, calendarToday);
   const cardAgent = useAgents(
     (s) =>
-      (s.sessions.find((x) => x.status === "waiting") ?? s.sessions.find((x) => x.status === "working"))?.id ?? null,
+      (
+        s.sessions.find((x) => x.status === "waiting" && !cardLater(s.later, x)) ??
+        s.sessions.find((x) => x.status === "working" && !cardLater(s.later, x))
+      )?.id ?? null,
   );
   const splitAgent = useAgents(
     useShallow((s) => {

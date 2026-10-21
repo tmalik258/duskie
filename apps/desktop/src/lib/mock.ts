@@ -1920,7 +1920,23 @@ if (typeof window !== "undefined") {
           mk("a3", "Claude Code", "falconxoft-portal", "Add CSV export to invoices", "idle", "edit", 14, {
             changes: 5,
           }),
-          mk("a4", "Codex", "api-gateway", "Fix missing rate limit headers", calm ? "idle" : "waiting", "ask", 3),
+          mk("a4", "Codex", "api-gateway", "Fix missing rate limit headers", calm ? "idle" : "waiting", "ask", 3, {
+            waitingSince: now - 3 * 60_000,
+            choose: {
+              id: "q1",
+              questions: [
+                {
+                  question: "Which limit should the headers report?",
+                  header: "Limit",
+                  multiSelect: false,
+                  options: [
+                    { label: "Per key", description: "Each API key has its own limit" },
+                    { label: "Per account", description: "One limit for the whole account" },
+                  ],
+                },
+              ],
+            },
+          }),
           mk("a5", "Claude Code", "duskie", "Writing tests for the wash controller", "working", "edit", 1, {
             branch: "agent/claude-voice-settings",
             plan: ["Read the controller", "List the cases", "Write the tests", "Run them", "Open a review"].map(
