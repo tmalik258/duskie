@@ -63,11 +63,13 @@ function GmailRow({
     <Field
       label="Gmail"
       hint={
-        status.provider === "composio"
+        status.provider === "composio" && status.configured
           ? "New mail comes through your Composio Gmail for now. Connect Gmail here for faster checks."
-          : status.configured
-            ? "Reads who an email is from, never its text. Skips mail you already read elsewhere."
-            : "Google sign-in is not set up in this build yet."
+          : status.provider === "composio"
+            ? "New mail comes through your Composio Gmail. Google sign-in is not set up in this build, so Gmail cannot connect here directly yet."
+            : status.configured
+              ? "Reads who an email is from, never its text. Skips mail you already read elsewhere."
+              : "Google sign-in is not set up in this build yet."
       }
     >
       <span className="text-[12px] text-(--muted)" role="status">

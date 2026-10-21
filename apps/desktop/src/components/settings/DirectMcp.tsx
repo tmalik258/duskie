@@ -9,7 +9,7 @@ import { useState } from "react";
 import { api } from "@/lib/bridge";
 import { useDuskie } from "@/lib/store";
 import type { DirectServer, ServerTool } from "@/lib/types";
-import { Button, Field, Section } from "./ui";
+import { Button, Field, Section, Select } from "./ui";
 
 const INPUT =
   "w-full rounded-md border border-(--border) bg-transparent px-2 py-1 text-[13px] outline-none focus:border-(--accent)";
@@ -174,15 +174,15 @@ export function DirectMcpCard({ onError }: { onError: (e: string) => void }) {
         />
       </Field>
       <Field label="Runs as">
-        <select
-          aria-label="Runs as"
+        <Select
+          label="Runs as"
           value={kind}
-          className={INPUT}
-          onChange={(e) => setKind(e.target.value as "stdio" | "url")}
-        >
-          <option value="stdio">A program on this PC</option>
-          <option value="url">An https address</option>
-        </select>
+          onChange={(v) => setKind(v as "stdio" | "url")}
+          options={[
+            { value: "stdio", label: "A program on this PC" },
+            { value: "url", label: "An https address" },
+          ]}
+        />
       </Field>
       {kind === "stdio" ? (
         <>

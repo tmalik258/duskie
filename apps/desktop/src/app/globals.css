@@ -588,12 +588,13 @@ body {
   color-scheme: dark;
 }
 .island-shell[data-color="atelier"] .island-settings {
+  /* Darker plates, as in the design: a faint fill and a thin sage line. */
   --bg: var(--c1);
-  --surface: rgb(from var(--c2) r g b / 0.14);
+  --surface: rgb(from var(--c2) r g b / 0.045);
   --text: var(--c2);
   --muted: rgb(from var(--c2) r g b / 0.62);
-  --border: rgb(from var(--c4) r g b / 0.28);
-  --hover: rgb(from var(--c4) r g b / 0.16);
+  --border: rgb(from var(--c4) r g b / 0.15);
+  --hover: rgb(from var(--c4) r g b / 0.14);
   --accent: var(--c3);
 }
 
