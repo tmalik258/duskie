@@ -1874,8 +1874,12 @@ function SessionList({ sessions }: { sessions: Session[] }) {
   return (
     <div className="ag-home">
       <div className="ag-bar">
-        <span className="ag-count">
-          {running} of {SLOTS} running
+        <span className="ag-count" title={`Up to ${SLOTS} agents work at once; more wait in a queue.`}>
+          {running === 0
+            ? "Nothing running"
+            : running >= SLOTS
+              ? `${running} running, all slots busy`
+              : `${running} running, room for ${SLOTS - running} more`}
           {queued.length > 0 && <> · {queued.length} queued</>}
           {need > 0 && <span className="ag-need"> · {need} need you</span>}
         </span>
