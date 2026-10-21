@@ -149,7 +149,7 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(20));
         let mut f = fs::File::create(&newer).unwrap();
         writeln!(f, "new plan body").unwrap();
-        let found = newest_plan_file(&[plans.clone()]).unwrap();
+        let found = newest_plan_file(std::slice::from_ref(&plans)).unwrap();
         assert_eq!(found, newer);
         let text = read_exit_plan(&serde_json::json!({}), Some(&root)).unwrap();
         assert!(text.contains("new plan body"), "{text}");

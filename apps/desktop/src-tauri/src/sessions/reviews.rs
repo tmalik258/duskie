@@ -140,6 +140,7 @@ pub fn list(id: &str) -> Vec<ReviewTurn> {
 }
 
 /// Latest non-empty turn snapshot files for a session (for fast Review open).
+#[cfg(test)]
 pub fn latest_files(id: &str) -> Option<Vec<review::FileChange>> {
     with(&REVIEWS, |r| {
         r.get(id).and_then(|turns| {

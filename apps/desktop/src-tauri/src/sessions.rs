@@ -948,6 +948,7 @@ pub const REVIEW_DONE_EVENT: &str = "review://done";
 
 /// The changes to review from this session's turn snapshots only, with secrets
 /// masked. Undo reads the files again, so masking here never changes what gets undone.
+#[cfg(test)]
 pub fn changes(id: &str) -> Result<Vec<review::FileChange>, String> {
     changes_emitting(id, None)
 }
