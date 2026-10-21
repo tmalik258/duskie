@@ -357,9 +357,15 @@ class FurRenderer {
     if (!gl) throw new Error("WebGL2 unavailable");
     this.gl = gl;
     this.lost = false;
+    // Kept from the start: the extension cannot be fetched once the context is gone.
+    const loser = gl.getExtension("WEBGL_lose_context");
     this.canvas.addEventListener("webglcontextlost", (e) => {
       e.preventDefault();
       this.lost = true;
+      // The browser does not always give the context back after a GPU reset; ask for it.
+      setTimeout(() => {
+        if (this.lost) loser?.restoreContext();
+      }, 1500);
     });
     this.canvas.addEventListener("webglcontextrestored", () => {
       this.init();
@@ -429,6 +435,9 @@ class FurRenderer {
 
 let api = null;
 let failed = false;
+// Software rendering at boot is often a GPU that is still waking up; look again a few times.
+let softTries = 0;
+const SOFT_RETRIES = 4;
 
 function boot() {
   let R;
@@ -445,7 +454,8 @@ function boot() {
   const forced = (window as unknown as { __creatureForce?: boolean }).__creatureForce === true;
   if (!forced && /swiftshader|llvmpipe|softpipe|basic render|microsoft basic/i.test(gpu)) {
     R.gl.getExtension("WEBGL_lose_context")?.loseContext();
-    failed = true;
+    softTries += 1;
+    failed = softTries >= SOFT_RETRIES;
     return null;
   }
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -1657,6 +1667,11 @@ function boot() {
     };
   }
   return { Mascot, THEMES, EXPRESSIONS: X, wake };
+}
+
+/** True while a later look might still find a GPU. */
+export function creatureMayRetry() {
+  return !api && !failed;
 }
 
 /** True when this machine can draw the creature (WebGL 2). */
