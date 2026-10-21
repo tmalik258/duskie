@@ -5242,6 +5242,18 @@ button.ak-cchip:hover,
   height: 100%;
 }
 .ak-rv-dock {
+  /* Outside the shell and .ak, so it carries its own ink tokens. */
+  --ink: var(--c2, #f5f5f7);
+  --i2: rgb(from var(--c2, #f5f5f7) r g b / 0.68);
+  --i3: rgb(from var(--c2, #f5f5f7) r g b / 0.52);
+  --chipbg: rgb(from var(--c4, #95a89a) r g b / 0.2);
+  --accent: var(--c4, #95a89a);
+  color: var(--ink);
+  font:
+    13px / 1.45 "Segoe UI Variable Text",
+    "Segoe UI",
+    system-ui,
+    sans-serif;
   overflow: auto;
   padding: 12px 10px 14px;
   border-radius: 16px;

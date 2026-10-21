@@ -36,14 +36,14 @@ export function IslandBubbles({ items, onOpen }: { items: BubbleItem[]; onOpen?:
         <li key={it.id} className="m-0 p-0">
           <motion.button
             type="button"
-            className="relative h-[38px] max-w-[170px] overflow-hidden rounded-[19px] border-0 bg-[rgb(from_var(--c1)_r_g_b_/_0.95)] pr-2.5 pl-[5px] text-left text-[12.5px] text-(--c2) shadow-[0_14px_30px_-12px_rgb(0_0_0_/_0.85),inset_0_0_0_1px_rgb(242_240_235_/_0.07)]"
+            className="relative h-[38px] max-w-[170px] overflow-hidden whitespace-nowrap rounded-[19px] border-0 bg-[rgb(from_var(--c1)_r_g_b_/_0.95)] pr-2.5 pl-[5px] text-left text-[12.5px] text-(--c2) shadow-[0_14px_30px_-12px_rgb(0_0_0_/_0.85),inset_0_0_0_1px_rgb(242_240_235_/_0.07)]"
             initial={reduced ? false : { opacity: 0, x: -6, scale: 0.96 }}
             animate={{ opacity: 1, x: 0, scale: 1 }}
             transition={spring}
             onClick={() => onOpen?.(it.id)}
           >
             {it.ring ? (
-              <span className="flex items-center gap-1.5">
+              <span className="flex items-center gap-1.5 pr-1 text-[12px]">
                 <Ring {...it.ring} />
                 {it.label}
               </span>
