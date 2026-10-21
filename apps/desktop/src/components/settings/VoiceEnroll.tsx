@@ -106,8 +106,8 @@ export function VoiceEnroll({
         </div>
         {state.taught && !renamed && (
           <Toggle
-            label="Only my voice wakes it"
-            hint="Others saying the name are ignored. Turn off if it misses you."
+            label="Only answer my voice"
+            hint="Questions in other voices are dropped. Turn off if it misses you."
             checked={voice.onlyMe ?? false}
             onChange={(onlyMe) => set({ onlyMe })}
           />

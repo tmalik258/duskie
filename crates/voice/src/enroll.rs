@@ -1,8 +1,13 @@
 //! Teaching Duskie your voice: you say its name a few times and read a few
 //! short sentences. From those it learns how firmly the wake word model
-//! hears your "Duskie", and a voiceprint so only your voice wakes it. The
-//! clips live in memory only and are dropped once this is done; just the
-//! bar and the voiceprint (numbers, not audio) are kept.
+//! hears your "Duskie", and a voiceprint so only your voice is answered.
+//! The takes live in memory only and are dropped once this is done; just
+//! the bar and the voiceprint (numbers, not audio) are kept.
+//!
+//! A voice is judged on the whole question, not on the wake word: a second
+//! of audio mostly tells which word was said, while a few seconds tell who
+//! said it. For the same reason the print comes from the sentences; the
+//! name takes only tune the wake word bar.
 
 use std::path::Path;
 
@@ -12,7 +17,7 @@ use crate::listen::{WAKE_THRESHOLD, spotter_config};
 use crate::models::{SPEAKER, WAKE};
 use crate::{MIC_RATE, Result, VoiceError};
 
-/// Name clips needed, and sentence clips.
+/// Name takes needed, and sentence takes.
 pub const NAME_TAKES: usize = 5;
 pub const SENTENCE_TAKES: usize = 3;
 /// Sentences to read, short and with varied sounds.
@@ -21,10 +26,13 @@ pub const SENTENCES: [&str; SENTENCE_TAKES] = [
     "Remind me to call the bank tomorrow morning.",
     "Turn on night light and play some quiet music.",
 ];
-/// Voices at least this alike count as the same person (cosine of two
-/// CAM++ embeddings against the averaged print). Kept forgiving: a cold or
-/// a different microphone must not lock you out.
-pub const SAME_VOICE: f32 = 0.5;
+/// A question at least this alike to the print is yours (cosine of CAM++
+/// embeddings). In tests the taught voice's questions scored 0.75 to 0.88
+/// and 33 questions in 11 other voices at most 0.63.
+pub const SAME_VOICE: f32 = 0.65;
+/// Voice needed to judge who spoke before the question ends (16 kHz
+/// samples). Less judges poorly; at the end whatever was said is used.
+pub const JUDGE_VOICE: usize = MIC_RATE as usize * 2;
 /// Keyword bars tried, firmest first. The firmest one that still hears all
 /// but one of your takes is kept, so other sounds wake it less.
 const BARS: [f32; 6] = [0.3, 0.25, 0.2, 0.15, 0.1, WAKE_THRESHOLD];
@@ -34,6 +42,7 @@ const BARS: [f32; 6] = [0.3, 0.25, 0.2, 0.15, 0.1, WAKE_THRESHOLD];
 pub struct Profile {
     /// The name it was taught with. A new name needs a new teaching.
     pub name: String,
+    /// Keyword bar for the wake word model.
     pub threshold: f32,
     pub print: Vec<f32>,
 }
@@ -60,9 +69,14 @@ impl Profile {
             print,
         })
     }
+
+    /// Whether `voice` (an embedding from [`embed`]) is yours.
+    pub fn matches(&self, voice: &[f32]) -> bool {
+        similarity(voice, &self.print) >= SAME_VOICE
+    }
 }
 
-/// Learns your bar and voiceprint from 16 kHz mono clips.
+/// Learns your bar and voiceprint from 16 kHz mono takes.
 pub fn learn(
     models: &Path,
     name: &str,
@@ -77,12 +91,11 @@ pub fn learn(
     }
     let threshold = calibrate(models, names)?;
     let extractor = extractor(models)?;
-    let prints: Vec<Vec<f32>> = names
+    let prints: Vec<Vec<f32>> = sentences
         .iter()
-        .chain(sentences)
         .filter_map(|clip| embed(&extractor, clip))
         .collect();
-    if prints.len() < NAME_TAKES {
+    if prints.len() < SENTENCE_TAKES {
         return Err(VoiceError::Engine(
             "could not hear your voice clearly".into(),
         ));
@@ -138,10 +151,30 @@ pub(crate) fn extractor(models: &Path) -> Result<SpeakerEmbeddingExtractor> {
     .ok_or_else(|| VoiceError::Engine("voice model did not load".into()))
 }
 
-/// A unit-length embedding of `clip`, or None when it is too short.
+/// Only the voiced parts of `audio`: quiet frames say nothing about who
+/// spoke and, around a short wake word, would swamp the voice.
+pub(crate) fn voiced(audio: &[f32]) -> Vec<f32> {
+    const FRAME: usize = MIC_RATE as usize / 50;
+    let level = |f: &[f32]| (f.iter().map(|x| x * x).sum::<f32>() / f.len() as f32).sqrt();
+    let peak = audio.chunks(FRAME).map(level).fold(0.0, f32::max);
+    let floor = (peak * 0.1).max(0.003);
+    audio
+        .chunks(FRAME)
+        .filter(|f| level(f) >= floor)
+        .flatten()
+        .copied()
+        .collect()
+}
+
+/// A unit-length embedding of the voice in `clip`, or None when there is
+/// too little of it.
 pub(crate) fn embed(extractor: &SpeakerEmbeddingExtractor, clip: &[f32]) -> Option<Vec<f32>> {
+    let clip = voiced(clip);
+    if clip.len() < MIC_RATE as usize / 8 {
+        return None;
+    }
     let stream = extractor.create_stream()?;
-    stream.accept_waveform(MIC_RATE as i32, clip);
+    stream.accept_waveform(MIC_RATE as i32, &clip);
     stream.input_finished();
     if !extractor.is_ready(&stream) {
         return None;
@@ -199,10 +232,21 @@ mod tests {
             threshold: 0.2,
             print: vec![0.6, 0.8],
         };
+        assert!(p.matches(&[0.6, 0.8]));
+        assert!(!p.matches(&[0.8, -0.6]));
         assert_eq!(Profile::from_json(&p.to_json()), Some(p));
         assert_eq!(Profile::from_json("{\"threshold\":2,\"print\":[]}"), None);
         assert_eq!(Profile::from_json("{\"threshold\":0.2,\"print\":[]}"), None);
         assert_eq!(Profile::from_json("not json"), None);
+    }
+
+    #[test]
+    fn voiced_drops_the_quiet() {
+        let mut audio = vec![0.0; 1600];
+        audio.extend(vec![0.3; 3200]);
+        audio.extend(vec![0.001; 1600]);
+        assert_eq!(voiced(&audio).len(), 3200);
+        assert!(voiced(&[0.0; 1600]).is_empty());
     }
 
     #[test]

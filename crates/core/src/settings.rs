@@ -423,7 +423,8 @@ pub struct VoiceSettings {
     pub live: bool,
     /// Keep Live conversations in Ask history (text only, never audio).
     pub live_history: bool,
-    /// Only the voice you taught Duskie wakes it. Needs a taught voice.
+    /// Only questions in the voice you taught Duskie are answered. Needs a
+    /// taught voice.
     pub only_me: bool,
 }
 

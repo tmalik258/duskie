@@ -148,8 +148,12 @@ pub struct Engine {
     /// Listening started by talking over the speakers: audio is heard even
     /// though the speakers were playing a moment ago.
     barged: bool,
-    /// Your voiceprint: a wake in another voice is ignored.
-    you: Option<(SpeakerEmbeddingExtractor, Vec<f32>)>,
+    /// Your voiceprint: a question in another voice comes out empty.
+    you: Option<(SpeakerEmbeddingExtractor, Profile)>,
+    /// Audio of the question so far, kept only to judge whose voice it is.
+    said: Vec<f32>,
+    /// Whose voice the question is, once judged: yours (true) or not.
+    judged: Option<bool>,
 }
 
 /// The keyword bar, tuned with the wake bench (10 voices, two speeds, 100
@@ -215,14 +219,14 @@ impl Engine {
     }
 
     /// Uses what was learned when you taught Duskie your voice: your own
-    /// wake bar, and only your voice wakes it.
+    /// wake bar, and with a print only your questions come through.
     pub fn with_profile(models: &Path, wake_word: bool, profile: Option<&Profile>) -> Result<Self> {
         let threshold = profile.map_or(WAKE_THRESHOLD, |p| p.threshold);
         let mut engine = Self::tuned(models, wake_word, wake_word, threshold)?;
         if let Some(p) = profile.filter(|p| !p.print.is_empty())
             && SPEAKER.installed(models)
         {
-            engine.you = Some((crate::enroll::extractor(models)?, p.print.clone()));
+            engine.you = Some((crate::enroll::extractor(models)?, p.clone()));
         }
         Ok(engine)
     }
@@ -284,6 +288,8 @@ impl Engine {
             barge: Barge::default(),
             barged: false,
             you: None,
+            said: Vec::new(),
+            judged: None,
         })
     }
 
@@ -325,6 +331,8 @@ impl Engine {
     pub fn listen_now(&mut self) {
         self.muted = false;
         self.start_listening();
+        // A press of the mic button is you, whoever is talking.
+        self.judged = Some(true);
     }
 
     pub fn cancel(&mut self) {
@@ -347,7 +355,7 @@ impl Engine {
         self.last.clear();
         self.recent.clear();
         self.heard = 0;
-        Some(Heard::Final(text))
+        Some(self.end(text))
     }
 
     fn start_listening(&mut self) {
@@ -358,6 +366,7 @@ impl Engine {
         self.paused = false;
         self.last.clear();
         let prime: Vec<f32> = self.recent.iter().copied().collect();
+        self.begin_judging(&prime);
         self.recognizer.reset(&self.stream);
         self.stream.accept_waveform(MIC_RATE as i32, &prime);
     }
@@ -382,7 +391,7 @@ impl Engine {
         if !self.listening {
             let spotted = self.spot(chunk);
             if !self.transcript_wake {
-                if spotted && self.is_you() {
+                if spotted {
                     out.push(Heard::Wake);
                     self.start_listening();
                 }
@@ -391,8 +400,10 @@ impl Engine {
             // The transcript already holds the wake audio, so listening
             // just carries on from here.
             let text = self.decode(chunk);
-            if (spotted || crate::text::find_wake(&text).is_some()) && self.is_you() {
+            if spotted || crate::text::find_wake(&text).is_some() {
                 out.push(Heard::Wake);
+                let prime: Vec<f32> = self.recent.iter().copied().collect();
+                self.begin_judging(&prime);
                 // The keyword model may still hold the phrase; it must not
                 // fire on it later.
                 self.fresh_spotter();
@@ -407,6 +418,9 @@ impl Engine {
             }
         } else {
             self.decode(chunk);
+            if self.you.is_some() && self.judged.is_none() {
+                self.said.extend_from_slice(chunk);
+            }
             self.heard += chunk.len();
             if self.heard > MAX_LISTEN {
                 out.extend(self.finish());
@@ -422,8 +436,19 @@ impl Engine {
         } else if self.listening {
             self.still += chunk.len();
             if !self.paused && self.still >= PAUSE && !crate::text::strip_wake(&text).is_empty() {
-                self.paused = true;
-                out.push(Heard::Pause(text.clone()));
+                // An answer may start here, so only for your voice; not
+                // enough voice yet to tell waits for the end.
+                match self.judge(false) {
+                    Some(true) => {
+                        self.paused = true;
+                        out.push(Heard::Pause(text.clone()));
+                    }
+                    Some(false) => {
+                        out.extend(self.finish());
+                        return out;
+                    }
+                    None => {}
+                }
             }
         }
         if self.recognizer.is_endpoint(&self.stream) {
@@ -441,26 +466,45 @@ impl Engine {
             self.last.clear();
             // The words just heard must not wake it again.
             self.recent.clear();
-            out.push(Heard::Final(text));
+            out.push(self.end(text));
         }
         out
     }
 
-    /// Whether the voice just heard is yours. Without a voiceprint anyone
-    /// may wake it.
-    fn is_you(&mut self) -> bool {
-        let Some((extractor, print)) = &self.you else {
-            return true;
-        };
-        let audio: Vec<f32> = self.recent.iter().copied().collect();
-        let yours = crate::enroll::embed(extractor, &audio)
-            .is_none_or(|e| crate::enroll::similarity(&e, print) >= crate::enroll::SAME_VOICE);
-        if !yours {
-            // Someone else said it: forget the phrase so it cannot fire later.
-            self.fresh_spotter();
-            self.recognizer.reset(&self.stream);
+    fn begin_judging(&mut self, prime: &[f32]) {
+        self.judged = None;
+        self.said.clear();
+        if self.you.is_some() {
+            self.said.extend_from_slice(prime);
         }
-        yours
+    }
+
+    /// Whether the question is in your voice. Without a voiceprint every
+    /// voice is. None while there is too little voice to tell, unless
+    /// `last`: then too little voice counts as not yours.
+    fn judge(&mut self, last: bool) -> Option<bool> {
+        let Some((extractor, you)) = &self.you else {
+            return Some(true);
+        };
+        if self.judged.is_none() {
+            let voice = crate::enroll::voiced(&self.said);
+            if voice.len() >= crate::enroll::JUDGE_VOICE || last {
+                let yours =
+                    crate::enroll::embed(extractor, &self.said).is_some_and(|e| you.matches(&e));
+                self.judged = Some(yours);
+                self.said = Vec::new();
+            }
+        }
+        self.judged
+    }
+
+    /// The end of a question: someone else's question comes out empty, as
+    /// if nothing was said, so it is never answered.
+    fn end(&mut self, text: String) -> Heard {
+        let yours = text.is_empty() || self.judge(true) == Some(true);
+        self.judged = None;
+        self.said = Vec::new();
+        Heard::Final(if yours { text } else { String::new() })
     }
 
     /// A new keyword stream: a reset keeps audio it has buffered, which
