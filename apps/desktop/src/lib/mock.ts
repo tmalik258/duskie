@@ -1225,6 +1225,7 @@ commands.ask_open = (a) => {
     page: null,
     view: settings.onboarded ? ((a.view as string | undefined) ?? "ask") : "welcome",
     tool: (a.tool as string | undefined) ?? null,
+    tab: (a.tab as string | undefined) ?? undefined,
   });
   if (!settings.onboarded && !welcomeSpoken) {
     welcomeSpoken = true;
