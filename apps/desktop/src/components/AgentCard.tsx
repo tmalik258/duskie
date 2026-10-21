@@ -32,7 +32,7 @@ export function AgentCard({ id }: { id: string }) {
         <p className="rd-title">{s.title}</p>
         <p className="rd-detail">{detail(s, step)}</p>
       </div>
-      <div className="flex flex-col gap-1" style={{ marginLeft: "calc(var(--orb-indent, 0px) * -1)" }}>
+      <div className="flex flex-col gap-1 pb-0.5">
         {plan.length > 1 && (
           <div className="rd-steps" aria-hidden>
             {plan.map((p, i) => (
