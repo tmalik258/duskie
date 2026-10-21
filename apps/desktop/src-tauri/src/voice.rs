@@ -1310,7 +1310,12 @@ pub fn download(app: &AppHandle) -> Result<(), String> {
         let v = voice(&app);
         let mut failure = None;
         // Greeting needs the voice; wake/ASR can follow.
-        let order = [&models::VOICE, &models::WAKE, &models::SPEECH];
+        let order = [
+            &models::VOICE,
+            &models::WAKE,
+            &models::SPEECH,
+            &models::FINAL,
+        ];
         for model in order {
             if model.installed(&v.models) {
                 continue;
