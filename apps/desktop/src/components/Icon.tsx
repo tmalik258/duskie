@@ -85,6 +85,7 @@ const SMALL = {
   search: '<circle cx="7" cy="7" r="4.5"/><path d="M10.4 10.4L14 14"/>',
   chev: '<path d="M4.5 6.2L8 9.7l3.5-3.5"/>',
   chevr: '<path d="M6.2 4.5L9.7 8l-3.5 3.5"/>',
+  chevl: '<path d="M9.8 4.5L6.3 8l3.5 3.5"/>',
   commit: '<circle cx="8" cy="8" r="2.6"/><path d="M1.5 8h3.9M10.6 8h3.9"/>',
   pr: '<circle cx="4" cy="3.5" r="1.5"/><circle cx="4" cy="12.5" r="1.5"/><circle cx="12" cy="12.5" r="1.5"/><path d="M4 5v6M12 11V6.5a2 2 0 00-2-2H7.2M8.7 3L7.2 4.5 8.7 6"/>',
   plus: '<path d="M8 3.2v9.6M3.2 8h9.6"/>',

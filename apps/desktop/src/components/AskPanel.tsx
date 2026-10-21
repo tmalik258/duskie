@@ -757,7 +757,14 @@ export function AskPanel() {
             hint: "Files, pages, chats",
             run: () => {
               const query = text.trim();
-              void api.search(query).then((found) => setHits({ query, items: found }));
+              // Show the list at once; results fill in when the search returns.
+              setHits({ query, items: [], loading: true });
+              void api
+                .search(query)
+                .catch(() => [])
+                .then((found) => {
+                  if (useDuskie.getState().askForm.hits?.query === query) setHits({ query, items: found });
+                });
               focusAndSelectInput();
             },
             stay: true,
@@ -889,6 +896,11 @@ export function AskPanel() {
     }
     if (openWhere) {
       setOpenWhere(null);
+      return;
+    }
+    if (showHits) {
+      setHits(null);
+      focusAndSelectInput();
       return;
     }
     if (inHistory || slash) {
@@ -1210,6 +1222,11 @@ export function AskPanel() {
           <Results
             query={hits.query}
             items={hits.items}
+            loading={hits.loading === true}
+            onBack={() => {
+              setHits(null);
+              focusAndSelectInput();
+            }}
             active={Math.min(pick, hits.items.length - 1)}
             onHover={setPick}
             onOpen={(h) => openHit(h.source, h.reference, h.title)}

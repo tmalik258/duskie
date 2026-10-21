@@ -167,7 +167,7 @@ export interface AskState {
 /** Sticky Ask input + search results for the app session (not localStorage). */
 export interface AskForm {
   text: string;
-  hits: { query: string; items: SearchHit[] } | null;
+  hits: { query: string; items: SearchHit[]; loading?: boolean } | null;
 }
 
 const MODEL_KEY = "sidekick.askModel";

@@ -7020,3 +7020,15 @@ button.ak-cchip:hover,
   padding: 0 7px;
   color: var(--ink-3, rgb(242 240 235 / 0.5));
 }
+
+/* Placeholder rows while a search runs. */
+.ak-skel {
+  background: linear-gradient(90deg, rgb(255 255 255 / 0.05), rgb(255 255 255 / 0.11), rgb(255 255 255 / 0.05));
+  background-size: 200% 100%;
+  animation: thinking-shimmer 1.4s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ak-skel {
+    animation: none;
+  }
+}
