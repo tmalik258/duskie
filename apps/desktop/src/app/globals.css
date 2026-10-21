@@ -6810,3 +6810,25 @@ button.ak-cchip:hover,
 .fhead .btn.danger {
   color: var(--err);
 }
+
+/* Agents home: step progress on running rows, and the hint line. */
+.ag-prog {
+  display: block;
+  height: 3px;
+  margin-top: 5px;
+  border-radius: 2px;
+  background: rgb(235 235 245 / 0.1);
+  overflow: hidden;
+}
+.ag-prog > i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #0a84ff;
+  transition: width 0.4s ease;
+}
+.ag-hint {
+  margin: 10px 2px 2px;
+  font-size: 11px;
+  color: rgb(235 235 245 / 0.46);
+}

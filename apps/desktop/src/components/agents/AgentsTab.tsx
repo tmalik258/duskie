@@ -1900,6 +1900,15 @@ function SessionList({ sessions }: { sessions: Session[] }) {
                   <span className="ag-sub block truncate">
                     {s.project} · {MODE_WORD[s.mode] ?? s.mode} · {ago(now - s.turnAt)}
                   </span>
+                  {g === "Running" && s.plan.length > 0 && (
+                    <span className="ag-prog" aria-hidden="true">
+                      <i
+                        style={{
+                          width: `${Math.round((s.plan.filter((p) => p.status === "completed").length / s.plan.length) * 100)}%`,
+                        }}
+                      />
+                    </span>
+                  )}
                 </span>
                 <span className="ag-st" data-g={g}>
                   {g === "Needs you"
@@ -1915,6 +1924,7 @@ function SessionList({ sessions }: { sessions: Session[] }) {
           </div>
         );
       })}
+      {sessions.length > 0 && <p className="ag-hint">Enter opens · Alt B puts them on the Board</p>}
     </div>
   );
 }

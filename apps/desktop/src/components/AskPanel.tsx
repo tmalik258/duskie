@@ -15,8 +15,8 @@ import {
   listenToAgents,
   openGit,
   type Session,
-  setLayout,
   setTab,
+  setView,
   showGit,
   useAgents,
 } from "@/lib/agents";
@@ -836,8 +836,9 @@ export function AskPanel() {
     v: () => (hearing !== null ? stopListening() : voiceReady && !streaming && startListening()),
     p: () => setAsk({ localOnly: !ask.localOnly }),
     h: () => !streaming && goTab(tab === "history" ? "ask" : "history"),
-    o: () => tab === "agents" && setLayout("one"),
-    b: () => tab === "agents" && setLayout("board"),
+    a: () => tab === "agents" && setView("home"),
+    o: () => tab === "agents" && setView("one"),
+    b: () => tab === "agents" && setView("board"),
     tab: (back) => pickTab(nextTab(tab, coder, !!back)),
     m: () => {
       if (streaming || choices.length < 2) return;

@@ -255,6 +255,23 @@ export function setLayout(layout: AgentsLayout) {
   }
 }
 
+/** The three Agents views: every session, one big, or the board. */
+export type AgentsView = "home" | "one" | "board";
+
+export function viewOf(st: { layout: AgentsLayout; current: string | null }): AgentsView {
+  return st.layout === "board" ? "board" : st.current === null ? "home" : "one";
+}
+
+export function setView(view: AgentsView) {
+  if (view === "board") return setLayout("board");
+  setLayout("one");
+  if (view === "home") return useAgents.setState({ current: null });
+  const st = useAgents.getState();
+  if (st.current !== null) return;
+  const latest = [...st.sessions].sort((a, b) => b.turnAt - a.turnAt)[0];
+  if (latest) useAgents.setState({ current: latest.id });
+}
+
 /** Gives a session your own name; it shows in the row and the board. */
 export function renameSession(id: string, title: string) {
   const t = title.trim();
