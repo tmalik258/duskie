@@ -1133,12 +1133,7 @@ export function AskPanel() {
               <Icon name={speak ? "speaker" : "speakerOff"} size={14} />
             </IconButton>
             {voiceReady && !streaming && (
-              <IconButton
-                label={`Talk, or say Hey ${assistant} (Alt V)`}
-                keys={alt}
-                hint="Alt V"
-                onClick={startListening}
-              >
+              <IconButton label={`Talk, or say ${assistant} (Alt V)`} keys={alt} hint="Alt V" onClick={startListening}>
                 <Ic name="mic" size={14} />
               </IconButton>
             )}

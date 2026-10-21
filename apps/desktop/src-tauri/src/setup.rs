@@ -739,7 +739,7 @@ pub async fn status(app: &AppHandle) -> Vec<SetupItem> {
             "voice",
             Group::Connect,
             "Voice",
-            "Say \"Hey Duskie\" and hear answers. About 205 MB, all on this PC.",
+            "Say \"Duskie\" and hear answers. About 205 MB, all on this PC.",
         )
         .done(
             voice_ready && settings.voice.enabled,

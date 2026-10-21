@@ -42,13 +42,13 @@ pub fn test_line(voice: &str) -> &'static str {
         "f2" => "Hey! Female 2 here, lively, bright, and ready to jump in.",
         "f3" => "Hello from Female 3. A calm voice for everyday questions.",
         "f4" => "Hi, Female 4, bright and upbeat when you need a quick answer.",
-        "f5" => "Hi, I'm Duskie. Female 5 is warm. Say hey Duskie anytime.",
+        "f5" => "Hi, I'm Duskie. Female 5 is warm. Just say Duskie anytime.",
         "m1" => "Hello. Male 1 speaking, straightforward and clear.",
         "m2" => "Hey there. Male 2: deep, lively, and easy on the ears.",
         "m3" => "Hi. Male 3 here, a solid everyday voice for Duskie.",
         "m4" => "Hello. Male 4: calm and measured when things get busy.",
         "m5" => "Hi. Male 5: deep and steady for longer answers.",
-        _ => "Hi, I'm Duskie. Say hey Duskie whenever you need me.",
+        _ => "Hi, I'm Duskie. Say Duskie whenever you need me.",
     }
 }
 

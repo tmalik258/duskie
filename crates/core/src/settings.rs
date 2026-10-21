@@ -393,7 +393,7 @@ pub struct ComposioSettings {
 #[serde(rename_all = "camelCase", default)]
 pub struct VoiceSettings {
     pub enabled: bool,
-    /// Listen for "Hey Duskie". Off leaves push to talk in Ask mode.
+    /// Listen for "Duskie" (with or without "hey"). Off leaves push to talk in Ask mode.
     pub wake_word: bool,
     /// Read answers aloud when the question was spoken.
     pub speak_answers: bool,

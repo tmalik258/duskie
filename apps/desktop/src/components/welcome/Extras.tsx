@@ -16,7 +16,7 @@ export function Extras() {
     <div className="flex flex-col gap-2.5 text-[13px]">
       <WelcomeChoice
         title="Talk to me"
-        hint={`Say "Hey ${name}". Downloads about 205 MB of speech models once; all on this PC.`}
+        hint={`Say "${name}". Downloads about 205 MB of speech models once; all on this PC.`}
         on={settings.voice.enabled}
         onChange={(enabled) => {
           void updateSettings({ voice: { ...settings.voice, enabled } });
@@ -47,7 +47,7 @@ export function Extras() {
   );
 }
 
-/** Call me something else: the name, and "Hey <name>" to talk. */
+/** Call me something else: the name, and "<name>" to talk. */
 function Rename() {
   const saved = useDuskie((s) => s.settings.assistantName);
   const [draft, setDraft] = useState(saved);

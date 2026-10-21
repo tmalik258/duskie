@@ -156,7 +156,8 @@ export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
 
 /** What saying the name does, and a warning for names that wake by mistake. */
 function nameHint(name: string): string {
-  const said = `Say "Hey ${name || "Duskie"}" to talk. "Hey Duskie" keeps working too.`;
+  const said =
+    name && name !== "Duskie" ? `Say "${name}" to talk. "Duskie" keeps working too.` : `Say "Duskie" to talk.`;
   const vowels = (name.toLowerCase().match(/[aeiouy]+/g) ?? []).length;
   return name.length < 4 || vowels < 2
     ? `${said} Short names wake by mistake more often; two syllables or more work best.`

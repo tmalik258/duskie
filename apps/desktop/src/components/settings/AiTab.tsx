@@ -715,7 +715,7 @@ function VoiceSection({ voice, onError }: { voice: VoiceSettings; onError: (e: s
     <>
       <Toggle
         label={`Talk to ${name}`}
-        hint={voice.wakeWord ? `Say "Hey ${name}"` : "Use the mic button or the Talk shortcut"}
+        hint={voice.wakeWord ? `Say "${name}"` : "Use the mic button or the Talk shortcut"}
         checked={voice.enabled}
         onChange={(enabled) => {
           void set({ enabled });
@@ -752,7 +752,7 @@ function VoiceSection({ voice, onError }: { voice: VoiceSettings; onError: (e: s
         <p className="text-[12px] text-(--muted)">
           {status?.listening
             ? voice.wakeWord
-              ? `Listening for Hey ${name}.`
+              ? `Listening for "${name}".`
               : "Ready. Use the mic button or the Talk shortcut."
             : "Starting the microphone..."}
         </p>
