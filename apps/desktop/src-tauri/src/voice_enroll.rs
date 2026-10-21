@@ -7,7 +7,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use duskie_voice::Profile;
-use duskie_voice::enroll::{self, NAME_TAKES, SENTENCE_TAKES, SENTENCES};
+use duskie_voice::enroll::{self, MORE_SENTENCES, NAME_TAKES, SENTENCE_TAKES, SENTENCES};
 use duskie_voice::{MIC_RATE, audio::Mic, models};
 use serde::Serialize;
 use tauri::{AppHandle, Manager};
@@ -21,6 +21,17 @@ pub struct Takes {
     names: Vec<Vec<f32>>,
     sentences: Vec<Vec<f32>>,
     more: Vec<Vec<f32>>,
+    /// A take is being recorded.
+    recording: bool,
+    /// Where this "Add samples" round starts in [`MORE_SENTENCES`]. Picked
+    /// once per round so the lines stay put while you read them.
+    more_from: Option<usize>,
+}
+
+/// Teaching is under way; the wake word listener stays off meanwhile.
+pub fn busy(app: &AppHandle) -> bool {
+    let t = lock(takes(app));
+    t.recording || !t.names.is_empty() || !t.sentences.is_empty() || !t.more.is_empty()
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -35,6 +46,8 @@ pub struct EnrollState {
     pub sentence_takes: usize,
     pub names_needed: usize,
     pub sentences: Vec<&'static str>,
+    /// Lines for the current "Add samples" round.
+    pub more_sentences: Vec<&'static str>,
     /// Voiceprints kept for the taught voice.
     pub samples: usize,
     /// Sentences recorded so far in an "Add samples" round.
@@ -76,7 +89,13 @@ pub fn state(app: &AppHandle) -> EnrollState {
     let saved = std::fs::read_to_string(path(&models_dir(app)))
         .ok()
         .and_then(|text| Profile::from_json(&text));
-    let t = lock(takes(app));
+    let mut t = lock(takes(app));
+    let from = *t.more_from.get_or_insert_with(|| {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.subsec_nanos() as usize)
+            % MORE_SENTENCES.len()
+    });
     EnrollState {
         taught: saved.is_some(),
         taught_for: saved.as_ref().map(|p| p.name.clone()),
@@ -84,6 +103,9 @@ pub fn state(app: &AppHandle) -> EnrollState {
         sentence_takes: t.sentences.len(),
         names_needed: NAME_TAKES,
         sentences: SENTENCES.to_vec(),
+        more_sentences: (0..SENTENCE_TAKES)
+            .map(|i| MORE_SENTENCES[(from + i) % MORE_SENTENCES.len()])
+            .collect(),
         samples: saved.map_or(0, |p| p.samples.len()),
         more_takes: t.more.len(),
     }
@@ -93,8 +115,18 @@ pub fn state(app: &AppHandle) -> EnrollState {
 /// records for an "Add samples" round instead of a teaching.
 pub fn record(app: &AppHandle, sentence: Option<usize>, more: bool) -> Result<EnrollState, String> {
     let seconds = if sentence.is_some() { 5.0 } else { 2.5 };
-    let clip = capture(Duration::from_secs_f32(seconds))?;
-    let clip = trim(&clip).ok_or("Didn't catch that. Try again a little closer to the mic.")?;
+    lock(takes(app)).recording = true;
+    crate::voice::refresh(app);
+    let clip = capture(Duration::from_secs_f32(seconds));
+    lock(takes(app)).recording = false;
+    let clip = match clip.map(|c| trim(&c)) {
+        Ok(Some(clip)) => clip,
+        failed => {
+            crate::voice::refresh(app);
+            failed?;
+            return Err("Didn't catch that. Try again a little closer to the mic.".into());
+        }
+    };
     {
         let mut t = lock(takes(app));
         match sentence {
@@ -158,7 +190,11 @@ pub fn finish(app: &AppHandle, more: bool) -> Result<EnrollState, String> {
         .assistant_name
         .clone();
     if more {
-        let extra = std::mem::take(&mut lock(takes(app)).more);
+        let extra = {
+            let mut t = lock(takes(app));
+            t.more_from = None;
+            std::mem::take(&mut t.more)
+        };
         let saved = std::fs::read_to_string(path(&models))
             .ok()
             .and_then(|text| Profile::from_json(&text))
@@ -186,6 +222,7 @@ pub fn finish(app: &AppHandle, more: bool) -> Result<EnrollState, String> {
 /// Drops takes in progress. A taught voice stays.
 pub fn cancel(app: &AppHandle) -> EnrollState {
     *lock(takes(app)) = Takes::default();
+    crate::voice::refresh(app);
     state(app)
 }
 

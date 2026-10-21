@@ -1751,6 +1751,7 @@ const enroll: {
   sentenceTakes: number;
   namesNeeded: number;
   sentences: string[];
+  moreSentences: string[];
   samples: number;
   moreTakes: number;
 } = {
@@ -1765,6 +1766,11 @@ const enroll: {
     "What is on my calendar this afternoon?",
     "Remind me to call the bank tomorrow morning.",
     "Turn on night light and play some quiet music.",
+  ],
+  moreSentences: [
+    "Read me the first three emails from today.",
+    "Set a timer for twenty five minutes.",
+    "How is the weather looking for the weekend?",
   ],
 };
 commands.voice_enroll_state = () => ({ ...enroll });

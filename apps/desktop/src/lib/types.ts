@@ -150,6 +150,8 @@ export interface EnrollState {
   sentenceTakes: number;
   namesNeeded: number;
   sentences: string[];
+  /** Lines for the current "Add samples" round. */
+  moreSentences: string[];
   /** Voiceprints kept for the taught voice. */
   samples: number;
   /** Sentences recorded so far in an "Add samples" round. */

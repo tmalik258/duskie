@@ -282,7 +282,9 @@ pub fn refresh(app: &AppHandle) {
         voice: settings.voice.clone(),
         speed: settings.speed,
         name: name.clone(),
-        listen: onboarded && listen,
+        // Teaching your voice records from the same mic; the listener would
+        // hear "Duskie" in the takes and wake.
+        listen: onboarded && listen && !crate::voice_enroll::busy(app),
         profile: crate::voice_enroll::profile(&v.models, &name, settings.only_me)
             .map(|p| p.to_json()),
     };

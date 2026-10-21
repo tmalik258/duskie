@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/bridge";
 import type { EnrollState, VoiceSettings } from "@/lib/types";
 import { Button, Toggle } from "./ui";
@@ -22,6 +22,17 @@ export function VoiceEnroll({
   const [adding, setAdding] = useState(false);
   const [busy, setBusy] = useState<"recording" | "learning" | null>(null);
   const [note, setNote] = useState<string | null>(null);
+
+  // Leaving Settings mid-teach drops the takes, which turns the wake word
+  // listener back on.
+  const activeRef = useRef(false);
+  activeRef.current = active;
+  useEffect(
+    () => () => {
+      if (activeRef.current) api.voiceEnrollCancel().catch(() => undefined);
+    },
+    [],
+  );
 
   useEffect(() => {
     api
@@ -157,14 +168,19 @@ export function VoiceEnroll({
             ? "All set."
             : sentence === null
               ? `Say "${name}"`
-              : `Read: "${state.sentences[sentence]}"`}
+              : `Read: "${(adding ? state.moreSentences : state.sentences)[sentence]}"`}
       </p>
       <p className="mt-1 text-[12px] text-(--muted)">
         {busy === "recording"
           ? "Listening..."
           : busy === "learning"
             ? "This takes a few seconds. The recordings are deleted after."
-            : (note ?? (sentence === null ? "Your normal voice, like you would call it." : "At your usual pace."))}
+            : (note ??
+              (sentence === null
+                ? "Your normal voice, like you would call it."
+                : adding
+                  ? "Try a new spot, mic or a softer voice. It helps most."
+                  : "At your usual pace."))}
       </p>
       <div className="mt-3 flex justify-end gap-2">
         <Button small onClick={stop} disabled={busy === "learning"}>

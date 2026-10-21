@@ -29,6 +29,21 @@ pub const SENTENCES: [&str; SENTENCE_TAKES] = [
     "Remind me to call the bank tomorrow morning.",
     "Turn on night light and play some quiet music.",
 ];
+/// More lines for "Add samples" rounds, so each round hears new words.
+pub const MORE_SENTENCES: [&str; 12] = [
+    "Read me the first three emails from today.",
+    "Set a timer for twenty five minutes.",
+    "How is the weather looking for the weekend?",
+    "Open the project folder and start the build.",
+    "Move my four o'clock meeting to Thursday.",
+    "What did Jessica say about the quarterly budget?",
+    "Pause the music and lower the volume a little.",
+    "Summarize this page in two or three sentences.",
+    "Send a quick note that I am running late.",
+    "Which pull requests are waiting on my review?",
+    "Show me the photos I took at the beach last summer.",
+    "Translate good morning into Spanish and French.",
+];
 /// A question at least this alike to the print is yours (cosine of CAM++
 /// embeddings). In tests the taught voice's questions scored 0.75 to 0.88
 /// and 33 questions in 11 other voices at most 0.63.

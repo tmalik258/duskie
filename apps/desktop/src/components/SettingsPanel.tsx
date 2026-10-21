@@ -284,8 +284,11 @@ export function SettingsPanel() {
                   aria-current={!searching && tab === i.id ? "page" : undefined}
                   onMouseDown={(e) => {
                     // Keep the nav from scrolling when the last item is focused.
+                    // Focus moved by script from the search box would show
+                    // the keyboard ring, so the click is marked as a click.
                     e.preventDefault();
-                    e.currentTarget.focus({ preventScroll: true });
+                    (document.activeElement as HTMLElement | null)?.blur();
+                    e.currentTarget.focus({ preventScroll: true, focusVisible: false } as FocusOptions);
                   }}
                   onClick={() => {
                     setQuery("");
