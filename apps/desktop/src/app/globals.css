@@ -490,6 +490,11 @@ body {
   overflow: hidden;
   cursor: pointer;
 }
+.rd-opt-row {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+}
 .rd-opt:hover {
   background: var(--fill-2, rgb(242 240 235 / 0.08));
 }
