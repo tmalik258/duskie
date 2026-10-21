@@ -84,8 +84,8 @@ export function shellGeom(opts: {
       : opts.agentsBoard
         ? BOARD_WIDTH
         : opts.agentsWide
-          ? SHELL_AGENTS.width
-          : SHELL_ASK.width;
+          ? SHELL_AGENTS.one
+          : SHELL_AGENTS.width;
     height = Math.max(SHELL_COMPACT.height, opts.contentHeight + 8);
     radius = SHELL_AGENTS.radius;
     take = TAKE_A_ASK;

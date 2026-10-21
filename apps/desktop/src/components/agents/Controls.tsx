@@ -44,6 +44,17 @@ export function modelsFor(agent: string): [string, string][] {
   return [];
 }
 
+/** The model an agent starts on when none is picked. */
+export function defaultModel(agent: string): string | null {
+  const id = idOf(agent);
+  if (id === "claude_code") return "claude-opus-5-5";
+  if (id === "codex") return CODEX_MODELS.find(([v]) => v === "gpt-6.1-sol")?.[0] ?? CODEX_MODELS[0]?.[0] ?? null;
+  return null;
+}
+
+/** Thinking an agent starts on when none is picked. */
+export const DEFAULT_EFFORT = "medium";
+
 const Caret = () => (
   <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3 opacity-60">
     <path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -336,7 +347,9 @@ export function ChatControls({
   const models = modelsFor(agent);
   const [mark, color] = markOf(agent);
   const local = idOf(agent) === "local";
-  const level = LEVELS.find(([v]) => v === effort);
+  const shownModel = model ?? defaultModel(agent);
+  const shownEffort = local ? effort : (effort ?? DEFAULT_EFFORT);
+  const level = LEVELS.find(([v]) => v === shownEffort);
 
   // Plan windows: this session's warning plus every window Duskie has seen.
   const now = Date.now();
@@ -369,14 +382,6 @@ export function ChatControls({
 
   const image = AGENT_IMAGES[idOf(agent)];
   const modelOptions: SelectOption[] = [
-    {
-      value: "",
-      label: "Default",
-      sub: "What the agent is set to use",
-      icon: image ? undefined : mark,
-      image,
-      color,
-    },
     ...models.map(([v, l]) => ({
       value: v,
       label: l,
@@ -386,7 +391,7 @@ export function ChatControls({
       color,
     })),
   ];
-  const modelName = models.find(([v]) => v === model)?.[1] ?? "Default model";
+  const modelName = models.find(([v]) => v === shownModel)?.[1] ?? models[0]?.[1] ?? "Model";
 
   return (
     <div className="ak-ctl">
@@ -394,13 +399,13 @@ export function ChatControls({
         <Pop label="Choose model" requested={panel.at} chip="Choose model">
           {(close) => (
             <>
-              {[["", "Default"], ...models].map(([value, label]) => (
+              {models.map(([value, label]) => (
                 <button
                   type="button"
                   className="chip ak-pop-btn"
                   key={value}
                   onClick={() => {
-                    onModel(value || null);
+                    onModel(value);
                     close();
                   }}
                 >
@@ -427,8 +432,8 @@ export function ChatControls({
               menuWidth={324}
               group={`${agent} models, from your next message`}
               current={modelName}
-              value={model ?? ""}
-              onChange={(v) => onModel(v || null)}
+              value={shownModel ?? ""}
+              onChange={(v) => onModel(v)}
               options={modelOptions}
             />
           </span>
@@ -441,7 +446,7 @@ export function ChatControls({
           chip={
             <>
               <Brain />
-              {local ? (effort === "off" ? "Off" : "On") : (level?.[1] ?? "Default")}
+              {local ? (effort === "off" ? "Off" : "On") : (level?.[1] ?? "Medium")}
               <Caret />
             </>
           }
@@ -483,16 +488,13 @@ export function ChatControls({
                   </span>
                 </div>
                 <fieldset className="ak-tseg" aria-label="How hard it thinks">
-                  <button type="button" aria-pressed={!level} onClick={() => onEffort(null)}>
-                    Default
-                  </button>
                   {LEVELS.map(([v, l]) => (
-                    <button key={v} type="button" aria-pressed={effort === v} onClick={() => onEffort(v)}>
+                    <button key={v} type="button" aria-pressed={shownEffort === v} onClick={() => onEffort(v)}>
                       {l}
                     </button>
                   ))}
                 </fieldset>
-                <p className="ak-pop-m">{level ? level[2] : "The agent's own default."}</p>
+                <p className="ak-pop-m">{level?.[2]}</p>
               </>
             )
           }

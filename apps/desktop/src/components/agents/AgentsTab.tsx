@@ -62,7 +62,7 @@ import { Ic, Icon } from "../Icon";
 import { Select } from "../settings/ui";
 import { Tip } from "../Tip";
 import { Board } from "./Board";
-import { ChatControls } from "./Controls";
+import { ChatControls, DEFAULT_EFFORT, defaultModel } from "./Controls";
 import { PlanPanel } from "./PlanPanel";
 import { ProjectPicker } from "./ProjectPicker";
 import { Review } from "./Review";
@@ -373,7 +373,14 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
     void refresh().catch(() => undefined);
     writeNewPrefs({ agent: pickedAgent, model, effort, mode });
     writeUsualAgent(pickedPath, pickedAgent);
-    startSession(pickedAgent, pickedPath, prompt.trim(), mode, model, effort)
+    startSession(
+      pickedAgent,
+      pickedPath,
+      prompt.trim(),
+      mode,
+      model ?? defaultModel(pickedAgent),
+      effort ?? (pickedAgent.toLowerCase() === "local" ? effort : DEFAULT_EFFORT),
+    )
       .then(() => setPrompt(""))
       .catch((e: unknown) => setError(String(e)))
       .finally(() => setBusy(false));

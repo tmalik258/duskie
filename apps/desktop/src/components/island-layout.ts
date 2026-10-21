@@ -49,7 +49,7 @@ export const SHELL_NOTIFY = { width: 340, radius: 26 } as const;
 
 /** Ask / Agents / Settings in-island sizes. */
 export const SHELL_ASK = { width: 452, radius: 26 } as const;
-export const SHELL_AGENTS = { width: 560, radius: 26 } as const;
+export const SHELL_AGENTS = { width: 560, one: 600, radius: 26 } as const;
 export const SHELL_SETTINGS = { width: 720, height: 520, nav: 196, radius: 26 } as const;
 /** Soft floor for shell/git-dock height when the Git panel is beside the island. */
 export const SHELL_GIT_MIN_H = 440;
@@ -102,7 +102,7 @@ export const EXPANDED = { width: 388, minHeight: 78, radius: 30, pad: PANEL_PAD 
 export const ASK_WIDTH = 420;
 export const AGENTS_WIDTH = 580;
 /** The board: two tiles across, three on a 1440p screen and up. */
-export const BOARD_WIDTH = 680;
+export const BOARD_WIDTH = 720;
 export const BOARD_WIDE_WIDTH = 940;
 /** Voice, Full listening style. */
 export const FULL_VOICE_WIDTH = 400;
