@@ -50,6 +50,9 @@ await page.addInitScript(() => {
     }).observe({ type: "longtask", buffered: true });
   } catch {}
 });
+// The editor (Monaco) loads only when it opens, never with the island.
+const loaded = [];
+page.on("request", (r) => loaded.push(r.url()));
 await page.goto(url);
 await page.waitForTimeout(1500);
 // The island is transparent, so there is no contentful paint: page load
@@ -86,7 +89,11 @@ for (let i = 0; i < RUNS; i++) {
 await browser.close();
 server.close();
 
-let failed = false;
+const monaco = loaded.filter((u) => /monaco/i.test(u));
+let failed = monaco.length > 0;
+console.log(
+  `${failed ? "SLOW" : "ok  "} editor stays lazy: ${monaco.length ? `loaded ${monaco[0]}` : "Monaco not loaded by the island"}`,
+);
 for (const [name, values] of Object.entries(results)) {
   const m = median(values);
   const ok = m <= TARGETS[name];
