@@ -62,8 +62,6 @@ export interface Session extends AgentStarted {
   model?: string | null;
   /** Thinking: off, low, medium, high; null is the default. */
   effort?: string | null;
-  /** Merged back with Finish. */
-  finished?: boolean;
   /** The local model went round in circles: offer a handoff. */
   stuck?: boolean;
 }

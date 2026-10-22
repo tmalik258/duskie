@@ -359,7 +359,6 @@ pub fn run() {
             commands::agent_project,
             commands::agent_reviews,
             commands::agent_review_decide,
-            commands::agent_finish,
             commands::cursor_chats,
             commands::cursor_open,
             commands::repos_overview,

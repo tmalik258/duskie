@@ -10,7 +10,6 @@ import { Tip } from "../../tip";
 import { AgentMark } from "../marks";
 import { ContextRing, SessionMemory } from "./context-ring";
 import { NameField } from "./name-field";
-import { WorktreeNote } from "./worktree-note";
 
 export function SessionHeader({
   session: s,
@@ -75,7 +74,6 @@ export function SessionHeader({
           )}
         </span>
       </div>
-      <WorktreeNote session={s} working={working} />
       {working && s.activeMode !== s.mode && <p className="ak-note ag-sh-note">New mode applies to the next message</p>}
     </>
   );
