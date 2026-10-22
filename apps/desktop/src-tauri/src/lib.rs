@@ -351,6 +351,7 @@ pub fn run() {
             commands::agent_rewind,
             commands::agent_files,
             commands::project_files,
+            commands::save_attachment,
             commands::agent_commands,
             commands::agent_open_editor,
             commands::agent_tune,

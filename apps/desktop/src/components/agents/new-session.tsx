@@ -6,6 +6,8 @@
 import { useEffect, useRef } from "react";
 import { type Session, SLOTS } from "@/lib/agents";
 import type { CursorChat } from "@/lib/types";
+import { AttachButton, AttachChips } from "../attach/attach-bar";
+import { useAttachments } from "../attach/use-attachments";
 import { Ic } from "../icon";
 import { ComposerPop } from "./composer/composer-pop";
 import { ChatControls } from "./controls";
@@ -22,6 +24,7 @@ import { SessionList } from "./session-list";
 export function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorChat[] }) {
   const n = useNewSession(sessions);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const att = useAttachments(n.prompt, n.setPrompt);
   const m = useNewMention(n.prompt, n.setPrompt, n.pickedPath || null);
   useEffect(() => {
     requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
@@ -85,13 +88,16 @@ export function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: 
                 onFile={m.pickFile}
               />
             )}
-            <div ref={m.wrapRef}>
+            <AttachChips items={att.items} error={att.error} onRemove={att.remove} />
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: a drop zone for files; the paperclip is the keyboard path */}
+            <div ref={m.wrapRef} onDrop={att.onDrop} onDragOver={att.onDragOver}>
               <textarea
                 className="no-scrollbar"
                 ref={inputRef}
                 rows={2}
                 value={n.prompt}
                 onChange={(e) => n.setPrompt(e.target.value)}
+                onPaste={att.onPaste}
                 onKeyDown={(e) => {
                   if (m.onKey(e)) return;
                   if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key === ".") {
@@ -114,7 +120,12 @@ export function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: 
                 effort={n.effort}
                 onModel={n.pickModel}
                 onEffort={n.pickEffort}
-                lead={<ModeChip mode={n.mode} onChange={n.pickMode} />}
+                lead={
+                  <>
+                    <AttachButton onFiles={(f) => void att.add(f)} />
+                    <ModeChip mode={n.mode} onChange={n.pickMode} />
+                  </>
+                }
                 tail={
                   <>
                     <span className="ag-note">

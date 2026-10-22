@@ -7,8 +7,11 @@ import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import type { AgentCommand } from "@/lib/agent-commands";
 import { type Session, setSessionMode, tuneSession } from "@/lib/agents";
 import { api } from "@/lib/bridge";
+import { AttachButton, AttachChips } from "../attach/attach-bar";
+import { useAttachments } from "../attach/use-attachments";
 import { ComposerPop } from "./composer/composer-pop";
 import { runCommand } from "./composer/run-command";
+import { TerminalOnly } from "./composer/terminal-only";
 import { useComposerLists } from "./composer/use-composer-lists";
 import { usePopPlace } from "./composer/use-pop-place";
 import { ChatControls } from "./controls";
@@ -48,6 +51,7 @@ export function Composer({
   const wrapRef = useRef<HTMLDivElement>(null);
   const { commands, shownCommands, files, slash, mention, count } = useComposerLists(s, text);
   const { float, popRef } = usePopPlace(wrapRef, count, text);
+  const att = useAttachments(text, setText);
   const at = Math.min(sel, Math.max(count - 1, 0));
   // biome-ignore lint/correctness/useExhaustiveDependencies: focus again when the session changes
   useEffect(() => {
@@ -129,8 +133,11 @@ export function Composer({
         </p>
       )}
       {terminal && <TerminalOnly id={s.id} command={terminal} onError={setNotice} />}
-      <div ref={wrapRef} className="ak-composer ak-two relative">
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: a drop zone for files; the paperclip is the keyboard path */}
+      <div ref={wrapRef} className="ak-composer ak-two relative" onDrop={att.onDrop} onDragOver={att.onDragOver}>
+        <AttachChips items={att.items} error={att.error} onRemove={att.remove} />
         <div className="ak-row">
+          <AttachButton onFiles={(f) => void att.add(f)} />
           <input
             ref={inputRef}
             value={text}
@@ -139,6 +146,7 @@ export function Composer({
               setSel(0);
             }}
             onBlur={() => onBlur?.()}
+            onPaste={att.onPaste}
             onKeyDown={onKey}
             placeholder={working ? "Steer it, it reads this next" : "Ask for more, / for commands, @ for files"}
           />
@@ -168,30 +176,5 @@ export function Composer({
         />
       </div>
     </>
-  );
-}
-
-/** A command only the agent's own terminal can run: open it there, or copy it. */
-function TerminalOnly({ id, command, onError }: { id: string; command: string; onError: (e: string) => void }) {
-  return (
-    <div className="ak-chips">
-      <span className="ak-note">
-        Terminal only: <code className="mono">{command}</code>
-      </span>
-      <button
-        type="button"
-        className="ak-chip chip"
-        onClick={() => void api.agentTerminal(id).catch((e) => onError(String(e)))}
-      >
-        Open in terminal
-      </button>
-      <button
-        type="button"
-        className="ak-chip chip"
-        onClick={() => void navigator.clipboard.writeText(command).catch((e) => onError(String(e)))}
-      >
-        Copy command
-      </button>
-    </div>
   );
 }
