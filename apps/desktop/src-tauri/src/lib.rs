@@ -350,6 +350,7 @@ pub fn run() {
             commands::agent_rewind_preview,
             commands::agent_rewind,
             commands::agent_files,
+            commands::project_files,
             commands::agent_commands,
             commands::agent_open_editor,
             commands::agent_tune,

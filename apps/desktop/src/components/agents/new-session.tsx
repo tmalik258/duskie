@@ -7,11 +7,13 @@ import { useEffect, useRef } from "react";
 import { type Session, SLOTS } from "@/lib/agents";
 import type { CursorChat } from "@/lib/types";
 import { Ic } from "../icon";
+import { ComposerPop } from "./composer/composer-pop";
 import { ChatControls } from "./controls";
 import { ModeChip } from "./controls/mode-chip";
 import { AgentMark } from "./marks";
 import { MODES, nextAgentMode } from "./modes";
 import { FixLine, NewSessionLoading, NoAgentsReady, pickerNote, ready } from "./new-session/agent-status";
+import { useNewMention } from "./new-session/use-new-mention";
 import { useNewSession } from "./new-session/use-new-session";
 import { ProjectPicker } from "./project-picker";
 import { SessionChips } from "./session-chips";
@@ -20,6 +22,7 @@ import { SessionList } from "./session-list";
 export function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorChat[] }) {
   const n = useNewSession(sessions);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const m = useNewMention(n.prompt, n.setPrompt, n.pickedPath || null);
   useEffect(() => {
     requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
   }, []);
@@ -68,25 +71,42 @@ export function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: 
                 <ProjectPicker projects={n.projects ?? []} path={n.pickedPath} onChange={n.pickPath} />
               </span>
             </div>
-            <textarea
-              className="no-scrollbar"
-              ref={inputRef}
-              rows={2}
-              value={n.prompt}
-              onChange={(e) => n.setPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key === ".") {
-                  e.preventDefault();
-                  n.pickMode(nextAgentMode(n.mode));
-                  return;
-                }
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  n.go();
-                }
-              }}
-              placeholder="What should it do? / for commands, @ for files"
-            />
+            {m.files.length > 0 && m.float && (
+              <ComposerPop
+                popRef={m.popRef}
+                float={m.float}
+                slash={false}
+                commands={[]}
+                files={m.files}
+                project={n.pickedPath.split(/[\\/]/).pop() ?? ""}
+                at={m.at}
+                onHover={m.setSel}
+                onCommand={() => undefined}
+                onFile={m.pickFile}
+              />
+            )}
+            <div ref={m.wrapRef}>
+              <textarea
+                className="no-scrollbar"
+                ref={inputRef}
+                rows={2}
+                value={n.prompt}
+                onChange={(e) => n.setPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (m.onKey(e)) return;
+                  if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key === ".") {
+                    e.preventDefault();
+                    n.pickMode(nextAgentMode(n.mode));
+                    return;
+                  }
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    n.go();
+                  }
+                }}
+                placeholder="What should it do? @ for files"
+              />
+            </div>
             <div className="ag-comp-foot">
               <ChatControls
                 agent={n.pickedAgent}

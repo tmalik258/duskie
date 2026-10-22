@@ -42,6 +42,12 @@ if (typeof window !== "undefined") {
       if (s) openReview(s.id);
       return s?.id ?? null;
     },
+    __mockNewSession: async () => {
+      const { useAgents } = await import("./agents");
+      const { api } = await import("./bridge");
+      useAgents.setState({ tab: "agents", current: null });
+      await api.askOpen();
+    },
     __mockGo: go,
     __mockCall: (name: string, args: Record<string, unknown> = {}) => commands[name]?.(args),
     __mockAgents: async (calm = false) => {

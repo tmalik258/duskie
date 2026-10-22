@@ -132,9 +132,14 @@ pub(super) fn checkpoint(id: &str, index: usize) -> Result<Baseline, String> {
 /// Files in the session's project whose path has every word of `query`,
 /// shortest paths first, for @ in the composer.
 pub fn files(id: &str, query: &str) -> Vec<String> {
-    let Some(root) = with(&SESSIONS, |s| s.get(id).map(|h| h.path.clone())) else {
-        return Vec::new();
-    };
+    match with(&SESSIONS, |s| s.get(id).map(|h| h.path.clone())) {
+        Some(root) => files_in(root, query),
+        None => Vec::new(),
+    }
+}
+
+/// Same as [`files`] for a folder, before any session exists.
+pub fn files_in(root: std::path::PathBuf, query: &str) -> Vec<String> {
     let words: Vec<String> = query
         .to_lowercase()
         .split_whitespace()
