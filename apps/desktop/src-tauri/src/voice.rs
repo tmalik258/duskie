@@ -835,6 +835,10 @@ fn on_heard(app: &AppHandle, heard: Heard) {
                 log::debug!("voice: ignored {text:?}");
                 text.clear();
             }
+            // "That's all" or "thanks Duskie" ends a conversation quietly.
+            if pushed && ends_conversation(&text) {
+                text.clear();
+            }
             mascot::dispatch(app, MascotEvent::Cancelled);
             let ended = (!text.is_empty()).then(std::time::Instant::now);
             *lock(&SPEECH_ENDED) = ended;
@@ -982,12 +986,12 @@ pub fn answer_done(app: &AppHandle, id: &str, error: Option<&str>) {
     if spoke && conversation && asked_by_voice && error.is_none() {
         let (app, id) = (app.clone(), id.to_owned());
         // Listen for a reply once the answer has been read out, unless the
-        // user moved on (closed Ask, or another answer started).
+        // user moved on (Esc, typing, or another answer started). The compact
+        // island answers without opening Ask, so Ask need not be open.
         listen_after_speaking(
             &app,
             move |app| {
-                ask::is_open(app)
-                    && !user_typing(app)
+                !user_typing(app)
                     && lock(&voice(app).speaking)
                         .as_ref()
                         .is_some_and(|(chat, _)| *chat == id)
@@ -1031,8 +1035,39 @@ fn listen_after_speaking(
     });
 }
 
+/// A reply that closes the conversation instead of asking something.
+fn ends_conversation(text: &str) -> bool {
+    let t: String = text
+        .to_lowercase()
+        .chars()
+        .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+        .collect();
+    let t = t.split_whitespace().collect::<Vec<_>>().join(" ");
+    const ENDS: &[&str] = &[
+        "thats all",
+        "that is all",
+        "thanks",
+        "thank you",
+        "thanks duskie",
+        "thank you duskie",
+        "stop",
+        "stop listening",
+        "never mind",
+        "nevermind",
+        "no thanks",
+        "nothing",
+        "bye",
+        "goodbye",
+        "ok thanks",
+        "okay thanks",
+        "im done",
+        "done",
+    ];
+    ENDS.contains(&t.as_str())
+}
+
 /// How long the mic waits for a spoken reply after an answer.
-const REPLY_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+const REPLY_WAIT: std::time::Duration = std::time::Duration::from_secs(8);
 /// A key pressed in Ask this recently counts as typing.
 const TYPING_GRACE_MS: u64 = 3000;
 
@@ -1404,6 +1439,21 @@ pub fn cancel_download(app: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn short_closings_end_a_conversation() {
+        for t in ["That's all.", "Thanks, Duskie!", "never mind", "Stop"] {
+            assert!(ends_conversation(t), "{t}");
+        }
+        for t in [
+            "thanks, now open Spotify",
+            "stop the server on port 3000",
+            "what's next",
+        ] {
+            assert!(!ends_conversation(t), "{t}");
+        }
+    }
+
     #[test]
     fn a_pause_between_sentences_is_not_the_end() {
         use std::time::Duration;
