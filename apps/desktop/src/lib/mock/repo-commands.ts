@@ -17,7 +17,6 @@ export const repoCommands: Record<string, (args: Record<string, unknown>) => unk
   agent_project: () => "C:/code/sidekick",
   agent_reviews: () => [],
   agent_review_decide: () => null,
-  agent_finish: () => "Merged wt/store-tests back",
   cursor_chats: () => [
     {
       id: "c1",

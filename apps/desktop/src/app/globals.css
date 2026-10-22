@@ -3177,25 +3177,6 @@ select.ak-mi option {
   color: #30d158;
   background: rgb(48 209 88 / 0.12);
 }
-.ak-twt {
-  font-size: 11.5px;
-  line-height: 1.4;
-  color: var(--i2);
-  padding: 7px 9px;
-  border-radius: 10px;
-  background: rgb(100 210 255 / 0.07);
-}
-.ak-twt b {
-  color: #64d2ff;
-  font-weight: 600;
-}
-.ag-sh-note.ak-twt {
-  text-align: left;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
 .ak-tlog {
   display: grid;
   gap: 5px;

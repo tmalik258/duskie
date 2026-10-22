@@ -143,7 +143,7 @@ export function AgentCard({ id }: { id: string }) {
 }
 
 function detail(s: Session, step: number): string {
-  const where = s.worktree ?? s.branch;
+  const where = s.branch;
   if (s.status === "waiting") return s.question?.label ?? "Waiting for your answer.";
   if (s.plan.length > 1)
     return `Step ${Math.min(step + 1, s.plan.length)} of ${s.plan.length}${where ? `, on ${where}` : ""}`;

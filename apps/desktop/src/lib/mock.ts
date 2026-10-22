@@ -84,11 +84,9 @@ if (typeof window !== "undefined") {
       });
       useAgents.setState({
         sessions: [
-          mk("a1", "Codex", "duskie", "Migrate tests to Vitest", "idle", "full", 22, { finished: true }),
+          mk("a1", "Codex", "duskie", "Migrate tests to Vitest", "idle", "full", 22),
           mk("a2", "Claude Code", "duskie", "Compact label wraps on narrow screens", "idle", "edit", 10, {
             changes: 3,
-            worktree: "wt/compact-label",
-            base: "feat/s-locator-pricing-page",
           }),
           mk("a3", "Claude Code", "falconxoft-portal", "Add CSV export to invoices", "idle", "edit", 14, {
             changes: 5,

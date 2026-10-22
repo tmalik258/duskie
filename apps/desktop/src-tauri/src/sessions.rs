@@ -15,13 +15,11 @@ mod local_calls;
 mod plain;
 mod plans;
 pub mod reviews;
-mod worktree;
 
 pub use claude::*;
 pub use codex::*;
 pub use edits::*;
 pub use plain::*;
-pub use worktree::*;
 
 use duskie_sensors::classify::mask;
 use std::borrow::Cow;
@@ -385,11 +383,6 @@ pub struct Started {
     pub branch: Option<String>,
     /// Changes can be reviewed and undone (the project uses git).
     pub reviewable: bool,
-    /// Another session works in this repo, so this one got its own
-    /// worktree on this branch; Finish merges it back.
-    pub worktree: Option<String>,
-    /// The branch the worktree came from, where Finish merges it.
-    pub base: Option<String>,
 }
 
 /// Starts an agent in `path` with `prompt`.
@@ -433,16 +426,6 @@ pub async fn start_tuned(
             )
         });
     }
-    let wt = {
-        let (path, prompt, id) = (path.to_owned(), prompt.to_owned(), id.clone());
-        tokio::task::spawn_blocking(move || own_worktree(&path, &prompt, &id))
-            .await
-            .ok()
-            .flatten()
-    };
-    let base = wt.as_ref().and_then(|_| branch(path));
-    let wt_dir = wt.as_ref().map(|w| w.dir.clone());
-    let path: &Path = wt_dir.as_deref().unwrap_or(path);
     let baseline = {
         let path = path.to_owned();
         tokio::task::spawn_blocking(move || review::capture(&path, shadow_root().as_deref()))
@@ -461,12 +444,7 @@ pub async fn start_tuned(
             .unwrap_or_default(),
         branch,
         reviewable: baseline.is_some(),
-        worktree: wt.as_ref().map(|w| w.branch.clone()),
-        base,
     };
-    if let Some(w) = wt {
-        with(&WORKTREES, |m| m.insert(id.clone(), w));
-    }
     with(&SESSIONS, |s| {
         s.insert(
             id.clone(),
@@ -1109,15 +1087,6 @@ mod tests {
         let raw = r#""C:\\Program Files\\WindowsApps\\PowerShell\\pwsh.exe" -Command "git status --short""#;
         assert_eq!(shown_command(raw), "git status --short");
         assert_eq!(shown_command("pnpm test"), "pnpm test");
-    }
-
-    #[test]
-    fn names_worktree_branches() {
-        assert_eq!(
-            worktree_branch("Fix the footer year, it says 2024!", "01ABCDWXYZ"),
-            "wt/fix-the-footer-year-it-wxyz"
-        );
-        assert_eq!(worktree_branch("???", "01AB"), "wt/task-01ab");
     }
 
     #[test]

@@ -642,14 +642,6 @@ pub async fn agent_review_decide(
     .map_err(|e| e.to_string())?
 }
 
-/// Finish a session that ran in its own worktree: merge it back.
-#[tauri::command]
-pub async fn agent_finish(id: String) -> CmdResult<String> {
-    tauri::async_runtime::spawn_blocking(move || crate::sessions::finish(&id))
-        .await
-        .map_err(|e| e.to_string())?
-}
-
 /// Chats started in Cursor, for the Agents list.
 #[tauri::command]
 pub async fn cursor_chats() -> Vec<crate::cursor_chats::CursorChat> {
