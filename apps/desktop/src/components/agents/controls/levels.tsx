@@ -75,7 +75,7 @@ export type ModeId = "plan" | "ask" | "edit" | "debug" | "full";
 export const MODE_INFO: { id: ModeId; label: string; note: string; icon: IcName }[] = [
   { id: "plan", label: "Plan", note: "Reads and plans, changes nothing", icon: "file" },
   { id: "ask", label: "Ask", note: "Asks before every change", icon: "warn" },
-  { id: "edit", label: "Edit", note: "Edits files, asks before commands", icon: "diff" },
+  { id: "edit", label: "Edit", note: "Edits files, asks before commands", icon: "pencil" },
   {
     id: "debug",
     label: "Debug",
