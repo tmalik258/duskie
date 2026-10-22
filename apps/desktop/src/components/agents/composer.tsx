@@ -11,7 +11,8 @@ import { ComposerPop } from "./composer/composer-pop";
 import { runCommand } from "./composer/run-command";
 import { useComposerLists } from "./composer/use-composer-lists";
 import { usePopPlace } from "./composer/use-pop-place";
-import { ChatControls, ModeChip } from "./controls";
+import { ChatControls } from "./controls";
+import { ModeChip } from "./controls/mode-chip";
 import { nextAgentMode } from "./modes";
 
 /** Where you type to the agent: / lists commands, @ finds files in the project. */

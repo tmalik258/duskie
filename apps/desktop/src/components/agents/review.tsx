@@ -10,49 +10,7 @@ import { type Session, sendToSession } from "@/lib/agents";
 import { api, EVENTS, listen } from "@/lib/bridge";
 import type { FileChange } from "@/lib/types";
 import { Ic } from "../icon";
-
-type Hunk = FileChange["hunks"][number];
-type Row = { o: number | null; n: number | null; kind: "add" | "del" | "ctx"; text: string };
-
-/** Lines of a hunk with their old and new line numbers. */
-function rows(h: Hunk): Row[] {
-  const m = h.header.match(/-(\d+)(?:,\d+)? \+(\d+)/);
-  let old = m ? Number(m[1]) : 1;
-  let now = m ? Number(m[2]) : 1;
-  const out: Row[] = [];
-  for (const l of h.lines) {
-    if (l.startsWith("\\")) continue;
-    if (l.startsWith("+")) out.push({ o: null, n: now++, kind: "add", text: l.slice(1) });
-    else if (l.startsWith("-")) out.push({ o: old++, n: null, kind: "del", text: l.slice(1) });
-    else out.push({ o: old++, n: now++, kind: "ctx", text: l.slice(1) });
-  }
-  return out;
-}
-
-/** Side by side: each run of removed lines faces the added lines after it. */
-function pairs(rs: Row[]): [Row | null, Row | null][] {
-  const out: [Row | null, Row | null][] = [];
-  for (let i = 0; i < rs.length; ) {
-    if (rs[i].kind === "ctx") {
-      out.push([rs[i], rs[i]]);
-      i++;
-      continue;
-    }
-    const del: Row[] = [];
-    const add: Row[] = [];
-    while (i < rs.length && rs[i].kind === "del") del.push(rs[i++]);
-    while (i < rs.length && rs[i].kind === "add") add.push(rs[i++]);
-    for (let k = 0; k < Math.max(del.length, add.length); k++) out.push([del[k] ?? null, add[k] ?? null]);
-  }
-  return out;
-}
-
-const split = (path: string) => {
-  const i = path.lastIndexOf("/");
-  return i < 0 ? ["", path] : [path.slice(0, i + 1), path.slice(i + 1)];
-};
-const letter = (f: FileChange) => (f.status === "added" ? "A" : f.status === "deleted" ? "D" : "M");
-const keyOf = (f: FileChange, h: Hunk) => `${f.path}:${h.header}`;
+import { keyOf, letter, pairs, rows, split, upsertFile } from "./review/hunk";
 
 /** Placeholder rows while diffs stream in. */
 export function ReviewLoading({ slow }: { slow?: boolean }) {
@@ -79,14 +37,6 @@ export function ReviewLoading({ slow }: { slow?: boolean }) {
       ))}
     </div>
   );
-}
-
-function upsertFile(list: FileChange[], file: FileChange): FileChange[] {
-  const i = list.findIndex((f) => f.path === file.path);
-  if (i < 0) return [...list, file];
-  const next = list.slice();
-  next[i] = file;
-  return next;
 }
 
 export function Review({ session, maxHeight, onDone }: { session: Session; maxHeight: number; onDone: () => void }) {

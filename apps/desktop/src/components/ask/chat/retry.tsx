@@ -10,7 +10,7 @@ import { useNow } from "@/lib/hooks";
 import { Markdown } from "@/lib/markdown";
 import { useReveal } from "@/lib/reveal";
 import { askAgain, askWhenOnline, retryLast, setAsk, setAskModel, useDuskie } from "@/lib/store";
-import { type Agents, PROVIDER_LABELS, type ProviderStatus, type Turn } from "@/lib/types";
+import { PROVIDER_LABELS, type ProviderStatus, type Turn } from "@/lib/types";
 import { useAgentName } from "../use-agent-name";
 
 /** "Try again" (Alt T) under a failed answer. */

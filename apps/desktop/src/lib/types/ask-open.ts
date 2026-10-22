@@ -1,7 +1,4 @@
-// Part of types: AskOpen, Timing, SearchHit, AppTime, formatDuration, BrowserInfo, EditorList, Suggestion, UpdateInfo, UpdateProgress, StoredEvent, AppInfo, HitRect.
-
-import { Settings } from "./ai-settings";
-import { Agents, type AskContext } from "./voice-heard";
+import type { AskContext } from "./voice-heard";
 
 export interface AskOpen {
   context: AskContext;

@@ -6,7 +6,7 @@
 // used instead so feedback never disappears.
 
 import { playMood, playSound } from "./sound/play-mood";
-import { audio, CUE_SOUND, out, SYNTH_CUE, SYNTH_KIT } from "./sound/snd-sound";
+import { audio, CUE_SOUND, SYNTH_CUE, SYNTH_KIT } from "./sound/snd-sound";
 import type { Cue } from "./types";
 
 export function playCue(cue: Cue, volume: number, kitId: string): void {

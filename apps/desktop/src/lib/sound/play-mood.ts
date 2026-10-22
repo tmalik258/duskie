@@ -1,7 +1,7 @@
 // Part of sound: playMood, playSound.
 
 import { playSynth, type SynthSound } from "../synth";
-import { audio, fallbackTone, loadKit, out, SND_FOR, type SndSound, SYNTH_FOR, SYNTH_KIT } from "./snd-sound";
+import { audio, fallbackTone, loadKit, SND_FOR, type SndSound, SYNTH_FOR, SYNTH_KIT } from "./snd-sound";
 
 /** A mascot sound (hello, sparkle, mwah...): its own voice in the Duskie
  * kit, the closest designed sound otherwise. */
