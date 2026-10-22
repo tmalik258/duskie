@@ -5,7 +5,7 @@ import { api, EVENTS, listen } from "../bridge";
 import { watchNet } from "../net";
 import { playSound } from "../sound/play-mood";
 import { preloadSounds } from "../sound/snd-sound";
-import { onAiDelta, onAiDone, onAiProposal, onAiTool } from "./answer-events";
+import { onAiAck, onAiDelta, onAiDone, onAiProposal, onAiTool } from "./answer-events";
 import { confirmSettings, helloOncePerDay, updateLastTurn } from "./chat-turns";
 import { onActionResult, onMascotState, onSuggestionLater, onSuggestionNew } from "./core-events";
 import { setHovered, showDone } from "./done-pill";
@@ -98,6 +98,7 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
         ),
       ),
       listen(EVENTS.aiTool, onAiTool),
+      listen(EVENTS.aiAck, onAiAck),
       listen(EVENTS.aiProposal, onAiProposal),
       listen(EVENTS.islandFocus, ({ until }) => useDuskie.setState({ focusUntil: until })),
       listen(EVENTS.islandDone, ({ id, text }) => {

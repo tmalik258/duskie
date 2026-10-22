@@ -29,6 +29,7 @@ export const EVENTS = {
   aiDelta: "ai://delta",
   aiDone: "ai://done",
   aiTool: "ai://tool",
+  aiAck: "ai://ack",
   connectorsDuplicate: "connectors://duplicate",
   libraryFound: "library://found",
   termData: "term://data",
@@ -82,6 +83,7 @@ export interface EventPayloads {
     /** US dollars, only for Anthropic API answers. */
     cost?: number | null;
   };
+  [EVENTS.aiAck]: { id: string; label: string };
   [EVENTS.aiTool]: { id: string; name: string; label?: string; source?: string | null };
   [EVENTS.connectorsDuplicate]: { app: string; used: string; unused: string[] };
   [EVENTS.libraryFound]: { names: string[] };

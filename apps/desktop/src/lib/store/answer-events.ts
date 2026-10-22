@@ -36,6 +36,16 @@ export function onAiDelta({ id, text }: EventPayloads[typeof EVENTS.aiDelta], so
   }
 }
 
+/** A first status line before any step runs; real steps replace it. */
+export function onAiAck({ id, label }: EventPayloads[typeof EVENTS.aiAck]) {
+  if (early?.id === id) return;
+  if (liveAnswer(id)) {
+    const prev = useDuskie.getState().live;
+    useDuskie.setState({ live: { caption: prev?.caption ?? "", tool: label, done: false } });
+  }
+  updateLastTurn(id, (t) => (t.tool || t.content ? t : { ...t, tool: label }));
+}
+
 export function onAiTool({ id, name, label, source }: EventPayloads[typeof EVENTS.aiTool]) {
   if (early?.id === id) {
     early.tools.push({ name, label, source });

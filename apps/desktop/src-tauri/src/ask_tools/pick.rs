@@ -154,6 +154,18 @@ pub async fn pick(app: &AppHandle, question: &str, defs: Vec<ToolDef>) -> Vec<To
         .collect()
 }
 
+/// The status line shown the moment a question is asked, from its intent.
+pub fn first_step(question: &str) -> Option<&'static str> {
+    let tools = by_intent(question);
+    let first = *tools.first()?;
+    Some(match first {
+        DIAGNOSE => "Looking into it",
+        SYSTEM => "Checking this PC",
+        HELP => "Checking Duskie's guide",
+        _ => "Checking",
+    })
+}
+
 /// Tools a question's intent always needs, on top of the picked ones, so a
 /// "why" question is never left without the tools that can find out why.
 pub fn by_intent(question: &str) -> Vec<&'static str> {
@@ -299,6 +311,12 @@ mod intent_tests {
         assert!(by_intent("Zen loads sites slower than Chrome").contains(&SYSTEM));
         assert!(by_intent("How do you work?").contains(&HELP));
         assert!(by_intent("Rewrite this sentence").is_empty());
+        assert_eq!(
+            first_step("Why is Cursor not updating?"),
+            Some("Looking into it")
+        );
+        assert_eq!(first_step("Which port is free?"), Some("Checking this PC"));
+        assert_eq!(first_step("Rewrite this sentence"), None);
         let names: Vec<String> = by_words("Is localhost busy?", defs())
             .into_iter()
             .map(|d| d.name)

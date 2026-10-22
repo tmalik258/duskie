@@ -25,6 +25,8 @@ use crate::composio_api as api;
 use crate::state::{AppState, lock};
 
 pub const TOOL_EVENT: &str = "ai://tool";
+/// A first status line from the question alone, before any tool runs.
+pub const ACK_EVENT: &str = "ai://ack";
 /// The tool the local model calls when a request is beyond it.
 pub const HANDOFF_TOOL: &str = "continue_in_claude_code";
 /// Most Composio tools offered to the local model at once; small models do
@@ -622,6 +624,12 @@ impl AiProvider for LocalWithTools {
             .map(|m| m.content.as_str())
             .unwrap_or_default();
         let started = std::time::Instant::now();
+        // Say at once what Duskie is about to do, before the model replies.
+        if let Some(label) = crate::ask_tools::first_step(question) {
+            let _ = self
+                .app
+                .emit(ACK_EVENT, json!({ "id": self.chat_id, "label": label }));
+        }
         let mut with_tools = req.clone();
         // Screen first: local vision describes then chat answers; cloud keeps
         // the image for native multimodal; OCR when vision is off or fails.
