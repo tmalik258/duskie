@@ -150,6 +150,7 @@ const SHARED: &[&str] = &[
     "notifications",
     "pc_status",
     "storage",
+    "system",
     "pc_control",
     "windows",
     "open",

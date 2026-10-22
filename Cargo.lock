@@ -1581,6 +1581,7 @@ dependencies = [
  "duskie-voice",
  "getrandom 0.3.4",
  "keyring",
+ "listeners",
  "log",
  "portable-pty",
  "regex",
