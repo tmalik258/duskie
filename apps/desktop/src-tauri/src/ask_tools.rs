@@ -19,12 +19,14 @@ mod open;
 mod pick;
 mod proposals;
 mod screen;
+mod system;
 
 pub use defs::*;
 pub use open::*;
 pub use pick::*;
 pub use proposals::*;
 pub use screen::*;
+pub use system::*;
 
 const SEARCH: &str = "search";
 const TODAY: &str = "today";
@@ -53,6 +55,7 @@ const RECIPES: &str = "recipes";
 const REMEMBER: &str = "remember";
 const USE_SKILL: &str = "use_skill";
 const HELP: &str = "duskie_help";
+const SYSTEM: &str = "system";
 
 /// The Ask chat answering right now, so tools called through Duskie's
 /// MCP server (by Claude Code or Codex) put their buttons in it.
@@ -152,6 +155,7 @@ const ASK_ACTIONS: &[&str] = &[
     "clear_compat",
     "git_commit",
     "git_delete_branches",
+    "kill_port",
 ];
 
 /// An action waiting for a tap, from one chat.
@@ -310,6 +314,10 @@ async fn run_tool(app: &AppHandle, chat_id: &str, name: &str, args: &Value) -> O
                 );
             }
             out
+        }
+        SYSTEM => {
+            let args = args.clone();
+            blocking(move || system_tool(&args)).await
         }
         STORAGE => tokio::task::spawn_blocking(crate::disk::report)
             .await

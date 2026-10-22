@@ -14,6 +14,7 @@ pub fn reads_only(name: &str) -> bool {
             | SCREEN
             | PC_STATUS
             | STORAGE
+            | SYSTEM
             | HELP
             | DOCTOR
             | GIT
@@ -39,6 +40,7 @@ pub fn is_own(name: &str) -> bool {
             | REVEAL
             | PC_STATUS
             | STORAGE
+            | SYSTEM
             | HELP
             | DOCTOR
             | GIT

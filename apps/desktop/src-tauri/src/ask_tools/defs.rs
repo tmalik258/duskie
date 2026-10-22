@@ -418,6 +418,7 @@ pub fn defs() -> Vec<ToolDef> {
                 "required": ["target"],
             }),
         },
+        system_def(),
     ]
 }
 
@@ -456,6 +457,7 @@ pub fn step_label(name: &str, args: &Value) -> String {
         NOTIFS => "Checking your notifications".into(),
         PC_STATUS => "Checking your PC".into(),
         STORAGE => "Measuring what takes space".into(),
+        SYSTEM => system_label(args),
         HELP => "Looking it up in Duskie's help".into(),
         DOCTOR => "Reading crash records".into(),
         GIT => "Reading the project's git".into(),
