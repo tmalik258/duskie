@@ -459,6 +459,9 @@ pub struct Attach {
     /// "Think harder": let the model reason before answering.
     #[serde(default)]
     pub think: bool,
+    /// Files attached in the Ask box (saved paths).
+    #[serde(default)]
+    pub files: Vec<String>,
 }
 
 /// Chats started early and not shown yet, by id.
@@ -827,6 +830,15 @@ pub fn chat(
             log_ask_user(&id, q, &attach, local_only);
             crate::ask_tools::begin_turn(&id, q);
         }
+        let (attached, extra) = crate::ask_files::read(&attach.files);
+        if !extra.is_empty()
+            && let Some(m) = messages
+                .iter_mut()
+                .rev()
+                .find(|m| m.role == duskie_ai::Role::User)
+        {
+            m.content.push_str(&extra);
+        }
         let image = if attach.screen {
             match screenshot(&app).await {
                 Ok(png) => Some(png),
@@ -848,7 +860,7 @@ pub fn chat(
                 }
             }
         } else {
-            None
+            attached
         };
         // "Turn on hotspot", "mute": done at once, no model to misread it.
         // Not while held: the question may still change.

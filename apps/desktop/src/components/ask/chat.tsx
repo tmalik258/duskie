@@ -5,6 +5,7 @@
 import { extractChoices, splitOptions } from "@/lib/options";
 import { useDuskie } from "@/lib/store";
 import { PROVIDER_LABELS, type Turn } from "@/lib/types";
+import { MessageText } from "../attach/message-text";
 import { AnswerActions } from "./chat/answer-actions";
 import { Answer, LiveStep, OfflineChips, TryAnother } from "./chat/retry";
 import { AddSkill, modelOf, Steps, seconds, TAG_NAMES, yamlBlock } from "./chat/yaml-block";
@@ -30,7 +31,7 @@ export function Chat({ turns }: { turns: Turn[] }) {
           return (
             // biome-ignore lint/suspicious/noArrayIndexKey: turns only ever append
             <div key={i} className="ak-um ak-in">
-              {t.content}
+              <MessageText text={t.content} />
               {t.screen && (
                 <span className="mt-0.5 block text-[11px] text-[rgb(235_235_245/0.62)]">with screenshot</span>
               )}

@@ -3,6 +3,7 @@ mod activity;
 mod agents;
 mod ai;
 mod ask;
+mod ask_files;
 mod ask_tools;
 mod audit;
 mod brief;
