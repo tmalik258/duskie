@@ -10,6 +10,7 @@ import { answerQuestion, interruptSession, type Session, useAgents } from "@/lib
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
+import { agoText, clockText } from "@/lib/time-text";
 import type { InboxStatus } from "@/lib/types";
 import { limitNote } from "./agents/session/format";
 import { CardChips, CardHead, CardList, CardNote, type CardRow } from "./island-card";
@@ -45,15 +46,8 @@ function openSession(id: string) {
   void api.askOpen();
 }
 
-function ago(ms: number, now: number): string {
-  const min = Math.max(1, Math.round((now - ms) / 60_000));
-  return min < 60 ? `${min} min` : `${Math.round(min / 60)} h`;
-}
-
-function clock(ms: number): string {
-  const s = Math.max(0, Math.round(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-}
+const ago = (ms: number, now: number) => agoText(ms, { atLeastOne: true }, now);
+const clock = clockText;
 
 /** Keys for the chips under a card: Enter and Alt + a letter or digit. */
 function useKeys(keys: Record<string, (() => void) | undefined>) {

@@ -5,6 +5,7 @@
 import { memo, type ReactNode, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/bridge";
 import { friendlyError } from "@/lib/friendly";
+import { useCopy } from "@/lib/hooks";
 import { startWaiting, stopWaiting, useDuskie } from "@/lib/store";
 import type { SetupItem } from "@/lib/types";
 import { ItemGuide } from "./setup-guides";
@@ -231,7 +232,7 @@ export const SetupRow = memo(function SetupRow({
             <div className="min-w-0 flex-1">
               <Code text={multiline ? item.command.split("\n")[0] : item.command} />
             </div>
-            <CopyButton text={item.command} />
+            <CopyCommand text={item.command} />
           </div>
         </div>
       )}
@@ -249,20 +250,6 @@ function Code({ text }: { text: string }) {
       </code>
     </Tip>
   );
-}
-
-function CopyButton({ text }: { text: string }) {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // Clipboard access can be refused; the command is selectable anyway.
-    }
-  };
-  return <SmallButton onClick={() => void copy()}>{copied ? "Copied" : "Copy"}</SmallButton>;
 }
 
 export function SmallButton({
@@ -313,4 +300,9 @@ export function SetupStatusMark({ checking, done }: { checking: boolean; done: b
       {!checking && done ? "✓" : ""}
     </span>
   );
+}
+
+function CopyCommand({ text }: { text: string }) {
+  const { copied, copy } = useCopy(text);
+  return <SmallButton onClick={copy}>{copied ? "Copied" : "Copy"}</SmallButton>;
 }

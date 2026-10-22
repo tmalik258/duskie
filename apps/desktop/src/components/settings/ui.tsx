@@ -16,6 +16,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { useCopy } from "@/lib/hooks";
 import { shortcutBinding, shortcutEnabled } from "@/lib/shortcuts";
 import { setOverlayHit, useDuskie } from "@/lib/store";
 import { EASE_OUT_STRONG } from "@/lib/ui-motion";
@@ -734,22 +735,9 @@ export function StatusDot({ state }: { state: "ok" | "off" | "checking" }) {
 }
 
 export function CopyButton({ text, label = "Copy" }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
+  const { copied, copy } = useCopy(text);
   return (
-    <Button
-      small
-      onClick={() =>
-        void navigator.clipboard
-          .writeText(text)
-          .then(() => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 1500);
-          })
-          .catch(() => {
-            // Clipboard access can be refused; the text is selectable anyway.
-          })
-      }
-    >
+    <Button small onClick={copy}>
       {copied ? "Copied" : label}
     </Button>
   );

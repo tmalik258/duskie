@@ -4,6 +4,7 @@
 
 import { cancelQueued, type Session, SLOTS, useAgents } from "@/lib/agents";
 import { useNow } from "@/lib/hooks";
+import { minutesText } from "@/lib/time-text";
 import { Ic } from "../icon";
 import { Tip } from "../tip";
 import { AgentMark } from "./marks";
@@ -22,12 +23,7 @@ function groupOf(s: Session): Group {
 
 const MODE_WORD: Record<string, string> = { plan: "Plan", ask: "Ask", edit: "Edit", debug: "Debug", full: "Full" };
 
-function ago(ms: number): string {
-  const m = Math.max(0, Math.round(ms / 60_000));
-  if (m < 60) return `${m} min`;
-  const h = Math.round(m / 60);
-  return h < 24 ? `${h} h` : `${Math.round(h / 24)} d`;
-}
+const ago = (ms: number) => minutesText(ms / 60_000, { days: true });
 
 /** Agents home: every session grouped by what it needs, newest first. */
 export function SessionList({ sessions }: { sessions: Session[] }) {

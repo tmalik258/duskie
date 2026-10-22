@@ -182,3 +182,19 @@ function useMedia(query: string): boolean {
   }, [query]);
   return on;
 }
+
+/** Copies text; `copied` stays true for 1.5 s. Refused clipboard access is ignored. */
+export function useCopy(text: string): { copied: boolean; copy: () => void } {
+  const [copied, setCopied] = useState(false);
+  const copy = () =>
+    void navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      })
+      .catch(() => {
+        // Clipboard access can be refused; the text is selectable anyway.
+      });
+  return { copied, copy };
+}

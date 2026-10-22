@@ -10,6 +10,7 @@ import { type Session, seenUsage, seenWindows } from "@/lib/agents";
 import { CLAUDE_MODELS, CODEX_MODELS, FAST_CLAUDE_MODEL } from "@/lib/ai-models";
 import { api } from "@/lib/bridge";
 import { setOverlayHit, useDuskie } from "@/lib/store";
+import { agoText } from "@/lib/time-text";
 import type { LimitState } from "@/lib/types";
 import { Ic, type IcName } from "../icon";
 import { Select, type SelectOption } from "../settings/ui";
@@ -254,10 +255,7 @@ function resetText(at: number | null): string {
   return h ? `Resets in ${h} hr ${m} min` : `Resets in ${m} min`;
 }
 
-function ago(t: number): string {
-  const mins = Math.round((Date.now() - t) / 60_000);
-  return mins < 1 ? "just now" : mins < 60 ? `${mins} min ago` : `${Math.round(mins / 60)} h ago`;
-}
+const ago = (t: number) => agoText(t, { suffix: true, justNow: "just now" });
 
 /** Ticks only while the usage popover is open (this component mounts with the pop). */
 function UsageBody({

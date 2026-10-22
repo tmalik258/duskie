@@ -22,6 +22,7 @@ import {
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useDuskie } from "@/lib/store";
+import { agoText } from "@/lib/time-text";
 import type { Agents } from "@/lib/types";
 import { Composer } from "./composer";
 import { AgentMark, agentMarkId } from "./marks";
@@ -204,12 +205,7 @@ function Tile({ s, n, focused }: { s: Session; n: number; focused: boolean }) {
   );
 }
 
-function ago(t: number): string {
-  const mins = Math.round((Date.now() - t) / 60_000);
-  if (mins < 60) return `${Math.max(1, mins)} min ago`;
-  const h = Math.round(mins / 60);
-  return h < 24 ? `${h} h ago` : `${Math.round(h / 24)} d ago`;
-}
+const ago = (t: number) => agoText(t, { suffix: true, atLeastOne: true, days: true });
 
 const PICK_NOTE: Record<string, string> = {
   claude_code: "Cloud",
