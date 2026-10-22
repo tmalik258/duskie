@@ -10,7 +10,6 @@ export function addAskFile(i: ContextItem) {
 }
 
 export function removeAskFile(i: ContextItem) {
-  if (i.url) URL.revokeObjectURL(i.url);
   useAskFiles.setState((s) => ({ items: s.items.filter((x) => x !== i) }));
 }
 
