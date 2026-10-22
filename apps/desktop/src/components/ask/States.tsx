@@ -9,7 +9,7 @@ import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { askWhenOnline, retryLast, setAsk, setAskModel, useDuskie } from "@/lib/store";
 import type { SetupItem, SetupStatus, Turn } from "@/lib/types";
-import { AGENT_IMAGES } from "../agents/AgentsTab";
+import { AGENT_IMAGES } from "../agents/marks";
 import { useAgentName } from "./Chat";
 
 interface Failure {

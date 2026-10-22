@@ -1,7 +1,7 @@
 "use client";
 import { api } from "@/lib/bridge";
 import type { ChatSummary, SearchHit } from "@/lib/types";
-import { Ic, Icon } from "../Icon";
+import { Ic } from "../Icon";
 import { Tip } from "../Tip";
 import { ago, Kbd, Snippet, SOURCE_LABELS, scrollIfActive } from "./parts";
 

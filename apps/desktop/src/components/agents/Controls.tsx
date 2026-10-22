@@ -13,7 +13,7 @@ import { setOverlayHit, useDuskie } from "@/lib/store";
 import type { LimitState } from "@/lib/types";
 import { Ic, type IcName } from "../Icon";
 import { Select, type SelectOption } from "../settings/ui";
-import { AGENT_IMAGES, AGENT_MARKS } from "./AgentsTab";
+import { AGENT_IMAGES, AGENT_MARKS } from "./marks";
 
 /** Thinking levels; "max" is the most each agent allows. */
 const LEVELS: [string, string, string][] = [

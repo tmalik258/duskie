@@ -4,7 +4,7 @@
 
 import { sendChat, setAsk, useDuskie } from "@/lib/store";
 import type { AskContext, CalendarToday } from "@/lib/types";
-import { Ic, type IcName, Icon } from "../Icon";
+import { Ic, type IcName } from "../Icon";
 import { Tip } from "../Tip";
 import { pendingCount, useAltDigits } from "./Proposals";
 import { KeyHint } from "./parts";
