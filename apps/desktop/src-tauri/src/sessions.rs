@@ -11,6 +11,7 @@ mod claude;
 mod codex;
 mod edits;
 mod local;
+mod local_calls;
 mod plain;
 mod plans;
 pub mod reviews;
