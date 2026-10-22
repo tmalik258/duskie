@@ -5,25 +5,22 @@
 
 import { useEffect, useState } from "react";
 import { api } from "@/lib/bridge";
-import { playCue } from "@/lib/sound";
-import { cueVolume, SYNTH_KIT } from "@/lib/sound/snd-sound";
 import { updateSettings, useDuskie } from "@/lib/store";
-import { type AppInfo, CUES, MASCOT_STATES } from "@/lib/types";
+import type { AppInfo } from "@/lib/types";
 import { SetupChecklist } from "../setup-checklist";
-import { CopyDiagnostics } from "./home-tab/copy-diagnostics";
+import { AboutSection } from "./home-tab/about-section";
 import {
   CloneRules,
   CodeFolders,
   DaySummaryToggle,
   END_OF_DAY,
   type HomePart,
-  KitStatus,
   LeftElsewhere,
-  SOUND_KITS,
 } from "./home-tab/day-summary-skill";
 import { NotificationInbox, UpdateRow } from "./home-tab/notification-inbox";
-import { Backup, RecentActions, RecentEvents, TimeToday } from "./home-tab/time-today";
-import { Button, Field, Section, Select, Slider, Toggle } from "./ui";
+import { SoundSection } from "./home-tab/sound-section";
+import { Backup, RecentActions, TimeToday } from "./home-tab/time-today";
+import { Field, Section, Select, Toggle } from "./ui";
 
 export function HomeTab({
   onError,
@@ -37,7 +34,6 @@ export function HomeTab({
 }) {
   const on = (p: HomePart) => !part || part === p;
   const settings = useDuskie((s) => s.settings);
-  const mascot = useDuskie((s) => s.mascot);
   const [info, setInfo] = useState<AppInfo | null>(null);
   useEffect(() => {
     void api.appInfo().then(setInfo);
@@ -110,52 +106,7 @@ export function HomeTab({
           <UpdateRow version={info?.version ?? ""} onError={onError} />
         </Section>
       )}
-      {on("sounds") && (
-        <Section
-          collapsible={!part}
-          summary={settings.muted ? "Muted" : "On"}
-          title="Sound"
-          hint={
-            settings.soundKit === SYNTH_KIT
-              ? "Soft sounds made by Duskie itself."
-              : "Sounds by SND (snd.dev), designed by Dentsu Inc. and Starryworks Inc."
-          }
-          keywords="volume mute audio cue kit voice"
-        >
-          <Field label="Sounds">
-            <Select
-              label="Sounds"
-              value={settings.soundKit}
-              options={SOUND_KITS}
-              onChange={(soundKit) => save({ soundKit })}
-            />
-          </Field>
-          <KitStatus kit={settings.soundKit} />
-          <Toggle label="Mute all sounds" checked={settings.muted} onChange={(muted) => save({ muted })} />
-          <Slider
-            label="Master volume"
-            value={settings.masterVolume}
-            onChange={(masterVolume) => save({ masterVolume })}
-          />
-          <details className="text-[13px]">
-            <summary className="cursor-pointer text-(--muted)">Each sound</summary>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
-              {CUES.map((cue) => (
-                <div key={cue} className="flex items-center gap-2">
-                  <Slider
-                    label={cue}
-                    value={settings.cueVolumes[cue] ?? 1}
-                    onChange={(v) => save({ cueVolumes: { ...settings.cueVolumes, [cue]: v } })}
-                  />
-                  <Button small onClick={() => playCue(cue, cueVolume(settings, cue), settings.soundKit)}>
-                    Test
-                  </Button>
-                </div>
-              ))}
-            </div>
-          </details>
-        </Section>
-      )}
+      {on("sounds") && <SoundSection collapsible={!part} save={save} />}
       {on("general") && (
         <Section collapsible summary="What Duskie did, with Undo" title="History" keywords="undo actions recent">
           <RecentActions onError={onError} />
@@ -166,45 +117,7 @@ export function HomeTab({
           <Backup onError={onError} />
         </Section>
       )}
-      {info && on("updates") && (
-        <Section collapsible summary={info.version} title="About" keywords="version database path">
-          <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="text-(--muted)">Version</dt>
-            <dd>{info.version}</dd>
-            <dt className="text-(--muted)">Database</dt>
-            <dd className="font-mono text-xs break-all">{info.dbPath}</dd>
-            <dt className="text-(--muted)">Settings</dt>
-            <dd className="font-mono text-xs break-all">{info.settingsPath}</dd>
-            <dt className="text-(--muted)">Stored events</dt>
-            <dd>{info.eventCount}</dd>
-          </dl>
-          <CopyDiagnostics onError={onError} />
-          <Toggle
-            label="Offer to report crashes"
-            hint="After a crash, Duskie shows the report and lets you send it. It holds the version, Windows version and the error, never your files or chats."
-            checked={settings.crashReports}
-            onChange={(crashReports) => save({ crashReports })}
-          />
-          <details className="text-[13px]">
-            <summary className="cursor-pointer text-(--muted)">Debug tools</summary>
-            <div className="mt-2 flex flex-col gap-2">
-              <div className="flex flex-wrap gap-2">
-                {MASCOT_STATES.map((s) => (
-                  <Button key={s} small active={s === mascot} onClick={() => void api.debugSetState(s)}>
-                    {s}
-                  </Button>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button small onClick={() => void api.debugEmitEvent()}>
-                  Emit test event
-                </Button>
-              </div>
-              <RecentEvents />
-            </div>
-          </details>
-        </Section>
-      )}
+      {info && on("updates") && <AboutSection info={info} save={save} onError={onError} />}
     </>
   );
 }
