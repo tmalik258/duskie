@@ -8,6 +8,7 @@ import { motion } from "motion/react";
 import { type ReactNode, useEffect, useLayoutEffect, useRef } from "react";
 import { api } from "@/lib/bridge";
 import { useNow } from "@/lib/hooks";
+import { clockText } from "@/lib/time-text";
 import { Ic } from "./icon";
 
 export type PillKind =
@@ -45,10 +46,7 @@ export interface PillModel {
   onCancel?: () => void;
 }
 
-const clock = (ms: number) => {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-};
+const clock = clockText;
 
 export function IslandPill({ model, onWidth }: { model: PillModel; onWidth: (w: number) => void }) {
   const ref = useRef<HTMLDivElement>(null);

@@ -13,6 +13,7 @@ import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
 import { shortcutBinding } from "@/lib/shortcuts";
 import { installUpdate, updateSettings, useAssistantName, useDuskie } from "@/lib/store";
+import { minutesText } from "@/lib/time-text";
 import { pickTip } from "@/lib/tips";
 import { type AppTime, type CalendarToday, formatDuration, type LaterItem } from "@/lib/types";
 import { updateBusy, updateLabel } from "@/lib/updates";
@@ -286,11 +287,7 @@ function LaterList() {
   );
 }
 
-function ago(mins: number): string {
-  if (mins < 1) return "now";
-  if (mins < 60) return `${mins} min`;
-  return `${Math.floor(mins / 60)} h`;
-}
+const ago = (mins: number) => minutesText(mins, { justNow: "now", floorHours: true });
 
 function QuickActions({
   paused,

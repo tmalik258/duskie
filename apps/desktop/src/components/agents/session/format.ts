@@ -1,11 +1,12 @@
 // Small text helpers for a session: times, the step tag and the usage note.
 
 import type { Session } from "@/lib/agents";
+import { clockText } from "@/lib/time-text";
 
 /** "1:12", or "8 s" under a minute. */
 export function clock(ms: number): string {
   const s = Math.round(ms / 1000);
-  return s < 60 ? `${s} s` : `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+  return s < 60 ? `${s} s` : clockText(ms);
 }
 
 /** follow:false + scroll:0 is a bad flush (open before layout); treat as stick-to-bottom. */

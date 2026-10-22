@@ -8,6 +8,7 @@ import { api, EVENTS, listen } from "./bridge";
 import { mask } from "./mask";
 import { claimsPlanReady, parsePlanDocument } from "./plan";
 import { dockTotal, readSeam, stacked } from "./seam";
+import { agoText } from "./time-text";
 import type { AgentMode, AgentStarted } from "./types";
 
 export interface Step {
@@ -954,8 +955,7 @@ export function usageLine(agent: string, now = Date.now()): string | null {
   if (live.length === 0) return "ready";
   const u = live.reduce((a, b) => (pct(b) > pct(a) ? b : a));
   const span = u.window === "five_hour" ? "5-hour" : u.window.startsWith("seven_day") ? "week" : "plan";
-  const mins = Math.round((now - u.at) / 60_000);
-  const ago = mins < 1 ? "just now" : mins < 60 ? `${mins} min ago` : `${Math.round(mins / 60)} h ago`;
+  const ago = agoText(u.at, { suffix: true, justNow: "just now" }, now);
   return `${pct(u)}% of ${span}, ${ago}`;
 }
 
