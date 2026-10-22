@@ -31,8 +31,9 @@ impl Pause {
 
 /// Shortcuts besides Ask, with their defaults.
 pub const SHORTCUTS: &[(&str, &str)] = &[
-    ("agents", "Ctrl+Shift+Space"),
-    ("talk", "Ctrl+Alt+Space"),
+    ("agents", "Ctrl+Alt+A"),
+    ("git", "Ctrl+Alt+G"),
+    ("talk", "Ctrl+Alt+T"),
     ("accept", "Ctrl+Alt+Enter"),
     ("dismiss", "Ctrl+Alt+Backspace"),
     ("screen", "Ctrl+Alt+S"),
@@ -78,6 +79,10 @@ pub struct Settings {
     /// clipboard, pause, settings). A leading `-` turns one off without
     /// clearing the combo; empty means no binding yet.
     pub shortcuts: BTreeMap<String, String>,
+    /// Which set of default shortcuts the saved ones were made from. A file
+    /// without it is from before version 1, so it reads as 0.
+    #[serde(default)]
+    pub shortcuts_version: u32,
     /// Where projects and files open: an editor id ("cursor", "pycharm"),
     /// or "auto" for the one used most this week.
     pub code_editor: String,
@@ -758,6 +763,7 @@ impl Default for Settings {
             skills: BTreeMap::new(),
             palette_hotkey: DEFAULT_PALETTE_HOTKEY.into(),
             shortcuts: default_shortcuts(),
+            shortcuts_version: SHORTCUTS_VERSION,
             code_editor: "auto".into(),
             code_folders: Vec::new(),
             saved_projects: Vec::new(),
@@ -797,7 +803,16 @@ impl Default for Settings {
     }
 }
 
-pub const DEFAULT_PALETTE_HOTKEY: &str = "Ctrl+Space";
+pub const DEFAULT_PALETTE_HOTKEY: &str = "Super+Alt+Space";
+
+/// Defaults before shortcuts version 1, moved once when still unchanged:
+/// Ctrl+Space is VS Code's suggestions and Ctrl+Alt+Space the Google app's.
+const OLD_DEFAULT_KEYS: &[(&str, &str)] = &[
+    ("ask", "Ctrl+Space"),
+    ("agents", "Ctrl+Shift+Space"),
+    ("talk", "Ctrl+Alt+Space"),
+];
+const SHORTCUTS_VERSION: u32 = 1;
 /// Screens in the first-run welcome (Welcome, Your AI, Connect, Tools, Extras).
 pub const WELCOME_STEP_COUNT: u32 = 5;
 
@@ -914,6 +929,23 @@ impl Settings {
         }
         // Trim; keep a leading `-` (Off) so the combo stays saved.
         self.palette_hotkey = sanitize_shortcut(&self.palette_hotkey);
+        // Old defaults nobody changed move to the new ones, once; keys you
+        // picked yourself stay.
+        if self.shortcuts_version < SHORTCUTS_VERSION {
+            for (action, old) in OLD_DEFAULT_KEYS {
+                if *action == "ask" {
+                    if self.palette_hotkey == *old {
+                        self.palette_hotkey = DEFAULT_PALETTE_HOTKEY.into();
+                    }
+                } else if let Some(keys) = self.shortcuts.get_mut(*action)
+                    && keys == old
+                    && let Some((_, new)) = SHORTCUTS.iter().find(|(a, _)| a == action)
+                {
+                    *keys = (*new).into();
+                }
+            }
+            self.shortcuts_version = SHORTCUTS_VERSION;
+        }
         for keys in self.shortcuts.values_mut() {
             *keys = sanitize_shortcut(keys);
         }
@@ -1022,7 +1054,7 @@ mod tests {
         let mut s = Settings::default();
         s.ai.order = vec!["local".into(), "bogus".into(), "local".into()];
         s.ai.semif.mode = "weird".into();
-        s.palette_hotkey = " Ctrl+Space ".into();
+        s.palette_hotkey = " Ctrl+K ".into();
         let s = s.sanitized();
         assert_eq!(
             s.ai.order,
@@ -1040,7 +1072,35 @@ mod tests {
         );
         assert_eq!(s.ai.coding_agent, "auto");
         assert_eq!(s.ai.semif.mode, "direct");
-        assert_eq!(s.palette_hotkey, "Ctrl+Space");
+        assert_eq!(s.palette_hotkey, "Ctrl+K");
+    }
+
+    #[test]
+    fn old_default_keys_move_once_and_own_keys_stay() {
+        let mut s = Settings {
+            palette_hotkey: "Ctrl+Space".into(),
+            shortcuts_version: 0,
+            ..Settings::default()
+        };
+        s.shortcuts
+            .insert("agents".into(), "Ctrl+Shift+Space".into());
+        s.shortcuts.insert("talk".into(), "Ctrl+Q".into());
+        let s = s.sanitized();
+        assert_eq!(s.palette_hotkey, DEFAULT_PALETTE_HOTKEY);
+        assert_eq!(s.shortcuts["agents"], "Ctrl+Alt+A");
+        assert_eq!(s.shortcuts["talk"], "Ctrl+Q");
+        assert_eq!(s.shortcuts["git"], "Ctrl+Alt+G");
+        // Picked again after the move: stays.
+        let mut again = s.clone();
+        again.palette_hotkey = "Ctrl+Space".into();
+        assert_eq!(again.sanitized().palette_hotkey, "Ctrl+Space");
+    }
+
+    #[test]
+    fn a_file_from_before_reads_as_version_0() {
+        let s: Settings = serde_json::from_str(r#"{"paletteHotkey":"Ctrl+Space"}"#).unwrap();
+        assert_eq!(s.shortcuts_version, 0);
+        assert_eq!(s.sanitized().palette_hotkey, DEFAULT_PALETTE_HOTKEY);
     }
 
     #[test]

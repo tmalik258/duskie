@@ -83,6 +83,7 @@ export interface ChatSummary {
 /** Shortcut actions besides Ask, in the order Settings shows them. */
 export const SHORTCUT_ACTIONS: { id: string; label: string }[] = [
   { id: "agents", label: "Agents" },
+  { id: "git", label: "Git" },
   { id: "talk", label: "Talk" },
   { id: "accept", label: "Accept the suggestion" },
   { id: "dismiss", label: "Stop or Not now" },

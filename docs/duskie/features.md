@@ -28,7 +28,7 @@ switch skills on or off, or set them to Auto. Destructive actions always ask.
 
 drop YAML files into the folder shown in Settings > Found on this PC (format in `skills/README.md`).
 
-## Press Ctrl+Space
+## Press Win+Alt+Space
 
 (or the search button on the island) and the island becomes Ask mode: type a command or ask anything, and the answer streams right there. Attach the app you were in or your clipboard with the chips; "This PC only" keeps the chat on a local model. Esc or a click elsewhere folds it back; the conversation stays for next time.
 

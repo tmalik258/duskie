@@ -26,7 +26,7 @@ export const X_A = {
   },
   listen: {
     label: "Listen",
-    when: "Wake word or Ctrl+Alt+Space",
+    when: "Wake word or Ctrl+Alt+T",
     eyes: "wide",
     rim: AI,
     pose: { scale: 1.03, tilt: -8 },

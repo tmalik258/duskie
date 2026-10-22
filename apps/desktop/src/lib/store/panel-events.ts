@@ -1,6 +1,6 @@
 // Opening and closing Ask, and finishing a wait once it is done.
 
-import { setTab, startHere } from "../agents";
+import { setTab, showGit, startHere } from "../agents";
 import { api, type EVENTS, type EventPayloads } from "../bridge";
 import { putCached, SETUP_STATUS_CACHE_KEY } from "../cache";
 import { playCue } from "../sound";
@@ -141,7 +141,10 @@ export function onAskOpen(open: EventPayloads[typeof EVENTS.askOpen]) {
     },
   });
   if (open.project) startHere(open.project, open.prompt);
-  else if (open.tab === "agents" || open.tab === "ask") setTab(open.tab);
+  else if (open.tab === "git") {
+    setTab("agents");
+    void showGit();
+  } else if (open.tab === "agents" || open.tab === "ask") setTab(open.tab);
   if (open.ask && open.prompt) sendChat(open.prompt, { clipboard: clip });
 }
 

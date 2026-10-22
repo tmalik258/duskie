@@ -10,7 +10,7 @@ Events, history and settings stay on the PC in a local database. AI and online s
 
 ## Ask mode
 
-Ctrl+Space (or the search button on the island) opens Ask. Duskie answers with tools that check the real PC: files and history, ports and processes, installed apps and their logs, Windows settings, the web, and connected apps. Changes are offered as buttons; nothing changes until the user taps one. "This PC only" keeps a chat on the local model with no web tools.
+Win+Alt+Space (or the search button on the island) opens Ask. Duskie answers with tools that check the real PC: files and history, ports and processes, installed apps and their logs, Windows settings, the web, and connected apps. Changes are offered as buttons; nothing changes until the user taps one. "This PC only" keeps a chat on the local model with no web tools.
 
 ## Which AI answers
 

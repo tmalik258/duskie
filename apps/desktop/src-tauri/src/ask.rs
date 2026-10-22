@@ -1,5 +1,5 @@
 //! Ask mode: the island itself grows into a panel for commands
-//! and chat. Ctrl+Space opens Ask; Ctrl+Shift+Space opens Agents. Esc or
+//! and chat. Win+Alt+Space opens Ask; Ctrl+Alt+A opens Agents. Esc or
 //! clicking anywhere else closes it. Until onboarding is finished, the island
 //! stays locked on welcome: blur, Esc and the Ask shortcut cannot dismiss it
 //! for good. Hide parks it (other apps stay usable); hovering the island
@@ -188,6 +188,11 @@ pub fn toggle(app: &AppHandle) {
 /// Opens (or closes, if already on) the Agents tab.
 pub fn toggle_agents(app: &AppHandle) {
     toggle_tab(app, "agents");
+}
+
+/// Opens Agents with the Git dock (or closes it, if already on).
+pub fn toggle_git(app: &AppHandle) {
+    toggle_tab(app, "git");
 }
 
 /// Opens (or closes, if already on) Settings.

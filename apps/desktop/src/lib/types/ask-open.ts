@@ -19,7 +19,7 @@ export interface AskOpen {
   /** Opens Agents with a new session in this project. */
   project?: string | null;
   /** Ask panel tab to show. */
-  tab?: "ask" | "agents" | null;
+  tab?: "ask" | "agents" | "git" | null;
   /** Rust open generation; stale opens after a close are ignored. */
   panelGen?: number;
 }
