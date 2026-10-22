@@ -2,16 +2,26 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import vm from "node:vm";
+import { buildSync } from "esbuild";
 import ts from "typescript";
 
-const source = readFileSync(new URL("../src/lib/agents.ts", import.meta.url), "utf8");
+// lib/agents is a barrel over several modules, so bundle it; the bridge, mask
+// and zustand stay outside and are stubbed below.
+const source = buildSync({
+  entryPoints: [new URL("../src/lib/agents.ts", import.meta.url).pathname],
+  bundle: true,
+  write: false,
+  format: "cjs",
+  target: "es2022",
+  external: ["zustand", "../bridge", "../mask", "./mask"],
+}).outputFiles[0].text;
 const commandsSource = readFileSync(new URL("../src/lib/agent-commands.ts", import.meta.url), "utf8");
 function boot(saved, storage = new Map(), rejectMode = false) {
   if (saved) storage.set("sidekick.agents", JSON.stringify(saved));
   const handlers = {};
   let timer;
   let event;
-  const exports = {};
+  const module = { exports: {} };
   const api = new Proxy(
     {},
     {
@@ -35,39 +45,37 @@ function boot(saved, storage = new Map(), rejectMode = false) {
     store.subscribe = (fn) => subscriptions.push(fn);
     return store;
   };
-  vm.runInNewContext(
-    ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } })
-      .outputText,
-    {
-      exports,
-      require: (name) =>
-        name === "zustand"
-          ? { create }
-          : name === "./mask"
-            ? { mask: (s) => s }
-            : {
-                api,
-                EVENTS: { agentEvent: "agent" },
-                listen: (_, fn) => {
-                  event = fn;
-                },
+  vm.runInNewContext(source, {
+    module,
+    exports: module.exports,
+    require: (name) =>
+      name === "zustand"
+        ? { create }
+        : name.endsWith("mask")
+          ? { mask: (s) => s }
+          : {
+              api,
+              EVENTS: { agentEvent: "agent" },
+              listen: (_, fn) => {
+                event = fn;
               },
-      localStorage: { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) },
-      window: {
-        screen: { height: 1080 },
-        addEventListener: (name, fn) => {
-          handlers[name] = fn;
-        },
+            },
+    localStorage: { getItem: (k) => storage.get(k) ?? null, setItem: (k, v) => storage.set(k, v) },
+    window: {
+      screen: { height: 1080 },
+      addEventListener: (name, fn) => {
+        handlers[name] = fn;
       },
-      setTimeout: (fn) => {
-        timer = fn;
-        return 1;
-      },
-      clearTimeout() {},
-      Date,
-      crypto: { randomUUID: () => "step" },
     },
-  );
+    setTimeout: (fn) => {
+      timer = fn;
+      return 1;
+    },
+    clearTimeout() {},
+    Date,
+    crypto: { randomUUID: () => "step" },
+  });
+  const exports = module.exports;
   exports.listenToAgents();
   return { ...exports, storage, flush: () => timer?.(), event: (e) => event(e), unload: () => handlers.pagehide() };
 }

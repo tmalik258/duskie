@@ -18,8 +18,11 @@ export const mock = {
       set = new Set();
       handlers.set(event, set);
     }
-    set.add(handler);
-    return () => set.delete(handler);
+    // Wrapped so each listen is its own entry, like Tauri: the same handler
+    // listened twice (Strict Mode) must survive the first unlisten.
+    const entry: Handler = (payload) => handler(payload);
+    set.add(entry);
+    return () => set.delete(entry);
   },
 };
 

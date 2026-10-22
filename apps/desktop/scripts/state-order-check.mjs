@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import vm from "node:vm";
 import ts from "typescript";
 
-const source = readFileSync(new URL("../src/lib/store.ts", import.meta.url), "utf8");
+const source = readFileSync(new URL("../src/lib/store/connect.ts", import.meta.url), "utf8");
 const init = source.slice(
   source.indexOf("  let disposed = false;", source.indexOf("export function connect")),
   source.indexOf("  void api.focusStatus()", source.indexOf("export function connect")),
@@ -55,10 +55,10 @@ for (const change of ["none", "event", "local"]) {
   assert.equal(state.updateProgress, change === "none" ? null : live);
   assert.equal(state.update.version, change === "none" ? "old" : "new");
 }
-const confirm = source.slice(
-  source.indexOf("let confirmedCodeFolders"),
-  source.indexOf("export function updateSettings"),
-);
+const turns = readFileSync(new URL("../src/lib/store/chat-turns.ts", import.meta.url), "utf8");
+const confirm = turns
+  .slice(turns.indexOf("let confirmedCodeFolders"), turns.indexOf("const SAD_WITHIN_MS"))
+  .replace("export function", "function");
 let state = {};
 const calls = [];
 const context = {
