@@ -540,8 +540,11 @@ impl Engine {
         if self.judged.is_none() {
             let voice = crate::enroll::voiced(&self.said);
             if voice.len() >= crate::enroll::JUDGE_VOICE || last {
-                let yours =
-                    crate::enroll::embed(extractor, &self.said).is_some_and(|e| you.matches(&e));
+                let score = crate::enroll::embed(extractor, &self.said)
+                    .map(|e| (crate::enroll::similarity(&e, &you.print), you.matches(&e)));
+                // Shown in the log so a miss is visible: same voice is 0.65 and up.
+                log::info!("voice match: {score:?} for {:?}", self.said.len());
+                let yours = score.is_some_and(|(_, m)| m);
                 self.judged = Some(yours);
                 self.said = Vec::new();
             }

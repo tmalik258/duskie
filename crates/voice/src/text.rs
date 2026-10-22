@@ -161,6 +161,10 @@ pub fn wake_keywords(vocab: Option<&Vocab>) -> String {
                 out.push_str(&format!("{spelled} @hey_duskie\n"));
             }
         }
+        // The bare name wakes too: "Duskie, what time is it".
+        if let Some(spelled) = spell(vocab, "duskie") {
+            out.push_str(&format!("{spelled} @duskie\n"));
+        }
     }
     if out.is_empty() {
         out.push_str(WAKE_KEYWORDS);
@@ -578,6 +582,20 @@ mod tests {
         .collect();
         assert_eq!(spell(&vocab, "hey Orbi").as_deref(), Some("▁HE Y ▁ OR B I"));
         assert_eq!(spell(&vocab, "hey Kai"), None);
+    }
+
+    #[test]
+    fn the_bare_name_is_a_wake_keyword() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../apps/desktop/src-tauri/resources/voice-models/",
+            "sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01/bpe.model"
+        );
+        let Ok(bytes) = std::fs::read(path) else {
+            return;
+        };
+        let vocab = read_vocab(&bytes);
+        assert!(wake_keywords(Some(&vocab)).contains(" @duskie\n"));
     }
 
     #[test]

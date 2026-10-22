@@ -7437,3 +7437,28 @@ button.ak-cchip:hover,
   border-radius: 10px;
   box-shadow: 0 12px 40px rgb(0 0 0 / 0.5);
 }
+
+/* Agent timeline: long commands, paths and output wrap or cut, never push the
+   panel wider than its column. */
+.ak-tg,
+.ak-term,
+.ak-ans,
+.ak-um,
+.ak-um-wrap,
+.ak-chips {
+  min-width: 0;
+  max-width: 100%;
+}
+.ak-tg > span:not(.ak-k) {
+  min-width: 0;
+}
+.ak-ans {
+  overflow-wrap: anywhere;
+}
+.ak-chips {
+  flex-wrap: wrap;
+}
+.ak-term pre {
+  overflow-x: auto;
+  overflow-wrap: anywhere;
+}
