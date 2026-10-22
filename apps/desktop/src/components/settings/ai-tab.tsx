@@ -21,7 +21,7 @@ import {
   type VoiceDownload,
   type VoiceSettings,
 } from "@/lib/types";
-import { SetupItems } from "../setup-checklist";
+import { SetupItems } from "../setup-checklist/group-titles";
 import { Tip } from "../tip";
 import { Button, Field, Section, Segmented, Select, StatusDot, Switch, TextField, Toggle } from "./ui";
 import { VoiceEnroll } from "./voice-enroll";

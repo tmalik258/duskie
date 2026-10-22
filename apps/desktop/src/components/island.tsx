@@ -47,10 +47,14 @@ import {
   SHELL_SETTINGS,
   TOP,
 } from "./island-layout";
-import { CompactTrailing, choose, dismiss, ExpandedContent } from "./island-parts";
-import { IslandPill, type PillModel } from "./island-pill";
+import { ExpandedContent } from "./island-parts";
+import { CompactTrailing, dismiss } from "./island-parts/activity";
+import { choose } from "./island-parts/dismiss-fill";
+import { IslandPill } from "./island-pill";
+import type { PillModel } from "./island-pill/pill-kind";
 import { IslandSettings } from "./island-settings";
-import { FullVoice, openBoard, VoicePill, voiceShellWidth } from "./island-voice";
+import { VoicePill } from "./island-voice";
+import { FullVoice, openBoard, voiceShellWidth } from "./island-voice/tail";
 import { IslandWelcome } from "./island-welcome";
 import { MeetingCard } from "./meeting-card";
 import { NetCard } from "./net-card";

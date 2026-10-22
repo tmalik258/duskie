@@ -28,7 +28,7 @@ import { onInputKey, submitComposer } from "./ask/panel/input-handlers";
 import { INTENT_PENDING } from "./ask/panel/item";
 import { goTab as goTabIn, pickTab as pickTabIn } from "./ask/panel/tabs";
 import { useAskPanel } from "./ask/panel/use-ask-panel";
-import { ContextLine } from "./ask/starters";
+import { ContextLine } from "./ask/starters/command";
 import { Timings } from "./ask/timings";
 import { LayoutSwitch } from "./layout-switch";
 import { PanelShell } from "./panel-shell";

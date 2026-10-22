@@ -3,7 +3,7 @@
 
 import { api } from "@/lib/bridge";
 import { runOpen, useDuskie } from "@/lib/store";
-import type { Command } from "../starters";
+import type { Command } from "../starters/command";
 import { WINDOWS_PAGES } from "../windows-pages";
 
 export function windowsCommands(q: string): Command[] {

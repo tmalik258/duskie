@@ -9,7 +9,7 @@ import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { sendChat, setAsk, setAskFormText, useDuskie } from "@/lib/store";
 import type { ChatSummary, EditorList, InstantResults, ProviderStatus } from "@/lib/types";
-import { markSeen } from "../../island-agents";
+import { markSeen } from "../../island-agents/away-ms";
 import type { HistoryKind } from "../history";
 import { INTENT_PENDING } from "./item";
 

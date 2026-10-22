@@ -3,7 +3,8 @@
 
 import { Chat } from "../chat";
 import { HistoryList } from "../history";
-import { Clips, Results } from "../lists";
+import { Results } from "../lists";
+import { Clips } from "../lists/chat-history";
 import { FirstRun } from "../states";
 import { openHit } from "./file-open";
 import { RowList } from "./row-list";
