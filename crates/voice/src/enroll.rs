@@ -165,11 +165,11 @@ pub fn add_samples(models: &Path, profile: &Profile, sentences: &[Vec<f32>]) -> 
 }
 
 /// The firmest bar at which the wake model still hears all but one take of
-/// the name, said on its own as it will be after teaching.
+/// the name.
 fn calibrate(models: &Path, names: &[Vec<f32>]) -> Result<f32> {
     let need = names.len().saturating_sub(1).max(1);
     for bar in BARS {
-        let spotter = KeywordSpotter::create(&spotter_config(models, bar, true))
+        let spotter = KeywordSpotter::create(&spotter_config(models, bar))
             .ok_or_else(|| VoiceError::Engine("wake word model did not load".into()))?;
         let heard = names.iter().filter(|clip| spots(&spotter, clip)).count();
         if heard >= need {

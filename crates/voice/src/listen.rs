@@ -1,4 +1,4 @@
-//! The listener: a small keyword model waits for "Hey Duskie"; then a
+//! The listener: a small keyword model waits for "Duskie"; then a
 //! streaming recognizer transcribes until you stop talking. Partial text
 //! arrives as you speak, so the island can show it live.
 
@@ -50,7 +50,7 @@ pub enum Control {
 #[derive(Debug, Clone)]
 pub struct ListenerConfig {
     pub models: PathBuf,
-    /// Listen for "Hey Duskie". Off means push to talk only.
+    /// Listen for "Duskie". Off means push to talk only.
     pub wake_word: bool,
     /// Talking over Duskie's voice stops it and starts listening.
     pub interrupt: bool,
@@ -181,7 +181,7 @@ fn offline_text(asr: &OfflineRecognizer, audio: &[f32]) -> String {
         .unwrap_or_default()
 }
 
-pub(crate) fn spotter_config(models: &Path, threshold: f32, bare: bool) -> KeywordSpotterConfig {
+pub(crate) fn spotter_config(models: &Path, threshold: f32) -> KeywordSpotterConfig {
     KeywordSpotterConfig {
         model_config: model(
             models,
@@ -200,7 +200,6 @@ pub(crate) fn spotter_config(models: &Path, threshold: f32, bare: bool) -> Keywo
                 .ok()
                 .map(|b| crate::text::read_vocab(&b))
                 .as_ref(),
-            bare,
         )),
         ..Default::default()
     }
@@ -239,11 +238,10 @@ impl Engine {
     }
 
     /// Uses what was learned when you taught Duskie your voice: your own
-    /// wake bar, the name alone as a wake word, and with a print only your
-    /// questions come through.
+    /// wake bar, and with a print only your questions come through.
     pub fn with_profile(models: &Path, wake_word: bool, profile: Option<&Profile>) -> Result<Self> {
         let threshold = profile.map_or(WAKE_THRESHOLD, |p| p.threshold);
-        let mut engine = Self::tuned(models, wake_word, wake_word, threshold, profile.is_some())?;
+        let mut engine = Self::tuned(models, wake_word, wake_word, threshold)?;
         if let Some(p) = profile.filter(|p| !p.print.is_empty())
             && SPEAKER.installed(models)
         {
@@ -255,16 +253,10 @@ impl Engine {
     /// `keyword`: the small keyword model. `transcript`: the speech model
     /// runs all the time and wakes on "hey Duskie" in what it hears.
     pub fn with_wake(models: &Path, keyword: bool, transcript: bool) -> Result<Self> {
-        Self::tuned(models, keyword, transcript, WAKE_THRESHOLD, false)
+        Self::tuned(models, keyword, transcript, WAKE_THRESHOLD)
     }
 
-    fn tuned(
-        models: &Path,
-        keyword: bool,
-        transcript: bool,
-        threshold: f32,
-        bare: bool,
-    ) -> Result<Self> {
+    fn tuned(models: &Path, keyword: bool, transcript: bool, threshold: f32) -> Result<Self> {
         let wake_word = keyword;
         if !SPEECH.installed(models)
             || !FINAL.installed(models)
@@ -273,7 +265,7 @@ impl Engine {
             return Err(VoiceError::MissingModels);
         }
         let spotter = if wake_word {
-            let config = spotter_config(models, threshold, bare);
+            let config = spotter_config(models, threshold);
             let spotter = KeywordSpotter::create(&config)
                 .ok_or_else(|| VoiceError::Engine("wake word model did not load".into()))?;
             let stream = spotter.create_stream();

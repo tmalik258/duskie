@@ -30,14 +30,16 @@ const GUIDE: &[(&[&str], &str)] = &[
         &[
             "voice",
             "wake",
-            "hey duskie",
+            "duskie",
+            "teach",
+            "train",
             "speak",
             "mic",
             "microphone",
             "live",
             "caption",
         ],
-        "Voice, wake word, Live answers and Live history: Settings > AI models > Voice.",
+        "Voice: say Duskie to wake it. Teach it your voice, and keep voice answers in history: Settings > AI models > Voice.",
     ),
     (
         &["memory", "remember", "forget", "knows"],

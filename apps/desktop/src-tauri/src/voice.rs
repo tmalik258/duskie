@@ -359,7 +359,7 @@ const ECHO_CHECK: std::time::Duration = std::time::Duration::from_millis(50);
 const ECHO_TAIL: std::time::Duration = std::time::Duration::from_millis(400);
 
 /// Keeps the microphone deaf while Duskie's own voice plays, so a line
-/// like "just say Hey Duskie" never wakes it, and while you teach it your
+/// like "just say Duskie" never wakes it, and while you teach it your
 /// voice. Runs for the whole process.
 /// Only changes are sent (and the current state to a newly built listener):
 /// a push to talk right after speaking unmutes and must stay unmuted.

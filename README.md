@@ -201,7 +201,7 @@ crates/sensors/          downloads, ports, clipboard, window, Claude Code hooks,
 crates/skills/           YAML skill engine
 crates/actions/          built-in actions and detection of installed browsers and tools
 crates/ai/               AI providers (Claude Code, Codex, local, Anthropic API), router, SemIf decisions
-crates/voice/            Hey Duskie wake word, live speech to text, Supertonic speech
+crates/voice/            Duskie wake word, live speech to text, Supertonic speech
 skills/                  built-in skills
 assets/                  app icon and social preview
 ```

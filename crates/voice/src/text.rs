@@ -1,9 +1,9 @@
 //! Text helpers: the wake phrase out of transcripts, and answers made fit to
 //! be read aloud, a sentence at a time.
 
-/// "Hey Duskie" letter by letter, for when the wake model's vocabulary cannot
+/// "Duskie" letter by letter, for when the wake model's vocabulary cannot
 /// be read; `wake_keywords` spells it properly from the vocabulary otherwise.
-pub const WAKE_KEYWORDS: &str = "▁HE Y ▁ D U S K I E @hey_duskie\n▁HI ▁ D U S K I E @hey_duskie\n▁O K ▁ D U S K I E @hey_duskie\n";
+pub const WAKE_KEYWORDS: &str = "▁ D U S K I E @duskie\n";
 
 /// A name the user gave the assistant ("Orbi"), as lowercase words. Empty
 /// means only "Duskie". The default name always keeps working too.
@@ -150,23 +150,13 @@ fn spell_word(vocab: &Vocab, word: &str) -> Option<Vec<String>> {
     best.remove(&text.len()).map(|(_, p)| p)
 }
 
-/// The wake phrases for the keyword model: "hey Duskie" always, plus
-/// "hey <name>" when the user renamed the assistant.
-/// `bare`: the name alone wakes it too, once your voice was taught (the
-/// voice check keeps others from waking it by saying the name).
-pub fn wake_keywords(vocab: Option<&Vocab>, bare: bool) -> String {
+/// The wake word for the keyword model: the name alone ("Duskie, what time
+/// is it"), plus the new name when the user renamed the assistant.
+pub fn wake_keywords(vocab: Option<&Vocab>) -> String {
     let mut out = String::new();
     // The app's own name, spelled from the model's vocabulary.
-    if let Some(vocab) = vocab {
-        for greeting in ["hey", "hi", "ok"] {
-            if let Some(spelled) = spell(vocab, &format!("{greeting} duskie")) {
-                out.push_str(&format!("{spelled} @hey_duskie\n"));
-            }
-        }
-        // "Duskie, what time is it", after teaching.
-        if let Some(spelled) = spell(vocab, "duskie").filter(|_| bare) {
-            out.push_str(&format!("{spelled} @duskie\n"));
-        }
+    if let Some(spelled) = vocab.and_then(|v| spell(v, "duskie")) {
+        out.push_str(&format!("{spelled} @duskie\n"));
     }
     if out.is_empty() {
         out.push_str(WAKE_KEYWORDS);
@@ -174,12 +164,7 @@ pub fn wake_keywords(vocab: Option<&Vocab>, bare: bool) -> String {
     let name = custom_name();
     if let (Some(vocab), false) = (vocab, name.is_empty()) {
         let name = name.join(" ");
-        for greeting in ["hey", "hi", "ok"] {
-            if let Some(spelled) = spell(vocab, &format!("{greeting} {name}")) {
-                out.push_str(&format!("{spelled} @hey_{}\n", name.replace(' ', "_")));
-            }
-        }
-        if let Some(spelled) = spell(vocab, &name).filter(|_| bare) {
+        if let Some(spelled) = spell(vocab, &name) {
             out.push_str(&format!("{spelled} @{}\n", name.replace(' ', "_")));
         }
     }
@@ -590,7 +575,7 @@ mod tests {
     }
 
     #[test]
-    fn the_bare_name_wakes_only_after_teaching() {
+    fn the_name_alone_is_the_wake_word() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../apps/desktop/src-tauri/resources/voice-models/",
@@ -600,8 +585,9 @@ mod tests {
             return;
         };
         let vocab = read_vocab(&bytes);
-        assert!(wake_keywords(Some(&vocab), true).contains(" @duskie\n"));
-        assert!(!wake_keywords(Some(&vocab), false).contains(" @duskie\n"));
+        let words = wake_keywords(Some(&vocab));
+        assert!(words.contains(" @duskie\n"));
+        assert!(!words.contains("HE Y"));
     }
 
     #[test]
@@ -617,8 +603,8 @@ mod tests {
         };
         let vocab = read_vocab(&bytes);
         assert!(spell(&vocab, "hey duskie").is_some_and(|s| s.starts_with("▁HE Y ")));
-        assert!(wake_keywords(Some(&vocab), false).contains("@hey_duskie"));
-        assert!(!wake_keywords(Some(&vocab), true).contains("SIDE"));
+        assert!(wake_keywords(Some(&vocab)).contains("@duskie"));
+        assert!(!wake_keywords(Some(&vocab)).contains("SIDE"));
         // Checked against the sentencepiece library.
         assert_eq!(spell(&vocab, "hey orbi").as_deref(), Some("▁HE Y ▁OR B I"));
         assert_eq!(spell(&vocab, "light up").as_deref(), Some("▁ L IGHT ▁UP"));

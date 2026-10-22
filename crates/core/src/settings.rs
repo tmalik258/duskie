@@ -145,7 +145,7 @@ pub struct Settings {
     pub answer_style: String,
     /// The user works with code: technical answers and setup. None: not asked.
     pub codes: Option<bool>,
-    /// What the assistant is called and answers to ("Hey Orbi"). The app
+    /// What the assistant is called and answers to ("Orbi"). The app
     /// itself stays Duskie.
     pub assistant_name: String,
     /// Learn from choices (links, files, suggestions, routines). Off: nothing
