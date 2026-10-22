@@ -15,6 +15,7 @@ pub fn reads_only(name: &str) -> bool {
             | PC_STATUS
             | STORAGE
             | SYSTEM
+            | RUN
             | HELP
             | DOCTOR
             | GIT
@@ -41,6 +42,7 @@ pub fn is_own(name: &str) -> bool {
             | PC_STATUS
             | STORAGE
             | SYSTEM
+            | RUN
             | HELP
             | DOCTOR
             | GIT

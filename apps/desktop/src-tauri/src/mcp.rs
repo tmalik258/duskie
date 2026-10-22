@@ -151,6 +151,7 @@ const SHARED: &[&str] = &[
     "pc_status",
     "storage",
     "system",
+    "run",
     "pc_control",
     "windows",
     "open",
@@ -458,6 +459,7 @@ mod tests {
                 "duskie_windows",
                 "duskie_open",
                 "duskie_system",
+                "duskie_run",
             ]
         );
         assert!(

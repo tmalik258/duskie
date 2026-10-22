@@ -18,6 +18,7 @@ mod defs;
 mod open;
 mod pick;
 mod proposals;
+mod run;
 mod screen;
 mod system;
 
@@ -25,6 +26,7 @@ pub use defs::*;
 pub use open::*;
 pub use pick::*;
 pub use proposals::*;
+pub use run::*;
 pub use screen::*;
 pub use system::*;
 
@@ -56,6 +58,7 @@ const REMEMBER: &str = "remember";
 const USE_SKILL: &str = "use_skill";
 const HELP: &str = "duskie_help";
 const SYSTEM: &str = "system";
+const RUN: &str = "run";
 
 /// The Ask chat answering right now, so tools called through Duskie's
 /// MCP server (by Claude Code or Codex) put their buttons in it.
@@ -156,6 +159,7 @@ const ASK_ACTIONS: &[&str] = &[
     "git_commit",
     "git_delete_branches",
     "kill_port",
+    "run_command",
 ];
 
 /// An action waiting for a tap, from one chat.
@@ -318,6 +322,12 @@ async fn run_tool(app: &AppHandle, chat_id: &str, name: &str, args: &Value) -> O
         SYSTEM => {
             let args = args.clone();
             blocking(move || system_tool(&args)).await
+        }
+        RUN => {
+            let args = args.clone();
+            tokio::task::spawn_blocking(move || run_command(&args))
+                .await
+                .unwrap_or_else(|e| format!("Error: {e}"))
         }
         STORAGE => tokio::task::spawn_blocking(crate::disk::report)
             .await
@@ -706,7 +716,7 @@ mod tests {
         let mut expected = vec![
             SEARCH, TODAY, RECENT, OPEN, SCREEN, PROPOSE, FIND, REVEAL, PC_STATUS, STORAGE, HELP,
             DOCTOR, GIT, PC, WINDOWS, NOTIFS, DESKTOP, OFFICE, RECIPES, REMEMBER, USE_SKILL,
-            SYSTEM,
+            SYSTEM, RUN,
         ];
         let mut got: Vec<&str> = offline.iter().map(String::as_str).collect();
         expected.sort_unstable();
@@ -826,7 +836,7 @@ mod tests {
             [
                 USE_SKILL, SEARCH, FIND, REVEAL, TODAY, RECENT, SCREEN, PROPOSE, WEB_SEARCH,
                 READ_PAGE, BROWSER, APP_ACTION, DESKTOP, APPS, OFFICE, RECIPES, REMEMBER, NOTIFS,
-                PC_STATUS, STORAGE, HELP, DOCTOR, GIT, GITHUB, PC, WINDOWS, OPEN, SYSTEM
+                PC_STATUS, STORAGE, HELP, DOCTOR, GIT, GITHUB, PC, WINDOWS, OPEN, SYSTEM, RUN
             ]
         );
     }

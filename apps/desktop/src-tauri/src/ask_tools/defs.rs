@@ -419,6 +419,7 @@ pub fn defs() -> Vec<ToolDef> {
             }),
         },
         system_def(),
+        run_def(),
     ]
 }
 
@@ -458,6 +459,7 @@ pub fn step_label(name: &str, args: &Value) -> String {
         PC_STATUS => "Checking your PC".into(),
         STORAGE => "Measuring what takes space".into(),
         SYSTEM => system_label(args),
+        RUN => run_label(args),
         HELP => "Looking it up in Duskie's help".into(),
         DOCTOR => "Reading crash records".into(),
         GIT => "Reading the project's git".into(),
