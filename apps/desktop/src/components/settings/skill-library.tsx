@@ -6,73 +6,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/bridge";
-import type { FoundSkill, LibrarySkill, LinkPreview, SkillOrigin, SkillTarget } from "@/lib/types";
-import { Button, Segmented } from "./ui";
-
-const ORIGIN: Record<SkillOrigin, string> = {
-  claude: "Claude Code",
-  claude_plugin: "Claude plugin",
-  codex: "Codex",
-  cursor: "Cursor",
-  duskie: "Duskie",
-  url: "Link",
-};
-
-const TARGETS: [SkillTarget, string][] = [
-  ["claude", "Claude Code"],
-  ["codex", "Codex"],
-  ["cursor", "Cursor"],
-  ["local", "Local model"],
-];
-
-function Badge({ children }: { children: string }) {
-  return <span className="rounded-full border border-(--border) px-1.5 text-[11px] text-(--muted)">{children}</span>;
-}
-
-/** Ticked by default: everything without scripts. */
-function preselect<T extends { name: string; hasScripts: boolean }>(list: T[], keep: (t: T) => boolean = () => true) {
-  return new Set(list.filter((s) => !s.hasScripts && keep(s)).map((s) => s.name));
-}
-
-function Pick({
-  name,
-  description,
-  badges,
-  checked,
-  onChange,
-  children,
-}: {
-  name: string;
-  description: string;
-  badges: string[];
-  checked: boolean;
-  onChange: (on: boolean) => void;
-  children?: React.ReactNode;
-}) {
-  return (
-    <li className="py-2">
-      <label className="flex cursor-pointer items-start gap-3">
-        <input
-          type="checkbox"
-          className="mt-1"
-          checked={checked}
-          onChange={(e) => onChange(e.target.checked)}
-          aria-label={`Add ${name} to library`}
-        />
-        <span className="min-w-0 text-[13px]">
-          <span className="flex flex-wrap items-center gap-2 font-medium">
-            {name}
-            {badges.map((b) => (
-              <Badge key={b}>{b}</Badge>
-            ))}
-          </span>
-          <span className="block truncate text-[12px] text-(--muted)">{description}</span>
-          {children}
-        </span>
-      </label>
-    </li>
-  );
-}
+import type { FoundSkill, LibrarySkill, LinkPreview } from "@/lib/types";
+import { LibraryList } from "./skill-library/library-list";
+import { LinkPreviewCard } from "./skill-library/link-preview";
+import { ORIGIN, Pick, preselect, toggle } from "./skill-library/pick";
+import { Button } from "./ui";
 
 export function SkillLibrary({ onError }: { onError: (e: string) => void }) {
   const [found, setFound] = useState<FoundSkill[]>([]);
@@ -100,13 +38,6 @@ export function SkillLibrary({ onError }: { onError: (e: string) => void }) {
     api.libraryList().then(setLib).catch(fail);
     void review();
   }, [fail, review]);
-
-  const toggle = (set: Set<string>, name: string, on: boolean) => {
-    const next = new Set(set);
-    if (on) next.add(name);
-    else next.delete(name);
-    return next;
-  };
 
   const addFound = () =>
     api
@@ -174,39 +105,13 @@ export function SkillLibrary({ onError }: { onError: (e: string) => void }) {
       </form>
 
       {preview && (
-        <div className="flex flex-col gap-2 rounded-lg border border-(--border) p-3">
-          <span className="text-[13px]">
-            At commit <span className="font-mono">{preview.commit.slice(0, 7)}</span>. Nothing runs when you add.
-          </span>
-          <ul className="flex flex-col divide-y divide-(--border)">
-            {preview.skills.map((s) => (
-              <Pick
-                key={s.name}
-                name={s.name}
-                description={s.description}
-                badges={[
-                  s.status === "new" ? "New" : s.status === "changed" ? "Update" : "Same as yours",
-                  `${s.files} file${s.files === 1 ? "" : "s"}, ${Math.max(1, Math.round(s.bytes / 1024))} KB`,
-                  ...(s.hasScripts ? ["Has scripts"] : []),
-                ]}
-                checked={linkChosen.has(s.name)}
-                onChange={(on) => setLinkChosen((c) => toggle(c, s.name, on))}
-              >
-                {s.diff.length > 0 && (
-                  <span className="mt-1 block font-mono text-[11px] text-(--muted)">{s.diff.join(", ")}</span>
-                )}
-              </Pick>
-            ))}
-          </ul>
-          <div className="flex gap-2">
-            <Button small primary disabled={linkChosen.size === 0} onClick={addLinked}>
-              Add to library
-            </Button>
-            <Button small onClick={() => setPreview(null)}>
-              Cancel
-            </Button>
-          </div>
-        </div>
+        <LinkPreviewCard
+          preview={preview}
+          chosen={linkChosen}
+          onChosen={setLinkChosen}
+          onAdd={addLinked}
+          onCancel={() => setPreview(null)}
+        />
       )}
 
       {found.length > 0 && (
@@ -246,62 +151,7 @@ export function SkillLibrary({ onError }: { onError: (e: string) => void }) {
           </p>
         )
       ) : (
-        <div className="flex flex-col gap-2">
-          <span className="text-[13px] font-medium">In your library</span>
-          <ul className="flex flex-col divide-y divide-(--border)">
-            {lib.map((s) => (
-              <li key={s.name} className="flex flex-col gap-2 py-2">
-                <div className="flex items-center justify-between gap-4">
-                  <span className="min-w-0 text-[13px]">
-                    <span className="flex items-center gap-2 font-medium">
-                      {s.name} <Badge>{ORIGIN[s.origin]}</Badge>
-                      {s.hasScripts && <Badge>Has scripts</Badge>}
-                    </span>
-                    <span className="block truncate text-[12px] text-(--muted)">
-                      {s.description}
-                      {s.commit ? ` (pinned at ${s.commit.slice(0, 7)})` : ""}
-                    </span>
-                  </span>
-                  <span className="flex gap-2">
-                    {s.url && (
-                      <Button small disabled={busy} onClick={() => fetchLink(s.url ?? "")}>
-                        Check for update
-                      </Button>
-                    )}
-                    <Button small onClick={() => api.libraryRemove(s.name).then(setLib).catch(fail)}>
-                      Remove
-                    </Button>
-                  </span>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  {TARGETS.map(([t, label]) => (
-                    <Segmented
-                      key={t}
-                      label={label}
-                      value={s.targets[t] === false ? "off" : "on"}
-                      options={[
-                        ["on", `${label} on`],
-                        ["off", "Off"],
-                      ]}
-                      onChange={(v) =>
-                        api
-                          .librarySetTarget(s.name, t, v === "on")
-                          .then(setLib)
-                          .catch(fail)
-                      }
-                    />
-                  ))}
-                </div>
-              </li>
-            ))}
-          </ul>
-          <div className="flex items-center gap-3">
-            <Button small onClick={sync}>
-              Sync now
-            </Button>
-            {note && <span className="text-[12px] text-(--muted)">{note}</span>}
-          </div>
-        </div>
+        <LibraryList lib={lib} busy={busy} note={note} onLib={setLib} onCheck={fetchLink} onSync={sync} fail={fail} />
       )}
     </div>
   );
