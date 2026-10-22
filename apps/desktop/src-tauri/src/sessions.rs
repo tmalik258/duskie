@@ -10,6 +10,7 @@
 mod claude;
 mod codex;
 mod edits;
+mod images;
 mod local;
 mod local_calls;
 mod plain;

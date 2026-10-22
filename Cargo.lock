@@ -1569,6 +1569,7 @@ version = "0.2.2"
 dependencies = [
  "arboard",
  "async-trait",
+ "base64 0.22.1",
  "chrono",
  "dirs 7.0.0",
  "duskie-actions",
