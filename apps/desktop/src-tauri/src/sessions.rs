@@ -99,6 +99,9 @@ pub struct Event {
 }
 
 fn emit(app: &AppHandle, session: &str, data: Value) {
+    if reviews::note_touch(session, &data) {
+        return;
+    }
     crate::activity::agent_event(app, session, &data);
     let _ = app.emit(
         EVENT,
@@ -702,6 +705,9 @@ pub fn send(app: &AppHandle, id: &str, text: &str) -> Result<(), String> {
 
 fn send_text(id: &str, text: &str) -> Result<(), String> {
     let writing = with(&reviews::WRITING, |w| w.insert(id.into(), true)).unwrap_or(false);
+    if !writing {
+        reviews::begin_touch(id);
+    }
     let path = with(&SESSIONS, |s| s.get(id).map(|h| h.path.clone()));
     if !writing
         && let Some(snap) = path
