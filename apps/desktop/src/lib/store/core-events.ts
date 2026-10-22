@@ -21,7 +21,7 @@ export function onMascotState(t: EventPayloads[typeof EVENTS.mascotState], sound
 }
 
 export function onSuggestionNew(suggestion: EventPayloads[typeof EVENTS.suggestionNew]) {
-  useDuskie.setState({ suggestion, lastResult: null });
+  useDuskie.setState({ suggestion, lastResult: null, choiceHeld: false });
   // The cue already plays for a new suggestion, so the mood is silent.
   const mood = moodForSkill(suggestion.skillId);
   if (mood) setMood(mood, SUGGESTION_MOOD_MS);

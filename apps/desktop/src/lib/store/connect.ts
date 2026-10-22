@@ -71,9 +71,10 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
       listen(EVENTS.actionResult, (p) => onActionResult(p, sounds)),
       listen(EVENTS.suggestionClear, (id) => {
         if (useDuskie.getState().suggestion?.id === id) {
-          useDuskie.setState({ suggestion: null, shiftHeld: false });
+          useDuskie.setState({ suggestion: null, shiftHeld: false, choiceHeld: false });
         }
       }),
+      listen(EVENTS.suggestionHeld, (choiceHeld) => useDuskie.setState({ choiceHeld })),
       listen(EVENTS.suggestionLater, (p) => onSuggestionLater(p, sounds)),
       listen(EVENTS.islandHover, setHovered),
       listen(EVENTS.islandShift, (shiftHeld: boolean) => useDuskie.setState({ shiftHeld })),

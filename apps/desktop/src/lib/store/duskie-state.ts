@@ -40,6 +40,8 @@ export interface DuskieState {
   netNotice: NetNotice | null;
   /** Cursor is over the island's interactive area (reported by Rust). */
   hovered: boolean;
+  /** The card waits for a spoken answer, so its countdown is paused (Rust). */
+  choiceHeld: boolean;
   /** Shift (hovered) or Shift+Alt (suggestion), Rust polls; webview has no focus. */
   shiftHeld: boolean;
   /** Extra interactive area while a floating menu is open (unioned into the hit rect). */
@@ -108,6 +110,7 @@ export const useDuskie = create<DuskieState>(() => ({
   offlineSince: null,
   netNotice: null,
   hovered: false,
+  choiceHeld: false,
   shiftHeld: false,
   overlayHit: null,
   visible: true,

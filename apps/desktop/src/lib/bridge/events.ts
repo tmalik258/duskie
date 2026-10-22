@@ -20,6 +20,7 @@ export const EVENTS = {
   mascotState: "mascot://state",
   suggestionNew: "suggestion://new",
   suggestionClear: "suggestion://clear",
+  suggestionHeld: "suggestion://held",
   islandHover: "island://hover",
   islandCursor: "island://cursor",
   islandVisible: "island://visible",
@@ -65,6 +66,7 @@ export interface EventPayloads {
   [EVENTS.islandFocus]: { until: number | null; held: number | unknown[]; ended?: boolean };
   [EVENTS.suggestionNew]: Suggestion;
   [EVENTS.suggestionClear]: string;
+  [EVENTS.suggestionHeld]: boolean;
   [EVENTS.islandHover]: boolean;
   [EVENTS.islandCursor]: { x: number; y: number };
   [EVENTS.islandVisible]: boolean;

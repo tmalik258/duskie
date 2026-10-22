@@ -13,11 +13,12 @@ import { Tip } from "../tip";
 import { ALWAYS_GLANCE, always, dismiss, runningLabel } from "./activity";
 
 /** A fill inside Dismiss that drains while the card waits to close on its
- * own. Rust restarts that clock while the island is hovered, so it refills.
+ * own. Rust restarts that clock while the island is hovered or the mic
+ * waits for a spoken answer, so it refills then and drains from full after.
  * With reduced motion it stays still. */
 function DismissFill() {
   const secs = useDuskie((s) => s.settings.collapseAfterSecs);
-  const hovered = useDuskie((s) => s.hovered);
+  const hovered = useDuskie((s) => s.hovered || s.choiceHeld);
   const reduced = useReducedMotion() ?? false;
   if (!secs || reduced) return null;
   return (
