@@ -25,6 +25,10 @@ async function asPng(f: File): Promise<Blob> {
   );
 }
 
+/** Thumbnails by saved path, so sent messages can show them too. */
+const previews = new Map<string, string>();
+export const previewOf = (path: string) => previews.get(path) ?? null;
+
 export async function saveFile(f: File): Promise<Attachment> {
   if (f.size > MAX_BYTES) throw new Error(`${f.name} is over 20 MB`);
   const image = f.type.startsWith("image/");
@@ -32,7 +36,9 @@ export async function saveFile(f: File): Promise<Attachment> {
   const base = (f.name || (image ? "pasted" : "file")).replace(/\.[^.]*$/, "") || "file";
   const name = image ? `${base}.png` : f.name || "file";
   const path = await api.saveAttachment(name, Array.from(new Uint8Array(await blob.arrayBuffer())));
-  return { name, path, url: image ? URL.createObjectURL(blob) : null };
+  const url = image ? URL.createObjectURL(blob) : null;
+  if (url) previews.set(path, url);
+  return { name, path, url };
 }
 
 /** Files on a paste or drop event, or none (plain text goes on as usual). */

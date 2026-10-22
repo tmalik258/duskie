@@ -6,6 +6,7 @@ import { useRef } from "react";
 import { Ic } from "../icon";
 import { Tip } from "../tip";
 import { type ContextItem, parents } from "./context";
+import { Thumb } from "./image-view";
 
 export function AttachButton({ onFiles }: { onFiles: (files: File[]) => void }) {
   const ref = useRef<HTMLInputElement>(null);
@@ -45,7 +46,7 @@ export function ContextChips({
       {items.map((i) => (
         <Tip key={i.path} label={parents(i.path)} className="inline-flex min-w-0">
           <span className="ak-att">
-            {i.url ? <img src={i.url} alt="" /> : <Ic name={i.folder ? "folder" : "file"} size={12} />}
+            {i.url ? <Thumb url={i.url} name={i.name} /> : <Ic name={i.folder ? "folder" : "file"} size={12} />}
             <span className="truncate">{i.name}</span>
             <button type="button" aria-label={`Remove ${i.name}`} onClick={() => onRemove(i)}>
               <Ic name="x" size={10} />

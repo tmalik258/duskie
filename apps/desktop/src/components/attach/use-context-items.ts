@@ -23,11 +23,9 @@ export function useContextItems() {
     }
   };
   const remove = (i: ContextItem) => {
-    if (i.url) URL.revokeObjectURL(i.url);
     setItems((xs) => xs.filter((x) => x !== i));
   };
   const clear = () => {
-    for (const i of items) if (i.url) URL.revokeObjectURL(i.url);
     setItems([]);
     setError(null);
   };

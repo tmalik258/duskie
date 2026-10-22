@@ -6,6 +6,8 @@
 import { Ic } from "../icon";
 import { Tip } from "../tip";
 import { fromPick, parents } from "./context";
+import { Thumb } from "./image-view";
+import { previewOf } from "./save-file";
 
 const REF = /@"([^"]+)"|@(\S+[\\/]\S*)/g;
 
@@ -17,6 +19,12 @@ export function MessageText({ text }: { text: string }) {
     const before = text.slice(at, m.index);
     if (before.trim()) parts.push(before.replace(/\s+$/, " "));
     const item = fromPick(path);
+    const url = previewOf(path);
+    if (url) {
+      parts.push(<Thumb key={m.index} url={url} name={item.name} size={56} />);
+      at = (m.index ?? 0) + m[0].length;
+      continue;
+    }
     parts.push(
       <Tip key={m.index} label={parents(path)} className="inline-flex min-w-0 align-middle">
         <span className="ak-att ak-att-sent">
