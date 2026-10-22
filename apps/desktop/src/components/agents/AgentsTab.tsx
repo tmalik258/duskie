@@ -11,7 +11,7 @@ import { Markdown } from "@/lib/markdown";
 import type { CursorChat } from "@/lib/types";
 import { Board } from "./Board";
 import { NewSession } from "./NewSession";
-import { CURSOR, SessionChips } from "./SessionList";
+import { CURSOR, SessionChips } from "./SessionChips";
 import { SessionView } from "./SessionView";
 
 /** Chats started in Cursor, refreshed while Agents is visible. */
