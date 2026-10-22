@@ -12,6 +12,7 @@ import { ComposioApps } from "./composio-apps";
 import { EditorPicker, OtherWays } from "./connections-tab/capital";
 import { BrowserCard, Meetings } from "./connections-tab/meetings";
 import { DirectMcpCard } from "./direct-mcp";
+import { MailCard } from "./mail-card";
 import { Button, Section, Toggle } from "./ui";
 
 export function ConnectionsTab({ onError, part }: { onError: (e: string) => void; part?: "apps" | "code" }) {
@@ -33,6 +34,13 @@ export function ConnectionsTab({ onError, part }: { onError: (e: string) => void
         keywords="apps accounts calendar meetings reminders join google outlook jira slack gmail notion trello github linear fathom login sign in"
       >
         <ComposioCard onError={onError} />
+      </Section>
+      <Section
+        title="Mail"
+        hint="Where new mail comes from. Shows in the notification inbox."
+        keywords="mail email gmail imap outlook inbox google app password"
+      >
+        <MailCard onError={onError} />
       </Section>
       <Section
         title="Browser"
