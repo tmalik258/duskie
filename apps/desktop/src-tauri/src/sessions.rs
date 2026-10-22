@@ -387,6 +387,8 @@ pub struct Started {
     /// Another session works in this repo, so this one got its own
     /// worktree on this branch; Finish merges it back.
     pub worktree: Option<String>,
+    /// The branch the worktree came from, where Finish merges it.
+    pub base: Option<String>,
 }
 
 /// Starts an agent in `path` with `prompt`.
@@ -437,6 +439,7 @@ pub async fn start_tuned(
             .ok()
             .flatten()
     };
+    let base = wt.as_ref().and_then(|_| branch(path));
     let wt_dir = wt.as_ref().map(|w| w.dir.clone());
     let path: &Path = wt_dir.as_deref().unwrap_or(path);
     let baseline = {
@@ -458,6 +461,7 @@ pub async fn start_tuned(
         branch,
         reviewable: baseline.is_some(),
         worktree: wt.as_ref().map(|w| w.branch.clone()),
+        base,
     };
     if let Some(w) = wt {
         with(&WORKTREES, |m| m.insert(id.clone(), w));

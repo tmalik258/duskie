@@ -3189,6 +3189,13 @@ select.ak-mi option {
   color: #64d2ff;
   font-weight: 600;
 }
+.ag-sh-note.ak-twt {
+  text-align: left;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .ak-tlog {
   display: grid;
   gap: 5px;

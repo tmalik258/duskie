@@ -42,10 +42,10 @@ if (typeof window !== "undefined") {
       if (s) openReview(s.id);
       return s?.id ?? null;
     },
-    __mockNewSession: async () => {
+    __mockNewSession: async (current: string | null = null) => {
       const { useAgents } = await import("./agents");
       const { api } = await import("./bridge");
-      useAgents.setState({ tab: "agents", current: null });
+      useAgents.setState({ tab: "agents", current });
       await api.askOpen();
     },
     __mockGo: go,
@@ -87,6 +87,8 @@ if (typeof window !== "undefined") {
           mk("a1", "Codex", "duskie", "Migrate tests to Vitest", "idle", "full", 22, { finished: true }),
           mk("a2", "Claude Code", "duskie", "Compact label wraps on narrow screens", "idle", "edit", 10, {
             changes: 3,
+            worktree: "wt/compact-label",
+            base: "feat/s-locator-pricing-page",
           }),
           mk("a3", "Claude Code", "falconxoft-portal", "Add CSV export to invoices", "idle", "edit", 14, {
             changes: 5,
