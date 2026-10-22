@@ -13,7 +13,7 @@ export const X_A = {
     accent: "lift",
     effect: "hm",
   },
-  idle: { label: "Idle", when: "Resting at the top", eyes: "pill" },
+  idle: { label: "Idle", when: "Resting at the top", eyes: "pill", glow: 0.75 },
   suggest: { label: "Suggest", when: "Has an idea", eyes: "pill", rim: "#7fc0ff", accent: "lift", arms: "out" },
   curious: {
     label: "Notice",
