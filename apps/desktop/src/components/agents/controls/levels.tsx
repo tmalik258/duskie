@@ -69,7 +69,7 @@ export const Brain = () => (
   </svg>
 );
 
-export type ModeId = "plan" | "ask" | "edit" | "debug" | "full";
+export type ModeId = "plan" | "ask" | "edit" | "debug" | "full" | "try";
 
 /** The agent modes, with the icon and note each shows in the composer bar. */
 export const MODE_INFO: { id: ModeId; label: string; note: string; icon: IcName }[] = [
@@ -83,6 +83,7 @@ export const MODE_INFO: { id: ModeId; label: string; note: string; icon: IcName 
     icon: "bug",
   },
   { id: "full", label: "Full", note: "Does everything without asking", icon: "bolt" },
+  { id: "try", label: "Try", note: "Works on a copy. Keep it or throw it away", icon: "copy" },
 ];
 
 /** A chip that opens a popover above itself (portaled so the island shell

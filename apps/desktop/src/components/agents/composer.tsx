@@ -93,7 +93,7 @@ export function Composer({
     if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key === ".") {
       e.preventDefault();
       e.stopPropagation();
-      void setSessionMode(s.id, nextAgentMode(s.mode));
+      if (!s.trial) void setSessionMode(s.id, nextAgentMode(s.mode, false));
       return;
     }
     if (count && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
@@ -161,7 +161,13 @@ export function Composer({
           effort={s.effort}
           onModel={(m) => tuneSession(s.id, m, s.effort ?? null)}
           onEffort={(e) => tuneSession(s.id, s.model ?? null, e)}
-          lead={<ModeChip mode={s.mode} onChange={(mode) => void setSessionMode(s.id, mode)} />}
+          lead={
+            <ModeChip
+              mode={s.mode}
+              only={(m) => (s.trial ? m === "try" : m !== "try")}
+              onChange={(mode) => void setSessionMode(s.id, mode)}
+            />
+          }
           usage={s.usage}
           panel={panel}
           onRefresh={

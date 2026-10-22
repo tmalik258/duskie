@@ -15,7 +15,7 @@ pub(super) fn plain_args(agent: Agent, mode: Mode, text: &str, again: bool) -> V
             }
             match mode {
                 Mode::Full => a.push("--allow-all-tools".into()),
-                Mode::Edit | Mode::Debug | Mode::Ask => {
+                Mode::Edit | Mode::Debug | Mode::Try | Mode::Ask => {
                     a.extend(["--allow-all-tools", "--deny-tool", "shell"].map(String::from))
                 }
                 Mode::Plan => a.extend(
@@ -33,7 +33,7 @@ pub(super) fn plain_args(agent: Agent, mode: Mode, text: &str, again: bool) -> V
         _ => {
             // Cursor streams each step as JSON, so its sessions are as live as Codex.
             a.extend(["--output-format", "stream-json"].map(String::from));
-            if matches!(mode, Mode::Full | Mode::Edit | Mode::Debug) {
+            if matches!(mode, Mode::Full | Mode::Edit | Mode::Debug | Mode::Try) {
                 a.push("--force".into());
             }
         }

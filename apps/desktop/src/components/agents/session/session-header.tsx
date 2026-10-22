@@ -10,6 +10,7 @@ import { Tip } from "../../tip";
 import { AgentMark } from "../marks";
 import { ContextRing, SessionMemory } from "./context-ring";
 import { NameField } from "./name-field";
+import { TrialBar } from "./trial-bar";
 
 export function SessionHeader({
   session: s,
@@ -74,6 +75,7 @@ export function SessionHeader({
           )}
         </span>
       </div>
+      <TrialBar session={s} working={working} />
       {working && s.activeMode !== s.mode && <p className="ak-note ag-sh-note">New mode applies to the next message</p>}
     </>
   );

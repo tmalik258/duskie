@@ -6796,6 +6796,40 @@ button.ak-cchip:hover,
 .ag-acts .ak-ibtn.danger:hover {
   color: #ff8a80;
 }
+.ag-trial {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: -2px 2px 8px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgb(120 180 255 / 0.1);
+  color: rgb(242 240 235 / 0.8);
+  font-size: 12px;
+}
+.ag-trial-acts {
+  display: inline-flex;
+  gap: 6px;
+  margin-left: auto;
+}
+.ag-trial-btn {
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.08);
+  color: inherit;
+}
+.ag-trial-btn:hover {
+  background: rgb(255 255 255 / 0.14);
+}
+.ag-trial-btn.keep {
+  background: rgb(120 180 255 / 0.3);
+  color: #fff;
+}
+.ag-trial-err {
+  flex-basis: 100%;
+  color: #ff8a80;
+}
 .ag-sh-note {
   margin: -4px 2px 6px;
   text-align: right;

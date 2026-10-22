@@ -642,6 +642,22 @@ pub async fn agent_review_decide(
     .map_err(|e| e.to_string())?
 }
 
+/// Try mode: bring the copy's changes into the project folder.
+#[tauri::command]
+pub async fn agent_keep(id: String) -> CmdResult<String> {
+    tauri::async_runtime::spawn_blocking(move || crate::sessions::keep_trial(&id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Try mode: delete the copy.
+#[tauri::command]
+pub async fn agent_discard(id: String) -> CmdResult<String> {
+    tauri::async_runtime::spawn_blocking(move || crate::sessions::discard_trial(&id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
 /// Chats started in Cursor, for the Agents list.
 #[tauri::command]
 pub async fn cursor_chats() -> Vec<crate::cursor_chats::CursorChat> {
