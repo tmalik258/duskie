@@ -23,8 +23,10 @@ import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useDuskie } from "@/lib/store";
 import type { Agents } from "@/lib/types";
-import { AgentMark, agentMarkId, Composer, NameField, STEP_TAG } from "./AgentsTab";
+import { Composer } from "./Composer";
+import { AgentMark, agentMarkId } from "./marks";
 import { folderName, ProjectPicker } from "./ProjectPicker";
+import { NameField, STEP_TAG } from "./SessionView";
 
 function state(s: Session): [string, string] {
   if (s.question) return ["ask", "Needs you"];

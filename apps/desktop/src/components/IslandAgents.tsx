@@ -11,7 +11,7 @@ import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
 import type { InboxStatus } from "@/lib/types";
-import { limitNote } from "./agents/AgentsTab";
+import { limitNote } from "./agents/SessionView";
 import { CardChips, CardHead, CardList, CardNote, type CardRow } from "./IslandCard";
 
 /** Away this long before the island shows what happened meanwhile. */
