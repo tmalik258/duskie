@@ -5,8 +5,8 @@
 // way the island does for a screen reader.
 
 import { useState } from "react";
-import { Creature } from "@/components/Creature";
-import { GrainWash } from "@/components/GrainWash";
+import { Creature } from "@/components/creature";
+import { GrainWash } from "@/components/grain-wash";
 import { ISLAND_STATES, type IslandStateDef } from "@/lib/island-states";
 
 export default function StatesPage() {

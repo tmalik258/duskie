@@ -41,49 +41,27 @@ export function useNow(ms: number): number {
   return now;
 }
 
-/**
- * Windows Do Not Disturb state. Optional `autoEnable` turns it on once when
- * the OS reports off (welcome Extras); Settings leaves that false.
- */
-export function useDnd(opts?: { onError?: (e: string) => void; autoEnable?: boolean }): {
+/** Windows Do Not Disturb state, with a setter that reads it back. */
+export function useDnd(opts?: { onError?: (e: string) => void }): {
   on: boolean;
   busy: boolean;
   set: (want: boolean) => void;
 } {
   const [on, setOn] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
-  const autoEnable = opts?.autoEnable ?? false;
   const onErrorRef = useRef(opts?.onError);
   onErrorRef.current = opts?.onError;
-  const autoDone = useRef(false);
   const busyRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
     void api.dndGet().then((now) => {
-      if (cancelled) return;
-      if (autoEnable && !autoDone.current && now !== true) {
-        autoDone.current = true;
-        setBusy(true);
-        setOn(true);
-        void api
-          .dndSet(true)
-          .catch((e) => onErrorRef.current?.(String(e)))
-          .then(() => api.dndGet())
-          .then((after) => {
-            if (!cancelled) setOn(after ?? true);
-          })
-          .finally(() => {
-            if (!cancelled) setBusy(false);
-          });
-        return;
-      }
-      setOn(now ?? false);
+      if (!cancelled) setOn(now ?? false);
     });
     return () => {
       cancelled = true;
     };
-  }, [autoEnable]);
+  }, []);
 
   const set = useCallback((want: boolean) => {
     if (busyRef.current) return;
@@ -125,7 +103,7 @@ export function useScrollEdge(): (el: HTMLElement | null) => void {
     const measure = () => {
       const top = el.scrollTop > EDGE_SLACK;
       // Need more than the fade band cut off, or a settled short panel keeps a
-      // black wash over the last lines (welcome Extras after the footer mounts).
+      // black wash over the last lines.
       const below = el.scrollHeight - el.scrollTop - el.clientHeight;
       const bottom = below > FADE_BAND;
       el.toggleAttribute("data-fade-top", top);
@@ -203,4 +181,20 @@ function useMedia(query: string): boolean {
     return () => m.removeEventListener("change", change);
   }, [query]);
   return on;
+}
+
+/** Copies text; `copied` stays true for 1.5 s. Refused clipboard access is ignored. */
+export function useCopy(text: string): { copied: boolean; copy: () => void } {
+  const [copied, setCopied] = useState(false);
+  const copy = () =>
+    void navigator.clipboard
+      .writeText(text)
+      .then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      })
+      .catch(() => {
+        // Clipboard access can be refused; the text is selectable anyway.
+      });
+  return { copied, copy };
 }

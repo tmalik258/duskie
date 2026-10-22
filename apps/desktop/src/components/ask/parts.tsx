@@ -3,7 +3,8 @@
 // Small pieces shared across Ask mode: chips, rows, key hints.
 
 import type { ReactNode } from "react";
-import { Tip } from "../Tip";
+import { minutesText } from "@/lib/time-text";
+import { Tip } from "../tip";
 
 export const ease = [0.23, 1, 0.32, 1] as const;
 
@@ -125,9 +126,7 @@ export function scrollIfActive(active: boolean, block: ScrollLogicalPosition = "
 export function ago(iso: string): string {
   const mins = Math.round((Date.now() - Date.parse(iso)) / 60_000);
   if (!Number.isFinite(mins)) return "";
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins} min ago`;
-  if (mins < 24 * 60) return `${Math.round(mins / 60)} h ago`;
+  if (mins < 24 * 60) return minutesText(mins, { suffix: true, justNow: "just now" });
   if (mins < 48 * 60) return "yesterday";
   return new Date(iso).toLocaleDateString();
 }
