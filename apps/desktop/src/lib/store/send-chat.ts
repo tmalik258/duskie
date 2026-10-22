@@ -5,6 +5,7 @@ import { isThanks } from "../mood";
 import { timings } from "../timings";
 import { toolStatus } from "../tools";
 import type { ChatMessage } from "../types";
+import { takeAskFiles } from "./ask-files";
 import { autoContext, type ChatAttach, type EarlyChat } from "./ask-types";
 import { setMood, useDuskie } from "./duskie-state";
 
@@ -38,6 +39,7 @@ function chatRequest(q: string, attach?: ChatAttach) {
       voice: attach?.voice ?? false,
       think: attach?.think ?? false,
       prefer: askModel,
+      files: [] as string[],
     },
     localOnly: ask?.localOnly ?? false,
   };
@@ -86,13 +88,15 @@ export function sendChat(prompt: string, attach?: ChatAttach): boolean {
         }
       : ask;
   const req = chatRequest(q, attach);
+  const files = takeAskFiles();
+  req.attach.files = files;
   const screen = req.attach.screen;
   useDuskie.setState({
     chatId: id,
     ask: nextAsk,
     turns: [
       ...turns,
-      { role: "user", content: q, screen, localOnly: req.localOnly },
+      { role: "user", content: [q, ...files.map((f) => `@"${f}"`)].join(" "), screen, localOnly: req.localOnly },
       {
         role: "assistant",
         content: "",

@@ -16,7 +16,10 @@ export interface ContextItem {
 export function fromPick(path: string): ContextItem {
   const folder = path.endsWith("/");
   const parts = path.replace(/\/+$/, "").split(/[\\/]/);
-  return { name: parts[parts.length - 1] || path, path, folder };
+  const last = parts[parts.length - 1] || path;
+  // Uploads are saved as "<id>-name"; show just the name.
+  const name = /duskie-attachments/.test(path) ? last.replace(/^[0-9A-Z]+-/, "") : last;
+  return { name, path, folder };
 }
 
 /** The last three folders above an item, for its hover tip. */
