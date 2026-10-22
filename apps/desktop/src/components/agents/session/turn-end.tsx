@@ -117,12 +117,8 @@ function AltChip({
 /** Review N changes; once this turn's review is finished, Reviewed (or how many are left). */
 function ReviewChip({ session: s, onReview }: { session: Session; onReview: () => void }) {
   const done = s.reviewed?.turnAt === s.turnAt ? s.reviewed : null;
-  if (done && done.left === 0)
-    return (
-      <AltChip keyName="1" onClick={onReview}>
-        ✓ Reviewed{" "}
-      </AltChip>
-    );
+  // Nothing left to decide: a label, not a button back into the same review.
+  if (done && done.left === 0) return <span className="ak-chip chip opacity-70">✓ Reviewed</span>;
   return (
     <AltChip primary keyName="1" onClick={onReview}>
       {done ? `Review ${done.left} left` : `Review ${s.changes} ${s.changes === 1 ? "change" : "changes"}`}
