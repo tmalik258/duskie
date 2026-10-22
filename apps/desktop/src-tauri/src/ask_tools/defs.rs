@@ -420,6 +420,8 @@ pub fn defs() -> Vec<ToolDef> {
         },
         system_def(),
         run_def(),
+        app_info_def(),
+        diagnose_def(),
     ]
 }
 
@@ -460,6 +462,13 @@ pub fn step_label(name: &str, args: &Value) -> String {
         STORAGE => "Measuring what takes space".into(),
         SYSTEM => system_label(args),
         RUN => run_label(args),
+        APP_INFO | DIAGNOSE => format!(
+            "Checking {}",
+            args["name"]
+                .as_str()
+                .or(args["app"].as_str())
+                .unwrap_or("the app")
+        ),
         HELP => "Looking it up in Duskie's help".into(),
         DOCTOR => "Reading crash records".into(),
         GIT => "Reading the project's git".into(),

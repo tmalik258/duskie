@@ -220,7 +220,7 @@ struct AskCase {
 }
 
 /// Runs every Ask case through the configured cloud model (Groq, xAI or OpenAI) with the full tool loop and
-/// writes evals/report.md. Needs XAI_API_KEY; ignored by default.
+/// writes evals/report.md. Needs a cloud key; ignored by default.
 #[tokio::test]
 #[ignore = "needs a cloud key; run: cargo test -p duskie-desktop ask_cases -- --ignored --nocapture"]
 async fn ask_cases_with_grok() {
@@ -239,46 +239,61 @@ async fn ask_cases_with_grok() {
     let ai = OpenAiCompat::cloud(provider, &key, model).expect("a known provider");
     let cases: Vec<AskCase> = serde_json::from_str(include_str!("../evals/ask-cases.json"))
         .expect("evals/ask-cases.json parses");
-    let defs = crate::ask_tools::defs();
+    let ai = std::sync::Arc::new(ai);
+    let defs = std::sync::Arc::new(crate::ask_tools::defs());
+    // A few at a time, each capped, so one slow answer cannot stall the run.
+    let gate = std::sync::Arc::new(tokio::sync::Semaphore::new(4));
+    let mut set = tokio::task::JoinSet::new();
+    for (i, c) in cases.iter().enumerate() {
+        let (ai, defs, gate, q) = (ai.clone(), defs.clone(), gate.clone(), c.q.clone());
+        set.spawn(async move {
+            let _slot = gate.acquire().await;
+            let runner = Recorder(Mutex::new(Vec::new()));
+            let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+            let req = ChatRequest {
+                system: crate::ai::SYSTEM.to_owned(),
+                messages: vec![Message::user(q)],
+                image: None,
+                more_images: Vec::new(),
+                think: false,
+            };
+            let (sink, cancel) = (Sink::new(tx), CancellationToken::new());
+            let started = std::time::Instant::now();
+            let call = ai.chat_with_tools(&req, &defs, &runner, &sink, &cancel);
+            let answer = match tokio::time::timeout(std::time::Duration::from_secs(90), call).await
+            {
+                Ok(Ok(_)) => Ok(()),
+                Ok(Err(e)) => Err(e.to_string()),
+                Err(_) => Err("no answer in 90 s".to_owned()),
+            };
+            let calls: Vec<String> = runner
+                .0
+                .into_inner()
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(n, _)| n)
+                .collect();
+            (i, answer, calls, started.elapsed().as_secs_f32())
+        });
+    }
+    let mut results = Vec::new();
+    while let Some(r) = set.join_next().await {
+        results.push(r.expect("case task"));
+    }
+    results.sort_by_key(|r| r.0);
     let mut rows = Vec::new();
     let mut passed = 0;
     let mut failed = 0;
-    for c in &cases {
-        let runner = Recorder(Mutex::new(Vec::new()));
-        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
-        let req = ChatRequest {
-            system: crate::ai::SYSTEM.to_owned(),
-            messages: vec![Message::user(c.q.clone())],
-            image: None,
-            more_images: Vec::new(),
-            think: false,
-        };
-        let started = std::time::Instant::now();
-        let answer = ai
-            .chat_with_tools(
-                &req,
-                &defs,
-                &runner,
-                &Sink::new(tx),
-                &CancellationToken::new(),
-            )
-            .await;
-        let secs = started.elapsed().as_secs_f32();
+    for (i, answer, calls, secs) in results {
+        let c = &cases[i];
         if let Err(e) = &answer {
             failed += 1;
             println!("ERR {}: {e}", c.q);
         }
-        let calls: Vec<String> = runner
-            .0
-            .into_inner()
-            .unwrap_or_default()
-            .into_iter()
-            .map(|(n, _)| n)
-            .collect();
         let ok = match &answer {
             Err(_) => false,
-            Ok(_) if c.tools_must.is_empty() => calls.is_empty(),
-            Ok(_) => calls.first().is_some_and(|n| c.tools_must.contains(n)),
+            Ok(()) if c.tools_must.is_empty() => calls.is_empty(),
+            Ok(()) => calls.first().is_some_and(|n| c.tools_must.contains(n)),
         };
         if ok {
             passed += 1;
