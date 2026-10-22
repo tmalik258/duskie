@@ -17,6 +17,12 @@ pub async fn save_attachment(name: String, data: Vec<u8>) -> CmdResult<String> {
     .map_err(|e| e.to_string())?
 }
 
+/// A file picker opened from the island is up (`open`) or closed.
+#[tauri::command]
+pub fn island_dialog(app: tauri::AppHandle, open: bool) {
+    crate::island::dialog_open(&app, open);
+}
+
 /// A file name without separators or spaces, so `@path` stays one word.
 fn clean(name: &str) -> String {
     let s: String = name

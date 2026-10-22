@@ -120,4 +120,8 @@ export interface HitRect {
   y: number;
   width: number;
   height: number;
+  /** Click-through space inside the rect. */
+  gap?: { x: number; y: number; width: number; height: number } | null;
+  /** A floating card inside the gap that still takes clicks. */
+  keep?: { x: number; y: number; width: number; height: number } | null;
 }

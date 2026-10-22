@@ -353,6 +353,7 @@ pub fn run() {
             commands::agent_files,
             commands::project_files,
             commands::save_attachment,
+            commands::island_dialog,
             commands::agent_commands,
             commands::agent_open_editor,
             commands::agent_tune,

@@ -178,7 +178,11 @@ export function useIslandShape(c: IslandStore & IslandWork & IslandHover & Islan
     clearTimeout(hitRectTimer.current);
     hitRectTimer.current = setTimeout(() => {
       const hitH = dockBeside ? sideDockH : height;
-      const base = { x: (window.innerWidth - dockPairW) / 2, y: TOP, width: dockPairW, height: hitH };
+      const x = (window.innerWidth - dockPairW) / 2;
+      // The dock beside the island runs the full height; the space under
+      // the island stays click-through.
+      const gap = dockBeside && hitH > height ? { x, y: TOP + height, width, height: hitH - height } : null;
+      const base = { x, y: TOP, width: dockPairW, height: hitH, gap, keep: overlayHit };
       const rect = overlayHit
         ? {
             x: Math.min(base.x, overlayHit.x),
@@ -190,7 +194,7 @@ export function useIslandShape(c: IslandStore & IslandWork & IslandHover & Islan
       void api.islandSetHitRect(rect);
     }, 16);
     return () => clearTimeout(hitRectTimer.current);
-  }, [dockPairW, height, dockBeside, sideDockH, overlayHit]);
+  }, [dockPairW, width, height, dockBeside, sideDockH, overlayHit]);
 
   // A small squish when something gets the mascot's attention while compact.
   useEffect(() => {
