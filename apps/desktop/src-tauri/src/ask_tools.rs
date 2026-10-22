@@ -316,6 +316,8 @@ async fn run_tool(app: &AppHandle, chat_id: &str, name: &str, args: &Value) -> O
         HELP => {
             let topic = args["topic"].as_str().unwrap_or_default();
             let mut out = crate::help::guide(topic);
+            out.push_str("\n\n");
+            out.push_str(&crate::commands::diag::live_state(app).await);
             if crate::help::is_problem(topic) {
                 out.push_str("\n\nHealth and recent problems:\n");
                 out.push_str(&crate::commands::diag::diagnostics(app.clone()).await);
