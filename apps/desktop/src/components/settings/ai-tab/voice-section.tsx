@@ -130,6 +130,18 @@ export function VoiceSection({ voice, onError }: { voice: VoiceSettings; onError
         checked={voice.conversation}
         onChange={(conversation) => void set({ conversation })}
       />
+      {voice.conversation && (
+        <Segmented
+          label="End after silence"
+          value={String(voice.replyWait ?? 8)}
+          options={[
+            ["5", "5 s"],
+            ["8", "8 s"],
+            ["15", "15 s"],
+          ]}
+          onChange={(v) => void set({ replyWait: Number(v) })}
+        />
+      )}
       <Toggle
         label="Read suggestions aloud"
         hint='Answer with "open" or "not now"'

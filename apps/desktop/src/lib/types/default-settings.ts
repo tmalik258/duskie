@@ -96,6 +96,7 @@ export const DEFAULT_SETTINGS: Settings = {
     speakAnswers: true,
     listeningStyle: "compact",
     conversation: true,
+    replyWait: 8,
     speakSuggestions: true,
     interrupt: true,
     live: false,

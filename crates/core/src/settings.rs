@@ -399,6 +399,8 @@ pub struct VoiceSettings {
     pub speak_answers: bool,
     /// After a spoken answer, listen for a reply without the wake phrase.
     pub conversation: bool,
+    /// Seconds of silence after an answer before the conversation ends.
+    pub reply_wait: u32,
     /// Read suggestions aloud and take a spoken choice ("open", "not now").
     pub speak_suggestions: bool,
     /// Talking over a spoken answer stops it and listens.
@@ -445,6 +447,7 @@ impl Default for VoiceSettings {
             speak_answers: true,
             listening_style: "compact".into(),
             conversation: true,
+            reply_wait: 8,
             speak_suggestions: true,
             interrupt: true,
             voice: "f4".into(),

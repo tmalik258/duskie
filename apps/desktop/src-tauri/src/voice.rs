@@ -980,7 +980,11 @@ pub fn answer_done(app: &AppHandle, id: &str, error: Option<&str>) {
         s.finish(u);
         spoke = true;
     });
-    let conversation = lock(&app.state::<AppState>().settings).voice.conversation;
+    let (conversation, wait) = {
+        let state = app.state::<AppState>();
+        let s = lock(&state.settings);
+        (s.voice.conversation, s.voice.reply_wait.clamp(3, 30))
+    };
     // Keep listening only after a question that was spoken, never a typed one.
     let asked_by_voice = lock(&voice(app).asked_by_voice).as_deref() == Some(id);
     if spoke && conversation && asked_by_voice && error.is_none() {
@@ -996,7 +1000,7 @@ pub fn answer_done(app: &AppHandle, id: &str, error: Option<&str>) {
                         .as_ref()
                         .is_some_and(|(chat, _)| *chat == id)
             },
-            Some(REPLY_WAIT),
+            Some(std::time::Duration::from_secs(u64::from(wait))),
         );
     }
 }
@@ -1066,8 +1070,6 @@ fn ends_conversation(text: &str) -> bool {
     ENDS.contains(&t.as_str())
 }
 
-/// How long the mic waits for a spoken reply after an answer.
-const REPLY_WAIT: std::time::Duration = std::time::Duration::from_secs(8);
 /// A key pressed in Ask this recently counts as typing.
 const TYPING_GRACE_MS: u64 = 3000;
 

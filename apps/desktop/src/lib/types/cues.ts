@@ -26,6 +26,8 @@ export interface VoiceSettings {
   listeningStyle: "compact" | "full";
   /** After a spoken answer, listen for a reply without the wake word. */
   conversation: boolean;
+  /** Seconds of silence after an answer before the conversation ends. */
+  replyWait?: number;
   /** Read suggestions aloud and take a spoken choice. */
   speakSuggestions: boolean;
   /** Talking over a spoken answer stops it and listens. */
