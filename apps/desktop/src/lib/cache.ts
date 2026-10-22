@@ -14,7 +14,9 @@ const PREFIX = "sidekick:cache:";
 const subscribers = new Map<string, Set<(json: string) => void>>();
 const pending = new Map<string, Promise<unknown>>();
 
-function loadOnce<T>(key: string, load: () => Promise<T>): Promise<T> {
+/** One request per key at a time: callers asking while it runs share it. Keys
+ * from different caches never clash (git keys start with "git\0"). */
+export function loadOnce<T>(key: string, load: () => Promise<T>): Promise<T> {
   const active = pending.get(key);
   if (active) return active as Promise<T>;
   const request = Promise.resolve().then(load);
