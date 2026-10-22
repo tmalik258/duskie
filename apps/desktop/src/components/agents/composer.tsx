@@ -7,8 +7,9 @@ import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import type { AgentCommand } from "@/lib/agent-commands";
 import { type Session, setSessionMode, tuneSession } from "@/lib/agents";
 import { api } from "@/lib/bridge";
-import { AttachButton, AttachChips } from "../attach/attach-bar";
-import { useAttachments } from "../attach/use-attachments";
+import { AttachButton, ContextChips } from "../attach/attach-bar";
+import { dropMention, withRefs } from "../attach/context";
+import { useContextItems } from "../attach/use-context-items";
 import { ComposerPop } from "./composer/composer-pop";
 import { runCommand } from "./composer/run-command";
 import { TerminalOnly } from "./composer/terminal-only";
@@ -37,7 +38,8 @@ export function Composer({
   setText: (t: string) => void;
   /** After rewind: focus the box and select the restored draft (Cursor-style edit). */
   editFocus?: number;
-  onSend: () => void;
+  /** Sends `text` (what was typed plus its context chips). */
+  onSend: (text: string) => void;
   onClear: () => void;
   onReview: () => void;
   onRewind: () => void;
@@ -51,7 +53,7 @@ export function Composer({
   const wrapRef = useRef<HTMLDivElement>(null);
   const { commands, shownCommands, files, slash, mention, count } = useComposerLists(s, text);
   const { float, popRef } = usePopPlace(wrapRef, count, text);
-  const att = useAttachments(text, setText);
+  const ctx = useContextItems();
   const at = Math.min(sel, Math.max(count - 1, 0));
   // biome-ignore lint/correctness/useExhaustiveDependencies: focus again when the session changes
   useEffect(() => {
@@ -73,7 +75,8 @@ export function Composer({
   const submit = () => {
     const match = /^\/(\S+)(?:\s+(.*))?$/.exec(text.trim());
     if (!match) {
-      onSend();
+      onSend(withRefs(text, ctx.items));
+      ctx.clear();
       return;
     }
     const command = commands.find((c) => c.name === `/${match[1].toLowerCase()}`);
@@ -82,7 +85,8 @@ export function Composer({
   };
   const pickFile = (f: string) => {
     if (!mention) return;
-    setText(`${text.slice(0, text.length - mention[2].length - 1)}@${f} `);
+    setText(dropMention(text));
+    ctx.pick(f);
     inputRef.current?.focus({ preventScroll: true });
   };
   const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
@@ -134,10 +138,10 @@ export function Composer({
       )}
       {terminal && <TerminalOnly id={s.id} command={terminal} onError={setNotice} />}
       {/* biome-ignore lint/a11y/noStaticElementInteractions: a drop zone for files; the paperclip is the keyboard path */}
-      <div ref={wrapRef} className="ak-composer ak-two relative" onDrop={att.onDrop} onDragOver={att.onDragOver}>
-        <AttachChips items={att.items} error={att.error} onRemove={att.remove} />
+      <div ref={wrapRef} className="ak-composer ak-two relative" onDrop={ctx.onDrop} onDragOver={ctx.onDragOver}>
+        <ContextChips items={ctx.items} error={ctx.error} onRemove={ctx.remove} />
         <div className="ak-row">
-          <AttachButton onFiles={(f) => void att.add(f)} />
+          <AttachButton onFiles={(f) => void ctx.upload(f)} />
           <input
             ref={inputRef}
             value={text}
@@ -146,7 +150,7 @@ export function Composer({
               setSel(0);
             }}
             onBlur={() => onBlur?.()}
-            onPaste={att.onPaste}
+            onPaste={ctx.onPaste}
             onKeyDown={onKey}
             placeholder={working ? "Steer it, it reads this next" : "Ask for more, / for commands, @ for files"}
           />

@@ -25,7 +25,5 @@ export function useMentionFiles(text: string, list: ((query: string) => Promise<
       clearTimeout(id);
     };
   }, [query, key]);
-  /** Text with the trailing @query swapped for the picked file. */
-  const pick = (f: string) => (mention ? `${text.slice(0, text.length - mention[2].length - 1)}@${f} ` : text);
-  return { files: query === null ? [] : files, mention, query, pick };
+  return { files: query === null ? [] : files, mention, query };
 }

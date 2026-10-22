@@ -90,8 +90,8 @@ export function Board({
   // biome-ignore lint/correctness/useExhaustiveDependencies: count again when tiles change
   useEffect(measure, [live.length]);
 
-  const send = () => {
-    const t = text.trim();
+  const send = (full = text) => {
+    const t = full.trim();
     if (!t || !target) return;
     sendToSession(target.id, t);
     clearDraft();
