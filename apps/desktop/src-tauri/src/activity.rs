@@ -468,16 +468,21 @@ pub fn observe(app: &AppHandle, event: &duskie_core::Event) {
             &id,
             "file",
             &format!("Downloading {}", p["name"].as_str().unwrap_or("file")),
-            if event.kind == "file.download_completed" {
+            // The partial file going away means the browser either renamed it
+            // to the real file (done) or deleted it (cancelled).
+            if event.kind == "file.download_completed"
+                || (p["missing"] == true && std::path::Path::new(destination).is_file())
+            {
                 Phase::Completed
             } else if p["missing"] == true {
-                Phase::Unconfirmed
+                Phase::Failed
             } else {
                 Phase::Downloading
             },
             p["size"].as_u64(),
             None,
-            None,
+            (p["missing"] == true && !std::path::Path::new(destination).is_file())
+                .then(|| "Cancelled".to_owned()),
         );
         metadata(app, &id, None, Some(destination.into()), None);
     }

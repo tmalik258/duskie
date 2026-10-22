@@ -154,12 +154,12 @@ export function visibleActivities(activities: Activity[], now: number, keepProbl
   return [...unique.values()]
     .filter((a) => {
       if (a.dismissed) return false;
-      if (keepProblems && needsAttention(a, now)) return true;
       const idle = now - a.lastProgressAt;
+      // Unconfirmed never completes on its own: a short notice, never stuck.
+      if (a.phase === "unconfirmed" && idle >= UNCONFIRMED_HOLD_MS) return false;
+      if (keepProblems && needsAttention(a, now)) return true;
       // Done / failed: brief hold, then gone (compact pill settles).
       if (terminal(a) && idle >= ACTIVITY_HOLD_MS) return false;
-      // Unconfirmed never completes on its own, same short hold as done pills.
-      if (a.phase === "unconfirmed" && idle >= UNCONFIRMED_HOLD_MS) return false;
       // Stalled downloads (no bytes for 2m): drop the compact pill; don't stick.
       if (idle >= INACTIVITY_MS && (a.source === "browser" || a.source === "file")) return false;
       return true;
