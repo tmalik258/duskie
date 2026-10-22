@@ -574,7 +574,8 @@ fn expire_when_ignored(app: &AppHandle, id: String) {
                 return;
             }
             let limit = Duration::from_secs(u64::from(lock(&state.settings).collapse_after_secs));
-            idle = if state.hovered.load(Ordering::Relaxed) {
+            // The mic is open for a spoken answer: the card waits for it.
+            idle = if state.hovered.load(Ordering::Relaxed) || crate::voice::awaiting_choice(&app) {
                 Duration::ZERO
             } else {
                 idle + EXPIRY_TICK

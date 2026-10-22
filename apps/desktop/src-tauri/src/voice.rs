@@ -782,15 +782,16 @@ fn on_heard(app: &AppHandle, heard: Heard) {
     let v = voice(app);
     match heard {
         Heard::Wake => {
+            if lock(&v.choosing).is_some() {
+                // Listening for a choice, not a question: Ask stays closed,
+                // and the voice goes on until a choice is really heard.
+                mascot::dispatch(app, MascotEvent::ListenStart);
+                return;
+            }
             // Talking over an answer stops it.
             stop_speaking(app);
             // Load the model while the question is still being spoken.
             crate::ai::warm_up(app);
-            if lock(&v.choosing).is_some() {
-                // Listening for a choice, not a question: Ask stays closed.
-                mascot::dispatch(app, MascotEvent::ListenStart);
-                return;
-            }
             // The island listens in its compact shape; Ask opens only when
             // the answer starts coming in.
             if !ask::is_open(app) {
@@ -817,14 +818,32 @@ fn on_heard(app: &AppHandle, heard: Heard) {
         Heard::Final(text) => {
             let mut text = fixed(app, strip_wake(&text));
             let pushed = v.pushed.swap(false, Ordering::SeqCst);
-            if let Some((id, labels)) = lock(&v.choosing).take() {
+            let choosing = lock(&v.choosing).take();
+            if let Some((id, labels)) = choosing {
                 mascot::dispatch(app, MascotEvent::Cancelled);
                 // Clears what showed as heard; an empty answer asks nothing.
                 emit_heard(app, String::new(), true);
-                let result = match match_choice(&text, &labels) {
-                    Choice::Option(i) => crate::suggestions::choose_by_voice(app, &id, i),
-                    Choice::Dismiss => crate::suggestions::dismiss(app, &id, "voice"),
-                    Choice::Unclear => Ok(()),
+                let choice = if is_short_reply(&text, &labels) {
+                    match_choice(&text, &labels)
+                } else {
+                    Choice::Unclear
+                };
+                let result = match choice {
+                    Choice::Option(i) => {
+                        stop_speaking(app);
+                        restore_interrupt(app);
+                        crate::suggestions::choose_by_voice(app, &id, i)
+                    }
+                    Choice::Dismiss => {
+                        stop_speaking(app);
+                        restore_interrupt(app);
+                        crate::suggestions::dismiss(app, &id, "voice")
+                    }
+                    // Probably talk in the room: ignore it and keep waiting.
+                    Choice::Unclear => {
+                        keep_waiting(app, id, labels);
+                        Ok(())
+                    }
                 };
                 if let Err(err) = result {
                     log::debug!("spoken choice ignored: {err}");
@@ -1142,6 +1161,7 @@ pub fn silence_suggestion(app: &AppHandle, stop_voice: bool) {
     if lock(&v.choosing).take().is_none() {
         return;
     }
+    restore_interrupt(app);
     *lock(&v.detailed) = None;
     if stop_voice {
         stop_speaking(app);
@@ -1198,6 +1218,13 @@ pub fn offer_spoken(app: &AppHandle, ui: &crate::state::Suggestion, priority: i3
         let Some(speaker) = runtime.as_ref().and_then(|r| r.speaker.as_ref()) else {
             return;
         };
+        let Some(listener) = runtime.as_ref().and_then(|r| r.listener.as_ref()) else {
+            // No microphone: never ask for an answer that cannot be heard.
+            speaker.say(ui.title.trim());
+            return;
+        };
+        // You can answer while it is still talking.
+        listener.send(Control::Interrupt(true));
         speaker.say(&spoken_prompt(&ui.title, &ui.options));
     }
     *lock(&v.speaking) = None;
@@ -1223,11 +1250,63 @@ pub fn offer_spoken(app: &AppHandle, ui: &crate::state::Suggestion, priority: i3
             .is_some_and(|(cid, _)| *cid == id);
         if stale {
             lock(&v.choosing).take();
+            restore_interrupt(&app);
             if let Some(l) = lock(&v.runtime).as_ref().and_then(|r| r.listener.as_ref()) {
                 l.send(Control::Cancel);
             }
         }
     });
+}
+
+/// Talking over Duskie goes back to what Settings say once a spoken
+/// suggestion is over.
+fn restore_interrupt(app: &AppHandle) {
+    if let Some(r) = lock(&voice(app).runtime).as_ref()
+        && let Some(l) = r.listener.as_ref()
+    {
+        l.send(Control::Interrupt(r.key.interrupt));
+    }
+}
+
+/// Something was heard that is not a choice: keep waiting for one while
+/// the card is up. The mic reopens without counting as a question.
+fn keep_waiting(app: &AppHandle, id: String, labels: Vec<String>) {
+    if crate::suggestions::current(app).is_none_or(|s| s.id != id) {
+        restore_interrupt(app);
+        return;
+    }
+    let v = voice(app);
+    *lock(&v.choosing) = Some((id, labels));
+    let runtime = lock(&v.runtime);
+    let speaking = runtime
+        .as_ref()
+        .and_then(|r| r.speaker.as_ref())
+        .is_some_and(Speaker::busy);
+    // While it talks, talking over it is heard again on its own.
+    if !speaking && let Some(l) = runtime.as_ref().and_then(|r| r.listener.as_ref()) {
+        l.send(Control::ListenNow);
+    }
+}
+
+/// True while the mic is open for an answer after the question was read.
+/// The card waits for that, never for the voice itself.
+pub fn awaiting_choice(app: &AppHandle) -> bool {
+    let v = voice(app);
+    lock(&v.choosing).is_some()
+        && mascot::current(app) == duskie_core::MascotState::Listening
+        && !lock(&v.runtime)
+            .as_ref()
+            .and_then(|r| r.speaker.as_ref())
+            .is_some_and(Speaker::busy)
+}
+
+/// A reply that is basically just a choice ("open", "open it", "not now"),
+/// not a sentence that happens to hold one ("can you open the door").
+pub fn is_short_reply(text: &str, labels: &[String]) -> bool {
+    let words = |s: &str| s.split_whitespace().count();
+    let longest = labels.iter().map(|l| words(l)).max().unwrap_or(1).max(2);
+    let n = words(text);
+    n > 0 && n <= longest + 1
 }
 
 /// Only the headline is read, so it ends about when the card would go:
@@ -1578,6 +1657,17 @@ mod tests {
         assert_eq!(match_choice("what is the weather", &opts), Choice::Unclear);
         let browsers = labels(&["Open", "Open in Chrome"]);
         assert_eq!(match_choice("open in chrome", &browsers), Choice::Option(1));
+    }
+
+    #[test]
+    fn takes_only_short_replies() {
+        let l = labels(&["Open", "Show in folder"]);
+        assert!(is_short_reply("open", &l));
+        assert!(is_short_reply("open it", &l));
+        assert!(is_short_reply("show in folder", &l));
+        assert!(is_short_reply("not now", &l));
+        assert!(!is_short_reply("can you open the door please", &l));
+        assert!(!is_short_reply("", &l));
     }
 
     #[test]

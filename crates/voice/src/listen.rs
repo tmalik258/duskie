@@ -45,6 +45,8 @@ pub enum Control {
     /// Duskie is speaking (true) or quiet again (false). While muted the
     /// microphone hears the speakers, so nothing it hears counts.
     Mute(bool),
+    /// Talking over Duskie's voice is heard (true) or not (false), for now.
+    Interrupt(bool),
 }
 
 #[derive(Debug, Clone)]
@@ -685,6 +687,7 @@ impl Listener {
                             }
                             Control::Cancel => engine.cancel(),
                             Control::Mute(muted) => engine.set_muted(muted),
+                            Control::Interrupt(on) => engine.set_interrupt(on),
                         }
                     }
                     match chunks.recv_timeout(Duration::from_millis(100)) {
