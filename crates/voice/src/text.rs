@@ -152,7 +152,9 @@ fn spell_word(vocab: &Vocab, word: &str) -> Option<Vec<String>> {
 
 /// The wake phrases for the keyword model: "hey Duskie" always, plus
 /// "hey <name>" when the user renamed the assistant.
-pub fn wake_keywords(vocab: Option<&Vocab>) -> String {
+/// `bare`: the name alone wakes it too, once your voice was taught (the
+/// voice check keeps others from waking it by saying the name).
+pub fn wake_keywords(vocab: Option<&Vocab>, bare: bool) -> String {
     let mut out = String::new();
     // The app's own name, spelled from the model's vocabulary.
     if let Some(vocab) = vocab {
@@ -161,8 +163,8 @@ pub fn wake_keywords(vocab: Option<&Vocab>) -> String {
                 out.push_str(&format!("{spelled} @hey_duskie\n"));
             }
         }
-        // The bare name wakes too: "Duskie, what time is it".
-        if let Some(spelled) = spell(vocab, "duskie") {
+        // "Duskie, what time is it", after teaching.
+        if let Some(spelled) = spell(vocab, "duskie").filter(|_| bare) {
             out.push_str(&format!("{spelled} @duskie\n"));
         }
     }
@@ -176,6 +178,9 @@ pub fn wake_keywords(vocab: Option<&Vocab>) -> String {
             if let Some(spelled) = spell(vocab, &format!("{greeting} {name}")) {
                 out.push_str(&format!("{spelled} @hey_{}\n", name.replace(' ', "_")));
             }
+        }
+        if let Some(spelled) = spell(vocab, &name).filter(|_| bare) {
+            out.push_str(&format!("{spelled} @{}\n", name.replace(' ', "_")));
         }
     }
     out
@@ -585,7 +590,7 @@ mod tests {
     }
 
     #[test]
-    fn the_bare_name_is_a_wake_keyword() {
+    fn the_bare_name_wakes_only_after_teaching() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
             "/../../apps/desktop/src-tauri/resources/voice-models/",
@@ -595,7 +600,8 @@ mod tests {
             return;
         };
         let vocab = read_vocab(&bytes);
-        assert!(wake_keywords(Some(&vocab)).contains(" @duskie\n"));
+        assert!(wake_keywords(Some(&vocab), true).contains(" @duskie\n"));
+        assert!(!wake_keywords(Some(&vocab), false).contains(" @duskie\n"));
     }
 
     #[test]
@@ -611,8 +617,8 @@ mod tests {
         };
         let vocab = read_vocab(&bytes);
         assert!(spell(&vocab, "hey duskie").is_some_and(|s| s.starts_with("▁HE Y ")));
-        assert!(wake_keywords(Some(&vocab)).contains("@hey_duskie"));
-        assert!(!wake_keywords(Some(&vocab)).contains("SIDE"));
+        assert!(wake_keywords(Some(&vocab), false).contains("@hey_duskie"));
+        assert!(!wake_keywords(Some(&vocab), true).contains("SIDE"));
         // Checked against the sentencepiece library.
         assert_eq!(spell(&vocab, "hey orbi").as_deref(), Some("▁HE Y ▁OR B I"));
         assert_eq!(spell(&vocab, "light up").as_deref(), Some("▁ L IGHT ▁UP"));
