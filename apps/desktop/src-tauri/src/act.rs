@@ -668,6 +668,7 @@ async fn find_on_screen(app: &AppHandle, want: &str) -> Result<(i32, i32, &'stat
         ),
         messages: vec![duskie_ai::Message::user(format!("Where is: {want}"))],
         image: Some(png),
+        more_images: Vec::new(),
         think: false,
     };
     let answer = tokio::time::timeout(Duration::from_secs(40), model.complete(&req, json!({})))

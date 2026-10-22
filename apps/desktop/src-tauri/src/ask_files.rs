@@ -1,14 +1,14 @@
-//! Files attached to an Ask question: the first image goes to the model as
-//! a picture; text files are read into the question.
+//! Files attached to an Ask question: images go to the model as pictures;
+//! text files are read into the question.
 
 use std::path::Path;
 
 /// Text read per file, so one big log cannot crowd out the question.
 const MAX_TEXT: usize = 20_000;
 
-/// The first PNG to show the model, and the text to add to the question.
-pub fn read(files: &[String]) -> (Option<Vec<u8>>, String) {
-    let mut image = None;
+/// The PNGs to show the model, and the text to add to the question.
+pub fn read(files: &[String]) -> (Vec<Vec<u8>>, String) {
+    let mut images = Vec::new();
     let mut text = String::new();
     for f in files {
         let path = Path::new(f);
@@ -20,10 +20,9 @@ pub fn read(files: &[String]) -> (Option<Vec<u8>>, String) {
             .extension()
             .is_some_and(|e| e.eq_ignore_ascii_case("png"))
         {
-            if image.is_none() {
-                image = std::fs::read(path).ok();
-            } else {
-                text.push_str(&format!("\n\n(Also attached: image {name}, not shown.)"));
+            match std::fs::read(path) {
+                Ok(png) => images.push(png),
+                Err(_) => text.push_str(&format!("\n\n(Attached image {name} could not be read.)")),
             }
             continue;
         }
@@ -43,7 +42,7 @@ pub fn read(files: &[String]) -> (Option<Vec<u8>>, String) {
             None => text.push_str(&format!("\n\n(Attached: {name} at {f}, not text.)")),
         }
     }
-    (image, text)
+    (images, text)
 }
 
 #[cfg(test)]
@@ -58,7 +57,7 @@ mod tests {
         std::fs::write(&p, [137u8, 80, 78, 71]).unwrap();
         let files = [t.display().to_string(), p.display().to_string()];
         let (image, text) = super::read(&files);
-        assert_eq!(image.as_deref(), Some(&[137u8, 80, 78, 71][..]));
+        assert_eq!(image, vec![vec![137u8, 80, 78, 71]]);
         assert!(
             text.contains("notes.txt") && text.contains("hello"),
             "{text}"

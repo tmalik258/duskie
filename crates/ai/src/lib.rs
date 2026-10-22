@@ -66,12 +66,37 @@ pub struct ChatRequest {
     pub messages: Vec<Message>,
     /// A PNG the latest question is about (a screenshot), if any.
     pub image: Option<Vec<u8>>,
+    /// More PNGs attached to the latest question, after `image`.
+    pub more_images: Vec<Vec<u8>>,
     /// Let a model that can think before answering do so. Off, it answers
     /// straight away (see `needs_thinking`).
     pub think: bool,
 }
 
 impl ChatRequest {
+    /// Every image for the latest question, `image` first.
+    pub fn images(&self) -> Vec<&Vec<u8>> {
+        self.image.iter().chain(self.more_images.iter()).collect()
+    }
+
+    /// Every image, base64-encoded, `image` first.
+    pub fn images_base64(&self) -> Vec<String> {
+        use base64::Engine;
+        self.images()
+            .into_iter()
+            .map(|png| base64::engine::general_purpose::STANDARD.encode(png))
+            .collect()
+    }
+
+    /// The file name image `i` is saved under for CLI agents.
+    pub fn shot_name(i: usize) -> String {
+        if i == 0 {
+            "screen.png".into()
+        } else {
+            format!("screen-{}.png", i + 1)
+        }
+    }
+
     pub fn image_base64(&self) -> Option<String> {
         use base64::Engine;
         self.image
@@ -248,6 +273,7 @@ mod tests {
                 Message::user("what is 2+2?"),
             ],
             image: None,
+            more_images: Vec::new(),
             think: false,
         };
         let t = transcript(&req);
@@ -262,6 +288,7 @@ mod tests {
             system: String::new(),
             messages: vec![Message::user("hello")],
             image: None,
+            more_images: Vec::new(),
             think: false,
         };
         assert_eq!(transcript(&req), "hello");

@@ -12,6 +12,7 @@ async fn run(p: &dyn AiProvider, prompt: &str) -> (Result<String, String>, Strin
         system: String::new(),
         messages: vec![Message::user(prompt)],
         image: None,
+        more_images: Vec::new(),
         think: false,
     };
     let r = p
@@ -78,6 +79,7 @@ done
             Message::user("and again"),
         ],
         image: None,
+        more_images: Vec::new(),
         think: false,
     };
     let second = p

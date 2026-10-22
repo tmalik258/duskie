@@ -383,12 +383,16 @@ impl AiProvider for ClaudeCode {
             .last()
             .map(|m| m.content.as_str())
             .unwrap_or_default();
-        if let Some(png) = &req.image {
-            // Claude Code reads images from files; it runs in this folder.
+        // Claude Code reads images from files; it runs in this folder.
+        let images = req.images();
+        if !images.is_empty() {
             let _ = std::fs::create_dir_all(&self.workdir);
-            std::fs::write(self.workdir.join(SCREENSHOT), png)
-                .map_err(|e| AiError::Failed(format!("could not save the screenshot: {e}")))?;
         }
+        for (i, png) in images.iter().enumerate() {
+            std::fs::write(self.workdir.join(ChatRequest::shot_name(i)), png)
+                .map_err(|e| AiError::Failed(format!("could not save the image: {e}")))?;
+        }
+        let names: Vec<String> = (0..images.len()).map(ChatRequest::shot_name).collect();
         let prompt = |continuing: bool| {
             // A session that already has the chat only needs the new message.
             let text = if continuing {
@@ -396,7 +400,12 @@ impl AiProvider for ClaudeCode {
             } else {
                 transcript(req)
             };
-            if req.image.is_some() {
+            if names.len() > 1 {
+                format!(
+                    "The user attached images saved in the current folder as {}. Read them first.\n\n{text}",
+                    names.join(", ")
+                )
+            } else if req.image.is_some() {
                 format!(
                     "A screenshot of the user's screen is saved as {SCREENSHOT} in the current folder. Read it first.\n\n{text}"
                 )

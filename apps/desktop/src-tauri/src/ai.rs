@@ -830,7 +830,7 @@ pub fn chat(
             log_ask_user(&id, q, &attach, local_only);
             crate::ask_tools::begin_turn(&id, q);
         }
-        let (attached, extra) = crate::ask_files::read(&attach.files);
+        let (mut attached, extra) = crate::ask_files::read(&attach.files);
         if !extra.is_empty()
             && let Some(m) = messages
                 .iter_mut()
@@ -859,8 +859,10 @@ pub fn chat(
                     return;
                 }
             }
+        } else if attached.is_empty() {
+            None
         } else {
-            attached
+            Some(attached.remove(0))
         };
         // "Turn on hotspot", "mute": done at once, no model to misread it.
         // Not while held: the question may still change.
@@ -961,6 +963,7 @@ pub fn chat(
             system: system_prompt(&app, &attach).await,
             messages,
             image,
+            more_images: attached,
             think,
         };
         let handoff = Arc::new(std::sync::Mutex::new(None));

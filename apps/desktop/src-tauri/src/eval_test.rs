@@ -168,6 +168,7 @@ async fn local_model_picks_the_right_tools() {
             system: crate::ai::SYSTEM.to_owned(),
             messages: vec![Message::user(c.prompt.clone())],
             image: None,
+            more_images: Vec::new(),
             think: false,
         };
         let done = ai
