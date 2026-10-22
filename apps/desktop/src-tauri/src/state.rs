@@ -83,6 +83,8 @@ pub struct AppState {
     /// Ranking picks per skill and app, from earlier decisions.
     pub decisions: Mutex<crate::decide::Cache>,
     pub voice: crate::voice::Voice,
+    /// Voice takes being recorded to teach Duskie your voice (memory only).
+    pub enroll: Mutex<crate::voice_enroll::Takes>,
     pub calendar: duskie_sensors::Calendar,
     /// Claude Code permission requests waiting on the island.
     pub approvals: duskie_sensors::Approvals,
@@ -134,6 +136,14 @@ pub struct Suggestion {
     /// Why this showed, from how often you took this kind before. Empty
     /// for Duskie's own notices.
     pub why: String,
+    /// A small pill that opens into the card on hover or Alt.
+    pub compact: bool,
+    /// Shows without a sound.
+    pub silent: bool,
+    /// Where it came from, for the card's "From Calendar, 2 min ago" line.
+    pub source: String,
+    /// When it was first raised (Unix ms), so a queued one shows its real age.
+    pub at: u64,
 }
 
 pub struct Active {

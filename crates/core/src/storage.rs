@@ -93,6 +93,8 @@ const MIGRATIONS: &[&str] = &[
     // How often each kind of suggestion was taken or waved away.
     "ALTER TABLE skill_habits ADD COLUMN accepted INTEGER NOT NULL DEFAULT 0;
     ALTER TABLE skill_habits ADD COLUMN dismissed INTEGER NOT NULL DEFAULT 0;",
+    // Chats with a Live answer, so history can filter them.
+    "ALTER TABLE chats ADD COLUMN live INTEGER NOT NULL DEFAULT 0;",
 ];
 
 /// A saved Ask conversation, without its turns.
@@ -102,6 +104,8 @@ pub struct ChatSummary {
     pub id: String,
     pub title: String,
     pub updated: String,
+    /// At least one answer was spoken Live.
+    pub live: bool,
 }
 
 /// A saved chat with its turns, for age-based pruning.
@@ -266,6 +270,14 @@ pub struct StoredEvent {
 
 pub struct Storage {
     conn: Connection,
+}
+
+/// Whether any turn was answered Live (the turn carries `"live": true`).
+fn has_live_turn(turns_json: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(turns_json).is_ok_and(|v| {
+        v.as_array()
+            .is_some_and(|turns| turns.iter().any(|t| t["live"] == true))
+    })
 }
 
 impl Storage {
@@ -458,7 +470,7 @@ impl Storage {
     }
 
     /// Per project from `day` on: (lowercase name, total secs, last day with time).
-    /// Newest activity first, then most time — for project pickers.
+    /// Newest activity first, then most time, for project pickers.
     pub fn time_by_project_since(
         &self,
         day: &str,
@@ -827,9 +839,9 @@ impl Storage {
     pub fn save_chat(&self, id: &str, title: &str, turns_json: &str) -> Result<(), StorageError> {
         let now = chrono::Utc::now().to_rfc3339();
         self.conn.execute(
-            "INSERT INTO chats (id, title, updated, turns_json) VALUES (?1, ?2, ?3, ?4)
-             ON CONFLICT(id) DO UPDATE SET title = ?2, updated = ?3, turns_json = ?4",
-            params![id, title, now, turns_json],
+            "INSERT INTO chats (id, title, updated, turns_json, live) VALUES (?1, ?2, ?3, ?4, ?5)
+             ON CONFLICT(id) DO UPDATE SET title = ?2, updated = ?3, turns_json = ?4, live = ?5",
+            params![id, title, now, turns_json, has_live_turn(turns_json)],
         )?;
         self.conn.execute(
             "DELETE FROM chats WHERE id NOT IN (SELECT id FROM chats ORDER BY updated DESC LIMIT ?1)",
@@ -841,12 +853,13 @@ impl Storage {
     pub fn recent_chats(&self, limit: u32) -> Result<Vec<ChatSummary>, StorageError> {
         let mut stmt = self
             .conn
-            .prepare("SELECT id, title, updated FROM chats ORDER BY updated DESC LIMIT ?1")?;
+            .prepare("SELECT id, title, updated, live FROM chats ORDER BY updated DESC LIMIT ?1")?;
         let rows = stmt.query_map([limit], |r| {
             Ok(ChatSummary {
                 id: r.get(0)?,
                 title: r.get(1)?,
                 updated: r.get(2)?,
+                live: r.get::<_, i64>(3)? != 0,
             })
         })?;
         Ok(rows.collect::<Result<_, _>>()?)
@@ -974,6 +987,19 @@ mod tests {
         assert_eq!(rows[0].seq, 1);
         assert_eq!(s.clear_opens(Some("2026-09-22")).unwrap(), 1);
         assert_eq!(s.clear_opens(None).unwrap(), 1);
+    }
+
+    #[test]
+    fn marks_chats_with_a_live_answer() {
+        let s = Storage::open_in_memory().unwrap();
+        s.save_chat("typed", "Typed", r#"[{"role":"assistant"}]"#)
+            .unwrap();
+        s.save_chat("spoken", "Spoken", r#"[{"role":"assistant","live":true}]"#)
+            .unwrap();
+        let list = s.recent_chats(10).unwrap();
+        let live = |id: &str| list.iter().find(|c| c.id == id).unwrap().live;
+        assert!(live("spoken"));
+        assert!(!live("typed"));
     }
 
     #[test]

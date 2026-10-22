@@ -4,6 +4,7 @@ import { acceptActivities, beginActivity, finishActivity, ownsWorking, useActivi
 import { setTab, startHere } from "./agents";
 import { api, EVENTS, listen } from "./bridge";
 import { putCached, revalidate, SETUP_STATUS_CACHE_KEY } from "./cache";
+import { captionOf } from "./live";
 import { firstToday, isThanks, type Mood, moodForSkill, SUGGESTION_MOOD_MS } from "./mood";
 import { type NetNotice, watchNet } from "./net";
 import { cueVolume, playCue, playMood, playSound, preloadSounds } from "./sound";
@@ -20,6 +21,7 @@ import {
   type MascotState,
   type MergeState,
   type Proposal,
+  type SearchHit,
   type Settings,
   type Suggestion,
   type Turn,
@@ -48,7 +50,7 @@ interface DuskieState {
   netNotice: NetNotice | null;
   /** Cursor is over the island's interactive area (reported by Rust). */
   hovered: boolean;
-  /** Shift (hovered) or Shift+Alt (suggestion) — Rust polls; webview has no focus. */
+  /** Shift (hovered) or Shift+Alt (suggestion), Rust polls; webview has no focus. */
   shiftHeld: boolean;
   /** Extra interactive area while a floating menu is open (unioned into the hit rect). */
   overlayHit: HitRect | null;
@@ -75,11 +77,15 @@ interface DuskieState {
   chatSkill: boolean;
   /** The model picked in Ask mode; null lets Duskie choose. */
   askModel: string | null;
+  /** Typed Ask draft and last search hits; survives close for the session. */
+  askForm: AskForm;
   /** A spoken question asked with Ask closed: the island stays compact
    * ("Thinking...") until the answer starts, then opens to show it. */
   voiceQuestion: string | null;
   /** A short "done" line in the compact island ("Hotspot is on"). */
   donePill: string | null;
+  /** Undo for the done pill, when what just happened can be taken back. */
+  doneUndo: (() => void) | null;
   /** When Focus mode ends (ms since epoch), or null when not focusing. */
   focusUntil: number | null;
   /** Where the conversation is saved, so it can be picked up later. */
@@ -88,6 +94,9 @@ interface DuskieState {
   speaking: boolean;
   /** Voice: what is being heard right now, while listening. */
   hearing: string | null;
+  /** Live: the spoken answer as a caption in the compact island, and the
+   * step it is on ("Checking Gmail"). Ask stays closed. */
+  live: { caption: string; tool: string | null; done: boolean } | null;
   voiceStatus: VoiceStatus | null;
   /** Suggestions held while you were busy or in a meeting. */
   later: number;
@@ -155,7 +164,23 @@ export interface AskState {
   tool?: "screen" | "clipboard" | null;
 }
 
+/** Sticky Ask input + search results for the app session (not localStorage). */
+export interface AskForm {
+  text: string;
+  hits: { query: string; items: SearchHit[]; loading?: boolean } | null;
+}
+
 const MODEL_KEY = "sidekick.askModel";
+
+/** Updates the typed Ask draft. Survives panel close. */
+export function setAskFormText(text: string) {
+  useDuskie.setState((s) => ({ askForm: { ...s.askForm, text } }));
+}
+
+/** Updates the last search hit list in Ask. Survives panel close. */
+export function setAskHits(hits: AskForm["hits"]) {
+  useDuskie.setState((s) => ({ askForm: { ...s.askForm, hits } }));
+}
 
 function savedModel(): string | null {
   try {
@@ -202,11 +227,14 @@ export const useDuskie = create<DuskieState>(() => ({
   chatPage: null,
   chatSkill: false,
   askModel: savedModel(),
+  askForm: { text: "", hits: null },
   voiceQuestion: null,
   donePill: null,
+  doneUndo: null,
   focusUntil: null,
   conversation: crypto.randomUUID(),
   hearing: null,
+  live: null,
   speaking: false,
   voiceStatus: null,
   later: 0,
@@ -332,10 +360,13 @@ export async function installUpdate(): Promise<void> {
 
 let doneTimer: ReturnType<typeof setTimeout> | undefined;
 /** Shows a compact done pill for a moment: nothing needs you. */
-export function showDone(text: string) {
+export function showDone(text: string, undo?: () => void) {
   clearTimeout(doneTimer);
-  useDuskie.setState({ donePill: text, voiceQuestion: null });
-  doneTimer = setTimeout(() => useDuskie.setState({ donePill: null }), DONE_PILL_MS);
+  useDuskie.setState({ donePill: text, doneUndo: undo ?? null, voiceQuestion: null });
+  doneTimer = setTimeout(
+    () => useDuskie.setState({ donePill: null, doneUndo: null }),
+    undo ? DONE_PILL_MS * 2 : DONE_PILL_MS,
+  );
 }
 
 /**
@@ -359,9 +390,11 @@ export async function runOpen(open: () => Promise<boolean>, doneMessage: string)
   try {
     await api.activityOpenStart(id, label).catch(() => {});
     const opened = await open();
-    const outcome = opened ? doneMessage.replace(/^Opened\b/i, "Launch requested for") : "Nothing opened";
+    const outcome = opened ? doneMessage : "Nothing opened";
+    // Finish on the backend before the done pill so a still-Running sync cannot
+    // flash "Opening…" again after the tick.
     finishActivity(id, true, outcome);
-    void api.activityOpenFinish(id, true, outcome).catch(() => {});
+    await api.activityOpenFinish(id, true, outcome).catch(() => {});
     if (mayFinishOpen(generation, id)) {
       useDuskie.setState({ running: null, mascot: "idle" });
       if (opened) showDone(outcome);
@@ -369,7 +402,7 @@ export async function runOpen(open: () => Promise<boolean>, doneMessage: string)
     return opened;
   } catch (e) {
     finishActivity(id, false, String(e));
-    void api.activityOpenFinish(id, false, String(e)).catch(() => {});
+    await api.activityOpenFinish(id, false, String(e)).catch(() => {});
     if (mayFinishOpen(generation, id))
       useDuskie.setState({
         running: null,
@@ -394,7 +427,7 @@ export function finishWaiting(waiting: Waiting, line: string) {
   playCue("ding", cueVolume(settings, "ding"), settings.soundKit);
   void api.voiceSay(line);
 
-  // Island Done / All set (mascot success) — not only the orb celebrate face.
+  // Island Done / All set (mascot success), not only the orb celebrate face.
   // Welcome/Settings reopen after this so the card is actually visible.
   const detail = line.replace(/^Done\.\s*/i, "").trim() || `${waiting.label} is connected.`;
   useDuskie.setState({
@@ -707,7 +740,7 @@ function chatRequest(q: string, attach?: ChatAttach) {
 interface EarlyChat {
   id: string;
   q: string;
-  tools: { name: string; label?: string }[];
+  tools: { name: string; label?: string; source?: string | null }[];
   proposals: { id: string; label: string; step?: boolean; undoable?: boolean }[];
 }
 let early: EarlyChat | null = null;
@@ -766,6 +799,7 @@ export function sendChat(prompt: string, attach?: ChatAttach): boolean {
         startedAt: Date.now(),
         offline: !useDuskie.getState().online,
         steps: adopted?.tools.map((t) => t.label || toolStatus(t.name).replace(/\.\.\.$/, "")),
+        sources: [...new Set(adopted?.tools.flatMap((t) => (t.source ? [t.source] : [])))],
         proposals: adopted?.proposals,
       },
     ],
@@ -876,6 +910,23 @@ let voiceTimer: ReturnType<typeof setTimeout> | null = null;
  * waiting for an answer, stays the same too long, the pill clears and
  * listening stops, so the island never stays stuck.
  */
+/** Chats asked by voice with Live on: answered as captions, Ask closed. */
+const liveIds = new Set<string>();
+const liveText = new Map<string, string>();
+/** How long the last caption stays after the answer ends. */
+const LIVE_LINGER_MS = 6000;
+function liveAnswer(id: string): boolean {
+  return liveIds.has(id) && !useDuskie.getState().ask;
+}
+
+/** Stops a Live answer: speech, the model and the caption. */
+export function stopLive() {
+  const { chatId } = useDuskie.getState();
+  if (chatId && liveIds.has(chatId)) void api.aiCancel(chatId);
+  void api.voiceStop();
+  useDuskie.setState({ live: null });
+}
+
 function watchVoice() {
   if (voiceTimer) clearTimeout(voiceTimer);
   const { hearing, voiceQuestion } = useDuskie.getState();
@@ -964,7 +1015,7 @@ export const setHovered = (hovered: boolean) => {
     useDuskie.setState({ hovered });
     return;
   }
-  // Leave shiftHeld alone while a suggestion is up — Shift+Alt morph is global
+  // Leave shiftHeld alone while a suggestion is up, Shift+Alt morph is global
   // and must survive the cursor leaving the island.
   const keepShift = useDuskie.getState().suggestion != null;
   useDuskie.setState(keepShift ? { hovered } : { hovered, shiftHeld: false });
@@ -1066,8 +1117,11 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
         useDuskie.setState({ mascot: t.state });
         const { settings } = useDuskie.getState();
         const suggestionCue = t.cue === "chirp" || t.cue === "pop";
-        const skipCue = suggestionCue && muteSuggestionCue(t.state, t.previous);
-        if (sounds && t.cue && !skipCue) playCue(t.cue, cueVolume(settings, t.cue), settings.soundKit);
+        const shown = useDuskie.getState().suggestion;
+        const skipCue = suggestionCue && (muteSuggestionCue(t.state, t.previous) || !!shown?.silent);
+        // A compact notification gets the soft version of the cue.
+        const soft = suggestionCue && shown?.compact ? 0.45 : 1;
+        if (sounds && t.cue && !skipCue) playCue(t.cue, cueVolume(settings, t.cue) * soft, settings.soundKit);
         if (sounds && t.previous === "sleeping" && t.state === "idle") helloOncePerDay();
       }),
       listen(EVENTS.settingsChanged, (settings) => {
@@ -1222,6 +1276,8 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
           }
           const started = sendChat(q, { speak: settings.voice.speakAnswers, voice: true });
           if (!started && !ask) useDuskie.setState({ voiceQuestion: null });
+          const live = useDuskie.getState().chatId;
+          if (started && !ask && settings.voice.live && live) liveIds.add(live);
         } else {
           useDuskie.setState({ hearing: null });
           if (byVoice && turns.length === 0 && ask) void api.askClose();
@@ -1238,16 +1294,40 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
         pendingText.set(id, (pendingText.get(id) ?? "") + text);
         scheduleText();
         timings.firstWord(id);
+        // Live: the answer stays a caption in the island; Ask stays closed.
+        if (liveAnswer(id)) {
+          liveText.set(id, (liveText.get(id) ?? "") + text);
+          const caption = captionOf(liveText.get(id) ?? "");
+          const prev = useDuskie.getState().live;
+          useDuskie.setState({ voiceQuestion: null, live: { caption, tool: prev?.tool ?? null, done: false } });
+          return;
+        }
         // The first words of a spoken question's answer: open to show it.
         if (sounds && useDuskie.getState().voiceQuestion !== null) {
           useDuskie.setState({ voiceQuestion: null });
           if (!useDuskie.getState().ask) void api.askOpen();
         }
       }),
-      listen(EVENTS.aiTool, ({ id, name, label }) => {
+      listen(EVENTS.connectorsDuplicate, ({ app, used, unused }) =>
+        showDone(`${app} is connected through ${[used, ...unused].join(" and ")}. Using the ${used}.`),
+      ),
+      listen(EVENTS.libraryFound, ({ names }) =>
+        showDone(
+          names.length === 1
+            ? `New skill ${names[0]} found. Add it in Settings, Skills.`
+            : `${names.length} new skills found. Add them in Settings, Skills.`,
+        ),
+      ),
+      listen(EVENTS.aiTool, ({ id, name, label, source }) => {
         if (early?.id === id) {
-          early.tools.push({ name, label });
+          early.tools.push({ name, label, source });
           return;
+        }
+        if (liveAnswer(id)) {
+          const prev = useDuskie.getState().live;
+          useDuskie.setState({
+            live: { caption: prev?.caption ?? "", tool: label || toolStatus(name).replace(/\.\.\.$/, ""), done: false },
+          });
         }
         flushText();
         // A line written before a tool call is narration ("I'll check your
@@ -1255,7 +1335,12 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
         updateLastTurn(id, (t) => (t.content && t.content.length < 240 ? { ...t, content: "" } : t));
         // Steps read as what they do ("Searching the web for ..."), in words.
         const step = label || toolStatus(name).replace(/\.\.\.$/, "");
-        updateLastTurn(id, (t) => ({ ...t, tool: step, steps: [...(t.steps ?? []), step] }));
+        updateLastTurn(id, (t) => ({
+          ...t,
+          tool: step,
+          steps: [...(t.steps ?? []), step],
+          sources: source && !t.sources?.includes(source) ? [...(t.sources ?? []), source] : t.sources,
+        }));
       }),
       listen(EVENTS.aiProposal, ({ chatId, id, label, step, undoable }) => {
         if (early?.id === chatId) {
@@ -1272,6 +1357,18 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
       listen(EVENTS.aiDone, ({ id, provider, error, handoff, cost }) => {
         flushText();
         timings.done(id);
+        const wasLive = liveAnswer(id);
+        if (wasLive) {
+          liveIds.delete(id);
+          liveText.delete(id);
+          const prev = useDuskie.getState().live;
+          if (prev) {
+            useDuskie.setState({ live: { ...prev, tool: null, done: true } });
+            setTimeout(() => {
+              if (useDuskie.getState().live?.done) useDuskie.setState({ live: null });
+            }, LIVE_LINGER_MS);
+          }
+        }
         if (useDuskie.getState().voiceQuestion !== null) useDuskie.setState({ voiceQuestion: null });
         updateLastTurn(id, (t) => ({
           ...t,
@@ -1279,15 +1376,17 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
           error,
           handoff,
           cost: cost ?? undefined,
+          live: wasLive || undefined,
           tool: null,
           streaming: false,
           tookMs: t.startedAt ? Date.now() - t.startedAt : undefined,
         }));
         if (useDuskie.getState().chatId === id) {
           useDuskie.setState({ chatId: null });
-          if (sounds && !useDuskie.getState().chatSkill) saveChat();
+          const keep = !wasLive || useDuskie.getState().settings.voice.liveHistory !== false;
+          if (sounds && keep && !useDuskie.getState().chatSkill) saveChat();
           // Ask was closed while the answer came in: bring it back with the answer.
-          if (sounds && !useDuskie.getState().ask && useDuskie.getState().turns.length > 0) {
+          if (sounds && !wasLive && !useDuskie.getState().ask && useDuskie.getState().turns.length > 0) {
             void api.askOpen();
           }
         }

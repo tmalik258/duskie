@@ -117,6 +117,49 @@ pub async fn voice_test(app: AppHandle) -> CmdResult<()> {
         .map_err(|e| e.to_string())?
 }
 
+#[tauri::command]
+pub fn voice_enroll_state(app: AppHandle) -> crate::voice_enroll::EnrollState {
+    crate::voice_enroll::state(&app)
+}
+
+/// Records one take (the name, or sentence `sentence`) from the microphone.
+/// `more` records for an "Add samples" round.
+#[tauri::command]
+pub async fn voice_enroll_record(
+    app: AppHandle,
+    sentence: Option<usize>,
+    more: Option<bool>,
+) -> CmdResult<crate::voice_enroll::EnrollState> {
+    let more = more.unwrap_or(false);
+    tauri::async_runtime::spawn_blocking(move || crate::voice_enroll::record(&app, sentence, more))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Learns from the takes and drops them.
+#[tauri::command]
+pub async fn voice_enroll_finish(
+    app: AppHandle,
+    more: Option<bool>,
+) -> CmdResult<crate::voice_enroll::EnrollState> {
+    let more = more.unwrap_or(false);
+    tauri::async_runtime::spawn_blocking(move || crate::voice_enroll::finish(&app, more))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Drops takes in progress; a taught voice stays.
+#[tauri::command]
+pub fn voice_enroll_cancel(app: AppHandle) -> crate::voice_enroll::EnrollState {
+    crate::voice_enroll::cancel(&app)
+}
+
+/// Forgets the taught voice.
+#[tauri::command]
+pub fn voice_enroll_reset(app: AppHandle) -> crate::voice_enroll::EnrollState {
+    crate::voice_enroll::reset(&app)
+}
+
 /// A key was pressed in Ask; keeps the mic closed while the user types.
 #[tauri::command]
 pub fn voice_typing(app: AppHandle, has_text: bool) {

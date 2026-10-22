@@ -27,10 +27,10 @@ export function WelcomeIntro() {
         <Point title="Summon">
           {hotkey ? (
             <>
-              <Kbd>{hotkey}</Kbd> or say "Hey {name}".
+              <Kbd>{hotkey}</Kbd> or say "{name}".
             </>
           ) : (
-            <>Say "Hey {name}".</>
+            <>Say "{name}".</>
           )}
         </Point>
         <Point title="Local">What I see stays on this PC.</Point>

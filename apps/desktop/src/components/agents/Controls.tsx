@@ -8,7 +8,10 @@ import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect, useRef,
 import { createPortal } from "react-dom";
 import { type Session, seenUsage, seenWindows } from "@/lib/agents";
 import { CLAUDE_MODELS, CODEX_MODELS, FAST_CLAUDE_MODEL } from "@/lib/ai-models";
+import { api } from "@/lib/bridge";
 import { setOverlayHit, useDuskie } from "@/lib/store";
+import type { LimitState } from "@/lib/types";
+import { Ic, type IcName } from "../Icon";
 import { Select, type SelectOption } from "../settings/ui";
 import { AGENT_IMAGES, AGENT_MARKS } from "./AgentsTab";
 
@@ -42,6 +45,17 @@ export function modelsFor(agent: string): [string, string][] {
   return [];
 }
 
+/** The model an agent starts on when none is picked. */
+export function defaultModel(agent: string): string | null {
+  const id = idOf(agent);
+  if (id === "claude_code") return "claude-opus-5-5";
+  if (id === "codex") return CODEX_MODELS.find(([v]) => v === "gpt-6.1-sol")?.[0] ?? CODEX_MODELS[0]?.[0] ?? null;
+  return null;
+}
+
+/** Thinking an agent starts on when none is picked. */
+export const DEFAULT_EFFORT = "medium";
+
 const Caret = () => (
   <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3 opacity-60">
     <path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
@@ -59,6 +73,74 @@ const Brain = () => (
     />
   </svg>
 );
+
+export type ModeId = "plan" | "ask" | "edit" | "debug" | "full";
+
+/** The agent modes, with the icon and note each shows in the composer bar. */
+export const MODE_INFO: { id: ModeId; label: string; note: string; icon: IcName }[] = [
+  { id: "plan", label: "Plan", note: "Reads and plans, changes nothing", icon: "file" },
+  { id: "ask", label: "Ask", note: "Asks before every change", icon: "warn" },
+  { id: "edit", label: "Edit", note: "Edits files, asks before commands", icon: "diff" },
+  {
+    id: "debug",
+    label: "Debug",
+    note: "Adds temporary logs, finds the cause, fixes it, then removes the logs",
+    icon: "bug",
+  },
+  { id: "full", label: "Full", note: "Does everything without asking", icon: "bolt" },
+];
+
+/** The mode as one chip with its icon; the menu lists every mode with its note. */
+export function ModeChip({ mode, onChange }: { mode: ModeId; onChange?: (m: ModeId) => void }) {
+  const cur = MODE_INFO.find((m) => m.id === mode) ?? MODE_INFO[2];
+  if (!onChange)
+    return (
+      <span className="ak-cchip ak-mode">
+        <Ic name={cur.icon} size={12} />
+        {cur.label}
+      </span>
+    );
+  return (
+    <Pop
+      label="Mode (Ctrl .)"
+      className="ak-mode"
+      chip={
+        <>
+          <Ic name={cur.icon} size={12} />
+          {cur.label}
+          <Caret />
+        </>
+      }
+    >
+      {(close) => (
+        <>
+          <div className="ak-pop-h">
+            <span>Mode</span>
+            <kbd className="mono">Ctrl .</kbd>
+          </div>
+          {MODE_INFO.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              className="ak-mode-opt"
+              aria-pressed={m.id === mode}
+              onClick={() => {
+                onChange(m.id);
+                close();
+              }}
+            >
+              <Ic name={m.icon} size={13} />
+              <span>
+                <b>{m.label}</b>
+                <small>{m.note}</small>
+              </span>
+            </button>
+          ))}
+        </>
+      )}
+    </Pop>
+  );
+}
 
 /** A chip that opens a popover above itself (portaled so the island shell
  *  does not clip it; same pattern as the model Select overlay). */
@@ -196,12 +278,31 @@ function UsageBody({
   onRefresh?: () => void;
 }) {
   const [, tick] = useState(0);
+  const [paused, setPaused] = useState<LimitState[]>([]);
   useEffect(() => {
-    const timer = setInterval(() => tick((n) => n + 1), 1000);
+    const read = () => void api.limitsPaused().then(setPaused, () => {});
+    read();
+    const timer = setInterval(() => {
+      tick((n) => n + 1);
+      read();
+    }, 1000);
     return () => clearInterval(timer);
   }, []);
   return (
     <>
+      {paused.length > 0 && (
+        <>
+          <div className="ak-pop-h">
+            <span>Paused after errors</span>
+          </div>
+          {paused.map((p) => (
+            <p key={p.name} className="ak-note">
+              {p.name} is tried again in {p.pausedSecs} s
+            </p>
+          ))}
+          <div className="ak-pop-sep" />
+        </>
+      )}
       {!usage && <p className="ak-note">Context capacity: Not reported</p>}
       {usage && ctxPct !== null && (
         <>
@@ -296,6 +397,8 @@ export function ChatControls({
   localModel,
   panel,
   onRefresh,
+  lead,
+  tail,
 }: {
   agent: string;
   model: string | null | undefined;
@@ -311,11 +414,17 @@ export function ChatControls({
   localModel?: string;
   panel?: { name: string; at: number };
   onRefresh?: () => void;
+  /** Shown before the model chip (the mode chip). */
+  lead?: ReactNode;
+  /** Shown at the end of the bar, in place of the usage chip (note and send). */
+  tail?: ReactNode;
 }) {
   const models = modelsFor(agent);
   const [mark, color] = markOf(agent);
   const local = idOf(agent) === "local";
-  const level = LEVELS.find(([v]) => v === effort);
+  const shownModel = model ?? defaultModel(agent);
+  const shownEffort = local ? effort : (effort ?? DEFAULT_EFFORT);
+  const level = LEVELS.find(([v]) => v === shownEffort);
 
   // Plan windows: this session's warning plus every window Duskie has seen.
   const now = Date.now();
@@ -348,14 +457,6 @@ export function ChatControls({
 
   const image = AGENT_IMAGES[idOf(agent)];
   const modelOptions: SelectOption[] = [
-    {
-      value: "",
-      label: "Default",
-      sub: "What the agent is set to use",
-      icon: image ? undefined : mark,
-      image,
-      color,
-    },
     ...models.map(([v, l]) => ({
       value: v,
       label: l,
@@ -365,21 +466,22 @@ export function ChatControls({
       color,
     })),
   ];
-  const modelName = models.find(([v]) => v === model)?.[1] ?? "Default model";
+  const modelName = models.find(([v]) => v === shownModel)?.[1] ?? models[0]?.[1] ?? "Model";
 
   return (
     <div className="ak-ctl">
+      {lead}
       {panel?.name === "model" && (
         <Pop label="Choose model" requested={panel.at} chip="Choose model">
           {(close) => (
             <>
-              {[["", "Default"], ...models].map(([value, label]) => (
+              {models.map(([value, label]) => (
                 <button
                   type="button"
                   className="chip ak-pop-btn"
                   key={value}
                   onClick={() => {
-                    onModel(value || null);
+                    onModel(value);
                     close();
                   }}
                 >
@@ -406,8 +508,8 @@ export function ChatControls({
               menuWidth={324}
               group={`${agent} models, from your next message`}
               current={modelName}
-              value={model ?? ""}
-              onChange={(v) => onModel(v || null)}
+              value={shownModel ?? ""}
+              onChange={(v) => onModel(v)}
               options={modelOptions}
             />
           </span>
@@ -420,7 +522,7 @@ export function ChatControls({
           chip={
             <>
               <Brain />
-              {local ? (effort === "off" ? "Off" : "On") : (level?.[1] ?? "Default")}
+              {local ? (effort === "off" ? "Off" : "On") : (level?.[1] ?? "Medium")}
               <Caret />
             </>
           }
@@ -462,60 +564,71 @@ export function ChatControls({
                   </span>
                 </div>
                 <fieldset className="ak-tseg" aria-label="How hard it thinks">
-                  <button type="button" aria-pressed={!level} onClick={() => onEffort(null)}>
-                    Default
-                  </button>
                   {LEVELS.map(([v, l]) => (
-                    <button key={v} type="button" aria-pressed={effort === v} onClick={() => onEffort(v)}>
+                    <button key={v} type="button" aria-pressed={shownEffort === v} onClick={() => onEffort(v)}>
                       {l}
                     </button>
                   ))}
                 </fieldset>
-                <p className="ak-pop-m">{level ? level[2] : "The agent's own default."}</p>
+                <p className="ak-pop-m">{level?.[2]}</p>
               </>
             )
           }
         </Pop>
       )}
       <span className="flex-1" />
-      {local ? (
-        <span className="ak-cchip ak-cquiet">
-          <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3">
-            <rect x="3.5" y="7" width="9" height="6.5" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.3" />
-            <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" strokeWidth="1.3" />
-          </svg>
-          On this PC {"\u00b7"} no limits
-        </span>
-      ) : (
-        (usageText || panel?.name === "usage") && (
-          <Pop
-            label="Usage"
-            requested={panel?.name === "usage" ? panel.at : undefined}
-            className="ak-cusage"
-            chip={
-              <>
-                <span className="ak-ring" aria-hidden="true">
-                  <i className="ak-cring" style={{ "--p": ringPct } as CSSProperties} />
-                </span>
-                {usageText || "Usage"}
-              </>
-            }
-          >
-            {() => (
-              <UsageBody
-                usage={usage}
-                ctxPct={ctxPct}
-                plans={plans}
-                now={now}
-                agent={agent}
-                onCompact={onCompact}
-                onRefresh={onRefresh}
-              />
-            )}
-          </Pop>
-        )
+      {!tail && (
+        <>
+          {local ? (
+            <span className="ak-cchip ak-cquiet">
+              <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3">
+                <rect
+                  x="3.5"
+                  y="7"
+                  width="9"
+                  height="6.5"
+                  rx="1.5"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.3"
+                />
+                <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" strokeWidth="1.3" />
+              </svg>
+              On this PC {"\u00b7"} no limits
+            </span>
+          ) : (
+            (usageText || panel?.name === "usage") && (
+              <Pop
+                label="Usage"
+                requested={panel?.name === "usage" ? panel.at : undefined}
+                className="ak-cusage"
+                chip={
+                  <>
+                    <span className="ak-ring" aria-hidden="true">
+                      <i className="ak-cring" style={{ "--p": ringPct } as CSSProperties} />
+                    </span>
+                    {usageText || "Usage"}
+                  </>
+                }
+              >
+                {() => (
+                  <UsageBody
+                    usage={usage}
+                    ctxPct={ctxPct}
+                    plans={plans}
+                    now={now}
+                    agent={agent}
+                    onCompact={onCompact}
+                    onRefresh={onRefresh}
+                  />
+                )}
+              </Pop>
+            )
+          )}
+        </>
       )}
       {keys && <span className="ckeys mono">{keys}</span>}
+      {tail}
     </div>
   );
 }

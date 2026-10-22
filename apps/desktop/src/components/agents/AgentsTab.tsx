@@ -22,6 +22,8 @@ import { answerText, type OpenChoice } from "@/lib/agent-questions";
 import {
   answerQuestion,
   COMPACT_AT,
+  cancelQueued,
+  closeReview,
   closeSession,
   dismissCompact,
   type Entry,
@@ -29,12 +31,17 @@ import {
   handOffSession,
   interruptSession,
   messageIndex,
+  openReview,
+  pauseSession,
   readNewPrefs,
   readUsualAgent,
   renameSession,
+  resumePaused,
   resumeSession,
   rewindSession,
+  runningCount,
   type Session,
+  SLOTS,
   type Step,
   sendToSession,
   sessionView,
@@ -52,15 +59,16 @@ import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
 import { Markdown } from "@/lib/markdown";
 import { extractChoices } from "@/lib/options";
-import { parsePlanDocument } from "@/lib/plan";
-import { setAsk, setOverlayHit, useDuskie } from "@/lib/store";
+import { stacked } from "@/lib/seam";
+import { setAsk, setOverlayHit } from "@/lib/store";
 import type { AgentInfo, AgentMode, Agents, CursorChat, EditorList } from "@/lib/types";
 import { scrollIfActive } from "../ask/parts";
-import { Icon } from "../Icon";
+import { Ic, Icon } from "../Icon";
 import { Select } from "../settings/ui";
 import { Tip } from "../Tip";
 import { Board } from "./Board";
-import { ChatControls } from "./Controls";
+import { ChatControls, DEFAULT_EFFORT, defaultModel, ModeChip } from "./Controls";
+import { DebugPanel } from "./DebugPanel";
 import { PlanPanel } from "./PlanPanel";
 import { ProjectPicker } from "./ProjectPicker";
 import { Review } from "./Review";
@@ -69,10 +77,11 @@ const MODES: { id: AgentMode; label: string; note: string }[] = [
   { id: "plan", label: "Plan", note: "Reads and plans, changes nothing" },
   { id: "ask", label: "Ask", note: "Asks before every change" },
   { id: "edit", label: "Edit", note: "Edits files, asks before commands" },
+  { id: "debug", label: "Debug", note: "Adds temporary logs, finds the cause, fixes it, then removes the logs" },
   { id: "full", label: "Full", note: "Does everything without asking" },
 ];
 
-/** Next Plan → Ask → Edit → Full (wraps). Bound to Ctrl+. in the composer. */
+/** Next Plan → Ask → Edit → Debug → Full (wraps). Bound to Ctrl+. in the composer. */
 function nextAgentMode(mode: AgentMode): AgentMode {
   const i = MODES.findIndex((m) => m.id === mode);
   return MODES[(i + 1) % MODES.length].id;
@@ -169,7 +178,7 @@ export function AgentsTab({
   active = true,
 }: {
   maxHeight: number;
-  /** False while Ask is closed but Agents is kept warm — skip background work. */
+  /** False while Ask is closed but Agents is kept warm, skip background work. */
   active?: boolean;
 }) {
   const sessions = useAgents((s) => s.sessions);
@@ -288,7 +297,6 @@ function SessionChips({
 }
 
 function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorChat[] }) {
-  const redesign = useDuskie((st) => st.settings.redesign.enabled);
   const { data: agents, refreshing, refresh } = useCached<Agents>("agents", api.agentsStatus);
   const { data: projects } = useCached<{ name: string; path: string }[]>("projects", api.projectsList, 30_000);
   const prefs = useRef(readNewPrefs()).current;
@@ -312,7 +320,7 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
   const [effort, setEffort] = useState<string | null>(
     seedTune.effort ?? (seedAgent === lastAgentId ? lastEffort : null) ?? null,
   );
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   // Ready agents first; the rest stay listed with what they need.
   const all = agents?.list ?? [];
   const choices = [...all.filter(ready), ...all.filter((a) => !ready(a) && a.installed)];
@@ -364,6 +372,7 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
   useEffect(() => {
     requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
   }, []);
+  const full = runningCount(sessions) >= SLOTS;
   const go = () => {
     if (!prompt.trim() || !pickedPath || busy || (picked && !ready(picked))) return;
     setBusy(true);
@@ -372,14 +381,21 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
     void refresh().catch(() => undefined);
     writeNewPrefs({ agent: pickedAgent, model, effort, mode });
     writeUsualAgent(pickedPath, pickedAgent);
-    startSession(pickedAgent, pickedPath, prompt.trim(), mode, model, effort)
+    startSession(
+      pickedAgent,
+      pickedPath,
+      prompt.trim(),
+      mode,
+      model ?? defaultModel(pickedAgent),
+      effort ?? (pickedAgent.toLowerCase() === "local" ? effort : DEFAULT_EFFORT),
+    )
       .then(() => setPrompt(""))
       .catch((e: unknown) => setError(String(e)))
       .finally(() => setBusy(false));
   };
   return (
     <>
-      {redesign && sessions.length > 0 ? (
+      {sessions.length > 0 ? (
         <SessionList sessions={sessions} />
       ) : (
         <>
@@ -395,48 +411,6 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
         <NoAgentsReady sessions={sessions.length} cursor={cursor.length} missing={missing} />
       ) : (
         <>
-          <div className="ak-meta">
-            {choices.length + missing.length > 1 ? (
-              <span className="ak-mi b">
-                <Select
-                  variant="plain"
-                  overlay
-                  label="Agent"
-                  value={pickedAgent}
-                  onChange={pickAgent}
-                  options={[...choices, ...missing].map((c) => ({
-                    value: c.id,
-                    label: c.name,
-                    sub: pickerNote(c),
-                    icon: AGENT_MARKS[c.id]?.[0] ?? "C",
-                    color: AGENT_MARKS[c.id]?.[1] ?? "#d97757",
-                    image: AGENT_IMAGES[c.id],
-                  }))}
-                />
-              </span>
-            ) : (
-              <span className="ak-mi b">
-                {choices[0]?.name ?? "Claude Code"}
-                {choices[0] && usageLine(choices[0].name) && (
-                  <em className="ml-1.5 font-normal not-italic opacity-70">{usageLine(choices[0].name)}</em>
-                )}
-              </span>
-            )}
-            <span className="ak-mi max-w-44">
-              <ProjectPicker
-                projects={projects ?? []}
-                path={pickedPath}
-                onChange={(next) => {
-                  setPath(next);
-                  useAgents.setState({ draftPath: next });
-                }}
-              />
-            </span>
-            <div className="ak-modes">
-              <ModeSwitch mode={mode} onChange={pickMode} />
-              <span className="keys mono">Ctrl+.</span>
-            </div>
-          </div>
           {picked && !ready(picked) && <FixLine agent={picked} />}
           {picked?.local && ready(picked) && (
             <p className="ak-local">
@@ -444,34 +418,82 @@ function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorC
               Review.
             </p>
           )}
-          <div className="ak-composer ak-two">
-            <div className="ak-row">
-              <input
-                ref={inputRef}
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key === ".") {
-                    e.preventDefault();
-                    pickMode(nextAgentMode(mode));
-                    return;
-                  }
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    go();
-                  }
-                }}
-                placeholder="What should it do?"
+          <div className="ag-comp">
+            <div className="ag-comp-top">
+              <fieldset className="ag-tabs" aria-label="Agent">
+                {choices.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    aria-pressed={pickedAgent === c.id}
+                    onClick={() => pickAgent(c.id)}
+                    title={pickerNote(c) || c.name}
+                  >
+                    <AgentMark agent={c.name} sm />
+                    {c.name === "Local (Ollama)" ? "Local" : c.name}
+                  </button>
+                ))}
+              </fieldset>
+              <span className="ag-proj">
+                <ProjectPicker
+                  projects={projects ?? []}
+                  path={pickedPath}
+                  onChange={(next) => {
+                    setPath(next);
+                    useAgents.setState({ draftPath: next });
+                  }}
+                />
+              </span>
+            </div>
+            <textarea
+              ref={inputRef}
+              rows={2}
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key === ".") {
+                  e.preventDefault();
+                  pickMode(nextAgentMode(mode));
+                  return;
+                }
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  go();
+                }
+              }}
+              placeholder="What should it do? / for commands, @ for files"
+            />
+            <div className="ag-comp-foot">
+              <ChatControls
+                agent={pickedAgent}
+                model={model}
+                effort={effort}
+                onModel={pickModel}
+                onEffort={pickEffort}
+                lead={<ModeChip mode={mode} onChange={pickMode} />}
+                tail={
+                  <>
+                    <span className="ag-note">
+                      {busy
+                        ? "Starting..."
+                        : full
+                          ? `${SLOTS} running, this one queues`
+                          : MODES.find((m) => m.id === mode)?.note}
+                    </span>
+                    <button
+                      type="button"
+                      className="ag-send"
+                      aria-label={full ? "Queue" : "Start"}
+                      title={full ? "Queue (Enter)" : "Start (Enter)"}
+                      disabled={busy || !prompt.trim()}
+                      onClick={go}
+                    >
+                      <Ic name="send" size={13} />
+                    </button>
+                  </>
+                }
               />
             </div>
-            <ChatControls
-              agent={pickedAgent}
-              model={model}
-              effort={effort}
-              onModel={pickModel}
-              onEffort={pickEffort}
-              keys={busy ? "Starting..." : "Enter start"}
-            />
           </div>
           {error && <p className="ak-err">{error}</p>}
         </>
@@ -588,42 +610,6 @@ function FixLine({ agent }: { agent: AgentInfo }) {
   );
 }
 
-function ModeSwitch({ mode, onChange, agent }: { mode: AgentMode; onChange?: (m: AgentMode) => void; agent?: string }) {
-  return (
-    <fieldset aria-label="Mode" className="ak-seg border-0">
-      {MODES.map((m) => (
-        <Tip
-          key={m.id}
-          label={
-            agent === "Codex"
-              ? {
-                  plan: "Codex Plan collaboration mode in a read-only sandbox",
-                  ask: "Workspace access; untrusted commands require approval",
-                  edit: "Workspace files and commands allowed; asks for escalation",
-                  full: "Full access without sandbox or approval prompts",
-                }[m.id]
-              : agent === "Local"
-                ? m.id === "plan"
-                  ? "Read-only tools"
-                  : "Every edit requires approval; commands are unavailable"
-                : m.note
-          }
-        >
-          <button
-            type="button"
-            aria-pressed={mode === m.id}
-            disabled={!onChange}
-            onClick={() => onChange?.(m.id)}
-            className="chip"
-          >
-            {m.label}
-          </button>
-        </Tip>
-      ))}
-    </fieldset>
-  );
-}
-
 /** How much of the context window is used, as a small ring. */
 export function ContextRing({ used, window, onCompact }: { used: number; window: number; onCompact?: () => void }) {
   const p = Math.round(Math.min(1, used / window) * 100);
@@ -734,8 +720,12 @@ function SessionView({
     flushAgentsView();
   };
   const reviewing = s.view?.reviewing ?? false;
-  const setReviewing = (next: boolean) =>
-    sessionView(s.id, { draft: textRef.current, ...scrollState.current, reviewing: next });
+  const reviewStacked = reviewing && stacked(typeof window === "undefined" ? 1920 : window.screen.availWidth);
+  const setReviewing = (next: boolean) => {
+    sessionView(s.id, { draft: textRef.current, ...scrollState.current });
+    if (next) openReview(s.id);
+    else closeReview(s.id);
+  };
   const [rewindAt, setRewindAt] = useState<number | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   /** Bumped after rewind so the composer focuses and selects the restored draft. */
@@ -752,7 +742,7 @@ function SessionView({
     return step && step.kind === "step" ? step.step.label : null;
   }, [s.entries]);
   // Restore scroll before paint; ResizeObserver keeps follow pinned while Markdown grows.
-  // Skip while warm/hidden — hidden nodes report scrollHeight 0 and would wipe the saved offset.
+  // Skip while warm/hidden, hidden nodes report scrollHeight 0 and would wipe the saved offset.
   // biome-ignore lint/correctness/useExhaustiveDependencies: follow new entry count, not every streamed token array identity
   useLayoutEffect(() => {
     if (!active) return;
@@ -863,42 +853,96 @@ function SessionView({
       break;
     }
   }
+  const planEntry = s.planEntry ?? null;
+  const planAboveFold = planEntry != null && planEntry < entryStart;
+  const onPlanDraft = (t: string) => {
+    setText(t);
+    setEditFocus((n) => n + 1);
+  };
 
   return (
     <>
-      <div className="ak-head">
-        <NameField id={s.id} title={s.title} />
-        {working ? (
-          <button type="button" onClick={() => interruptSession(s.id)} className="ak-stop chip">
-            Stop <kbd>Esc</kbd>
-          </button>
-        ) : (
-          <Tip label="Close session">
+      <div className="ag-sh">
+        <AgentMark agent={s.agent} />
+        <div className="min-w-0 flex-1">
+          <NameField id={s.id} title={s.title} />
+          <p className="ag-sh-sub">
+            {s.agent}
+            <span className="sep" />
+            {s.project}
+            {s.branch && (
+              <>
+                <span className="sep" />
+                <span className="mono truncate">{s.branch}</span>
+              </>
+            )}
+          </p>
+        </div>
+        {s.usage && s.usage.window > 0 && <ContextRing used={s.usage.used} window={s.usage.window} />}
+        <span className="ag-acts">
+          <SessionMemory id={s.id} live={active && s.status !== "ended" && s.status !== "failed" && !s.restored} />
+          {s.changes > 0 && (
+            <Tip label="Review changes (Alt 1)">
+              <button
+                type="button"
+                aria-label="Review changes"
+                onClick={() => setReviewing(true)}
+                className="ak-ibtn chip"
+              >
+                <Ic name="diff" size={14} />
+              </button>
+            </Tip>
+          )}
+          <Tip label="Continue in a terminal (Alt 2)">
             <button
               type="button"
-              aria-label="Close session"
-              onClick={() => closeSession(s.id)}
+              aria-label="Continue in a terminal"
+              onClick={() => void api.agentTerminal(s.id)}
               className="ak-ibtn chip"
             >
-              <Icon name="close" size={13} />
+              <Ic name="term" size={14} />
             </button>
           </Tip>
-        )}
+          {working && (
+            <Tip label={s.paused ? "Resume" : "Pause"}>
+              <button
+                type="button"
+                aria-label={s.paused ? "Resume" : "Pause"}
+                onClick={() => (s.paused ? resumePaused(s.id) : pauseSession(s.id))}
+                className="ak-ibtn chip"
+              >
+                <Ic name={s.paused ? "play" : "pause"} size={13} />
+              </button>
+            </Tip>
+          )}
+          {working ? (
+            <Tip label="Stop (Esc)">
+              <button
+                type="button"
+                aria-label="Stop"
+                onClick={() => interruptSession(s.id)}
+                className="ak-ibtn chip danger"
+              >
+                <Ic name="stop" size={13} />
+              </button>
+            </Tip>
+          ) : (
+            <Tip label="Close session">
+              <button
+                type="button"
+                aria-label="Close session"
+                onClick={() => closeSession(s.id)}
+                className="ak-ibtn chip"
+              >
+                <Ic name="x" size={13} />
+              </button>
+            </Tip>
+          )}
+        </span>
       </div>
-      <SessionChips sessions={sessions} current={s.id} />
-      <div className="ak-meta">
-        <span className="ak-mi b">{s.agent}</span>
-        <span className="ak-mi">{s.project}</span>
-        {s.branch && <span className="ak-mi">⎇ {s.branch}</span>}
-        <SessionMemory id={s.id} live={active && s.status !== "ended" && s.status !== "failed" && !s.restored} />
-        <div className="ak-modes">
-          <ModeSwitch agent={s.agent} mode={s.mode} onChange={(mode) => void setSessionMode(s.id, mode)} />
-          <span className="keys mono">Ctrl+.</span>
-        </div>
-        {working && s.activeMode !== s.mode && <span className="ak-note">Applies to next message</span>}
-      </div>
+      {working && s.activeMode !== s.mode && <p className="ak-note ag-sh-note">New mode applies to the next message</p>}
 
-      {reviewing ? (
+      {reviewStacked ? (
         <Review session={s} maxHeight={maxHeight} onDone={() => setReviewing(false)} />
       ) : (
         <>
@@ -919,13 +963,15 @@ function SessionView({
                 Show earlier ({entryStart} more)
               </button>
             )}
+            {planAboveFold && <PlanPanel session={s} onDraft={onPlanDraft} />}
+            {(s.activeMode ?? s.mode) === "debug" && <DebugPanel session={s} />}
             {visibleEntries.map((e, j) => {
               const i = entryStart + j;
               // Last agent prose (idle or still "working" after a clarifying ask).
               const lastText = e.kind === "text" && !s.question && i === lastAgentText;
-              // Full plan lives in PlanPanel — don't repeat the same prose above it.
-              const planCovers =
-                lastText && !!s.planDoc && e.kind === "text" && (parsePlanDocument(e.text)?.items.length ?? 0) >= 2;
+              // Full plan lives in PlanPanel under planEntry - hide that turn's prose.
+              const planCovers = planEntry === i && !!s.planDoc?.markdown && e.kind === "text";
+              const showPlanHere = planEntry === i || (planEntry == null && i === lastAgentText && s.mode === "plan");
               return (
                 <Fragment key={i}>
                   {!planCovers && (
@@ -951,27 +997,13 @@ function SessionView({
                       }}
                     />
                   )}
-                  {i === lastAgentText && (
-                    <PlanPanel
-                      session={s}
-                      onDraft={(t) => {
-                        setText(t);
-                        setEditFocus((n) => n + 1);
-                      }}
-                    />
-                  )}
+                  {showPlanHere && <PlanPanel session={s} onDraft={onPlanDraft} />}
                 </Fragment>
               );
             })}
-            {/* Plan with no agent text yet still needs a home. */}
-            {lastAgentText < 0 && (
-              <PlanPanel
-                session={s}
-                onDraft={(t) => {
-                  setText(t);
-                  setEditFocus((n) => n + 1);
-                }}
-              />
+            {/* Plan with no agent text yet still needs a home while planning. */}
+            {planEntry == null && lastAgentText < 0 && s.mode === "plan" && (
+              <PlanPanel session={s} onDraft={onPlanDraft} />
             )}
 
             {working && !s.question && (
@@ -1248,18 +1280,23 @@ function EntryRow({
   );
 }
 
-/** A command's output: collapsed to a line count until opened. */
+/** A command's output: one quiet line with its last line as a preview, opened in place. */
 function Output({ step }: { step: Step }) {
   const [open, setOpen] = useState(false);
-  const lines = (step.output ?? "").split("\n");
+  const text = (step.output ?? "").replace(/\s+$/, "");
+  const lines = text.split("\n");
   const count = lines.length;
+  const last = [...lines].reverse().find((l) => l.trim()) ?? "";
   return (
-    <div className="ak-term ak-in">
-      <button type="button" onClick={() => setOpen((o) => !o)} className="chip flex items-center gap-1.5">
-        <Icon name="chevron" size={12} className={open ? "" : "-rotate-90"} />
-        {open ? "Show less" : `${count} ${count === 1 ? "line" : "lines"}`}
+    <div className="ak-term ak-in" data-open={open}>
+      <button type="button" onClick={() => setOpen((o) => !o)} aria-expanded={open} className="ak-term-h">
+        <Icon name="chevron" size={11} className={`ak-term-c ${open ? "" : "-rotate-90"}`} />
+        <span className="ak-term-n">
+          Output · {count} {count === 1 ? "line" : "lines"}
+        </span>
+        {!open && last && <span className="ak-term-last mono">{last.trim()}</span>}
       </button>
-      {open && <pre className="mono">{step.output ?? ""}</pre>}
+      {open && <pre className="mono ak-scroll">{text}</pre>}
     </div>
   );
 }
@@ -1471,7 +1508,7 @@ export function Composer({
       return;
     }
     const mode = c.name.slice(1) as AgentMode;
-    if (["plan", "ask", "edit", "full"].includes(mode)) {
+    if (["plan", "ask", "edit", "debug", "full"].includes(mode)) {
       void setSessionMode(s.id, mode);
       return;
     }
@@ -1490,7 +1527,7 @@ export function Composer({
         onReview();
         break;
       case "/permissions":
-        if (["plan", "ask", "edit", "full"].includes(args)) void setSessionMode(s.id, args as AgentMode);
+        if (["plan", "ask", "edit", "debug", "full"].includes(args)) void setSessionMode(s.id, args as AgentMode);
         else
           setNotice(
             `Selected: ${s.mode}. Use the mode buttons above or Ctrl+. to cycle. Codex Edit allows workspace commands and asks for escalation; Full disables the sandbox.`,
@@ -1699,6 +1736,7 @@ export function Composer({
           effort={s.effort}
           onModel={(m) => tuneSession(s.id, m, s.effort ?? null)}
           onEffort={(e) => tuneSession(s.id, s.model ?? null, e)}
+          lead={<ModeChip mode={s.mode} onChange={(mode) => void setSessionMode(s.id, mode)} />}
           usage={s.usage}
           panel={panel}
           onRefresh={
@@ -1807,7 +1845,8 @@ function ChoiceCard({ open, agent, onAnswer }: { open: OpenChoice; agent: string
 }
 
 type Group = "Needs you" | "Running" | "Ready to review" | "Done" | "Stopped";
-const GROUPS: Group[] = ["Needs you", "Running", "Ready to review", "Done", "Stopped"];
+// Oldest news at the top; what needs you sits next to the composer.
+const GROUPS: (Group | "Queued")[] = ["Stopped", "Done", "Queued", "Ready to review", "Running", "Needs you"];
 
 function groupOf(s: Session): Group {
   if (s.status === "waiting" || s.question || s.choose) return "Needs you";
@@ -1817,7 +1856,7 @@ function groupOf(s: Session): Group {
   return "Done";
 }
 
-const MODE_WORD: Record<string, string> = { plan: "Plan", ask: "Ask", edit: "Edit", full: "Full" };
+const MODE_WORD: Record<string, string> = { plan: "Plan", ask: "Ask", edit: "Edit", debug: "Debug", full: "Full" };
 
 function ago(ms: number): string {
   const m = Math.max(0, Math.round(ms / 60_000));
@@ -1831,14 +1870,61 @@ function SessionList({ sessions }: { sessions: Session[] }) {
   const now = useNow(30_000);
   const running = sessions.filter((s) => s.status === "working").length;
   const need = sessions.filter((s) => groupOf(s) === "Needs you").length;
+  const queued = useAgents((st) => st.queued);
   return (
     <div className="ag-home">
-      <p className="ag-count">
-        {running} of {sessions.length} running
-        {need > 0 && <span className="ag-need"> · {need} need you</span>}
-      </p>
+      <div className="ag-bar">
+        <span className="ag-count" title={`Up to ${SLOTS} agents work at once; more wait in a queue.`}>
+          {running === 0
+            ? "Nothing running"
+            : running >= SLOTS
+              ? `${running} running, all slots busy`
+              : `${running} running, room for ${SLOTS - running} more`}
+          {queued.length > 0 && <> · {queued.length} queued</>}
+          {need > 0 && <span className="ag-need"> · {need} need you</span>}
+        </span>
+        <button
+          type="button"
+          className="ag-new"
+          onClick={() => document.querySelector<HTMLTextAreaElement>(".ag-comp textarea")?.focus()}
+        >
+          <Ic name="plus" size={12} /> New
+        </button>
+      </div>
       {GROUPS.map((g) => {
-        const list = sessions.filter((s) => groupOf(s) === g).sort((a, b) => b.turnAt - a.turnAt);
+        if (g === "Queued")
+          return queued.length === 0 ? null : (
+            <div key={g} className="ag-group">
+              <p className="ak-group">
+                {g} <span className="ag-n">{queued.length}</span>
+              </p>
+              {queued.map((q) => (
+                <div key={q.id} className="ag-row ag-qrow">
+                  <AgentMark agent={q.agent} />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate">{q.prompt}</span>
+                    <span className="ag-sub block truncate">
+                      {q.path.split(/[\\/]/).pop()} · {MODE_WORD[q.mode] ?? q.mode} · starts when a slot frees
+                    </span>
+                  </span>
+                  <span className="ag-st" data-g={g}>
+                    Queued
+                  </span>
+                  <Tip label="Remove from the queue">
+                    <button
+                      type="button"
+                      aria-label="Remove from the queue"
+                      onClick={() => cancelQueued(q.id)}
+                      className="ak-ibtn chip"
+                    >
+                      <Ic name="x" size={12} />
+                    </button>
+                  </Tip>
+                </div>
+              ))}
+            </div>
+          );
+        const list = sessions.filter((s) => groupOf(s) === g).sort((a, b) => a.turnAt - b.turnAt);
         if (list.length === 0) return null;
         return (
           <div key={g} className="ag-group">
@@ -1859,6 +1945,15 @@ function SessionList({ sessions }: { sessions: Session[] }) {
                     {s.project} · {MODE_WORD[s.mode] ?? s.mode} · {ago(now - s.turnAt)}
                   </span>
                 </span>
+                {g === "Running" && s.plan.length > 0 && (
+                  <span className="ag-prog" aria-hidden="true">
+                    <i
+                      style={{
+                        width: `${Math.round((s.plan.filter((p) => p.status === "completed").length / s.plan.length) * 100)}%`,
+                      }}
+                    />
+                  </span>
+                )}
                 <span className="ag-st" data-g={g}>
                   {g === "Needs you"
                     ? "Needs you"
@@ -1873,6 +1968,7 @@ function SessionList({ sessions }: { sessions: Session[] }) {
           </div>
         );
       })}
+      {sessions.length > 0 && <p className="ag-hint">Enter opens · Alt B puts them on the Board</p>}
     </div>
   );
 }

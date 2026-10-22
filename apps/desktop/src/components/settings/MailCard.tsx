@@ -37,7 +37,7 @@ export function MailCard({ onError }: { onError: (e: string) => void }) {
   };
 
   if (!status) return null;
-  const connected = status.state !== "disconnected";
+  const connected = status.state !== "disconnected" && status.provider !== "composio";
   return (
     <>
       <GmailRow status={status} busy={busy} run={run} connected={connected} />
@@ -63,13 +63,18 @@ function GmailRow({
     <Field
       label="Gmail"
       hint={
-        status.configured
-          ? "Reads who an email is from, never its text. Skips mail you already read elsewhere."
-          : "Google sign-in is not set up in this build yet."
+        status.provider === "composio" && status.configured
+          ? "New mail comes through your Composio Gmail for now. Connect Gmail here for faster checks."
+          : status.provider === "composio"
+            ? "New mail comes through your Composio Gmail. Google sign-in is not set up in this build, so Gmail cannot connect here directly yet."
+            : status.configured
+              ? "Reads who an email is from, never its text. Skips mail you already read elsewhere."
+              : "Google sign-in is not set up in this build yet."
       }
     >
       <span className="text-[12px] text-(--muted)" role="status">
         {LABEL[status.state]}
+        {connected && status.lastOk ? `, checked ${checkedAgo(status.lastOk)}` : ""}
       </span>
       {connected && status.state !== "auth_expired" ? (
         <Button small disabled={busy} onClick={() => run(api.mailDisconnect)}>
@@ -149,4 +154,12 @@ function ImapForm({ status, busy, run }: { status: MailStatus; busy: boolean; ru
       {status.error && <p className="text-[12px] text-(--err)">{status.error}</p>}
     </div>
   );
+}
+
+/** "just now", "4 min ago" or "2 h ago" for a check time in seconds. */
+function checkedAgo(at: number): string {
+  const mins = Math.floor((Date.now() / 1000 - at) / 60);
+  if (mins < 1) return "just now";
+  if (mins < 60) return `${mins} min ago`;
+  return `${Math.floor(mins / 60)} h ago`;
 }

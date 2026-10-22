@@ -436,6 +436,37 @@ pub fn unstage(path: &Path, files: &[String]) -> Result<Outcome, ActionError> {
     }))
 }
 
+/// Drops unstaged changes, but never for good: they go to a stash the user
+/// can put back from Stashes. Staged changes stay staged. No files means all.
+pub fn discard(path: &Path, files: &[String]) -> Result<Outcome, ActionError> {
+    repo(path)?;
+    // Git refuses --keep-index with a file list, so named files go whole.
+    let mut args = vec![
+        "stash",
+        "push",
+        "--include-untracked",
+        "-m",
+        "Discarded from Duskie",
+    ];
+    if files.is_empty() {
+        args.insert(2, "--keep-index");
+    } else {
+        args.push("--");
+        for f in files {
+            args.push(safe_file(f)?);
+        }
+    }
+    git(path, &args)?;
+    Ok(Outcome::msg(if files.is_empty() {
+        "Discarded your changes. They are in Stashes if you need them.".to_owned()
+    } else {
+        format!(
+            "Discarded {} file(s). They are in Stashes if you need them.",
+            files.len()
+        )
+    }))
+}
+
 /// Replaces the last commit with what is staged now. A new message is
 /// optional; without one the old message stays. The caller warns before a
 /// force push is needed (the commit was already pushed).
@@ -496,6 +527,354 @@ pub fn delete_branches(path: &Path, branches: &[String]) -> Result<Outcome, Acti
         1 => format!("Deleted {}", gone[0]),
         n => format!("Deleted {n} merged branches"),
     }))
+}
+
+/// One commit in the History tab.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct CommitRow {
+    pub hash: String,
+    pub subject: String,
+    pub author: String,
+    /// Relative time, as git words it ("2 hours ago").
+    pub when: String,
+}
+
+const FIELD: char = '\u{1f}';
+
+/// Parses `git log --format=%h<US>%s<US>%an<US>%ar`.
+pub fn parse_log(text: &str) -> Vec<CommitRow> {
+    text.lines()
+        .filter_map(|l| {
+            let mut p = l.split(FIELD);
+            Some(CommitRow {
+                hash: p.next()?.trim().to_owned(),
+                subject: p.next()?.to_owned(),
+                author: p.next()?.to_owned(),
+                when: p.next()?.to_owned(),
+            })
+        })
+        .filter(|c| !c.hash.is_empty())
+        .collect()
+}
+
+/// The newest `n` commits on the current branch.
+pub fn log(path: &Path, n: usize) -> Result<Vec<CommitRow>, ActionError> {
+    repo(path)?;
+    let count = format!("-{}", n.clamp(1, 200));
+    let text = git(
+        path,
+        &["log", &count, "--format=%h\u{1f}%s\u{1f}%an\u{1f}%ar"],
+    )
+    .unwrap_or_default();
+    Ok(parse_log(&text))
+}
+
+/// One stash in the Stashes tab.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct StashRow {
+    /// `stash@{0}` and so on.
+    pub name: String,
+    pub message: String,
+    pub when: String,
+}
+
+/// Parses `git stash list --format=%gd<US>%gs<US>%cr`.
+pub fn parse_stashes(text: &str) -> Vec<StashRow> {
+    text.lines()
+        .filter_map(|l| {
+            let mut p = l.split(FIELD);
+            Some(StashRow {
+                name: p.next()?.trim().to_owned(),
+                message: p.next()?.to_owned(),
+                when: p.next().unwrap_or_default().to_owned(),
+            })
+        })
+        .filter(|s| valid_stash(&s.name))
+        .collect()
+}
+
+/// Only names git itself gives a stash: `stash@{N}`.
+fn valid_stash(name: &str) -> bool {
+    name.strip_prefix("stash@{")
+        .and_then(|r| r.strip_suffix('}'))
+        .is_some_and(|n| !n.is_empty() && n.chars().all(|c| c.is_ascii_digit()))
+}
+
+pub fn stashes(path: &Path) -> Result<Vec<StashRow>, ActionError> {
+    repo(path)?;
+    let text = git(path, &["stash", "list", "--format=%gd\u{1f}%gs\u{1f}%cr"]).unwrap_or_default();
+    Ok(parse_stashes(&text))
+}
+
+/// Puts a stash's changes back. `pop` also removes it from the list.
+pub fn stash_apply(path: &Path, name: &str, pop: bool) -> Result<Outcome, ActionError> {
+    repo(path)?;
+    if !valid_stash(name) {
+        return Err(ActionError::Invalid(format!("not a stash: {name}")));
+    }
+    git(path, &["stash", if pop { "pop" } else { "apply" }, name])?;
+    Ok(Outcome::msg(if pop {
+        "Popped the stash"
+    } else {
+        "Applied the stash. A copy stays in Stashes."
+    }))
+}
+
+/// Deletes a stash. The caller asks first; this cannot be undone here.
+pub fn stash_drop(path: &Path, name: &str) -> Result<Outcome, ActionError> {
+    repo(path)?;
+    if !valid_stash(name) {
+        return Err(ActionError::Invalid(format!("not a stash: {name}")));
+    }
+    git(path, &["stash", "drop", name])?;
+    Ok(Outcome::msg("Dropped the stash"))
+}
+
+/// Puts every uncommitted change, untracked files too, away in a new stash.
+pub fn stash_push(path: &Path) -> Result<Outcome, ActionError> {
+    repo(path)?;
+    if git(path, &["status", "--porcelain"])?.trim().is_empty() {
+        return Ok(Outcome::msg("Nothing to stash"));
+    }
+    git(
+        path,
+        &[
+            "stash",
+            "push",
+            "--include-untracked",
+            "-m",
+            "Stashed from Duskie",
+        ],
+    )?;
+    Ok(Outcome::msg("Stashed your changes. They are in Stashes."))
+}
+
+// ---- Branches, fetch, push ----------------------------------------------------
+
+/// One local branch in the Git dock's Branches tab.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BranchRow {
+    pub name: String,
+    pub current: bool,
+    pub ahead: u64,
+    pub behind: u64,
+    /// Whether it tracks a remote branch; without one, Push publishes it.
+    pub upstream: bool,
+}
+
+fn safe_branch(name: &str) -> Result<&str, ActionError> {
+    if name.is_empty()
+        || name.starts_with('-')
+        || name.contains("..")
+        || name.contains('\\')
+        || name.contains('\0')
+    {
+        return Err(ActionError::Invalid(format!("not a branch name: {name}")));
+    }
+    Ok(name)
+}
+
+fn track_counts(path: &Path, branch: &str) -> Option<(u64, u64)> {
+    let Ok(upstream) = git(
+        path,
+        &[
+            "rev-parse",
+            "--abbrev-ref",
+            &format!("{branch}@{{upstream}}"),
+        ],
+    ) else {
+        return None;
+    };
+    let upstream = upstream.trim();
+    if upstream.is_empty() {
+        return None;
+    }
+    let Ok(counts) = git(
+        path,
+        &[
+            "rev-list",
+            "--left-right",
+            "--count",
+            &format!("{branch}...{upstream}"),
+        ],
+    ) else {
+        return Some((0, 0));
+    };
+    let mut parts = counts.trim().split('\t');
+    let ahead = parts.next().unwrap_or("0").parse().unwrap_or(0);
+    let behind = parts.next().unwrap_or("0").parse().unwrap_or(0);
+    Some((ahead, behind))
+}
+
+/// Every local branch, newest commit first, with upstream ahead/behind when set.
+pub fn branches(path: &Path) -> Result<Vec<BranchRow>, ActionError> {
+    repo(path)?;
+    let current = git(path, &["branch", "--show-current"])?.trim().to_owned();
+    let list = git(
+        path,
+        &[
+            "for-each-ref",
+            "--sort=-committerdate",
+            "refs/heads/",
+            "--format=%(refname:short)",
+        ],
+    )?;
+    Ok(list
+        .lines()
+        .map(str::trim)
+        .filter(|n| !n.is_empty())
+        .map(|name| {
+            let counts = track_counts(path, name);
+            let (ahead, behind) = counts.unwrap_or((0, 0));
+            BranchRow {
+                name: name.to_owned(),
+                current: name == current,
+                ahead,
+                behind,
+                upstream: counts.is_some(),
+            }
+        })
+        .collect())
+}
+
+/// Updates remotes (`git fetch`).
+pub fn fetch(path: &Path) -> Result<Outcome, ActionError> {
+    repo(path)?;
+    git(path, &["fetch", "--prune", "--tags"])?;
+    Ok(Outcome::msg("Fetched from the remote"))
+}
+
+/// Pushes the current branch; sets upstream when this branch has none yet.
+pub fn push(path: &Path) -> Result<Outcome, ActionError> {
+    repo(path)?;
+    let has_upstream = git(path, &["rev-parse", "--abbrev-ref", "@{upstream}"]).is_ok();
+    if has_upstream {
+        git(path, &["push"])?;
+        Ok(Outcome::msg("Pushed to the remote"))
+    } else {
+        git(path, &["push", "-u", "origin", "HEAD"])?;
+        Ok(Outcome::msg("Pushed and set the upstream branch"))
+    }
+}
+
+/// Pulls then pushes, like an editor's Sync. Your uncommitted changes are put
+/// aside and back. A pull that hits conflicts stops there for the Merge tab.
+pub fn sync(path: &Path) -> Result<Outcome, ActionError> {
+    repo(path)?;
+    let dirty = !git(path, &["status", "--porcelain", "--untracked-files=no"])?
+        .trim()
+        .is_empty();
+    if dirty {
+        git(
+            path,
+            &["stash", "push", "--quiet", "-m", crate::dev::UPDATE_STASH],
+        )?;
+    }
+    if let Err(e) = git(path, &["pull", "--no-rebase", "--no-edit", "--quiet"]) {
+        // Conflicts stay for the Merge tab; it finishes or undoes the merge
+        // and puts your changes back either way.
+        if !crate::dev::conflicted(path).is_empty() {
+            return Err(ActionError::Failed(
+                "The pull has conflicts. Solve them in the Merge tab, then push.".into(),
+            ));
+        }
+        let _ = git(path, &["merge", "--abort"]);
+        if dirty {
+            let _ = git(path, &["stash", "pop", "--quiet"]);
+        }
+        return Err(e);
+    }
+    if dirty && let Err(e) = git(path, &["stash", "pop", "--quiet"]) {
+        return Err(ActionError::Failed(format!(
+            "Your changes clash with the new commits; they are kept in Stashes ({e})"
+        )));
+    }
+    git(path, &["push"])?;
+    Ok(Outcome::msg(
+        "Synced: pulled the new commits and pushed yours",
+    ))
+}
+
+/// Checks out an existing local branch.
+pub fn switch_branch(path: &Path, name: &str) -> Result<Outcome, ActionError> {
+    repo(path)?;
+    let name = safe_branch(name)?;
+    git(path, &["switch", name])?;
+    Ok(Outcome::msg(format!("Switched to {name}")))
+}
+
+/// Creates a branch from HEAD and checks it out.
+pub fn create_branch(path: &Path, name: &str) -> Result<Outcome, ActionError> {
+    repo(path)?;
+    let name = safe_branch(name)?;
+    git(path, &["switch", "-c", name])?;
+    Ok(Outcome::msg(format!("Created and switched to {name}")))
+}
+
+/// One file's diff text, staged or in the working tree.
+pub fn diff_file(path: &Path, file: &str, staged: bool) -> Result<String, ActionError> {
+    repo(path)?;
+    let file = safe_file(file)?;
+    let args: Vec<&str> = if staged {
+        vec![
+            "-c",
+            "core.quotepath=false",
+            "diff",
+            "--cached",
+            "--no-color",
+            "--no-ext-diff",
+            "-U3",
+            "--",
+            file,
+        ]
+    } else {
+        vec![
+            "-c",
+            "core.quotepath=false",
+            "diff",
+            "--no-color",
+            "--no-ext-diff",
+            "-U3",
+            "--",
+            file,
+        ]
+    };
+    git(path, &args)
+}
+
+/// Stages one hunk from a unified diff via `git apply --cached`.
+pub fn apply_cached(path: &Path, patch: &str) -> Result<(), ActionError> {
+    repo(path)?;
+    use std::io::Write;
+    use std::process::{Command, Stdio};
+    let mut cmd = Command::new("git");
+    cmd.arg("-C")
+        .arg(path)
+        .args(["apply", "--cached", "--recount"])
+        .stdin(Stdio::piped())
+        .env("GIT_TERMINAL_PROMPT", "0");
+    hidden(&mut cmd);
+    let mut child = cmd.spawn().map_err(fail)?;
+    child
+        .stdin
+        .take()
+        .ok_or_else(|| ActionError::Failed("could not write the patch".into()))?
+        .write_all(patch.as_bytes())
+        .map_err(fail)?;
+    let out = child.wait_with_output().map_err(fail)?;
+    if out.status.success() {
+        Ok(())
+    } else {
+        Err(ActionError::Failed(
+            String::from_utf8_lossy(&out.stderr)
+                .lines()
+                .last()
+                .unwrap_or("git apply failed")
+                .trim()
+                .to_owned(),
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -656,5 +1035,82 @@ mod tests {
         let s = "é".repeat(10);
         assert!(cut(&s, 5).starts_with("éé"));
         assert_eq!(cut("short", 50), "short");
+    }
+    #[test]
+    fn log_and_stash_lines_parse_and_odd_stash_names_are_refused() {
+        let log = parse_log("abc123\u{1f}Fix the mic\u{1f}Ali\u{1f}2 hours ago\n\nbad line");
+        assert_eq!(log.len(), 1);
+        assert_eq!(log[0].subject, "Fix the mic");
+        assert_eq!(log[0].when, "2 hours ago");
+        let st = parse_stashes(
+            "stash@{0}\u{1f}On main: wip\u{1f}5 minutes ago\nstash@{x}\u{1f}bad\u{1f}now",
+        );
+        assert_eq!(st.len(), 1);
+        assert_eq!(st[0].name, "stash@{0}");
+        assert!(!valid_stash("stash@{0}; rm -rf"));
+        assert!(!valid_stash("--all"));
+    }
+
+    #[test]
+    fn stashes_list_apply_pop_and_drop() {
+        let dir = std::env::temp_dir().join(format!("duskie-stash-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).unwrap();
+        run(&dir, &["init", "-q", "-b", "main"]);
+        run(&dir, &["config", "user.email", "t@example.com"]);
+        run(&dir, &["config", "user.name", "T"]);
+        std::fs::write(dir.join("a.txt"), "one\n").unwrap();
+        run(&dir, &["add", "."]);
+        run(&dir, &["commit", "-q", "-m", "first"]);
+        assert_eq!(log(&dir, 10).unwrap()[0].subject, "first");
+        assert_eq!(stash_push(&dir).unwrap().message, "Nothing to stash");
+        std::fs::write(dir.join("new.txt"), "untracked\n").unwrap();
+        stash_push(&dir).unwrap();
+        assert!(!dir.join("new.txt").exists());
+        assert_eq!(stashes(&dir).unwrap().len(), 1);
+        stash_apply(&dir, "stash@{0}", true).unwrap();
+        assert!(dir.join("new.txt").exists());
+        // Discard keeps a way back.
+        discard(&dir, &["new.txt".to_owned()]).unwrap();
+        assert!(!dir.join("new.txt").exists());
+        stash_apply(&dir, "stash@{0}", true).unwrap();
+        assert!(dir.join("new.txt").exists());
+        std::fs::remove_file(dir.join("new.txt")).unwrap();
+        // Discard all keeps what is staged.
+        std::fs::write(dir.join("b.txt"), "staged\n").unwrap();
+        run(&dir, &["add", "b.txt"]);
+        std::fs::write(dir.join("a.txt"), "dirty\n").unwrap();
+        discard(&dir, &[]).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(dir.join("a.txt"))
+                .unwrap()
+                .trim_end(),
+            "one"
+        );
+        assert!(dir.join("b.txt").exists());
+        stash_drop(&dir, "stash@{0}").unwrap();
+        run(&dir, &["reset", "-q", "--hard"]);
+        std::fs::write(dir.join("a.txt"), "two\n").unwrap();
+        run(&dir, &["stash", "push", "-q", "-m", "wip"]);
+        let list = stashes(&dir).unwrap();
+        assert_eq!(list.len(), 1);
+        assert!(list[0].message.contains("wip"));
+        stash_apply(&dir, "stash@{0}", false).unwrap();
+        // Git for Windows may check the file out with CRLF.
+        assert_eq!(
+            std::fs::read_to_string(dir.join("a.txt"))
+                .unwrap()
+                .trim_end(),
+            "two"
+        );
+        assert_eq!(stashes(&dir).unwrap().len(), 1);
+        run(&dir, &["checkout", "-q", "--", "a.txt"]);
+        stash_apply(&dir, "stash@{0}", true).unwrap();
+        assert!(stashes(&dir).unwrap().is_empty());
+        run(&dir, &["stash", "push", "-q", "-m", "again"]);
+        stash_drop(&dir, "stash@{0}").unwrap();
+        assert!(stashes(&dir).unwrap().is_empty());
+        assert!(stash_drop(&dir, "--all").is_err());
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

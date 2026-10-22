@@ -8,10 +8,17 @@
 //! the same review, undo and rewind work and the project itself is never
 //! touched.
 
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
+
+/// Bound how long a Review `git diff` may run before we fail with a clear error.
+const GIT_TIMEOUT: Duration = Duration::from_secs(12);
+/// Soft cap so a huge generated file cannot freeze the Review UI.
+const MAX_FILE_DIFF_LINES: usize = 2_000;
 
 /// The project as it was when the agent started.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -53,24 +60,72 @@ fn git(root: &Path, args: &[&str]) -> Result<String, String> {
 
 /// Runs git in `root`, against a private repository when `git_dir` is set.
 fn git_in(root: &Path, git_dir: Option<&Path>, args: &[&str]) -> Result<String, String> {
+    git_in_timed(root, git_dir, args, None)
+}
+
+fn git_in_timed(
+    root: &Path,
+    git_dir: Option<&Path>,
+    args: &[&str],
+    timeout: Option<Duration>,
+) -> Result<String, String> {
     let mut cmd = Command::new("git");
     if let Some(dir) = git_dir {
         cmd.arg("--git-dir").arg(dir).arg("--work-tree").arg(root);
     }
-    cmd.args(args).current_dir(root);
+    cmd.args(args)
+        .current_dir(root)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
     hide_console(&mut cmd);
-    let out = cmd
-        .output()
-        .map_err(|e| format!("could not run git: {e}"))?;
-    if !out.status.success() {
-        return Err(String::from_utf8_lossy(&out.stderr).trim().to_owned());
+    let mut child = cmd.spawn().map_err(|e| format!("could not run git: {e}"))?;
+    // Drain pipes on other threads so a large diff cannot fill the buffer and hang.
+    let stdout = child.stdout.take();
+    let stderr = child.stderr.take();
+    let out_h = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(mut r) = stdout {
+            let _ = r.read_to_end(&mut buf);
+        }
+        buf
+    });
+    let err_h = std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(mut r) = stderr {
+            let _ = r.read_to_end(&mut buf);
+        }
+        buf
+    });
+    let deadline = timeout.map(|t| Instant::now() + t);
+    let status = loop {
+        match child.try_wait() {
+            Ok(Some(status)) => break status,
+            Ok(None) => {
+                if deadline.is_some_and(|d| Instant::now() >= d) {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err("Reading diffs timed out. Try again, or review fewer files.".into());
+                }
+                std::thread::sleep(Duration::from_millis(20));
+            }
+            Err(e) => return Err(format!("could not run git: {e}")),
+        }
+    };
+    let stdout = out_h.join().unwrap_or_default();
+    let stderr = err_h.join().unwrap_or_default();
+    if !status.success() {
+        return Err(String::from_utf8_lossy(&stderr).trim().to_owned());
     }
-    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    Ok(String::from_utf8_lossy(&stdout).into_owned())
 }
 
 /// git for a snapshot: in its project, against its private repository if any.
 fn run(b: &Baseline, args: &[&str]) -> Result<String, String> {
     git_in(&b.root, b.git_dir.as_deref(), args)
+}
+
+fn run_diff(b: &Baseline, args: &[&str]) -> Result<String, String> {
+    git_in_timed(&b.root, b.git_dir.as_deref(), args, Some(GIT_TIMEOUT))
 }
 
 /// Like `run`, for output that may not be text (a file's stored bytes).
@@ -305,25 +360,53 @@ fn untracked_in(root: &Path, git_dir: Option<&Path>) -> Vec<String> {
 
 /// Everything changed since the snapshot, by file.
 pub fn changes(b: &Baseline) -> Result<Vec<FileChange>, String> {
-    let diff = run(
-        b,
-        &[
-            "diff",
-            "--no-color",
-            "--no-ext-diff",
-            "-U3",
-            &b.commit,
-            "--",
-        ],
-    )?;
+    changes_for(b, None)
+}
+
+/// Like [`changes`], optionally limited to agent-touched `paths` (faster on large repos).
+pub fn changes_for(b: &Baseline, paths: Option<&[String]>) -> Result<Vec<FileChange>, String> {
+    let mut args: Vec<&str> = vec![
+        "diff",
+        "--no-color",
+        "--no-ext-diff",
+        "-U3",
+        &b.commit,
+        "--",
+    ];
+    let path_refs: Vec<&str> = paths
+        .unwrap_or(&[])
+        .iter()
+        .map(String::as_str)
+        .filter(|p| !p.is_empty() && !skip_review_path(p))
+        .collect();
+    if paths.is_some() {
+        if path_refs.is_empty() {
+            return Ok(Vec::new());
+        }
+        args.extend(path_refs.iter().copied());
+    }
+    let diff = run_diff(b, &args)?;
     let mut files = parse(&diff);
     for path in untracked_in(&b.root, b.git_dir.as_deref()) {
+        if skip_review_path(&path) {
+            continue;
+        }
+        if let Some(wanted) = paths
+            && !wanted.iter().any(|p| p == &path)
+        {
+            continue;
+        }
         if b.untracked.contains(&path)
             || run(b, &["cat-file", "-e", &format!("{}:{path}", b.commit)]).is_ok()
         {
             continue;
         }
         let text = std::fs::read_to_string(b.root.join(&path)).unwrap_or_default();
+        let line_count = text.lines().count();
+        if line_count > MAX_FILE_DIFF_LINES {
+            files.push(stub_large_file(&path, line_count));
+            continue;
+        }
         let lines: Vec<String> = text.lines().map(|l| format!("+{l}")).collect();
         files.push(FileChange {
             path,
@@ -336,8 +419,39 @@ pub fn changes(b: &Baseline) -> Result<Vec<FileChange>, String> {
             }],
         });
     }
+    cap_large_files(&mut files);
     files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(files)
+}
+
+fn skip_review_path(path: &str) -> bool {
+    let p = path.replace('\\', "/");
+    SHADOW_SKIP.iter().any(|s| p.contains(s))
+}
+
+fn stub_large_file(path: &str, lines: usize) -> FileChange {
+    FileChange {
+        path: path.to_owned(),
+        status: "modified".into(),
+        added: lines,
+        removed: 0,
+        hunks: vec![Hunk {
+            header: "@@ preview @@".into(),
+            lines: vec![format!(
+                "+(file too large to preview: {lines} lines - undo still works on the whole file)"
+            )],
+        }],
+    }
+}
+
+fn cap_large_files(files: &mut [FileChange]) {
+    for f in files.iter_mut() {
+        let total: usize = f.hunks.iter().map(|h| h.lines.len()).sum();
+        if total <= MAX_FILE_DIFF_LINES {
+            continue;
+        }
+        *f = stub_large_file(&f.path, total);
+    }
 }
 
 /// Splits a unified diff into files and hunks.
@@ -389,7 +503,14 @@ pub fn undo_hunk(b: &Baseline, path: &str, index: usize) -> Result<(), String> {
         .iter()
         .find(|f| f.path == path)
         .ok_or("That file has no changes any more.")?;
-    if file.status != "modified" || file.hunks.len() == 1 {
+    // Preview stubs and single-hunk files: restore the whole file from the baseline.
+    if file.status != "modified"
+        || file.hunks.len() == 1
+        || file
+            .hunks
+            .get(index)
+            .is_some_and(|h| h.header.contains("preview"))
+    {
         return undo_file(b, path);
     }
     let hunk = file
@@ -517,6 +638,23 @@ new file mode 100644
         assert_eq!((files[0].added, files[0].removed), (2, 1));
         assert_eq!(files[0].hunks[1].lines, [" x", "+y", " z"]);
         assert_eq!(files[1].status, "added");
+    }
+
+    #[test]
+    fn path_scoped_diff_skips_untouched_files() {
+        let Some(dir) = repo("scoped") else {
+            return;
+        };
+        let b = snapshot(&dir, None).expect("a repo");
+        std::fs::write(dir.join("a.txt"), "changed\n").unwrap();
+        std::fs::write(dir.join("other.txt"), "untouched new\n").unwrap();
+        let all = changes(&b).unwrap();
+        assert!(all.iter().any(|f| f.path == "a.txt"));
+        assert!(all.iter().any(|f| f.path == "other.txt"));
+        let scoped = changes_for(&b, Some(&["a.txt".into()])).unwrap();
+        assert_eq!(scoped.len(), 1);
+        assert_eq!(scoped[0].path, "a.txt");
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     /// A throwaway repo with one committed file.

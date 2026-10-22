@@ -435,16 +435,40 @@ fn show_or_queue(app: &AppHandle, proposal: Proposal) {
         });
         return;
     }
-    show(app, proposal);
+    show(app, proposal, Instant::now());
 }
 
-fn show(app: &AppHandle, proposal: Proposal) {
+fn unix_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_or(0, |d| d.as_millis() as u64)
+}
+
+/// A friendly name for where a skill's suggestion comes from, by its group.
+pub fn source_of(skill_id: &str) -> &'static str {
+    match skill_id.split('.').next().unwrap_or_default() {
+        "dev" => "Your code",
+        "system" => "Windows",
+        "files" => "Files",
+        "clipboard" | "clip" => "Clipboard",
+        "browser" => "Browser",
+        "calendar" => "Calendar",
+        "mail" => "Mail",
+        "notify" => "Notifications",
+        "focus" => "Focus",
+        "mcp" => "Your servers",
+        "recipes" => "Recipes",
+        _ => "Duskie",
+    }
+}
+
+fn show(app: &AppHandle, proposal: Proposal, since: Instant) {
     if mascot::dispatch(app, MascotEvent::SkillMatched).is_none() {
         // Raced with another state change; try again shortly.
         let app = app.clone();
         lock(&app.state::<AppState>().queue).push_front(Queued {
             proposal,
-            at: Instant::now(),
+            at: since,
         });
         schedule_next(&app, NEXT_AFTER_DISMISS);
         return;
@@ -473,6 +497,10 @@ fn show(app: &AppHandle, proposal: Proposal) {
         } else {
             String::new()
         },
+        compact: proposal.compact,
+        silent: proposal.silent,
+        source: source_of(&proposal.skill_id).into(),
+        at: unix_ms().saturating_sub(since.elapsed().as_millis() as u64),
     };
     let priority = proposal.priority;
     let auto = proposal.trust == Trust::Auto
@@ -576,6 +604,25 @@ pub fn choose(app: &AppHandle, id: &str, index: usize) -> Result<(), String> {
     run_choice(app, id, index, false)
 }
 
+/// A spoken pick: a destructive option stays on screen and waits for a tap,
+/// so voice alone never confirms it.
+pub fn choose_by_voice(app: &AppHandle, id: &str, index: usize) -> Result<(), String> {
+    let action = {
+        let state = app.state::<AppState>();
+        let current = lock(&state.active);
+        match current.as_ref() {
+            Some(a) if a.ui.id == id => a.proposal.options.get(index).map(|o| o.action.clone()),
+            _ => None,
+        }
+    }
+    .ok_or("suggestion is no longer active")?;
+    if !duskie_core::live::voice_may_choose(&action) {
+        crate::voice::say_now(app, "That one needs a tap on screen.");
+        return Ok(());
+    }
+    run_choice(app, id, index, false)
+}
+
 fn run_choice(app: &AppHandle, id: &str, index: usize, auto: bool) -> Result<(), String> {
     let active = take(app, id)?;
     let option = active
@@ -607,13 +654,11 @@ fn run_choice(app: &AppHandle, id: &str, index: usize, auto: bool) -> Result<(),
         // Acting counts for the app it came from (a human pick, not Auto).
         if !auto && let Some(from) = option.args["app"].as_str().or(option.args["name"].as_str()) {
             let mut next = lock(&app.state::<AppState>().settings).clone();
-            if next.redesign.enabled {
-                next.notifications
-                    .lessons
-                    .acted(&format!("app:{from}"), chrono::Utc::now().timestamp());
-                if let Err(err) = crate::commands::apply_settings(app, next) {
-                    log::warn!("could not save what was learned: {err}");
-                }
+            next.notifications
+                .lessons
+                .acted(&format!("app:{from}"), chrono::Utc::now().timestamp());
+            if let Err(err) = crate::commands::apply_settings(app, next) {
+                log::warn!("could not save what was learned: {err}");
             }
         }
     }
@@ -974,24 +1019,7 @@ pub fn dismiss(app: &AppHandle, id: &str, reason: &str) -> Result<(), String> {
         "suggestion from {} dismissed: {reason}",
         active.proposal.skill_id
     );
-    // With the redesign on, Dismiss is neutral: only acting and Show less teach.
-    let neutral = lock(&app.state::<AppState>().settings).redesign.enabled;
-    if !neutral {
-        crate::learn::on_dismiss(app, &active.proposal.skill_id, reason);
-    }
-    if !neutral && reason == "user" && active.proposal.skill_id.starts_with("notify.") {
-        let from = active
-            .proposal
-            .options
-            .iter()
-            .find_map(|o| o.args["app"].as_str().or(o.args["name"].as_str()))
-            .unwrap_or_default()
-            .to_owned();
-        crate::inbox::lesson(format!("Dismissed: {}", active.proposal.title));
-        if let Some(note) = crate::inbox::on_dismiss(app, &from) {
-            log::info!("notifications: {note}");
-        }
-    }
+    // Dismiss is neutral: only acting and Show less teach.
     // Shown while nobody was looking: keep it, so hovering the island
     // later still finds it.
     if reason == "timeout" {
@@ -1093,7 +1121,7 @@ fn schedule_next(app: &AppHandle, after: Duration) {
             queue.pop_front()
         };
         if let Some(q) = next {
-            show(&app, q.proposal);
+            show(&app, q.proposal, q.at);
         }
     });
 }

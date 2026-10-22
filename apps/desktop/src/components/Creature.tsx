@@ -7,7 +7,7 @@ import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { subscribeCursor } from "@/lib/cursor";
 import type { MascotState, Theme } from "@/lib/types";
-import { createCreature, creatureSupported } from "./creature/creature";
+import { createCreature, creatureMayRetry, creatureSupported } from "./creature/creature";
 import { type Expression, FOR_STATE } from "./creature/expressions";
 
 interface Live {
@@ -39,8 +39,8 @@ export function Creature(props: {
   /** False while nothing is on screen: the creature stops drawing. */
   active?: boolean;
   /**
-   * Full-body vs bust crop. Prototype island always uses full body and CSS
-   * scale; pass false on the redesign path so Ask (small scale) keeps eyes.
+   * Full-body vs bust crop. The island always uses full body and CSS scale;
+   * pass false so Ask (small scale) keeps eyes.
    */
   bust?: boolean;
 }) {
@@ -59,6 +59,17 @@ export function Creature(props: {
   // render match; null means not decided yet.
   const [supported, setSupported] = useState<boolean | null>(null);
   useEffect(() => setSupported(creatureSupported()), []);
+  // A GPU still waking up reads as software rendering; try again before settling on the still.
+  const [look, setLook] = useState(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: look schedules the next try.
+  useEffect(() => {
+    if (supported !== false || !creatureMayRetry()) return;
+    const t = setTimeout(() => {
+      if (creatureSupported()) setSupported(true);
+      else setLook((n) => n + 1);
+    }, 3000);
+    return () => clearTimeout(t);
+  }, [supported, look]);
   const reduced = (useReducedMotion() ?? false) || simple;
   const expression = face ?? FOR_STATE[state];
   const root = useRef<HTMLDivElement>(null);
@@ -129,8 +140,8 @@ export function Creature(props: {
     };
   }, [supported, size, magnetic, reduced]);
 
-  // No WebGL 2 on this machine: a still silhouette, no animation.
-  if (supported === false) {
+  // No WebGL 2 yet (or ever): a still silhouette, no animation.
+  if (supported !== true) {
     return (
       <div
         className="creature-still"

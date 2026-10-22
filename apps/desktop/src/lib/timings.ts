@@ -38,12 +38,14 @@ export const timings = {
 export const TIMING_LABELS = {
   open_to_ready: "Open to ready",
   enter_to_first_word: "Enter to first word",
+  speech_to_first_word: "End of speech to first word",
   speech_to_first_sound: "End of speech to first sound",
 } as const;
 
 export const TIMING_TARGETS = {
   open_to_ready: 100,
   enter_to_first_word: 1500,
+  speech_to_first_word: 500,
   speech_to_first_sound: 700,
 } as const;
 

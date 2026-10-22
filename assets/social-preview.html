@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Duskie social preview</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #0a0a0c;
+      }
+      .card {
+        position: relative;
+        width: 1280px;
+        height: 640px;
+        overflow: hidden;
+        background:
+          radial-gradient(ellipse 60% 70% at 26% 50%, rgb(255 231 184 / 0.16) 0%, rgb(255 231 184 / 0) 70%),
+          linear-gradient(180deg, #0c0c10 0%, #0a0a0c 100%);
+        font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif;
+      }
+      .mascot {
+        position: absolute;
+        left: 110px;
+        top: 70px;
+        width: 500px;
+        height: 500px;
+        filter: drop-shadow(0 0 36px rgb(255 231 184 / 0.18));
+      }
+      .copy {
+        position: absolute;
+        left: 690px;
+        top: 0;
+        height: 640px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      .rule {
+        width: 84px;
+        height: 4px;
+        border-radius: 2px;
+        background: #ffe7b8;
+        opacity: 0.8;
+        margin-bottom: 36px;
+      }
+      h1 {
+        margin: 0;
+        font-size: 176px;
+        font-weight: 600;
+        line-height: 1;
+        letter-spacing: -0.02em;
+        color: #f5f0e6;
+      }
+      p {
+        margin: 26px 0 0;
+        font-size: 38px;
+        font-weight: 400;
+        color: #a9a397;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <img class="mascot" src="../apps/desktop/app-icon.png" alt="" />
+      <div class="copy">
+        <div class="rule"></div>
+        <h1>Duskie</h1>
+        <p>A proactive desktop companion</p>
+      </div>
+    </div>
+  </body>
+</html>

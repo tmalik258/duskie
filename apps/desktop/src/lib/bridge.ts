@@ -23,39 +23,55 @@ import type {
   ChatMessage,
   ChatSummary,
   CloudId,
+  CommitRow,
   ComposioStatus,
   CursorChat,
+  DirectServer,
+  EditorHit,
   EditorList,
+  EnrollState,
   ExtensionGuide,
   FileChange,
   Found,
+  FoundSkill,
+  GitBranch,
   GitFile,
   HitRect,
   InboxStatus,
   InstantResults,
   LaterItem,
   Learned,
+  LearnedLevel,
   LessonRow,
+  LibrarySkill,
+  LimitState,
+  LinkPreview,
   LocalModels,
   MailStatus,
   MascotState,
   MergeState,
   MessageDiff,
   NotifyLevel,
+  OpenFile,
   ProviderStatus,
   Recipe,
   ReposOverview,
   RoutineItem,
   SearchHit,
+  ServerTool,
   Settings,
   SetupPlan,
   SetupStatus,
   SkillInfo,
+  SkillTarget,
+  StashRow,
   StoredEvent,
   Suggestion,
   SuggestionRate,
+  SyncReport,
   Timing,
   Transition,
+  TreeEntry,
   Turn,
   UpdateInfo,
   UpdateProgress,
@@ -79,6 +95,9 @@ export const EVENTS = {
   aiDelta: "ai://delta",
   aiDone: "ai://done",
   aiTool: "ai://tool",
+  connectorsDuplicate: "connectors://duplicate",
+  libraryFound: "library://found",
+  termData: "term://data",
   aiProposal: "ai://proposal",
   askOpen: "ask://open",
   askClose: "ask://close",
@@ -100,6 +119,8 @@ export const EVENTS = {
   timing: "timing://recorded",
   islandDone: "island://done",
   islandFocus: "island://focus",
+  reviewFile: "review://file",
+  reviewDone: "review://done",
 } as const;
 
 export interface EventPayloads {
@@ -127,7 +148,10 @@ export interface EventPayloads {
     /** US dollars, only for Anthropic API answers. */
     cost?: number | null;
   };
-  [EVENTS.aiTool]: { id: string; name: string; label?: string };
+  [EVENTS.aiTool]: { id: string; name: string; label?: string; source?: string | null };
+  [EVENTS.connectorsDuplicate]: { app: string; used: string; unused: string[] };
+  [EVENTS.libraryFound]: { names: string[] };
+  [EVENTS.termData]: { id: number; data: string | null; done: boolean };
   [EVENTS.aiProposal]: { chatId: string; id: string; label: string; step?: boolean; undoable?: boolean };
   [EVENTS.askOpen]: AskOpen;
   [EVENTS.askClose]: { reason: "close" | "defer"; panelGen?: number };
@@ -144,6 +168,8 @@ export interface EventPayloads {
   [EVENTS.guideKey]: number;
   [EVENTS.voiceWelcome]: WelcomeSpeech;
   [EVENTS.timing]: Timing;
+  [EVENTS.reviewFile]: { session: string; file: FileChange };
+  [EVENTS.reviewDone]: { session: string };
 }
 
 export function isTauri(): boolean {
@@ -160,6 +186,11 @@ let tauriEventPromise: Promise<typeof import("@tauri-apps/api/event")> | null = 
 function getTauriEvent() {
   tauriEventPromise ??= import("@tauri-apps/api/event");
   return tauriEventPromise;
+}
+
+/** Kept for callers that still invoke it; usually a no-op (window sized at launch). */
+function setIslandWidth(width: number): Promise<void> {
+  return invoke<void>("island_width", { width });
 }
 
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -229,6 +260,28 @@ export const api = {
   debugEmitEvent: () => invoke<void>("debug_emit_event"),
   skillsList: () => invoke<SkillInfo[]>("skills_list"),
   skillSet: (id: string, enabled: boolean, auto: boolean) => invoke<Settings>("skill_set", { id, enabled, auto }),
+  libraryReview: () => invoke<FoundSkill[]>("library_review"),
+  libraryList: () => invoke<LibrarySkill[]>("library_list"),
+  libraryImport: (names: string[]) => invoke<LibrarySkill[]>("library_import", { names }),
+  librarySetTarget: (name: string, target: SkillTarget, on: boolean) =>
+    invoke<LibrarySkill[]>("library_set_target", { name, target, on }),
+  libraryRemove: (name: string) => invoke<LibrarySkill[]>("library_remove", { name }),
+  librarySync: () => invoke<SyncReport>("library_sync"),
+  libraryFetchUrl: (url: string) => invoke<LinkPreview>("library_fetch_url", { url }),
+  libraryInstallFetched: (url: string, commit: string, names: string[]) =>
+    invoke<LibrarySkill[]>("library_install_fetched", { url, commit, names }),
+  editorTree: (root: string) => invoke<TreeEntry[]>("editor_tree", { root }),
+  editorRead: (root: string, path: string) => invoke<OpenFile>("editor_read", { root, path }),
+  editorWrite: (root: string, path: string, text: string, stamp: string) =>
+    invoke<string>("editor_write", { root, path, text, stamp }),
+  editorChanged: (root: string, path: string, stamp: string) =>
+    invoke<boolean>("editor_changed", { root, path, stamp }),
+  editorHead: (root: string, path: string) => invoke<string>("editor_head", { root, path }),
+  editorSearch: (root: string, query: string) => invoke<EditorHit[]>("editor_search", { root, query }),
+  termOpen: (root: string, cols: number, rows: number) => invoke<number>("term_open", { root, cols, rows }),
+  termWrite: (id: number, data: string) => invoke<void>("term_write", { id, data }),
+  termResize: (id: number, cols: number, rows: number) => invoke<void>("term_resize", { id, cols, rows }),
+  termClose: (id: number) => invoke<void>("term_close", { id }),
   capabilitiesGet: (rescan = false) => invoke<CapabilityInfo>("capabilities_get", { rescan }),
   choicesReset: () => invoke<number>("choices_reset"),
   routinesToday: () => invoke<RoutineItem[]>("routines_today"),
@@ -364,15 +417,44 @@ export const api = {
   attentionLessons: () => invoke<LessonRow[]>("attention_lessons"),
   attentionActed: (key: string) => invoke<void>("attention_acted", { key }),
   attentionShowLess: (key: string) => invoke<void>("attention_show_less", { key }),
+  attentionUndoShowLess: (key: string) => invoke<void>("attention_undo_show_less", { key }),
+  attentionSetLevel: (key: string, level: LearnedLevel) => invoke<void>("attention_set_level", { key, level }),
   mcpValidateStdio: (spec: { command: string; args: string[] }) => invoke<void>("mcp_validate_stdio", { spec }),
   attentionReset: (scope: string) => invoke<void>("attention_reset", { scope }),
   gitStatus: (path: string) => invoke<GitFile[]>("git_status", { path }),
   gitStage: (path: string, files: string[]) => invoke<string>("git_stage", { path, files }),
   gitUnstage: (path: string, files: string[]) => invoke<string>("git_unstage", { path, files }),
+  gitDiscard: (path: string, files: string[]) => invoke<string>("git_discard", { path, files }),
   gitCommit: (path: string, message: string) => invoke<string>("git_commit", { path, message }),
   gitWriteMessage: (path: string) => invoke<string>("git_write_message", { path }),
   gitAmend: (path: string, message?: string) => invoke<string>("git_amend", { path, message }),
   gitLastCommitPushed: (path: string) => invoke<boolean>("git_last_commit_pushed", { path }),
+  gitLog: (path: string) => invoke<CommitRow[]>("git_log", { path }),
+  gitStashes: (path: string) => invoke<StashRow[]>("git_stashes", { path }),
+  gitStashApply: (path: string, name: string, pop: boolean) => invoke<string>("git_stash_apply", { path, name, pop }),
+  gitStashDrop: (path: string, name: string) => invoke<string>("git_stash_drop", { path, name }),
+  gitStashPush: (path: string) => invoke<string>("git_stash_push", { path }),
+  gitFetch: (path: string) => invoke<string>("git_fetch", { path }),
+  gitPush: (path: string) => invoke<string>("git_push", { path }),
+  gitSync: (path: string) => invoke<string>("git_sync", { path }),
+  gitBranches: (path: string) => invoke<GitBranch[]>("git_branches", { path }),
+  gitSwitchBranch: (path: string, name: string) => invoke<string>("git_switch_branch", { path, name }),
+  gitCreateBranch: (path: string, name: string) => invoke<string>("git_create_branch", { path, name }),
+  gitFileDiff: (path: string, file: string, staged: boolean) =>
+    invoke<FileChange>("git_file_diff", { path, file, staged }),
+  gitStageHunk: (path: string, file: string, index: number) => invoke<string>("git_stage_hunk", { path, file, index }),
+  /** Widens the island window for a dock beside it; 0 puts it back. Skips no-ops. */
+  islandWidth: (width: number) => setIslandWidth(width),
+  limitsPaused: () => invoke<LimitState[]>("limits_paused"),
+  gpuMemory: () => invoke<number | null>("gpu_memory"),
+  serversSave: (server: DirectServer, env: Record<string, string>) => invoke<string>("servers_save", { server, env }),
+  serversCommand: (id: string) => invoke<string>("servers_command", { id }),
+  serversConfirm: (id: string, shown: string) => invoke<void>("servers_confirm", { id, shown }),
+  serversTest: (id: string) => invoke<ServerTool[]>("servers_test", { id }),
+  serversAllowWrite: (id: string, tool: string, allow: boolean) =>
+    invoke<void>("servers_allow_write", { id, tool, allow }),
+  serversRemove: (id: string) => invoke<void>("servers_remove", { id }),
+  serversSignIn: (id: string) => invoke<void>("servers_sign_in", { id }),
   gitMessageDiff: (path: string) => invoke<MessageDiff>("git_message_diff", { path }),
   mailStatus: () => invoke<MailStatus>("mail_status"),
   mailConnect: () => invoke<MailStatus>("mail_connect"),
@@ -417,6 +499,12 @@ export const api = {
   voiceTyping: (hasText: boolean) => invoke<void>("voice_typing", { hasText }),
   voiceStop: () => invoke<void>("voice_stop"),
   voiceTest: () => invoke<void>("voice_test"),
+  voiceEnrollState: () => invoke<EnrollState>("voice_enroll_state"),
+  voiceEnrollRecord: (sentence?: number, more = false) =>
+    invoke<EnrollState>("voice_enroll_record", { sentence: sentence ?? null, more }),
+  voiceEnrollFinish: (more = false) => invoke<EnrollState>("voice_enroll_finish", { more }),
+  voiceEnrollCancel: () => invoke<EnrollState>("voice_enroll_cancel"),
+  voiceEnrollReset: () => invoke<EnrollState>("voice_enroll_reset"),
   voiceWelcome: () => invoke<WelcomeSpeech>("voice_welcome"),
   voiceWelcomeStep: (step: number) => invoke<void>("voice_welcome_step", { step }),
   voiceSay: (text: string) => invoke<void>("voice_say", { text }),

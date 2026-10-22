@@ -17,7 +17,7 @@ pub const CURSOR_EVENT: &str = "island://cursor";
 pub const VISIBLE_EVENT: &str = "island://visible";
 /// Shift (or Shift+Alt with a suggestion) for morph labels without focus.
 /// Glance: Shift while hovered. Suggestion chips: Shift+Alt even when the
-/// cursor is elsewhere — Alt+N shortcuts are global, so the words must be too.
+/// cursor is elsewhere, Alt+N shortcuts are global, so the words must be too.
 pub const SHIFT_EVENT: &str = "island://shift";
 /// Whether a fullscreen app is in front on the island's screen, so the glance
 /// can offer "Hide while fullscreen" right there.
@@ -47,6 +47,8 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     let window = app
         .get_webview_window(LABEL)
         .ok_or_else(|| tauri::Error::WindowNotFound)?;
+    // Size once to dock-max so Git open never calls set_size (that stalls the UI thread).
+    ensure_base_width(&window)?;
     position_top_center(&window)?;
     spawn_top_keeper(window.clone());
     spawn_hover_tracker(app.clone(), window.clone());
@@ -121,6 +123,41 @@ fn place_on(window: &WebviewWindow, monitor: &tauri::Monitor) -> tauri::Result<(
     window.set_position(PhysicalPosition::new(x, origin.y))
 }
 
+/// Keep the island at dock-max width (or the screen, if smaller).
+/// `_width` is ignored - the window stays wide so Git open never hits `set_size`.
+pub fn set_width(window: &WebviewWindow, _width: f64) -> tauri::Result<()> {
+    ensure_base_width(window)
+}
+
+/// Size the transparent window to `BASE_WIDTH` (clamped to the monitor) once.
+/// Opening Git only lays out CSS inside this already-wide surface.
+pub fn ensure_base_width(window: &WebviewWindow) -> tauri::Result<()> {
+    let Some(monitor) = window.current_monitor()? else {
+        return Ok(());
+    };
+    let scale = monitor.scale_factor();
+    let screen = f64::from(monitor.size().width) / scale;
+    let width = BASE_WIDTH.min(screen);
+    let outer = window.outer_size()?;
+    let current = f64::from(outer.width) / scale;
+    if (current - width).abs() < 1.0 {
+        return Ok(());
+    }
+    let height = f64::from(outer.height) / scale;
+    let origin = monitor.position();
+    let screen_phys = monitor.size();
+    let width_phys = (width * scale).round() as i32;
+    let x = origin.x + (screen_phys.width as i32 - width_phys) / 2;
+    window.set_position(PhysicalPosition::new(x, origin.y))?;
+    window.set_size(tauri::LogicalSize::new(width, height))?;
+    Ok(())
+}
+
+/// Logical width of the transparent island window - large enough for Ask + Git
+/// dock beside it (`dockWindowWidth` max ≈ 1540). Stays at this size always so
+/// opening Git is a CSS layout change, not an OS resize.
+pub const BASE_WIDTH: f64 = 1540.0;
+
 /// The monitor that holds point (x, y), in physical pixels.
 fn monitor_at(monitors: &[tauri::Monitor], x: i64, y: i64) -> Option<&tauri::Monitor> {
     monitors.iter().find(|m| {
@@ -165,6 +202,10 @@ pub fn follow_active_monitor(app: &AppHandle, payload: &serde_json::Value) {
     }
     if let Err(err) = place_on(&window, target) {
         log::warn!("could not move the island: {err}");
+    }
+    // New monitor may be narrower/wider - keep dock-max (clamped to screen).
+    if let Err(err) = ensure_base_width(&window) {
+        log::warn!("could not size the island: {err}");
     }
 }
 

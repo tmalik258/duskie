@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   answerQuestion,
   finishSession,
+  openReview,
   resumeSession,
   type Session,
   sendToSession,
@@ -33,6 +34,12 @@ function state(s: Session): [string, string] {
 }
 
 /** The last few steps, tagged like the transcript; the running one shimmers. */
+/** What it was asked to do, for a tile with nothing newer to show. */
+function firstAsk(s: Session): string {
+  const first = s.entries.find((e) => e.kind === "you");
+  return first?.kind === "you" ? first.text : "";
+}
+
 function lastSteps(s: Session): { tag: string; text: string; live: boolean }[] {
   const out: { tag: string; text: string; live: boolean }[] = [];
   for (let i = s.entries.length - 1; i >= 0 && out.length < 3; i--) {
@@ -167,6 +174,8 @@ function Tile({ s, n, focused }: { s: Session; n: number; focused: boolean }) {
             )}
           </div>
         </>
+      ) : lastSteps(s).length === 0 && firstAsk(s) ? (
+        <p className="ak-tsay ak-tclamp ak-tasked">{plain(firstAsk(s))}</p>
       ) : (
         <ul className="ak-tlog">
           {lastSteps(s).map((t, i) => (
@@ -213,7 +222,7 @@ function EmptySlot({
   recent: Session[];
   /** Parent bumps this (Ctrl N) to open the new-session picker. */
   openSignal?: number;
-  /** After the picker closes — put focus back on the board composer. */
+  /** After the picker closes, put focus back on the board composer. */
   onDismiss?: () => void;
 }) {
   const { data: agents } = useCached<Agents>("agents", api.agentsStatus);
@@ -261,7 +270,7 @@ function EmptySlot({
       pickRoot.current?.focus({ preventScroll: true });
     });
   }, [openSignal]);
-  // Esc closes the picker (or steps back), not the island — AskPanel also
+  // Esc closes the picker (or steps back), not the island, AskPanel also
   // listens for Esc on window; capture + preventDefault wins that race.
   useEffect(() => {
     if (!picking) return;
@@ -486,7 +495,7 @@ export function Board({
 }: {
   sessions: Session[];
   maxHeight: number;
-  /** False while Ask is shown but Agents is kept warm — do not steal Ctrl N. */
+  /** False while Ask is shown but Agents is kept warm, do not steal Ctrl N. */
   active?: boolean;
 }) {
   const focus = useAgents((s) => s.focus);
@@ -651,9 +660,9 @@ export function Board({
             })
           }
           onReview={() => {
-            sessionView(target.id, { reviewing: true });
             setLayout("one");
             useAgents.setState({ current: target.id });
+            openReview(target.id);
           }}
           onRewind={() => {
             setLayout("one");

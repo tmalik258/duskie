@@ -24,7 +24,7 @@ Duskie talks to Ollama at `127.0.0.1:11434`, so "Expose Ollama to the network" c
 | Browser extension | Settings > Connections > Browser > **Install** next to your browser. Duskie copies the extension folder path and opens the browser's extensions page: turn on Developer mode, click Load unpacked, paste. The extension pairs on its own and the island asks you to Allow it | Page summaries, form help, duplicate tabs, saved sessions |
 | Code folders | Settings > Home > Your code: tick the folders Duskie found | Project status, the project launcher, the end-of-day check |
 | Folders to search | Settings > Privacy and data > Search: tick the folders Duskie found | Search inside your documents and notes |
-| Voice (optional) | Settings > AI > Voice, about 205 MB once | "Hey Duskie", spoken answers and follow-ups without the wake word, all on this PC |
+| Voice (optional) | Settings > AI > Voice, about 205 MB once | "Duskie" to wake it, spoken answers and follow-ups without the wake word, all on this PC |
 
 ## 3. Tools
 

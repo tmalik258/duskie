@@ -31,22 +31,52 @@ pub(crate) fn repo(path: &Path) -> Result<(), ActionError> {
 }
 
 pub(crate) fn git(path: &Path, args: &[&str]) -> Result<String, ActionError> {
+    match run_git(path, &[], args) {
+        // Git on Windows can fail to append to its logs on some drives
+        // (network shares, WSL paths); its own hint is to turn this off.
+        Err(err) if err.contains("appendAtomically") => {
+            run_git(path, &["-c", "windows.appendAtomically=false"], args)
+                .map_err(|e| ActionError::Failed(git_error(&e)))
+        }
+        r => r.map_err(|e| ActionError::Failed(git_error(&e))),
+    }
+}
+
+fn run_git(path: &Path, pre: &[&str], args: &[&str]) -> Result<String, String> {
     let mut cmd = Command::new("git");
-    cmd.arg("-C")
+    cmd.args(pre)
+        .arg("-C")
         .arg(path)
         .args(args)
         .env("GIT_TERMINAL_PROMPT", "0")
         .stdin(Stdio::null());
     hidden(&mut cmd);
-    let out = cmd.output().map_err(fail)?;
+    let out = cmd.output().map_err(|e| e.to_string())?;
     if out.status.success() {
         Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     } else {
-        let err = String::from_utf8_lossy(&out.stderr);
-        Err(ActionError::Failed(
-            err.lines().last().unwrap_or("git failed").trim().to_owned(),
-        ))
+        Err(String::from_utf8_lossy(&out.stderr).into_owned())
     }
+}
+
+/// The line of git's output that says what went wrong, not its hints.
+pub(crate) fn git_error(stderr: &str) -> String {
+    let lines: Vec<&str> = stderr
+        .lines()
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .collect();
+    let pick = lines
+        .iter()
+        .rev()
+        .find(|l| l.starts_with("fatal:") || l.starts_with("error:"))
+        .or_else(|| lines.iter().rev().find(|l| !l.starts_with("hint:")))
+        .copied()
+        .unwrap_or("git failed");
+    pick.trim_start_matches("fatal:")
+        .trim_start_matches("error:")
+        .trim()
+        .to_owned()
 }
 
 /// Lockfiles and the command that installs from each.
@@ -142,7 +172,7 @@ pub fn main_branch(path: &Path) -> String {
 /// Marks a result whose merge stopped on conflicts: the island opens them.
 pub const MERGE_AT: &str = "git-merge:";
 /// The stash message for changes put aside while the branch updates.
-const UPDATE_STASH: &str = "sidekick: update";
+pub(crate) const UPDATE_STASH: &str = "sidekick: update";
 
 fn dirty(path: &Path) -> Result<bool, ActionError> {
     Ok(
@@ -248,7 +278,7 @@ pub fn update_branch(path: &Path) -> Result<Outcome, ActionError> {
 }
 
 /// Files the open merge left with conflicts.
-fn conflicted(path: &Path) -> Vec<String> {
+pub(crate) fn conflicted(path: &Path) -> Vec<String> {
     git(path, &["diff", "--name-only", "--diff-filter=U"])
         .unwrap_or_default()
         .lines()
@@ -734,5 +764,18 @@ mod tests {
         assert_eq!(std::fs::read_to_string(b.join("f")).unwrap(), "a");
         assert_eq!(std::fs::read_to_string(b.join("g")).unwrap(), "wip");
         let _ = std::fs::remove_dir_all(&base);
+    }
+}
+
+#[cfg(test)]
+mod git_error_tests {
+    use super::git_error;
+
+    #[test]
+    fn skips_hints_for_the_real_error() {
+        let err = "error: cannot append to .git/logs/refs/stash\nhint: git config windows.appendAtomically false\n";
+        assert_eq!(git_error(err), "cannot append to .git/logs/refs/stash");
+        assert_eq!(git_error("fatal: not a repo\n"), "not a repo");
+        assert_eq!(git_error(""), "git failed");
     }
 }

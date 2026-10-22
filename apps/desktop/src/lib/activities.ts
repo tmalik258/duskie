@@ -21,7 +21,21 @@ export const useActivities = create<{ revision: number; activities: Activity[]; 
 }));
 export function acceptActivities(snapshot: ActivitySnapshot) {
   if (snapshot.revision <= useActivities.getState().revision) return;
-  useActivities.setState({ revision: snapshot.revision, activities: snapshot.activities });
+  useActivities.setState((s) => {
+    const remote = new Map(snapshot.activities.map((a) => [a.id, a]));
+    return {
+      revision: snapshot.revision,
+      activities: snapshot.activities,
+      // Drop optimistic rows the backend already owns, but keep a finished
+      // local copy over a stale remote "running" (open start vs local finish).
+      local: s.local.filter((a) => {
+        const r = remote.get(a.id);
+        if (!r) return true;
+        if (terminal(r) || !terminal(a)) return false;
+        return true;
+      }),
+    };
+  });
 }
 export function beginActivity(label: string): string {
   const id = crypto.randomUUID();
@@ -122,11 +136,20 @@ export function needsAttention(a: Activity, now: number): boolean {
  * `keepProblems`, failed, unconfirmed and stalled ones stay until dismissed.
  */
 export function visibleActivities(activities: Activity[], now: number, keepProblems = false) {
-  // Matched by id: a later copy (newer revision) replaces an earlier one.
+  // Matched by id: newer revision wins, but a finished copy beats a still-running
+  // one so an optimistic local complete is not undone by a stale "opening" sync.
   const unique = new Map<string, Activity>();
   for (const a of activities) {
     const seen = unique.get(a.id);
-    if (!seen || a.revision >= seen.revision) unique.set(a.id, a);
+    if (!seen) {
+      unique.set(a.id, a);
+      continue;
+    }
+    if (terminal(a) !== terminal(seen)) {
+      if (terminal(a)) unique.set(a.id, a);
+      continue;
+    }
+    if (a.revision >= seen.revision) unique.set(a.id, a);
   }
   return [...unique.values()]
     .filter((a) => {
@@ -135,7 +158,7 @@ export function visibleActivities(activities: Activity[], now: number, keepProbl
       const idle = now - a.lastProgressAt;
       // Done / failed: brief hold, then gone (compact pill settles).
       if (terminal(a) && idle >= ACTIVITY_HOLD_MS) return false;
-      // Unconfirmed never completes on its own — same short hold as done pills.
+      // Unconfirmed never completes on its own, same short hold as done pills.
       if (a.phase === "unconfirmed" && idle >= UNCONFIRMED_HOLD_MS) return false;
       // Stalled downloads (no bytes for 2m): drop the compact pill; don't stick.
       if (idle >= INACTIVITY_MS && (a.source === "browser" || a.source === "file")) return false;

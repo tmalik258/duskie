@@ -14,7 +14,15 @@ pub const EVENT: &str = "timing://recorded";
 pub const OPEN_TO_READY: &str = "open_to_ready";
 pub const ENTER_TO_FIRST_WORD: &str = "enter_to_first_word";
 pub const SPEECH_TO_FIRST_SOUND: &str = "speech_to_first_sound";
-const NAMES: &[&str] = &[OPEN_TO_READY, ENTER_TO_FIRST_WORD, SPEECH_TO_FIRST_SOUND];
+/// End of speech to the model's first words: with first sound, splits the
+/// wait into thinking and speaking.
+pub const SPEECH_TO_FIRST_WORD: &str = "speech_to_first_word";
+const NAMES: &[&str] = &[
+    OPEN_TO_READY,
+    ENTER_TO_FIRST_WORD,
+    SPEECH_TO_FIRST_WORD,
+    SPEECH_TO_FIRST_SOUND,
+];
 
 const FILE: &str = "timings.log";
 /// The log is cut to its newer half past this size.

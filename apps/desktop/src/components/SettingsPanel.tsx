@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { friendlyError } from "@/lib/friendly";
 import { useScrollEdge } from "@/lib/hooks";
 import { useDuskie } from "@/lib/store";
+import { Ic, type IcName } from "./Icon";
 import { AiTab } from "./settings/AiTab";
 import { AppearanceTab } from "./settings/AppearanceTab";
 import { ConnectionsTab } from "./settings/ConnectionsTab";
@@ -15,6 +16,70 @@ import { SkillsTab } from "./settings/SkillsTab";
 import { StorageTab } from "./settings/StorageTab";
 import { SettingsQuery } from "./settings/ui";
 
+/** Design layout: the sections grouped in a sidebar, with a short line on each. */
+const GROUPS: { label: string; items: { id: SettingsTab; label: string; icon: IcName; blurb: string }[] }[] = [
+  {
+    label: "Duskie",
+    items: [
+      {
+        id: "home",
+        label: "General",
+        icon: "home",
+        blurb: "How Duskie starts, how your day is shaped, and when it stays quiet.",
+      },
+      {
+        id: "appearance",
+        label: "Appearance",
+        icon: "palette",
+        blurb: "The look of Duskie, the island and the wash behind it.",
+      },
+      { id: "sounds", label: "Sounds", icon: "bell", blurb: "Soft cues for what happens, and how loud." },
+      {
+        id: "notifications",
+        label: "Notifications",
+        icon: "spark",
+        blurb: "Windows stays quiet. Only what matters comes up on the island.",
+      },
+    ],
+  },
+  {
+    label: "Intelligence",
+    items: [
+      { id: "ai", label: "AI models", icon: "cpu", blurb: "Which brain answers, and which one writes code." },
+      { id: "voice", label: "Voice", icon: "mic", blurb: "Runs on this PC. Audio is never saved or sent." },
+      { id: "memory", label: "Memory", icon: "brain", blurb: "What Duskie knows about you. All of it is editable." },
+      {
+        id: "skills",
+        label: "Skills",
+        icon: "bolt",
+        blurb: "What Duskie offers, and what it now does on its own.",
+      },
+    ],
+  },
+  {
+    label: "Connections",
+    items: [
+      { id: "connections", label: "Apps", icon: "plug", blurb: "Accounts Duskie can read from and act in." },
+      {
+        id: "code",
+        label: "Code and Git",
+        icon: "branch",
+        blurb: "Where your projects live, and the editor they open in.",
+      },
+    ],
+  },
+  {
+    label: "System",
+    items: [
+      { id: "shortcuts", label: "Shortcuts", icon: "key", blurb: "Click a shortcut, then press the new keys." },
+      { id: "privacy", label: "Privacy", icon: "shield", blurb: "What Duskie notices, and what it never looks at." },
+      { id: "storage", label: "Storage", icon: "disk", blurb: "What takes space on this PC." },
+      { id: "updates", label: "Updates", icon: "update", blurb: "New versions, and what this one is." },
+      { id: "setup", label: "Setup", icon: "check", blurb: "Tools that make Duskie better, one click each." },
+    ],
+  },
+];
+
 export const SETTINGS_TABS = [
   { id: "home", label: "Home" },
   { id: "appearance", label: "Appearance" },
@@ -25,16 +90,20 @@ export const SETTINGS_TABS = [
   { id: "storage", label: "Storage" },
   { id: "privacy", label: "Privacy" },
   { id: "skills", label: "Skills" },
+  { id: "sounds", label: "Sounds" },
+  { id: "notifications", label: "Notifications" },
+  { id: "voice", label: "Voice" },
+  { id: "code", label: "Code and Git" },
+  { id: "updates", label: "Updates" },
+  { id: "setup", label: "Setup" },
 ] as const;
 export type SettingsTab = (typeof SETTINGS_TABS)[number]["id"];
 
 /** Old tab ids (links from setup items and older builds) to the new ones. */
 const MOVED: Record<string, SettingsTab> = {
   general: "home",
-  setup: "home",
   today: "home",
   about: "home",
-  voice: "ai",
   browser: "connections",
   apps: "connections",
   calendar: "connections",
@@ -63,6 +132,7 @@ export function SettingsPanel() {
   const ready = useDuskie((s) => s.ready);
   const [tab, setTab] = useState<SettingsTab>(() => recent()?.tab ?? "home");
   const [query, setQuery] = useState("");
+  const searchRef = useRef<HTMLInputElement>(null);
   const scroller = useRef<HTMLDivElement | null>(null);
   const edges = useScrollEdge();
   const scrollerRef = useCallback(
@@ -82,6 +152,12 @@ export function SettingsPanel() {
     setTab(t);
     scroller.current?.scrollTo({ top: 0 });
   }, []);
+
+  // Focus search once the panel is ready to type into.
+  useEffect(() => {
+    if (!ready) return;
+    searchRef.current?.focus({ preventScroll: true });
+  }, [ready]);
 
   // Opened at a given tab (back from connecting an app): that tab, at its top.
   useEffect(() => {
@@ -132,70 +208,111 @@ export function SettingsPanel() {
   const searching = query.trim() !== "";
   const show = (id: SettingsTab) => searching || tab === id;
 
-  return (
-    <div className="island-settings flex min-h-0 flex-auto flex-col">
-      <div className="flex shrink-0 flex-col gap-2 pb-2.5">
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search settings"
-          aria-label="Search settings"
-          spellCheck={false}
-          className="w-full rounded-lg bg-(--surface) px-3 py-1.5 text-[13px] text-(--text) placeholder:text-(--muted) outline-none focus:bg-(--hover)"
-        />
-        {!searching && (
-          <nav aria-label="Settings sections" className="no-scrollbar -mx-1 flex gap-1 overflow-x-auto px-1">
-            {SETTINGS_TABS.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                aria-pressed={tab === t.id}
-                onClick={() => pick(t.id)}
-                className={`chip shrink-0 rounded-full px-3 py-1 text-[12.5px] font-medium ${
-                  tab === t.id
-                    ? "bg-(--text) text-(--bg)"
-                    : "bg-(--surface) text-(--muted) hover:bg-(--hover) hover:text-(--text)"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </nav>
+  const body = (
+    <SettingsQuery.Provider value={query.trim()}>
+      <div
+        ref={scrollerRef}
+        onScroll={(e) => {
+          scrolled.current = e.currentTarget.scrollTop;
+        }}
+        className="settings-scroll flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-0.5 pb-3"
+      >
+        {searching ? (
+          <HomeTab onError={report} onOpenTab={open} />
+        ) : (
+          (["home", "sounds", "notifications", "code", "updates", "setup"] as const).includes(tab as "home") && (
+            <HomeTab
+              onError={report}
+              onOpenTab={open}
+              part={tab === "home" ? "general" : (tab as "sounds" | "notifications" | "code" | "updates" | "setup")}
+            />
+          )
         )}
+        {show("appearance") && <AppearanceTab onError={report} />}
+        {(searching || tab === "ai" || tab === "voice") && (
+          <AiTab onError={report} part={searching ? undefined : tab === "voice" ? "voice" : "models"} />
+        )}
+        {(show("connections") || (!searching && tab === "code")) && (
+          <ConnectionsTab onError={report} part={searching ? undefined : tab === "code" ? "code" : "apps"} />
+        )}
+        {show("privacy") && <PrivacyTab onError={report} />}
+        {show("memory") && <MemoryTab onError={report} />}
+        {show("shortcuts") && <ShortcutsTab onError={report} />}
+        {show("storage") && <StorageTab onError={report} />}
+        {show("skills") && <SkillsTab onError={report} />}
       </div>
+    </SettingsQuery.Provider>
+  );
+  const alert = error && (
+    <p
+      role="alert"
+      className="mb-2 flex shrink-0 items-start justify-between gap-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300"
+    >
+      <span className="min-w-0 break-words">{error}</span>
+      <button type="button" onClick={() => setError(null)} aria-label="Hide" className="shrink-0 opacity-70">
+        ×
+      </button>
+    </p>
+  );
 
-      {error && (
-        <p
-          role="alert"
-          className="mb-2 flex shrink-0 items-start justify-between gap-3 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-2 text-sm text-red-300"
-        >
-          <span className="min-w-0 break-words">{error}</span>
-          <button type="button" onClick={() => setError(null)} aria-label="Hide" className="shrink-0 opacity-70">
-            ×
-          </button>
-        </p>
-      )}
-
-      <SettingsQuery.Provider value={query.trim()}>
-        <div
-          ref={scrollerRef}
-          onScroll={(e) => {
-            scrolled.current = e.currentTarget.scrollTop;
-          }}
-          className="settings-scroll flex min-h-0 flex-auto flex-col gap-5 overflow-y-auto px-0.5 pb-3"
-        >
-          {show("home") && <HomeTab onError={report} onOpenTab={open} />}
-          {show("appearance") && <AppearanceTab onError={report} />}
-          {show("ai") && <AiTab onError={report} />}
-          {show("connections") && <ConnectionsTab onError={report} />}
-          {show("privacy") && <PrivacyTab onError={report} />}
-          {show("memory") && <MemoryTab onError={report} />}
-          {show("shortcuts") && <ShortcutsTab onError={report} />}
-          {show("storage") && <StorageTab onError={report} />}
-          {show("skills") && <SkillsTab onError={report} />}
+  const current = GROUPS.flatMap((g) => g.items).find((i) => i.id === tab);
+  return (
+    <div className="island-settings st-split flex min-h-0 flex-1 overflow-hidden">
+      <nav aria-label="Settings sections" className="st-side">
+        <label className="st-search shrink-0">
+          <Ic name="search" size={14} />
+          <input
+            ref={searchRef}
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search settings"
+            aria-label="Search settings"
+            spellCheck={false}
+          />
+          <kbd>/</kbd>
+        </label>
+        <div className="st-side-links">
+          {GROUPS.map((g) => (
+            <div key={g.label} className="flex flex-col">
+              <p className="st-group">{g.label}</p>
+              {g.items.map((i) => (
+                <button
+                  key={i.id}
+                  type="button"
+                  className="st-item"
+                  aria-current={!searching && tab === i.id ? "page" : undefined}
+                  onMouseDown={(e) => {
+                    // Keep the nav from scrolling when the last item is focused.
+                    // Focus moved by script from the search box would show
+                    // the keyboard ring, so the click is marked as a click.
+                    e.preventDefault();
+                    (document.activeElement as HTMLElement | null)?.blur();
+                    e.currentTarget.focus({ preventScroll: true, focusVisible: false } as FocusOptions);
+                  }}
+                  onClick={() => {
+                    setQuery("");
+                    pick(i.id);
+                  }}
+                >
+                  <span className="inline-flex shrink-0">
+                    <Ic name={i.icon} size={15} />
+                  </span>
+                  <span className="truncate">{i.label}</span>
+                </button>
+              ))}
+            </div>
+          ))}
         </div>
-      </SettingsQuery.Provider>
+      </nav>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <div className="shrink-0 pb-3">
+          <p className="st-title">{searching ? "Search" : current?.label}</p>
+          <p className="st-blurb">{searching ? `Settings matching "${query.trim()}"` : current?.blurb}</p>
+        </div>
+        {alert}
+        {body}
+      </div>
     </div>
   );
 }
