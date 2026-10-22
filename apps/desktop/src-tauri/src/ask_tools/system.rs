@@ -139,6 +139,11 @@ fn ports() -> String {
     format!("Listening ports:\n{}{tail}", rows.join("\n"))
 }
 
+/// One app's processes now: CPU, memory and count.
+pub fn processes_of(name: &str) -> String {
+    processes(name, false)
+}
+
 /// Processes summed by name, busiest first. CPU needs two samples.
 fn processes(filter: &str, by_memory: bool) -> String {
     let mut sys = System::new();

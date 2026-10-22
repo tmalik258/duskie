@@ -422,6 +422,7 @@ pub fn defs() -> Vec<ToolDef> {
         run_def(),
         app_info_def(),
         diagnose_def(),
+        compare_def(),
     ]
 }
 
@@ -469,6 +470,7 @@ pub fn step_label(name: &str, args: &Value) -> String {
                 .or(args["app"].as_str())
                 .unwrap_or("the app")
         ),
+        COMPARE => compare_label(args),
         HELP => "Looking it up in Duskie's help".into(),
         DOCTOR => "Reading crash records".into(),
         GIT => "Reading the project's git".into(),

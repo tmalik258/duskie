@@ -18,6 +18,7 @@ pub fn reads_only(name: &str) -> bool {
             | RUN
             | APP_INFO
             | DIAGNOSE
+            | COMPARE
             | HELP
             | DOCTOR
             | GIT
@@ -47,6 +48,7 @@ pub fn is_own(name: &str) -> bool {
             | RUN
             | APP_INFO
             | DIAGNOSE
+            | COMPARE
             | HELP
             | DOCTOR
             | GIT
@@ -160,6 +162,7 @@ pub fn first_step(question: &str) -> Option<&'static str> {
     let first = *tools.first()?;
     Some(match first {
         DIAGNOSE => "Looking into it",
+        COMPARE => "Comparing them",
         SYSTEM => "Checking this PC",
         HELP => "Checking Duskie's guide",
         _ => "Checking",
@@ -172,6 +175,16 @@ pub fn by_intent(question: &str) -> Vec<&'static str> {
     let q = format!(" {} ", question.to_lowercase());
     let has = |words: &[&str]| words.iter().any(|w| q.contains(w));
     let mut out: Vec<&'static str> = Vec::new();
+    if has(&[
+        "slower than",
+        "faster than",
+        " vs ",
+        "compared to",
+        "than chrome",
+        "than edge",
+    ]) {
+        out.push(COMPARE);
+    }
     if has(&[
         "why",
         "not working",
@@ -311,6 +324,7 @@ mod intent_tests {
         assert!(by_intent("Zen loads sites slower than Chrome").contains(&SYSTEM));
         assert!(by_intent("How do you work?").contains(&HELP));
         assert!(by_intent("Rewrite this sentence").is_empty());
+        assert_eq!(by_intent("Zen loads sites slower than Chrome")[0], COMPARE);
         assert_eq!(
             first_step("Why is Cursor not updating?"),
             Some("Looking into it")
