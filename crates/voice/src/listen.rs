@@ -169,6 +169,9 @@ pub struct Engine {
 /// Teaching Duskie your voice sets your own.
 pub const WAKE_THRESHOLD: f32 = 0.05;
 
+/// The firmest bar a learned profile may set.
+pub const WAKE_TRAINED_MAX: f32 = 0.1;
+
 /// Transcribes a whole clip at once with the final recognizer.
 fn offline_text(asr: &OfflineRecognizer, audio: &[f32]) -> String {
     if audio.is_empty() {
@@ -242,7 +245,10 @@ impl Engine {
     /// Uses what was learned when you taught Duskie your voice: your own
     /// wake bar, and with a print only your questions come through.
     pub fn with_profile(models: &Path, wake_word: bool, profile: Option<&Profile>) -> Result<Self> {
-        let threshold = profile.map_or(WAKE_THRESHOLD, |p| p.threshold);
+        // Takes taught up close are clearer than everyday speech, so a
+        // learned bar never goes above WAKE_TRAINED_MAX; the final
+        // recognizer still checks every wake.
+        let threshold = profile.map_or(WAKE_THRESHOLD, |p| p.threshold.min(WAKE_TRAINED_MAX));
         let mut engine = Self::tuned(models, wake_word, wake_word, threshold)?;
         if let Some(p) = profile.filter(|p| !p.print.is_empty())
             && SPEAKER.installed(models)
@@ -448,10 +454,12 @@ impl Engine {
             // looks like the phrase is dropped, and what it heard forgotten
             // so it cannot fire again.
             if !self.confirm_wake() {
+                log::info!("wake: dropped (keyword {spotted}, transcript {heard})");
                 self.recognizer.reset(&self.stream);
                 self.fresh_spotter();
                 return out;
             }
+            log::info!("wake: heard (keyword {spotted}, transcript {heard})");
             out.push(Heard::Wake);
             if self.transcript_wake {
                 // The transcript already holds the wake audio, so listening
@@ -558,6 +566,7 @@ impl Engine {
     /// if nothing was said, so it is never answered.
     fn end(&mut self, streamed: String) -> Heard {
         let text = self.final_text(streamed);
+        log::info!("question heard: {} words", text.split_whitespace().count());
         let yours = text.is_empty() || self.judge(true) == Some(true);
         self.judged = None;
         self.said = Vec::new();
@@ -568,7 +577,14 @@ impl Engine {
     /// recognizer.
     fn confirm_wake(&self) -> bool {
         let audio: Vec<f32> = self.recent.iter().copied().collect();
-        crate::text::find_wake(&offline_text(&self.final_asr, &audio)).is_some()
+        let text = offline_text(&self.final_asr, &audio);
+        // The window can start mid-word ("a duskie"), so the name may sit
+        // anywhere in it.
+        let found = crate::text::has_name(&text);
+        if !found {
+            log::info!("wake: final recognizer heard {text:?}");
+        }
+        found
     }
 
     /// The question as the final recognizer heard it, from the wake phrase

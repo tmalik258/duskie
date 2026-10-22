@@ -244,6 +244,22 @@ pub fn strip_wake(text: &str) -> String {
 /// Where the wake phrase starts in a running transcript: a greeting and the
 /// name anywhere ("so, hey duskie, what..."), or the bare name as the
 /// first word. None when it is not there.
+/// Whether the name is anywhere in `text`, not just at its start.
+pub fn has_name(text: &str) -> bool {
+    text.char_indices()
+        .filter(|&(i, c)| {
+            (c.is_alphanumeric() || c == '\'')
+                && text[..i]
+                    .chars()
+                    .last()
+                    .is_none_or(|p| !(p.is_alphanumeric() || p == '\''))
+        })
+        .any(|(i, _)| {
+            let rest = &text[i..];
+            strip_wake(rest) != rest.trim()
+        })
+}
+
 pub fn find_wake(text: &str) -> Option<usize> {
     let mut starts = Vec::new();
     let mut in_word = false;
@@ -538,6 +554,16 @@ impl Sentences {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn the_name_counts_anywhere_in_the_wake_window() {
+        assert!(has_name("duskie"));
+        assert!(has_name("a duskie"));
+        assert!(has_name("the dusky"));
+        assert!(!has_name("open the folder"));
+    }
+
     #[test]
     fn tells_requests_from_noise() {
         assert!(!looks_like_request("Byzant mixed."));
@@ -549,7 +575,6 @@ mod tests {
         assert!(looks_like_request("my battery is low right now"));
     }
 
-    use super::*;
 
     #[test]
     fn spells_a_name_in_wake_tokens() {
