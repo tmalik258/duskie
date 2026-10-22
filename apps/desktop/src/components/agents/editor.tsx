@@ -6,24 +6,22 @@
 // agent rewrote asks before reloading.
 
 import type * as MonacoNs from "monaco-editor";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/bridge";
 import { lineMarks } from "@/lib/linediff";
-import { DUSKIE_THEME, languageOf, loadMonaco } from "@/lib/monaco";
-import type { EditorHit, TreeEntry } from "@/lib/types";
-import { Ic } from "../icon";
+import { languageOf } from "@/lib/monaco";
+import type { TreeEntry } from "@/lib/types";
+import { EditorBar } from "./editor/editor-bar";
+import { ProjectSearch, QuickOpen } from "./editor/editor-pops";
+import { EditorTabs, FileNav } from "./editor/file-nav";
+import { changeDecorations } from "./editor/setup";
+import { StaleNote } from "./editor/stale-note";
+import type { Tab } from "./editor/tab";
+import { useDiskWatch } from "./editor/use-disk-watch";
+import { useEditorKeys } from "./editor/use-editor-keys";
+import { useMonaco } from "./editor/use-monaco";
+import { useSearchHits } from "./editor/use-search-hits";
 import { Terminal } from "./terminal";
-
-interface Tab {
-  path: string;
-  stamp: string;
-  head: string;
-  dirty: boolean;
-  /** An agent or another app changed the file on disk. */
-  stale: boolean;
-}
-
-const POLL_MS = 2000;
 
 export function Editor({
   root,
@@ -34,19 +32,18 @@ export function Editor({
   initial?: { path: string; line?: number; atChange?: boolean } | null;
   onClose: () => void;
 }) {
+  const [error, setError] = useState("");
   const host = useRef<HTMLDivElement>(null);
   const monaco = useRef<typeof MonacoNs | null>(null);
   const editor = useRef<MonacoNs.editor.IStandaloneCodeEditor | null>(null);
   const models = useRef(new Map<string, MonacoNs.editor.ITextModel>());
+  const ready = useMonaco({ host, monaco, editor, models }, setError);
   const decos = useRef<MonacoNs.editor.IEditorDecorationsCollection | null>(null);
   const [tree, setTree] = useState<TreeEntry[]>([]);
   const [tabs, setTabs] = useState<Tab[]>([]);
   const [active, setActive] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
-  const [error, setError] = useState("");
   const [quick, setQuick] = useState<string | null>(null);
   const [find, setFind] = useState<string | null>(null);
-  const [hits, setHits] = useState<EditorHit[]>([]);
   const [term, setTerm] = useState(false);
   const tabsRef = useRef(tabs);
   tabsRef.current = tabs;
@@ -63,65 +60,10 @@ export function Editor({
     const m = monaco.current;
     const tab = tabsRef.current.find((t) => t.path === active);
     if (!ed || !m || !tab) return;
-    const marks = lineMarks(tab.head, ed.getValue());
-    const range = (line: number) => new m.Range(line, 1, line, 1);
-    const all = [
-      ...marks.added.map((l) => ({
-        range: range(l),
-        options: { isWholeLine: true, linesDecorationsClassName: "ed-add" },
-      })),
-      ...marks.changed.map((l) => ({
-        range: range(l),
-        options: { isWholeLine: true, linesDecorationsClassName: "ed-chg" },
-      })),
-      ...marks.removed.map((l) => ({ range: range(Math.max(1, l)), options: { linesDecorationsClassName: "ed-del" } })),
-    ];
+    const all = changeDecorations(m, tab.head, ed.getValue());
     if (decos.current) decos.current.set(all);
     else decos.current = ed.createDecorationsCollection(all);
   }, [active]);
-
-  // Monaco loads on first open only.
-  useEffect(() => {
-    let gone = false;
-    loadMonaco()
-      .then((m) => {
-        if (gone || !host.current) return;
-        monaco.current = m;
-        const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        m.editor.defineTheme("duskie", DUSKIE_THEME);
-        editor.current = m.editor.create(host.current, {
-          theme: "duskie",
-          automaticLayout: true,
-          minimap: { enabled: false },
-          fontSize: 13,
-          fontFamily: '"JetBrains Mono", "Cascadia Code", ui-monospace, Consolas, monospace',
-          fontLigatures: true,
-          lineHeight: 21,
-          padding: { top: 12, bottom: 12 },
-          renderLineHighlight: "line",
-          lineNumbersMinChars: 3,
-          glyphMargin: false,
-          folding: false,
-          overviewRulerLanes: 0,
-          hideCursorInOverviewRuler: true,
-          guides: { indentation: true },
-          scrollbar: { verticalScrollbarSize: 6, horizontalScrollbarSize: 6, useShadows: false },
-          cursorBlinking: reduced ? "solid" : "smooth",
-          smoothScrolling: !reduced,
-          cursorSmoothCaretAnimation: reduced ? "off" : "on",
-          scrollBeyondLastLine: false,
-        });
-        setReady(true);
-      })
-      .catch((e) => setError(String(e)));
-    const owned = models.current;
-    return () => {
-      gone = true;
-      editor.current?.dispose();
-      for (const model of owned.values()) model.dispose();
-      owned.clear();
-    };
-  }, []);
 
   const open = useCallback(
     async (path: string, line?: number, atChange = false) => {
@@ -205,167 +147,40 @@ export function Editor({
     }
   }, [active, root]);
 
-  const reload = useCallback(
-    async (path: string) => {
-      const file = await api.editorRead(root, path);
-      models.current.get(path)?.setValue(file.text);
-      setTabs((ts) => ts.map((t) => (t.path === path ? { ...t, stamp: file.stamp, dirty: false, stale: false } : t)));
-    },
-    [root],
-  );
+  const reload = useDiskWatch(root, tabsRef, setTabs, models);
 
-  // Notice files changed on disk by an agent or another app.
-  useEffect(() => {
-    const id = window.setInterval(() => {
-      for (const t of tabsRef.current) {
-        if (t.stale) continue;
-        api
-          .editorChanged(root, t.path, t.stamp)
-          .then((changed) => {
-            if (!changed) return;
-            if (t.dirty) setTabs((ts) => ts.map((x) => (x.path === t.path ? { ...x, stale: true } : x)));
-            else void reload(t.path);
-          })
-          .catch(() => {});
-      }
-    }, POLL_MS);
-    return () => window.clearInterval(id);
-  }, [root, reload]);
+  useEditorKeys({ save, onClose, quick, find, setQuick, setFind, setTerm });
+  const hits = useSearchHits(root, find);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const mod = e.ctrlKey || e.metaKey;
-      if (mod && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        void save();
-      } else if (e.ctrlKey && e.key === "`") {
-        e.preventDefault();
-        setTerm((t) => !t);
-      } else if (mod && e.key.toLowerCase() === "p") {
-        e.preventDefault();
-        setQuick("");
-      } else if (mod && e.shiftKey && e.key.toLowerCase() === "f") {
-        e.preventDefault();
-        setFind("");
-      } else if (e.key === "Escape") {
-        if (quick !== null || find !== null) {
-          setQuick(null);
-          setFind(null);
-        } else onClose();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [save, onClose, quick, find]);
-
-  useEffect(() => {
-    if (!find) {
-      setHits([]);
-      return;
-    }
-    const t = window.setTimeout(
-      () =>
-        void api
-          .editorSearch(root, find)
-          .then(setHits)
-          .catch(() => setHits([])),
-      200,
-    );
-    return () => window.clearTimeout(t);
-  }, [find, root]);
-
-  const files = useMemo(() => tree.filter((e) => !e.dir), [tree]);
-  const matches = useMemo(() => {
-    const q = (quick ?? "").toLowerCase();
-    return files.filter((f) => f.path.toLowerCase().includes(q)).slice(0, 30);
-  }, [files, quick]);
   const current = tabs.find((t) => t.path === active);
 
   return (
     <section className="ed flex min-h-0 flex-1 flex-col" aria-label="Editor">
-      <div className="gd-bar">
-        <span className="gd-pick">
-          <Ic name="folder" size={14} />
-          <span className="truncate">{root.split(/[\\/]/).pop()}</span>
-        </span>
-        <button type="button" className="rd-btn ghost chip-s" onClick={() => setQuick("")}>
-          Open file <kbd>Ctrl P</kbd>
-        </button>
-        <button type="button" className="rd-btn ghost chip-s" onClick={() => setFind("")}>
-          Search <kbd>Ctrl Shift F</kbd>
-        </button>
-        <button type="button" className="rd-btn ghost chip-s" aria-pressed={term} onClick={() => setTerm((t) => !t)}>
-          Terminal <kbd>Ctrl `</kbd>
-        </button>
-        <button
-          type="button"
-          className="rd-btn ghost chip-s ic-only ml-auto"
-          aria-label="Close editor"
-          onClick={onClose}
-        >
-          <Ic name="x" size={12} />
-        </button>
-      </div>
+      <EditorBar
+        root={root}
+        term={term}
+        onQuick={() => setQuick("")}
+        onFind={() => setFind("")}
+        onTerm={() => setTerm((t) => !t)}
+        onClose={onClose}
+      />
       <div className="ed-main min-h-0 flex-1">
-        <nav className="ed-tree" aria-label="Files">
-          <span className="ed-head">Files</span>
-          {tree.map((e) => (
-            <button
-              key={e.path}
-              type="button"
-              className="ed-node"
-              data-dir={e.dir}
-              data-active={e.path === active}
-              style={{ paddingLeft: 8 + (e.path.split("/").length - 1) * 12 }}
-              disabled={e.dir}
-              onClick={() => void open(e.path)}
-            >
-              <Ic name={e.dir ? "folder" : "file"} size={12} />
-              <span className="truncate">{e.path.split("/").pop()}</span>
-            </button>
-          ))}
-        </nav>
+        <FileNav tree={tree} active={active} onOpen={(p) => void open(p)} />
         <div className="ed-pane flex min-w-0 flex-1 flex-col">
-          <nav className="ed-tabs" aria-label="Open files">
-            {tabs.map((t) => (
-              <span key={t.path} className="ed-tab" data-active={t.path === active}>
-                <button
-                  type="button"
-                  aria-current={t.path === active ? "page" : undefined}
-                  onClick={() => setActive(t.path)}
-                >
-                  <Ic name="file" size={11} />
-                  {t.path.split("/").pop()}
-                  {t.dirty && <span className="ed-dot" role="img" aria-label="unsaved" />}
-                </button>
-                <button type="button" aria-label={`Close ${t.path}`} onClick={() => close(t.path)}>
-                  <Ic name="x" size={10} />
-                </button>
-              </span>
-            ))}
-          </nav>
+          <EditorTabs tabs={tabs} active={active} onPick={setActive} onClose={close} />
           {current?.stale && (
-            <div className="ed-note" role="alert">
-              <span>This file changed on disk while you edited it.</span>
-              <button type="button" className="rd-btn chip-s" onClick={() => void reload(current.path)}>
-                Load theirs
-              </button>
-              <button
-                type="button"
-                className="rd-btn ghost chip-s"
-                onClick={() =>
-                  void api
-                    .editorRead(root, current.path)
-                    .then((f) =>
-                      setTabs((ts) =>
-                        ts.map((t) => (t.path === current.path ? { ...t, stamp: f.stamp, stale: false } : t)),
-                      ),
-                    )
-                }
-              >
-                Keep mine
-              </button>
-            </div>
+            <StaleNote
+              onTheirs={() => void reload(current.path)}
+              onMine={() =>
+                void api
+                  .editorRead(root, current.path)
+                  .then((f) =>
+                    setTabs((ts) =>
+                      ts.map((t) => (t.path === current.path ? { ...t, stamp: f.stamp, stale: false } : t)),
+                    ),
+                  )
+              }
+            />
           )}
           {error && (
             <p className="ed-note" role="alert">
@@ -378,66 +193,8 @@ export function Editor({
           {term && <Terminal root={root} />}
         </div>
       </div>
-      {quick !== null && (
-        <div className="ed-pop" role="dialog" aria-label="Open file">
-          <input
-            // biome-ignore lint/a11y/noAutofocus: the picker opens for typing.
-            autoFocus
-            aria-label="File name"
-            placeholder="Go to file"
-            value={quick}
-            onChange={(e) => setQuick(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && matches[0]) {
-                // Keep the Enter from reaching the file that opens.
-                e.preventDefault();
-                e.stopPropagation();
-                void open(matches[0].path);
-                setQuick(null);
-              }
-            }}
-          />
-          {matches.map((f) => (
-            <button
-              key={f.path}
-              type="button"
-              onClick={() => {
-                void open(f.path);
-                setQuick(null);
-              }}
-            >
-              {f.path}
-            </button>
-          ))}
-        </div>
-      )}
-      {find !== null && (
-        <div className="ed-pop" role="dialog" aria-label="Search the project">
-          <input
-            // biome-ignore lint/a11y/noAutofocus: the search opens for typing.
-            autoFocus
-            aria-label="Search text"
-            placeholder="Search in files"
-            value={find}
-            onChange={(e) => setFind(e.target.value)}
-          />
-          {hits.map((h) => (
-            <button
-              key={`${h.path}:${h.line}`}
-              type="button"
-              onClick={() => {
-                void open(h.path, h.line);
-                setFind(null);
-              }}
-            >
-              <span className="mono">
-                {h.path}:{h.line}
-              </span>{" "}
-              {h.text}
-            </button>
-          ))}
-        </div>
-      )}
+      {quick !== null && <QuickOpen quick={quick} tree={tree} setQuick={setQuick} onOpen={(p) => void open(p)} />}
+      {find !== null && <ProjectSearch find={find} hits={hits} setFind={setFind} onOpen={(p, l) => void open(p, l)} />}
     </section>
   );
 }
