@@ -10,8 +10,8 @@
 // re-renders as words arrive.
 
 import { memo, type ReactNode, useState } from "react";
-import { Icon } from "@/components/Icon";
-import { Tip } from "@/components/Tip";
+import { Icon } from "@/components/icon";
+import { Tip } from "@/components/tip";
 import { api } from "./bridge";
 
 interface ListItem {

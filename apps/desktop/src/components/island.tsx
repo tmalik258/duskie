@@ -1,0 +1,1093 @@
+"use client";
+
+// The island: a black capsule that morphs like Apple's Dynamic Island. One
+// Orb instance lives inside and travels between the compact and expanded
+// layouts, so its gaze and blink never reset. The shell size is spring driven
+// and interruptible; content cross-fades through a short blur.
+
+import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion } from "motion/react";
+import { type CSSProperties, useCallback, useEffect, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
+import {
+  activityLabel,
+  INACTIVITY_MS,
+  latestActivity,
+  ownsWorking,
+  terminal,
+  useActivities,
+  visibleActivities,
+} from "@/lib/activities";
+import { cardLater, interruptSession, listenToAgents, useAgents, wideScreen } from "@/lib/agents";
+import { api } from "@/lib/bridge";
+import { useCached } from "@/lib/cache";
+import { useNow, useSystemLook } from "@/lib/hooks";
+import { PANEL_PAD } from "@/lib/island-size";
+import { resolveIslandState } from "@/lib/resolve-island-state";
+import { DOCK_MIN, dockTotal, SEAM_W, stacked } from "@/lib/seam";
+import { connect, setHovered, stopLive, useDuskie, watchWaiting } from "@/lib/store";
+import { type CalendarToday, isPaused, type MascotState, type Settings } from "@/lib/types";
+import { updateBusy, updateLabel } from "@/lib/updates";
+import { PALETTES, type WashEvent } from "@/lib/wash";
+import { ActivitiesCard } from "./activities-card";
+import { AgentCard } from "./agent-card";
+import { GitSideDock } from "./agents/git-side-dock";
+import { ReviewSideDock } from "./agents/review-side-dock";
+import { Announcer } from "./announcer";
+import { ASK_PAD, AskPanel } from "./ask-panel";
+import { Creature } from "./creature";
+import { type BubbleItem, BubblePeek, IslandBubbles } from "./island-bubbles";
+import { IslandGuide, useGuide } from "./island-guide";
+import { useBlockBrowserKeys, useFocusLeft, useIntent, useSuggestionKeys } from "./island-hooks";
+import {
+  COMPACT,
+  EXPANDED,
+  OPEN_STATES,
+  SHELL_HOVER_IN_MS,
+  SHELL_HOVER_OUT_MS,
+  SHELL_SETTINGS,
+  TOP,
+} from "./island-layout";
+import { CompactTrailing, choose, dismiss, ExpandedContent } from "./island-parts";
+import { IslandPill, type PillModel } from "./island-pill";
+import { IslandSettings } from "./island-settings";
+import { FullVoice, openBoard, VoicePill, voiceShellWidth } from "./island-voice";
+import { IslandWelcome } from "./island-welcome";
+import { MeetingCard } from "./meeting-card";
+import { NetCard } from "./net-card";
+import { PreparingVoice } from "./preparing-voice";
+import { UpdateCard } from "./update-card";
+import { shellGeom } from "./use-island-shell";
+
+export function Island() {
+  const { mascot, settings, suggestion, hovered: rawHover, visible, ready } = useDuskie();
+  const asking = useDuskie((s) => s.ask !== null);
+  const askTab = useAgents((s) => s.tab);
+  const agentsLayout = useAgents((s) => s.layout);
+  const agentCurrent = useAgents((s) => s.current);
+  const gitListW = useAgents((s) => s.listW);
+  const gitDock = useAgents((s) => s.dock);
+  const reviewOpen = useAgents((s) => s.sessions.some((x) => x.view?.reviewing));
+  const screenW = typeof window === "undefined" ? 1920 : window.screen.availWidth;
+  // Keep the dock mounted while open (warm cache/state); only lay it beside on Repos.
+  const gitDockLive = asking && !!gitDock && gitListW != null && !stacked(screenW);
+  const gitBeside = gitDockLive && askTab === "repos";
+  const reviewDockLive = asking && reviewOpen && gitListW != null && !stacked(screenW);
+  const reviewBeside = reviewDockLive && askTab === "agents";
+  const dockBeside = gitBeside || reviewBeside;
+  useEffect(listenToAgents, []);
+  const view = useDuskie((s) => s.ask?.view);
+  // The Ask panel itself (not Settings or the welcome shown in its place).
+  const askPanel = asking && view !== "welcome";
+  const chatting = useDuskie((s) => s.chatId !== null);
+  const voiceStatus = useDuskie((s) => s.voiceStatus);
+  const online = useDuskie((s) => s.online);
+  const laterCount = useDuskie((s) => s.later);
+  // A newly held suggestion shows as a short notice, then the island rests.
+  const storeReady = useDuskie((s) => s.ready);
+  const [laterSeen, setLaterSeen] = useState<number | null>(null);
+  const [laterFresh, setLaterFresh] = useState(false);
+  if (storeReady && laterSeen === null) setLaterSeen(laterCount);
+  else if (laterSeen !== null && laterCount !== laterSeen) {
+    setLaterSeen(laterCount);
+    setLaterFresh(laterCount > laterSeen);
+  }
+  useEffect(() => {
+    if (!laterFresh) return;
+    const t = setTimeout(() => setLaterFresh(false), 8000);
+    return () => clearTimeout(t);
+  }, [laterFresh]);
+  const later = laterFresh ? laterCount : 0;
+  // Design: losing the connection only changes the pill; the card opens on a click.
+  const [netOpen, setNetOpen] = useState(false);
+  if (netOpen && online) setNetOpen(false);
+  const netShown = netOpen;
+  const merging = useDuskie((s) => s.merge !== null);
+  const updateProgress = useDuskie((s) => s.updateProgress);
+  const updateActivity = useActivities((s) => latestActivity(s.activities, "update"));
+  const updateSuppressed = updateActivity?.dismissed;
+  const updateNow = useNow(1000);
+  const updateWorking =
+    updateProgress && !updateSuppressed && updateBusy(updateProgress)
+      ? updateActivity
+        ? activityLabel(updateActivity, updateNow)
+        : updateLabel(updateProgress)
+      : null;
+  const waiting = useDuskie((s) => (s.ask ? null : s.waiting));
+  const justDone = useDuskie((s) => s.justDone);
+  // A task still running after Ask closed: its current step, small.
+  const chatWorking = useDuskie((s) => {
+    const last = s.turns[s.turns.length - 1];
+    if (!s.chatId || !last?.streaming) return null;
+    return last.tool ? `${last.tool}...` : "Working...";
+  });
+  // Agents keep working with Ask closed: a small pill says so, and says
+  // when one needs an answer. Hovering it lists them.
+  const agentWorking = useAgents((s) => {
+    const waiting = s.sessions.find((x) => x.status === "waiting");
+    if (waiting) return `${waiting.agent} needs you`;
+    const live = s.sessions.filter((x) => x.status === "working" || x.status === "waiting");
+    const busy = live.filter((x) => x.status === "working");
+    if (live.length > 1)
+      return busy.length === live.length
+        ? `${live.length} agents working`
+        : `${live.length} agents · ${busy.length} working`;
+    return busy[0] ? `${busy[0].agent}: ${busy[0].project}` : null;
+  });
+  // One ring arc per running agent in the compact pill.
+  const agentDots = useAgents(
+    useShallow((s) => s.sessions.filter((x) => x.status === "working" || x.status === "waiting").map((x) => x.status)),
+  );
+  // A question opens the island by itself, unless Do Not Disturb, a
+  // fullscreen app or a pause says to stay small; it shrinks back once
+  // answered.
+  const questionId = useAgents((s) => s.sessions.find((x) => x.question)?.question?.id ?? null);
+  const fullscreen = useDuskie((s) => s.fullscreen);
+  const [dndOn, setDndOn] = useState(false);
+  const [peekId, setPeekId] = useState<string | null>(null);
+  useEffect(() => {
+    if (!questionId) return;
+    let live = true;
+    void api
+      .dndGet()
+      .then((v) => live && setDndOn(v === true))
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [questionId]);
+  // Skill / action in flight with Ask closed: same slim pill as chat/agents.
+  // Combine outside a store selector so closed-over chat/agent labels stay fresh.
+  const activityState = useActivities();
+  const activityNow = useNow(1000);
+  const keepProblems = true;
+  const liveActivities = visibleActivities(
+    [...activityState.activities, ...activityState.local],
+    activityNow,
+    keepProblems,
+  );
+  // A finished open already showed its done pill; holding it as a pill or a
+  // bubble too would bring "Opening..." and the spinner back after the tick.
+  const doneOpen = (a: (typeof liveActivities)[number]) => a.source === "open" && a.phase === "completed";
+  const foreground = liveActivities.filter((a) => !["browser", "file"].includes(a.source) && !doneOpen(a));
+  const backgroundAll = liveActivities.filter((a) => ["browser", "file"].includes(a.source));
+  const background = backgroundAll.filter((a) => !terminal(a));
+  const pausedDownloads = background.filter((a) => a.phase === "awaitingUser").length;
+  const waitingDownloads = background.filter(
+    (a) => a.phase === "unconfirmed" || activityNow - a.lastProgressAt >= INACTIVITY_MS,
+  ).length;
+  const skillWorking = foreground[0] ? activityLabel(foreground[0], activityNow) : null;
+  const downloadWorking =
+    background.length > 1
+      ? pausedDownloads > 0
+        ? `${background.length} downloads · ${pausedDownloads} paused`
+        : waitingDownloads > 0
+          ? `${background.length} downloads · ${waitingDownloads} awaiting progress`
+          : `${background.length} downloads in progress`
+      : backgroundAll[0]
+        ? activityLabel(background[0] ?? backgroundAll[0], activityNow)
+        : null;
+  useEffect(() => {
+    if (
+      mascot !== "working" ||
+      chatWorking ||
+      agentWorking ||
+      activityState.revision < 0 ||
+      [...activityState.activities, ...activityState.local].some(ownsWorking)
+    )
+      return;
+    const timer = setTimeout(() => {
+      const current = useActivities.getState();
+      if (
+        [...current.activities, ...current.local].some(ownsWorking) ||
+        useDuskie.getState().chatId ||
+        useAgents.getState().sessions.some((s) => s.status === "working" || s.status === "waiting")
+      )
+        return;
+      useDuskie.setState((s) => (s.mascot === "working" ? { mascot: "idle", running: null } : {}));
+      void api.activityReconcile().catch(() => {});
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [mascot, chatWorking, agentWorking, activityState]);
+  const agentAsks = useAgents((s) => s.sessions.some((x) => x.status === "waiting"));
+  const askingTitle = useAgents((s) => s.sessions.find((x) => x.status === "waiting")?.title ?? null);
+  const { data: calendarToday } = useCached<CalendarToday>("calendar-today", api.calendarToday);
+  const meetingSoon = soonMeeting(updateNow, calendarToday);
+  const cardAgent = useAgents(
+    (s) =>
+      (
+        s.sessions.find((x) => x.status === "waiting" && !cardLater(s.later, x)) ??
+        s.sessions.find((x) => x.status === "working" && !cardLater(s.later, x))
+      )?.id ?? null,
+  );
+  const splitAgent = useAgents(
+    useShallow((s) => {
+      const x = s.sessions.find((y) => y.status === "working");
+      if (!x) return null;
+      const mark = x.agent
+        .split(/\s+/)
+        .map((w) => w[0] ?? "")
+        .join("")
+        .slice(0, 2)
+        .toUpperCase();
+      return {
+        id: x.id,
+        agent: x.agent,
+        mark,
+        done: x.plan.filter((p) => p.status === "completed").length,
+        total: x.plan.length,
+      };
+    }),
+  );
+  // Focus mode: a compact pill with the focus face and the time left.
+  const focusUntil = useDuskie((s) => (s.ask ? null : s.focusUntil));
+  const focusLeft = useFocusLeft(focusUntil);
+  const askingCount = useAgents((s) => s.sessions.filter((x) => x.status === "waiting").length);
+  const working = asking
+    ? null
+    : ((agentAsks ? agentWorking : null) ??
+      updateWorking ??
+      skillWorking ??
+      chatWorking ??
+      agentWorking ??
+      // In Focus a download waits in a bubble beside the pill.
+      (focusLeft !== null ? null : downloadWorking));
+  // Prefer an exact label match. Multi-download and update-without-activity
+  // labels are synthetic, so fall back to the owning row when find misses.
+  const displayedActivity = working
+    ? (liveActivities.find((a) => activityLabel(a, activityNow) === working) ??
+      (working === downloadWorking ? (background[0] ?? backgroundAll[0]) : undefined) ??
+      (working === updateWorking ? (updateActivity ?? undefined) : undefined))
+    : undefined;
+  const activityWaiting =
+    (working === downloadWorking && background.length > 1 && (pausedDownloads > 0 || waitingDownloads > 0)) ||
+    (displayedActivity &&
+      !terminal(displayedActivity) &&
+      (displayedActivity.phase === "awaitingUser" ||
+        displayedActivity.phase === "unconfirmed" ||
+        activityNow - displayedActivity.lastProgressAt >= INACTIVITY_MS));
+  // An agent waiting on an answer: the mascot looks up curious and the pill
+  // shows an amber dot instead of the busy bars.
+  const asksYou = agentAsks && working === agentWorking;
+  const guide = useGuide(waiting);
+  // Voice with Ask closed: a compact pill while listening and thinking; the
+  // island opens only when the answer starts.
+  const hearing = useDuskie((s) => (s.ask ? null : s.hearing));
+  const live = useDuskie((s) => (s.ask ? null : s.live));
+  const voiceQuestion = useDuskie((s) => (s.ask ? null : s.voiceQuestion));
+  // Something finished that needs nothing more: a short done pill.
+  // Also covers mascot success without Undo / Open (e.g. "Switched to Claude"
+  // after Settings closed, showDone was skipped while Ask was open).
+  const donePill = useDuskie((s) => {
+    if (s.ask || updateBusy(s.updateProgress)) return null;
+    if (s.donePill) return s.donePill;
+    if (s.mascot !== "success") return null;
+    const r = s.lastResult;
+    if (r?.undoId != null || r?.path) return null;
+    return r?.message ?? "Done";
+  });
+  const doneUndo = useDuskie((s) => s.doneUndo);
+  // Success that still needs Undo or Open folder: keep the expanded card.
+  const successCard = useDuskie((s) => {
+    if (s.ask || s.mascot !== "success") return false;
+    const r = s.lastResult;
+    return !!(r && (r.undoId != null || r.path));
+  });
+  const reduced = useReducedMotion() ?? false;
+  const look = useSystemLook();
+  const now = useNow(15_000);
+  const paused = isPaused(settings.pause, now);
+  // Closing a panel (Hide, Esc, Done) goes straight to the small orb. The
+  // hover card stays off until the cursor leaves and comes back; otherwise
+  // shrinking the hit rect clears quiet while useIntent still thinks we are
+  // hovering, and "Watching for moments" flashes.
+  const [contentHeight, setContentHeight] = useState(0);
+  const [prevAsking, setPrevAsking] = useState(asking);
+  const [quiet, setQuiet] = useState(false);
+  if (prevAsking !== asking) {
+    setPrevAsking(asking);
+    if (!asking) setQuiet(true);
+    // Drop stale panel height on Ask open so the shell grows from compact
+    // instead of opening tall and shrinking to the new measure.
+    if (asking) setContentHeight(0);
+  }
+  // Cleared only once the cursor has been away as long as hover intent takes
+  // to fall; clearing at once let a stale intent reopen a just-hidden welcome.
+  useEffect(() => {
+    if (!quiet || rawHover) return;
+    const id = setTimeout(() => setQuiet(false), SHELL_HOVER_OUT_MS);
+    return () => clearTimeout(id);
+  }, [quiet, rawHover]);
+  const intent = useIntent(rawHover && !quiet, SHELL_HOVER_IN_MS);
+
+  // Full suggestion card as soon as it arrives - no fresh pill / compact peek.
+  const notifyFresh = meetingSoon !== null && !paused;
+  // Until onboarding is done, hover shows the steps being waited on, or else
+  // brings the welcome back; the idle card ("watching for moments") would
+  // just flash on the way.
+  const guideOnHover = !!waiting && !waiting.background;
+  // Pending actions take priority over resuming onboarding on hover.
+  const needsAttention =
+    !!suggestion ||
+    questionId !== null ||
+    merging ||
+    updateProgress !== null ||
+    mascot === "error" ||
+    skillWorking !== null;
+  const hovered = intent && !quiet && (settings.onboarded || guideOnHover || needsAttention);
+  const resumeWelcome =
+    intent &&
+    !quiet &&
+    !settings.onboarded &&
+    !asking &&
+    !guideOnHover &&
+    !needsAttention &&
+    !justDone &&
+    mascot !== "success";
+  useEffect(() => {
+    if (resumeWelcome) void api.askResumeWelcome();
+  }, [resumeWelcome]);
+  const preparingVoice =
+    !settings.onboarded &&
+    !asking &&
+    !needsAttention &&
+    !waiting &&
+    !(voiceStatus?.models.some((m) => m.id === "voice" && m.installed) ?? false);
+  // A guide stays open while Duskie waits on something you finish elsewhere.
+  const guiding = !!waiting && !waiting.minimized && (waiting.steps?.length ?? 0) > 0;
+  // Voice / in-flight Ask with Ask closed: Listening / Thinking / Working pill.
+  // Stay non-bare so the hit rect stays usable (Idle alone would shrink to a
+  // pinprick and lock out).
+  const voiceBusy =
+    hearing !== null ||
+    voiceQuestion !== null ||
+    donePill !== null ||
+    mascot === "listening" ||
+    working !== null ||
+    focusLeft !== null;
+  const voicePill: {
+    text: string;
+    thinking: boolean;
+    working?: boolean;
+    done?: boolean;
+    focus?: boolean;
+    asks?: boolean;
+    waiting?: boolean;
+    failed?: boolean;
+    dots?: string[];
+  } | null = asking
+    ? null
+    : donePill !== null
+      ? { text: donePill, thinking: false, done: true }
+      : voiceQuestion !== null
+        ? { text: voiceQuestion, thinking: true }
+        : hearing !== null || mascot === "listening"
+          ? { text: hearing ?? "", thinking: false }
+          : live !== null
+            ? { text: live.caption || (live.tool ?? ""), thinking: !live.caption }
+            : working !== null
+              ? {
+                  text: working,
+                  thinking: !asksYou && !activityWaiting && (!displayedActivity || !terminal(displayedActivity)),
+                  working: true,
+                  asks: asksYou,
+                  waiting: !!activityWaiting,
+                  done: displayedActivity?.phase === "completed",
+                  failed: displayedActivity?.phase === "failed",
+                  dots: agentDots,
+                }
+              : focusLeft !== null
+                ? { text: `Focus · ${focusLeft}`, thinking: false, focus: true }
+                : null;
+  // Only agents at work: hover lists them (and answers in place) instead of
+  // opening Ask.
+  const agentsOnly = voiceQuestion === null && hearing === null && chatWorking === null && agentWorking !== null;
+  // Full listening style: the island opens while you talk, with a waveform,
+  // a timer and your words larger, instead of the slim pill.
+  const fullVoice =
+    voicePill !== null &&
+    !voicePill.working &&
+    !voicePill.focus &&
+    !voicePill.done &&
+    (settings.voice.listeningStyle ?? "compact") === "full";
+  // Suggestions stay normal during thinking, do not gate them on !voicePill.
+  const askOpens =
+    questionId !== null && !dndOn && !fullscreen && !paused && settings.onboarded && agentsOnly && !quiet;
+  const expanded =
+    asking ||
+    askOpens ||
+    fullVoice ||
+    preparingVoice ||
+    // Pause stays a compact pill on hover (sleep mascot at rest), not glance.
+    (hovered && !paused && (!voicePill || agentsOnly || updateWorking !== null || liveActivities.length > 0)) ||
+    guiding ||
+    (OPEN_STATES.has(mascot) && !voicePill && mascot === "suggesting") ||
+    successCard ||
+    !!suggestion ||
+    (netShown && !voicePill) ||
+    updateProgress?.phase === "failed" ||
+    merging;
+  // Paused at rest: bare sleep sphere; hover reveals the compact paused pill.
+  const showPausedPill = paused && hovered && !asking && !voicePill;
+  // At rest only the sphere shows. The shell keeps its size (so hover and the
+  // orb position do not move) but loses its background.
+  const bare =
+    !expanded &&
+    !chatting &&
+    !waiting &&
+    !voiceBusy &&
+    !showPausedPill &&
+    online &&
+    (mascot === "idle" || mascot === "sleeping");
+  const busy = chatting || preparingVoice || voiceBusy || mascot === "noticing" || mascot === "working";
+
+  // Hover while Thinking or Working: open Ask so the island is usable, not a dead pill.
+  useEffect(() => {
+    if (!intent || quiet || asking || !settings.onboarded || updateWorking !== null || suggestion) return;
+    if (voiceQuestion === null && liveActivities.length > 0) return;
+    if (voiceQuestion === null && working === null) return;
+    if (agentsOnly) return;
+    void api.askOpen();
+  }, [
+    intent,
+    quiet,
+    asking,
+    settings.onboarded,
+    voiceQuestion,
+    working,
+    agentsOnly,
+    updateWorking,
+    suggestion,
+    liveActivities.length,
+  ]);
+
+  const bump = useMotionValue(1);
+  // A mood (thanks, Claude finished) shows for a moment; offline and at
+  // rest, the mascot looks a little lost.
+  const mood = useDuskie((s) => s.mood);
+  const speaking = useDuskie((s) => s.speaking);
+  const face =
+    mood?.id ??
+    (asksYou && !voiceQuestion && hearing === null ? "curious" : null) ??
+    (focusLeft !== null && !voiceQuestion && hearing === null && mascot !== "listening" ? "focus" : null) ??
+    (paused && !voiceQuestion && hearing === null ? "sleep" : null) ??
+    (speaking && mascot !== "listening"
+      ? "speak"
+      : !online && (mascot === "idle" || mascot === "sleeping")
+        ? "oops"
+        : null);
+  const contentEl = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => connect({ sounds: true }), []);
+  // The window stays hidden until this page has drawn, so it never flashes
+  // an empty black frame at startup. Two frames: the first one is painted.
+  useEffect(() => {
+    let raf = requestAnimationFrame(() => {
+      raf = requestAnimationFrame(() => void api.islandReady().catch(() => {}));
+    });
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  useEffect(() => watchWaiting(), []);
+
+  // Measure expanded content so the capsule grows exactly to fit it. A
+  // callback ref, because the content node mounts and unmounts with expansion.
+  const observer = useRef<ResizeObserver | null>(null);
+  const contentRef = useCallback((el: HTMLDivElement | null) => {
+    // Keep the last height while the node is gone (AnimatePresence swaps);
+    // zeroing here collapses Settings/Welcome mid-transition. The outgoing
+    // panel's null comes after the new panel attached, so it must not
+    // disconnect the new panel's observer.
+    if (!el) return;
+    observer.current?.disconnect();
+    contentEl.current = el;
+    const measure = () => setContentHeight(el.offsetHeight);
+    measure();
+    observer.current = new ResizeObserver(measure);
+    observer.current.observe(el);
+  }, []);
+
+  // Remeasure after paint when Ask content swaps (New, stream, view change),
+  // so a stale tall height does not stick after the chat clears.
+  const turnsLen = useDuskie((s) => s.turns.length);
+  const chatId = useDuskie((s) => s.chatId);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: triggers only, remeasure when Agents body changes size
+  useEffect(() => {
+    if (!asking) return;
+    let id2 = 0;
+    const id1 = requestAnimationFrame(() => {
+      id2 = requestAnimationFrame(() => {
+        const el = contentEl.current;
+        if (el) setContentHeight(el.offsetHeight);
+      });
+    });
+    return () => {
+      cancelAnimationFrame(id1);
+      cancelAnimationFrame(id2);
+    };
+  }, [asking, view, turnsLen, chatId, askTab, agentCurrent, agentsLayout]);
+
+  const showGuide =
+    !!waiting &&
+    !waiting.background &&
+    !suggestion &&
+    questionId === null &&
+    !updateProgress &&
+    (mascot === "idle" || mascot === "sleeping");
+  const pillWidth = voicePill
+    ? voiceShellWidth(voicePill.text, voicePill.thinking, {
+        status: !!(
+          voicePill.working ||
+          voicePill.done ||
+          voicePill.waiting ||
+          voicePill.failed ||
+          voicePill.focus ||
+          voicePill.asks
+        ),
+        cancel: agentsOnly || !!voicePill.focus,
+        indicator: !!(
+          voicePill.working ||
+          voicePill.thinking ||
+          voicePill.done ||
+          voicePill.waiting ||
+          voicePill.failed ||
+          voicePill.asks ||
+          (voicePill.dots && voicePill.dots.length > 0)
+        ),
+      })
+    : waiting
+      ? COMPACT.waitWidth
+      : busy
+        ? COMPACT.busyWidth
+        : !online
+          ? COMPACT.offlineWidth
+          : COMPACT.width;
+  // The bounce is for opening only; once open, size changes are calm.
+  const [settled, setSettled] = useState(false);
+  useEffect(() => {
+    if (!expanded && !asking) {
+      setSettled(false);
+      return;
+    }
+    setSettled(false);
+    const id = setTimeout(() => setSettled(true), 600);
+    return () => clearTimeout(id);
+  }, [expanded, asking]);
+  // Dock open/close is a fresh shell morph - reset to GROW (not SETTLE).
+  useEffect(() => {
+    if (!asking) return;
+    setSettled(false);
+    // Hold GROW a beat longer while the dock slides in from the seam.
+    const id = setTimeout(() => setSettled(true), dockBeside ? 700 : 500);
+    return () => clearTimeout(id);
+  }, [dockBeside, asking]);
+
+  const lastError = useDuskie((s) => (s.lastResult && !s.lastResult.ok ? s.lastResult.message : null));
+  const pillModel: PillModel | null =
+    !expanded && !asking
+      ? hearing !== null || mascot === "listening"
+        ? { kind: "listening", label: hearing?.trim() ? hearing : "", dim: hearing?.trim() ? undefined : "Listening" }
+        : live !== null
+          ? {
+              kind: "caption",
+              label: live.caption || (live.tool ?? "Thinking"),
+              chip: live.caption && live.tool ? live.tool : undefined,
+              onChip: stopLive,
+            }
+          : mascot === "error"
+            ? { kind: "error", label: shortError(lastError) }
+            : donePill !== null
+              ? { kind: "done", label: donePill, ...(doneUndo ? { chip: "Undo", onChip: doneUndo } : {}) }
+              : asksYou && askingTitle && voiceQuestion === null
+                ? {
+                    kind: "waiting",
+                    label: askingTitle,
+                    dim: "waiting for you",
+                    count: askingCount,
+                    onOpen: () => void api.askOpen(),
+                  }
+                : working !== null || voiceQuestion !== null
+                  ? {
+                      kind: "working",
+                      label: displayedActivity
+                        ? activityLabel(displayedActivity, activityNow, { elapsed: false }).replace(/(\.\.\.|…)$/, "")
+                        : (voiceQuestion ?? working ?? "").replace(/(\.\.\.|…)$/, ""),
+                      startedAt: displayedActivity?.startedAt,
+                    }
+                  : focusLeft !== null
+                    ? {
+                        kind: "focus",
+                        label: "Focus",
+                        dim: focusUntil ? `until ${clockTime(focusUntil)}` : undefined,
+                        left: focusLeft,
+                      }
+                    : meetingSoon && !paused
+                      ? {
+                          kind: "notify",
+                          label: meetingSoon.title,
+                          dim: meetingSoon.mins < 1 ? "starting now" : `starts in ${meetingSoon.mins} minutes`,
+                          chip: meetingSoon.join ? "Join the call" : undefined,
+                          onChip: () => meetingSoon.join && void api.openReference("page", meetingSoon.join),
+                        }
+                      : later > 0 && !paused
+                        ? {
+                            kind: "waiting",
+                            label: later === 1 ? "1 suggestion" : `${later} suggestions`,
+                            dim: "held while you were busy",
+                            count: later,
+                          }
+                        : showPausedPill
+                          ? {
+                              kind: "paused",
+                              label: "Paused",
+                              dim: pauseDim(settings.pause),
+                              onCancel: () => void api.sensorsResume(),
+                            }
+                          : !online
+                            ? {
+                                kind: "offline",
+                                label: "Offline",
+                                dim: "catching up when back",
+                                onOpen: () => setNetOpen(true),
+                              }
+                            : mascot === "noticing"
+                              ? { kind: "noticing", label: "Taking a look" }
+                              : null
+      : null;
+  const [pillMeasured, setPillMeasured] = useState(0);
+
+  const registryId = resolveIslandState({
+    asking,
+    askTab: view === "settings" ? "settings" : asking ? askTab : null,
+    settingsView: view === "settings",
+    welcome: view === "welcome",
+    guiding,
+    expanded,
+    bare,
+    fullVoice,
+    voicePill: voicePill !== null,
+    suggestion: !!suggestion,
+    suggestPeek: false,
+    waitingForYou: !!waiting && !waiting.minimized && !guiding,
+    merging,
+    updateCard: updateProgress?.phase === "failed" || (hovered && updateWorking !== null),
+    offline: !online,
+    netCard: netShown && !voicePill,
+    notifyCard: hovered && meetingSoon !== null && !paused,
+    agentCard: hovered && agentsOnly && cardAgent !== null,
+    focus: focusLeft !== null,
+    paused: showPausedPill,
+    notifyFresh: !!notifyFresh && !busy && !expanded,
+    unread: later,
+    activitiesOpen: expanded && liveActivities.length > 0 && !suggestion,
+    mascot,
+    quietGlance:
+      expanded &&
+      !suggestion &&
+      !merging &&
+      questionId === null &&
+      liveActivities.length === 0 &&
+      (mascot === "idle" || mascot === "sleeping"),
+  });
+  const layout = shellGeom({
+    id: registryId,
+    contentHeight,
+    pillWidth: pillModel && pillMeasured ? pillMeasured : pillWidth,
+    askTab,
+    agentsWide: agentCurrent !== null,
+    agentsBoard: agentsLayout === "board",
+    boardWide: agentsLayout === "board" && wideScreen(),
+    gitListW: dockBeside ? gitListW : null,
+    // Fixed shell size - IslandSettings uses the same height so inner panes can scroll.
+    settingsHeight: view === "settings" ? SHELL_SETTINGS.height + 18 : undefined,
+    reduced,
+    settled: settled || (!expanded && !asking),
+  });
+  const width = layout.geom.width;
+  const height = layout.geom.height;
+  const radius = layout.geom.radius;
+  const transition = layout.transition;
+  const sideDockW = dockBeside && gitListW != null ? Math.max(DOCK_MIN, dockTotal(screenW) - gitListW) : 0;
+  const dockPairW = dockBeside ? width + SEAM_W + sideDockW : width;
+  // Dock fills the island window below the top gap; shell stays content-sized.
+  const sideDockH = typeof window === "undefined" ? height : Math.max(height, window.innerHeight - TOP - PANEL_PAD);
+
+  const overlayHit = useDuskie((s) => s.overlayHit);
+  // Report the target shape as the interactive area; outside it the window
+  // stays click-through. A floating menu expands the rect so it stays usable.
+  // Debounced: during spring animations width/height change every frame, so
+  // we wait one frame before sending across the IPC boundary.
+  const hitRectTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  useEffect(() => {
+    clearTimeout(hitRectTimer.current);
+    hitRectTimer.current = setTimeout(() => {
+      const hitH = dockBeside ? sideDockH : height;
+      const base = { x: (window.innerWidth - dockPairW) / 2, y: TOP, width: dockPairW, height: hitH };
+      const rect = overlayHit
+        ? {
+            x: Math.min(base.x, overlayHit.x),
+            y: Math.min(base.y, overlayHit.y),
+            width: Math.max(base.x + base.width, overlayHit.x + overlayHit.width) - Math.min(base.x, overlayHit.x),
+            height: Math.max(base.y + base.height, overlayHit.y + overlayHit.height) - Math.min(base.y, overlayHit.y),
+          }
+        : base;
+      void api.islandSetHitRect(rect);
+    }, 16);
+    return () => clearTimeout(hitRectTimer.current);
+  }, [dockPairW, height, dockBeside, sideDockH, overlayHit]);
+
+  // A small squish when something gets the mascot's attention while compact.
+  useEffect(() => {
+    if (mascot !== "noticing" || reduced) return;
+    void animate(bump, [1, 1.06, 1], { duration: 0.42, ease: [0.23, 1, 0.32, 1] });
+  }, [mascot, reduced, bump]);
+
+  // Number keys must not pick a suggestion while the user is typing.
+  useSuggestionKeys(asking ? null : suggestion);
+  // WebView chrome: Ctrl+J is Downloads, not a Duskie feature.
+  useBlockBrowserKeys();
+
+  if (!ready) return null;
+
+  const mascotX = layout.geom.mascotX;
+  const mascotY = layout.geom.mascotY;
+  const mascotSize = layout.geom.mascotSize;
+  // Size stays 48; Take A / Ask scale via CSS (prototype orbAt). perch is on geom.
+  const mascotScale = layout.geom.mascotScale;
+  // Hidden for a fullscreen app, the island still comes back under the cursor.
+  const shown = visible || rawHover;
+  const shellColor = settings.islandColor;
+  const washEvent =
+    mascot === "success" || donePill || mascot === "error"
+      ? mascot === "error"
+        ? ("error" as const)
+        : ("success" as const)
+      : null;
+  const agentBubble: BubbleItem[] =
+    splitAgent && working !== agentWorking
+      ? [
+          {
+            id: `agent-${splitAgent.id}`,
+            label: splitAgent.total > 1 ? `${splitAgent.done + 1} of ${splitAgent.total}` : splitAgent.agent,
+            ring: { mark: splitAgent.mark, done: splitAgent.done, total: splitAgent.total },
+          },
+        ]
+      : [];
+  // Bubbles sit beside any open state, so nothing in flight is hidden by it.
+  const sideOpen = busy || !["idle", "quiet-glance", "glance", "activities"].includes(registryId);
+  const activityBubble = (a: (typeof liveActivities)[number]): BubbleItem => {
+    const frac = a.total && a.transferred != null ? a.transferred / a.total : null;
+    return {
+      id: a.id,
+      label: a.label || a.source,
+      icon: ["browser", "file"].includes(a.source) ? "dl" : undefined,
+      sub:
+        a.phase === "failed"
+          ? "Failed"
+          : a.phase === "awaitingUser"
+            ? "Paused"
+            : frac !== null
+              ? `${Math.round(frac * 100)}%`
+              : a.transferred != null
+                ? `${Math.round(a.transferred / 1e6)} MB`
+                : "Working",
+      progress: a.phase === "failed" ? null : frac,
+      tone: a.phase === "failed" ? "err" : undefined,
+    };
+  };
+  // A bubble opens its peek card; an agent's bubble opens the board instead.
+  const openBubble = (id: string) => {
+    if (id.startsWith("agent-")) return openBoard();
+    setPeekId((cur) => (cur === id ? null : id));
+  };
+  const peekSuggestion = suggestion && peekId === suggestion.id ? suggestion : null;
+  const bubbleItems = [
+    ...agentBubble,
+    ...(sideOpen && suggestion && registryId !== "suggestion" && registryId !== "suggest-peek"
+      ? [{ id: suggestion.id, label: suggestion.title || "Suggestion", sub: suggestion.detail || undefined }]
+      : []),
+    ...(sideOpen
+      ? liveActivities
+          .filter((a) => a !== displayedActivity && !doneOpen(a))
+          .slice(0, 4)
+          .map(activityBubble)
+      : []),
+  ];
+
+  return (
+    <motion.div
+      className="flex h-screen w-screen justify-center select-none"
+      style={{ paddingTop: TOP, originY: 0 }}
+      initial={false}
+      animate={shown ? { opacity: 1, scale: 1, filter: "blur(0px)" } : { opacity: 0, scale: 0.92, filter: "blur(4px)" }}
+      transition={reduced ? { duration: 0 } : { duration: shown ? 0.32 : 0.2, ease: [0.23, 1, 0.32, 1] }}
+    >
+      <div className={`relative${dockBeside ? " flex items-start" : ""}`}>
+        <motion.div
+          className="island-shell relative overflow-hidden text-white"
+          data-bare={layout.geom.bare}
+          data-perch={layout.geom.perch || undefined}
+          data-color={shellColor}
+          data-state={registryId}
+          data-solid={look.solid || undefined}
+          data-simple={look.simple || undefined}
+          initial={false}
+          animate={{ width, height, borderRadius: radius }}
+          transition={transition}
+          style={{ scaleX: bump, originY: 0 }}
+          // Focusing the input while the shell is still small would scroll its
+          // content up; the shell never scrolls.
+          onScroll={(e) => {
+            e.currentTarget.scrollTop = 0;
+          }}
+          onPointerEnter={() => setHovered(true)}
+          onPointerLeave={() => setHovered(false)}
+        >
+          <div
+            className="isl-tint"
+            aria-hidden
+            style={{ "--tint": tintRgb(washEvent ?? layout.geom.wash) } as CSSProperties}
+          />
+          <Announcer registryId={registryId} />
+
+          <AnimatePresence initial={false}>
+            {pillModel && <IslandPill key={`pill-${pillModel.kind}`} model={pillModel} onWidth={setPillMeasured} />}
+            {!pillModel && !expanded && voicePill && (
+              <VoicePill
+                key="voice"
+                {...voicePill}
+                activity={displayedActivity}
+                onOpen={agentsOnly ? () => openBoard() : undefined}
+                onCancel={
+                  agentsOnly
+                    ? () => {
+                        for (const s of useAgents.getState().sessions) {
+                          if (s.status === "working" || s.status === "waiting") interruptSession(s.id);
+                        }
+                      }
+                    : undefined
+                }
+              />
+            )}
+            {!pillModel && !expanded && !bare && !voicePill && (
+              <CompactTrailing
+                key="compact"
+                busy={busy}
+                paused={paused}
+                offline={!online}
+                waiting={waiting?.label ?? null}
+              />
+            )}
+          </AnimatePresence>
+
+          <AnimatePresence initial={false} mode="popLayout">
+            {/* Exclusive branches only (as on main): keeping Ask mounted while closed
+              stacked with Expanded and stuck the island after rapid open/close. */}
+            {asking ? (
+              <motion.div
+                key="ask"
+                ref={contentRef}
+                className="absolute top-0 right-0"
+                style={
+                  askPanel
+                    ? ({
+                        // Design: only the tab row sits beside Duskie; the rest runs full width.
+                        left: 12,
+                        paddingTop: ASK_PAD.top,
+                        paddingRight: ASK_PAD.x,
+                        paddingBottom: ASK_PAD.bottom,
+                        "--ak-indent": `${layout.geom.contentPadLeft - 12}px`,
+                      } as CSSProperties)
+                    : {
+                        left: layout.geom.contentPadLeft,
+                        paddingTop: EXPANDED.pad,
+                        paddingRight: EXPANDED.pad,
+                      }
+                }
+                initial={
+                  reduced
+                    ? { opacity: 0 }
+                    : askPanel && askTab === "agents"
+                      ? { opacity: 0, filter: "blur(8px)", y: 10, scale: 0.985 }
+                      : { opacity: 0, y: 4 }
+                }
+                animate={{ opacity: 1, filter: "blur(0px)", y: 0, scale: 1 }}
+                exit={{
+                  opacity: 0,
+                  filter: reduced ? undefined : "blur(4px)",
+                  y: reduced ? 0 : -3,
+                  transition: { duration: 0.1 },
+                }}
+                transition={
+                  reduced
+                    ? { duration: 0 }
+                    : askPanel && askTab === "agents"
+                      ? { duration: 0.34, delay: 0.05, ease: [0.23, 1, 0.32, 1] }
+                      : { duration: 0.18, ease: [0.23, 1, 0.32, 1] }
+                }
+              >
+                {view === "settings" ? <IslandSettings /> : view === "welcome" ? <IslandWelcome /> : <AskPanel />}
+              </motion.div>
+            ) : preparingVoice ? (
+              <motion.div
+                key="preparing"
+                ref={contentRef}
+                className="absolute top-0 right-0"
+                style={{
+                  left: layout.geom.contentPadLeft,
+                  paddingTop: EXPANDED.pad,
+                  paddingRight: EXPANDED.pad,
+                  paddingBottom: 6,
+                }}
+                initial={reduced ? { opacity: 0 } : { opacity: 0, filter: "blur(6px)", y: 4 }}
+                animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+                exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.1 } }}
+                transition={{ duration: 0.28, delay: 0.06, ease: [0.23, 1, 0.32, 1] }}
+              >
+                <PreparingVoice voiceStatus={voiceStatus} />
+              </motion.div>
+            ) : (
+              expanded && (
+                <motion.div
+                  key="expanded"
+                  ref={contentRef}
+                  className="absolute top-0 right-0"
+                  style={
+                    {
+                      left: layout.geom.contentPadLeft,
+                      paddingTop: EXPANDED.pad,
+                      paddingRight: EXPANDED.pad,
+                      // Tight inset only - clears the shell radius; height hugs content.
+                      paddingBottom: 6,
+                      // Lists below the orb (You missed) reach back under it.
+                      "--orb-indent": `${layout.geom.mascotSize + 14}px`,
+                    } as CSSProperties
+                  }
+                  initial={reduced ? { opacity: 0 } : { opacity: 0, filter: "blur(6px)", y: 4 }}
+                  animate={{ opacity: 1, filter: "blur(0px)", y: 0 }}
+                  exit={{ opacity: 0, filter: "blur(4px)", transition: { duration: 0.1 } }}
+                  transition={{ duration: 0.28, delay: 0.06, ease: [0.23, 1, 0.32, 1] }}
+                >
+                  {fullVoice && voicePill ? (
+                    <FullVoice text={voicePill.text} thinking={voicePill.thinking} />
+                  ) : showGuide && waiting ? (
+                    <IslandGuide waiting={waiting} guide={guide} />
+                  ) : registryId === "activities" ? (
+                    <ActivitiesCard />
+                  ) : registryId === "update" && updateWorking !== null ? (
+                    <UpdateCard activityId={updateActivity?.id ?? null} startedAt={updateActivity?.startedAt ?? null} />
+                  ) : registryId === "agent-card" && cardAgent ? (
+                    <AgentCard id={cardAgent} />
+                  ) : registryId === "notify-card" && meetingSoon ? (
+                    <MeetingCard meeting={meetingSoon} />
+                  ) : registryId === "net-card" ? (
+                    <NetCard onClose={() => setNetOpen(false)} />
+                  ) : (
+                    <ExpandedContent mascot={mascot} paused={paused} suggestion={suggestion} />
+                  )}
+                </motion.div>
+              )
+            )}
+          </AnimatePresence>
+        </motion.div>
+        {bubbleItems.length > 0 && (
+          <IslandBubbles
+            items={bubbleItems}
+            openId={peekId}
+            onOpen={openBubble}
+            peek={
+              peekSuggestion && (
+                <BubblePeek
+                  eyebrow={peekSuggestion.source ? `From ${peekSuggestion.source}` : undefined}
+                  title={peekSuggestion.title || "Suggestion"}
+                  detail={peekSuggestion.detail || undefined}
+                  actions={peekSuggestion.options.slice(0, 2).map((label, i) => ({
+                    label,
+                    run: () => {
+                      setPeekId(null);
+                      choose(peekSuggestion, i);
+                    },
+                  }))}
+                  onDismiss={() => {
+                    setPeekId(null);
+                    dismiss(peekSuggestion);
+                  }}
+                />
+              )
+            }
+          />
+        )}
+        {/* Outside the shell, so its clipping never cuts Duskie's arms or hops. */}
+        <motion.div
+          className="pointer-events-none absolute top-0 left-0 z-2"
+          initial={false}
+          animate={{ x: mascotX, y: mascotY, scale: mascotScale }}
+          transition={transition}
+          style={{ originX: 0, originY: 0 }}
+        >
+          <span className="dk-orb" data-face={haloFace(mascot)}>
+            <span className="dk-halo" />
+            <Creature
+              state={chatting && mascot === "idle" ? "working" : mascot}
+              face={chatting && mascot === "idle" ? null : face}
+              size={mascotSize}
+              theme={settings.theme}
+              alive={settings.alive && visible && !look.simple}
+              simple={look.simple}
+              active={shown}
+              bust={false}
+            />
+          </span>
+        </motion.div>
+        <AnimatePresence initial={false}>
+          {gitDockLive && <GitSideDock key="git-side" height={sideDockH} visible={gitBeside} />}
+          {reviewDockLive && <ReviewSideDock key="review-side" height={sideDockH} visible={reviewBeside} />}
+        </AnimatePresence>
+      </div>
+    </motion.div>
+  );
+}
+
+/** Newest words matter most while talking; keep the pill from growing forever. */
+
+/** Wash palette colour as "r g b" for the tint gradient. */
+function tintRgb(e: WashEvent): string {
+  const h = PALETTES[e].a;
+  return [1, 3, 5].map((i) => Number.parseInt(h.slice(i, i + 2), 16)).join(" ");
+}
+
+/** Halo colour and strength follow the mascot's mood. */
+function haloFace(m: MascotState): string {
+  if (m === "listening") return "listen";
+  if (m === "success") return "happy";
+  if (m === "error") return "sad";
+  if (m === "working") return "work";
+  if (m === "sleeping") return "sleep";
+  return "idle";
+}
+
+/** First clause of an error, short enough for the compact line. */
+function shortError(msg: string | null): string {
+  const first = (msg ?? "").split(/[.\n]/)[0]?.trim() ?? "";
+  if (!first) return "That did not work";
+  return first.length > 42 ? `${first.slice(0, 41)}…` : first;
+}
+
+function clockTime(ms: number): string {
+  return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function pauseDim(p: Settings["pause"]): string | undefined {
+  return p.kind === "until" ? `until ${clockTime(Date.parse(p.until))}` : undefined;
+}
+
+/** A meeting starting within ten minutes (or just started), for the notify pill. */
+function soonMeeting(now: number, cal: CalendarToday | null | undefined) {
+  for (const m of cal?.meetings ?? []) {
+    const [h, mm] = m.start.split(":").map(Number);
+    const d = new Date(now);
+    d.setHours(h ?? 0, mm ?? 0, 0, 0);
+    const mins = Math.round((d.getTime() - now) / 60_000);
+    if (mins >= -2 && mins <= 10)
+      return { title: m.title, mins: Math.max(0, mins), join: m.joinUrl, notes: m.notes ?? null };
+  }
+  return null;
+}

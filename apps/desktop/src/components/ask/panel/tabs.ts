@@ -3,7 +3,7 @@
 import { type AskTab, setTab, showGit } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { setAsk } from "@/lib/store";
-import type { PanelTab } from "../../PanelTabs";
+import type { PanelTab } from "../../panel-tabs";
 import type { AskState } from "./use-ask-state";
 
 export function goTab(s: AskState, next: AskTab) {

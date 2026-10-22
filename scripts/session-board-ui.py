@@ -1,5 +1,5 @@
 from pathlib import Path
-p = Path('apps/desktop/src/components/agents/Board.tsx')
+p = Path('apps/desktop/src/components/agents/board.tsx')
 s = p.read_text(encoding='utf-8')
 s = s.replace('  tuneSession,', '  sessionView,\n  startHere,')
 s = s.replace('import { AgentMark,', 'import { Composer, AgentMark,')

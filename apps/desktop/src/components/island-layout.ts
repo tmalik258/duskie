@@ -1,4 +1,4 @@
-import { ISLAND_TOP, PANEL_PAD } from "@/lib/islandSize";
+import { ISLAND_TOP, PANEL_PAD } from "@/lib/island-size";
 import { SPRINGS, spring } from "@/lib/spring";
 import type { MascotState } from "@/lib/types";
 

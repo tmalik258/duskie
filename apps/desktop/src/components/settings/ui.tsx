@@ -19,7 +19,7 @@ import { createPortal } from "react-dom";
 import { shortcutBinding, shortcutEnabled } from "@/lib/shortcuts";
 import { setOverlayHit, useDuskie } from "@/lib/store";
 import { EASE_OUT_STRONG } from "@/lib/ui-motion";
-import { Tip } from "../Tip";
+import { Tip } from "../tip";
 
 /** The settings search text; empty shows everything. */
 export const SettingsQuery = createContext("");

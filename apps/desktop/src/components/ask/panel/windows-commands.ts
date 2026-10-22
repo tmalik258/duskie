@@ -3,8 +3,8 @@
 
 import { api } from "@/lib/bridge";
 import { runOpen, useDuskie } from "@/lib/store";
-import type { Command } from "../Starters";
-import { WINDOWS_PAGES } from "../windowsPages";
+import type { Command } from "../starters";
+import { WINDOWS_PAGES } from "../windows-pages";
 
 export function windowsCommands(q: string): Command[] {
   const want = /\b(on|enable|start)\b/.test(q) ? true : /\b(off|disable|stop)\b/.test(q) ? false : null;

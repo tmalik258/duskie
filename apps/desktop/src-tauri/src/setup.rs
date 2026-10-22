@@ -1305,11 +1305,11 @@ pub fn merge_path(fresh: &str, current: &str) -> String {
 mod tests {
     use super::*;
 
-    /// The UI paints `SetupCatalog.ts` before this module answers, so its
+    /// The UI paints `setup-catalog.ts` before this module answers, so its
     /// text must match or rows change under the user when the data lands.
     #[test]
     fn ui_catalog_matches_the_items() {
-        let catalog = include_str!("../../src/components/SetupCatalog.ts");
+        let catalog = include_str!("../../src/components/setup-catalog.ts");
         let source = include_str!("setup.rs");
         let mut checked = 0;
         for line in catalog.lines().map(str::trim) {
@@ -1318,7 +1318,7 @@ mod tests {
                     let literal = literal.trim_end_matches(',');
                     assert!(
                         source.contains(literal),
-                        "SetupCatalog.ts has {key}{literal}, which setup.rs does not; keep them the same"
+                        "setup-catalog.ts has {key}{literal}, which setup.rs does not; keep them the same"
                     );
                     checked += 1;
                 }

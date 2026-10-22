@@ -1,7 +1,7 @@
 // Rows for a file with no default app: open it in the editor, show it in
 // its folder, pick an app, or go back.
 
-import { Ic } from "../../Icon";
+import { Ic } from "../../icon";
 import type { OpenHow } from "./file-open";
 import type { Item } from "./item";
 

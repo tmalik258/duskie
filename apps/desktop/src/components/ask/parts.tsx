@@ -3,7 +3,7 @@
 // Small pieces shared across Ask mode: chips, rows, key hints.
 
 import type { ReactNode } from "react";
-import { Tip } from "../Tip";
+import { Tip } from "../tip";
 
 export const ease = [0.23, 1, 0.32, 1] as const;
 

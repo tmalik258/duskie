@@ -2,7 +2,7 @@
 
 // Development page: the skills library against the browser mock.
 
-import { SkillLibrary } from "@/components/settings/SkillLibrary";
+import { SkillLibrary } from "@/components/settings/skill-library";
 
 export default function SkillsDev() {
   return (
