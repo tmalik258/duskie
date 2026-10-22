@@ -391,6 +391,7 @@ fn spawn_hover_tracker(app: AppHandle, window: WebviewWindow) {
                 // The UI decides what hover shows (a waiting guide, or the
                 // parked welcome), after its hover-intent delay.
                 let _ = app.emit_to(LABEL, HOVER_EVENT, inside);
+                crate::voice::read_details(&app, inside);
             }
             // Poll modifiers here: the webview stays unfocused / click-through.
             // Hovered → Shift alone (glance Ask↔Agents, Focus↔Pause).

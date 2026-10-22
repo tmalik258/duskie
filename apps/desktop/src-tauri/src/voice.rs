@@ -132,6 +132,8 @@ pub struct Voice {
     /// A suggestion read aloud, waiting for a spoken choice: its id and
     /// option labels.
     choosing: Mutex<Option<(String, Vec<String>)>>,
+    /// The suggestion whose details were read or are queued to be read.
+    detailed: Mutex<Option<String>>,
     last_error: Mutex<Option<String>>,
 }
 
@@ -159,6 +161,7 @@ impl Voice {
                 ..Default::default()
             }),
             choosing: Mutex::default(),
+            detailed: Mutex::default(),
             last_error: Mutex::default(),
         }
     }
@@ -1131,6 +1134,58 @@ fn suggestion_speech_blocked(app: &AppHandle) -> bool {
         || !lock(&app.state::<AppState>().chats).is_empty()
 }
 
+/// True while a suggestion is being read aloud. The dismiss timer waits
+/// for this, so the card stays up until the headline has been said.
+pub fn reading_suggestion(app: &AppHandle) -> bool {
+    let v = voice(app);
+    lock(&v.choosing).is_some()
+        && lock(&v.runtime)
+            .as_ref()
+            .and_then(|r| r.speaker.as_ref())
+            .is_some_and(Speaker::busy)
+}
+
+/// The card went (dismissed, acted on, or replaced): stop reading it and
+/// stop waiting for a spoken choice.
+pub fn silence_suggestion(app: &AppHandle) {
+    let v = voice(app);
+    if lock(&v.choosing).take().is_none() {
+        return;
+    }
+    *lock(&v.detailed) = None;
+    stop_speaking(app);
+    if let Some(l) = lock(&v.runtime).as_ref().and_then(|r| r.listener.as_ref()) {
+        l.send(Control::Cancel);
+    }
+}
+
+/// Hovering a spoken suggestion reads its details, once, after the headline.
+pub fn read_details(app: &AppHandle, hovered: bool) {
+    if !hovered {
+        return;
+    }
+    let Some(ui) = crate::suggestions::current(app) else {
+        return;
+    };
+    let v = voice(app);
+    if ui.detail.trim().is_empty()
+        || lock(&v.choosing)
+            .as_ref()
+            .is_none_or(|(id, _)| *id != ui.id)
+    {
+        return;
+    }
+    let mut done = lock(&v.detailed);
+    if done.as_deref() == Some(ui.id.as_str()) {
+        return;
+    }
+    *done = Some(ui.id.clone());
+    let detail = ui.detail.replace('·', ",");
+    if let Some(s) = lock(&v.runtime).as_ref().and_then(|r| r.speaker.as_ref()) {
+        s.say(detail.trim());
+    }
+}
+
 /// Reads a suggestion aloud ("Report.pdf downloaded. Say open, show in
 /// folder, or not now.") and takes a spoken choice.
 pub fn offer_spoken(app: &AppHandle, ui: &crate::state::Suggestion, priority: i32) {
@@ -1151,9 +1206,10 @@ pub fn offer_spoken(app: &AppHandle, ui: &crate::state::Suggestion, priority: i3
         let Some(speaker) = runtime.as_ref().and_then(|r| r.speaker.as_ref()) else {
             return;
         };
-        speaker.say(&spoken_prompt(&ui.title, &ui.detail, &ui.options));
+        speaker.say(&spoken_prompt(&ui.title, &ui.options));
     }
     *lock(&v.speaking) = None;
+    *lock(&v.detailed) = None;
     let (id, labels) = (ui.id.clone(), ui.options.clone());
     *lock(&v.choosing) = Some((id.clone(), labels));
     let wanted_id = id.clone();
@@ -1182,14 +1238,10 @@ pub fn offer_spoken(app: &AppHandle, ui: &crate::state::Suggestion, priority: i3
     });
 }
 
-/// "Report.pdf. Downloaded, 2 MB. Say open, show in folder, or not now."
-pub fn spoken_prompt(title: &str, detail: &str, options: &[String]) -> String {
+/// Only the headline is read, so it ends about when the card would go:
+/// "Report.pdf downloaded. Say open, show in folder, or not now."
+pub fn spoken_prompt(title: &str, options: &[String]) -> String {
     let mut out = title.trim().trim_end_matches('.').to_owned();
-    let detail = detail.replace('·', ",");
-    if !detail.trim().is_empty() {
-        out.push_str(". ");
-        out.push_str(detail.trim().trim_end_matches('.'));
-    }
     let names: Vec<String> = options.iter().take(3).map(|o| o.to_lowercase()).collect();
     out.push_str(". Say ");
     out.push_str(&names.join(", "));
@@ -1540,11 +1592,10 @@ mod tests {
     fn reads_a_suggestion_aloud() {
         assert_eq!(
             spoken_prompt(
-                "report.pdf",
-                "Downloaded · 2 MB",
+                "report.pdf downloaded",
                 &labels(&["Open", "Show in folder"])
             ),
-            "report.pdf. Downloaded , 2 MB. Say open, show in folder, or not now."
+            "report.pdf downloaded. Say open, show in folder, or not now."
         );
     }
 }

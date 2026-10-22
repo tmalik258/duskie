@@ -574,7 +574,10 @@ fn expire_when_ignored(app: &AppHandle, id: String) {
                 return;
             }
             let limit = Duration::from_secs(u64::from(lock(&state.settings).collapse_after_secs));
-            idle = if state.hovered.load(Ordering::Relaxed) {
+            // The countdown starts once the headline has been read.
+            idle = if state.hovered.load(Ordering::Relaxed)
+                || crate::voice::reading_suggestion(&app)
+            {
                 Duration::ZERO
             } else {
                 idle + EXPIRY_TICK
@@ -1041,6 +1044,7 @@ fn take(app: &AppHandle, id: &str) -> Result<Active, String> {
         }
     };
     let active = taken.ok_or("suggestion is no longer active")?;
+    crate::voice::silence_suggestion(app);
     unbind_keys(app);
     let _ = app.emit(SUGGESTION_CLEAR, &active.ui.id);
     Ok(active)
