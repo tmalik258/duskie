@@ -574,10 +574,7 @@ fn expire_when_ignored(app: &AppHandle, id: String) {
                 return;
             }
             let limit = Duration::from_secs(u64::from(lock(&state.settings).collapse_after_secs));
-            // The countdown starts once the headline has been read.
-            idle = if state.hovered.load(Ordering::Relaxed)
-                || crate::voice::reading_suggestion(&app)
-            {
+            idle = if state.hovered.load(Ordering::Relaxed) {
                 Duration::ZERO
             } else {
                 idle + EXPIRY_TICK

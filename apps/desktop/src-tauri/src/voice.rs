@@ -1134,17 +1134,6 @@ fn suggestion_speech_blocked(app: &AppHandle) -> bool {
         || !lock(&app.state::<AppState>().chats).is_empty()
 }
 
-/// True while a suggestion is being read aloud. The dismiss timer waits
-/// for this, so the card stays up until the headline has been said.
-pub fn reading_suggestion(app: &AppHandle) -> bool {
-    let v = voice(app);
-    lock(&v.choosing).is_some()
-        && lock(&v.runtime)
-            .as_ref()
-            .and_then(|r| r.speaker.as_ref())
-            .is_some_and(Speaker::busy)
-}
-
 /// The card went (dismissed, acted on, or replaced): stop reading it and
 /// stop waiting for a spoken choice.
 pub fn silence_suggestion(app: &AppHandle) {
