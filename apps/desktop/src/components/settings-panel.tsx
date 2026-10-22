@@ -4,7 +4,6 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { friendlyError } from "@/lib/friendly";
 import { useScrollEdge } from "@/lib/hooks";
 import { useDuskie } from "@/lib/store";
-import { Ic } from "./icon";
 import { AiTab } from "./settings/ai-tab";
 import { AppearanceTab } from "./settings/appearance-tab";
 import { ConnectionsTab } from "./settings/connections-tab";
@@ -15,6 +14,7 @@ import { ShortcutsTab } from "./settings/shortcuts-tab";
 import { SkillsTab } from "./settings/skills-tab";
 import { StorageTab } from "./settings/storage-tab";
 import { SettingsQuery } from "./settings/ui";
+import { SettingsNav } from "./settings-panel/settings-nav";
 import { GROUPS, REMEMBER_MS, type SettingsTab, tabFor } from "./settings-panel/settings-tabs";
 
 /** Where Settings was when it last closed. Lives outside the component,
@@ -156,53 +156,13 @@ export function SettingsPanel() {
   const current = GROUPS.flatMap((g) => g.items).find((i) => i.id === tab);
   return (
     <div className="island-settings st-split flex min-h-0 flex-1 overflow-hidden">
-      <nav aria-label="Settings sections" className="st-side">
-        <label className="st-search shrink-0">
-          <Ic name="search" size={14} />
-          <input
-            ref={searchRef}
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search settings"
-            aria-label="Search settings"
-            spellCheck={false}
-          />
-          <kbd>/</kbd>
-        </label>
-        <div className="st-side-links">
-          {GROUPS.map((g) => (
-            <div key={g.label} className="flex flex-col">
-              <p className="st-group">{g.label}</p>
-              {g.items.map((i) => (
-                <button
-                  key={i.id}
-                  type="button"
-                  className="st-item"
-                  aria-current={!searching && tab === i.id ? "page" : undefined}
-                  onMouseDown={(e) => {
-                    // Keep the nav from scrolling when the last item is focused.
-                    // Focus moved by script from the search box would show
-                    // the keyboard ring, so the click is marked as a click.
-                    e.preventDefault();
-                    (document.activeElement as HTMLElement | null)?.blur();
-                    e.currentTarget.focus({ preventScroll: true, focusVisible: false } as FocusOptions);
-                  }}
-                  onClick={() => {
-                    setQuery("");
-                    pick(i.id);
-                  }}
-                >
-                  <span className="inline-flex shrink-0">
-                    <Ic name={i.icon} size={15} />
-                  </span>
-                  <span className="truncate">{i.label}</span>
-                </button>
-              ))}
-            </div>
-          ))}
-        </div>
-      </nav>
+      <SettingsNav
+        searchRef={searchRef}
+        query={query}
+        onQuery={setQuery}
+        current={searching ? null : tab}
+        onPick={pick}
+      />
       <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <div className="shrink-0 pb-3">
           <p className="st-title">{searching ? "Search" : current?.label}</p>
