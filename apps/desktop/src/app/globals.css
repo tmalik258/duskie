@@ -7296,3 +7296,53 @@ button.ak-cchip:hover,
     transition: none;
   }
 }
+
+/* Attachments in chat boxes: paperclip and file chips. */
+.ak-attach {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 7px;
+  color: var(--i3);
+}
+.ak-attach:hover {
+  color: var(--i1);
+  background: rgb(255 255 255 / 0.06);
+}
+.ak-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 8px 0;
+}
+.ak-att {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 200px;
+  padding: 3px 4px 3px 6px;
+  font-size: 11.5px;
+  color: var(--i2);
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.07);
+}
+.ak-att img {
+  width: 22px;
+  height: 22px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.ak-att button {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  color: var(--i3);
+}
+.ak-att button:hover {
+  color: var(--i1);
+  background: rgb(255 255 255 / 0.1);
+}

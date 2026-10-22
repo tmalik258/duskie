@@ -102,6 +102,7 @@ export const agentCommands: Record<string, (args: Record<string, unknown>) => un
   agent_rewind: () => 1,
   agent_files: (a) => mockFiles(a),
   project_files: (a) => mockFiles(a),
+  save_attachment: (a) => `C:/Users/you/AppData/Local/Temp/duskie-attachments/01J-${String(a.name)}`,
   agent_commands: () => [
     { name: "/compact", description: "Summarize the chat to free context", group: "Session" },
     { name: "/clear", description: "Start fresh in the same project", group: "Session" },

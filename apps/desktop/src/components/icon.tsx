@@ -13,6 +13,7 @@ const BODIES = {
   close:
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M14.5 9.50002L9.5 14.5M9.49998 9.5L14.5 14.5"/></g>',
   // Drawn for Duskie (not from Solar), in the same 1.5 stroke style.
+  clip: '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m20 11.5-7.8 7.8a5 5 0 0 1-7.1-7.1l8.3-8.3a3.3 3.3 0 0 1 4.7 4.7l-8.3 8.3a1.7 1.7 0 0 1-2.4-2.4l7.6-7.6"/>',
   plus: '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5" d="M12 5v14M5 12h14"/>',
   ask: '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></g>',
   focus:
@@ -134,6 +135,7 @@ const BIG: Record<string, IconName> = {
   check: "check",
   folder: "folder",
   file: "file",
+  clip: "clip",
   clock: "history",
   history: "history",
   mic: "mic",
