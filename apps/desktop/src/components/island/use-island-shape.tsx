@@ -60,11 +60,12 @@ export function useIslandShape(c: IslandStore & IslandWork & IslandHover & Islan
                         ? activityLabel(displayedActivity, activityNow, { elapsed: false }).replace(/(\.\.\.|…)$/, "")
                         : (voiceQuestion ?? working ?? "").replace(/(\.\.\.|…)$/, ""),
                       // The edge ring fills with real progress; a known time
-                      // left replaces the elapsed timer.
+                      // left turns the timer into a countdown.
                       ...(() => {
                         const p = displayedActivity ? downloadProgress(displayedActivity) : null;
                         return {
                           startedAt: p?.left == null ? displayedActivity?.startedAt : undefined,
+                          endsAt: p?.left == null ? undefined : activityNow + p.left * 1000,
                           progress: p?.pct == null ? undefined : p.pct / 100,
                         };
                       })(),

@@ -27,7 +27,12 @@ export function IslandPill({ model, onWidth }: { model: PillModel; onWidth: (w: 
   }, [onWidth]);
 
   let trail: ReactNode = null;
-  if (kind === "working") trail = <span className="tnum">{clock(now - (model.startedAt ?? now))}</span>;
+  if (kind === "working")
+    trail = (
+      <span className="tnum">
+        {model.endsAt !== undefined ? clock(Math.max(0, model.endsAt - now)) : clock(now - (model.startedAt ?? now))}
+      </span>
+    );
   else if (kind === "listening") trail = <Bars />;
   else if (kind === "caption")
     trail = (

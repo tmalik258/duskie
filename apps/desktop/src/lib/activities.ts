@@ -156,8 +156,10 @@ export function activityLabel(a: Activity, now: number, opts?: { elapsed?: boole
       pct !== null
         ? [`${Math.floor(pct)}%`, `${size(a.transferred)} of ${size(a.total ?? 0)}`]
         : [`${size(a.transferred)} received`];
-    if (left !== null) parts.push(timeLeft(left));
-    else if (speed !== null) parts.push(rate(speed));
+    // The pill shows the time left in its own timer.
+    if (left !== null) {
+      if (opts?.elapsed !== false) parts.push(timeLeft(left));
+    } else if (speed !== null) parts.push(rate(speed));
     const progress = parts.join(" · ");
     return `${label} · ${progress}`;
   }

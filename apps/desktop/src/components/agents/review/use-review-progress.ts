@@ -35,9 +35,13 @@ export function useReviewFinish(id: string, finished: boolean, total: number, le
     },
     [id],
   );
-  // Every change decided: done; close after a beat so the last decision is seen.
+  // Every change decided here: done; close after a beat so the last decision
+  // is seen. Opened with everything already decided (to look at the diff
+  // again), it stays open.
+  const undecided = useRef(false);
+  if (finished && left > 0) undecided.current = true;
   useEffect(() => {
-    if (!finished || total === 0 || left > 0) return;
+    if (!finished || total === 0 || left > 0 || !undecided.current) return;
     const t = setTimeout(() => {
       markReviewed(id, 0);
       onDone();

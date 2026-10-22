@@ -420,8 +420,8 @@ pub struct VoiceSettings {
     pub model: u32,
     /// Words voice gets wrong, comma separated: "horsepot = hotspot".
     pub fixes: String,
-    /// Live: start answering at a pause in speech and show captions in the
-    /// island. Off by default; off is the kill switch.
+    /// Old Live switch, kept so older settings files load. Live answers are
+    /// always on now.
     pub live: bool,
     /// Keep Live conversations in Ask history (text only, never audio).
     pub live_history: bool,

@@ -44,7 +44,7 @@ export function onVoiceHeard({ text, final, pause, byVoice }: EventPayloads[type
     const started = sendChat(q, { speak: settings.voice.speakAnswers, voice: true });
     if (!started && !ask) useDuskie.setState({ voiceQuestion: null });
     const live = useDuskie.getState().chatId;
-    if (started && !ask && settings.voice.live && live) liveIds.add(live);
+    if (started && !ask && live) liveIds.add(live);
   } else {
     useDuskie.setState({ hearing: null });
     if (byVoice && turns.length === 0 && ask) void api.askClose();

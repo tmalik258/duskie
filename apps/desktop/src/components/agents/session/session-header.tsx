@@ -44,15 +44,7 @@ export function SessionHeader({
         {s.usage && s.usage.window > 0 && <ContextRing used={s.usage.used} window={s.usage.window} />}
         <span className="ag-acts">
           <SessionMemory id={s.id} live={active && s.status !== "ended" && s.status !== "failed" && !s.restored} />
-          {s.changes > 0 && (
-            <HeaderButton
-              tip="Review changes (Alt 1)"
-              label="Review changes"
-              icon="diff"
-              size={14}
-              onClick={onReview}
-            />
-          )}
+          {s.changes > 0 && <HeaderButton tip="Diff (Alt 1)" label="Diff" icon="diff" size={14} onClick={onReview} />}
           <HeaderButton
             tip="Continue in a terminal (Alt 2)"
             label="Continue in a terminal"

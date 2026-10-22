@@ -149,19 +149,11 @@ export function VoiceSection({ voice, onError }: { voice: VoiceSettings; onError
         onChange={(speakSuggestions) => void set({ speakSuggestions })}
       />
       <Toggle
-        label="Live answers"
-        hint="Start answering when you pause. Changes still need a tap."
-        checked={voice.live ?? false}
-        onChange={(live) => void set({ live })}
+        label="Keep voice answers in history"
+        hint="Saved as text in Ask history. Audio is never kept."
+        checked={voice.liveHistory ?? true}
+        onChange={(liveHistory) => void set({ liveHistory })}
       />
-      {voice.live && (
-        <Toggle
-          label="Keep Live in history"
-          hint="Saved as text in Ask history. Audio is never kept."
-          checked={voice.liveHistory ?? true}
-          onChange={(liveHistory) => void set({ liveHistory })}
-        />
-      )}
       <Field label="Voice">
         <div className="flex items-center gap-2">
           <Select
