@@ -232,7 +232,7 @@ pub(super) async fn run_codex(
                     if pending.values().any(|m| m == "turn/start") { queued.push(text); continue; }
                     if turn.is_some() && selected_mode(id, mode) != active_mode { queued.push(text); continue; }
                     next_id += 1;
-                    let input = json!([{ "type": "text", "text": text }]);
+                    let input = super::images::codex_input(&text);
                     let msg = match &turn {
                         Some(active) => json!({ "id": next_id, "method": "turn/steer",
                             "params": { "threadId": t, "expectedTurnId": active, "input": input } }),

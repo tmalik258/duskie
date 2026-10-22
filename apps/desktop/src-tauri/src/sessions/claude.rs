@@ -146,7 +146,7 @@ pub(super) async fn run_claude(
                 Some(Cmd::Send(text)) => {
                     let mut line = json!({
                         "type": "user",
-                        "message": { "role": "user", "content": [{ "type": "text", "text": text }] },
+                        "message": { "role": "user", "content": super::images::claude_content(&text) },
                     })
                     .to_string();
                     line.push('\n');
