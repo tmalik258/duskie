@@ -643,6 +643,7 @@ Be concise."
                         .into(),
                     messages: vec![Message::user("What is on this screen?")],
                     image: Some(png.clone()),
+                    more_images: Vec::new(),
                     think: false,
                 };
                 match vision.complete(&desc, json!({})).await {
@@ -661,6 +662,46 @@ Be concise."
                 inject_screen_ocr(&self.app, &mut with_tools, png).await;
             }
             // Cloud OpenAI-compat: leave image on the request for native vision.
+        }
+        // A local text model cannot take pictures: describe the other
+        // attached images too, or say they were left out.
+        if self.inner.id() == "local" && !with_tools.more_images.is_empty() {
+            let more = std::mem::take(&mut with_tools.more_images);
+            let ai = lock(&self.app.state::<AppState>().settings)
+                .ai
+                .local
+                .clone();
+            let vision = ai.vision_model.trim();
+            for (i, png) in more.into_iter().enumerate() {
+                let seen = if vision.is_empty() || vision.eq_ignore_ascii_case("off") {
+                    None
+                } else {
+                    let desc = ChatRequest {
+                        system: "Describe this image for another assistant: readable text, \
+what it shows, anything that looks wrong. Be concise."
+                            .into(),
+                        messages: vec![Message::user("What is in this image?")],
+                        image: Some(png),
+                        ..Default::default()
+                    };
+                    OpenAiCompat::new(Some(ai.base_url.clone()), Some(ai.vision_model.clone()))
+                        .complete(&desc, json!({}))
+                        .await
+                        .ok()
+                        .filter(|t| !t.trim().is_empty())
+                };
+                with_tools.system.push_str(&match seen {
+                    Some(t) => format!(
+                        "\n\nAttached image {} (seen by a vision model):\n```\n{}\n```",
+                        i + 2,
+                        t.trim()
+                    ),
+                    None => format!(
+                        "\n\nAttached image {} could not be read: no vision model is set up.",
+                        i + 2
+                    ),
+                });
+            }
         }
         // Embedding tool pick for local and cloud (by_words if embedder missing).
         let mut defs = crate::ask_tools::pick(&self.app, question, crate::ask_tools::defs()).await;

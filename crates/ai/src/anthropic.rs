@@ -52,15 +52,18 @@ impl Anthropic {
             }]);
         }
         // The image goes with the latest question.
-        if let (Some(data), Some(last)) = (
-            req.image_base64(),
+        let images = req.images_base64();
+        if let (false, Some(last)) = (
+            images.is_empty(),
             body["messages"].as_array_mut().and_then(|m| m.last_mut()),
         ) {
             let text = last["content"].clone();
-            last["content"] = json!([
-                { "type": "image", "source": { "type": "base64", "media_type": "image/png", "data": data } },
-                { "type": "text", "text": text },
-            ]);
+            let mut parts: Vec<Value> = images
+                .into_iter()
+                .map(|data| json!({ "type": "image", "source": { "type": "base64", "media_type": "image/png", "data": data } }))
+                .collect();
+            parts.push(json!({ "type": "text", "text": text }));
+            last["content"] = Value::Array(parts);
         }
         // If a safety classifier declines, let the API retry on another model
         // within the same call instead of failing the answer.
@@ -273,6 +276,7 @@ mod tests {
             system: "Be brief.".into(),
             messages: vec![Message::user("hi")],
             image: None,
+            more_images: Vec::new(),
             think: false,
         });
         assert_eq!(body["model"], DEFAULT_MODEL);
@@ -289,6 +293,7 @@ mod tests {
             system: String::new(),
             messages: vec![Message::user("what is this?")],
             image: Some(vec![1, 2, 3]),
+            more_images: Vec::new(),
             think: false,
         });
         let content = &body["messages"][0]["content"];
