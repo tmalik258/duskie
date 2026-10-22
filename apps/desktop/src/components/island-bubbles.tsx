@@ -55,6 +55,7 @@ export function IslandBubbles({
             animate={{ opacity: 1, x: 0, scale: 1 }}
             transition={spring}
             aria-expanded={openId === it.id}
+            title={it.sub ? `${it.label} · ${it.sub}` : it.label}
             onClick={() => onOpen?.(it.id)}
           >
             {it.ring ? (

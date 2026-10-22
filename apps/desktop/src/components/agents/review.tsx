@@ -6,7 +6,7 @@
 // Keys: Y keep, N drop, J K next and back, [ ] files, C comment, Alt 1 / Alt 2 all.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type Session, sendToSession } from "@/lib/agents";
+import { markReviewed, type Session, sendToSession } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { FileTree } from "./review/file-tree";
 import { groupByDir, keyOf, letter, rows } from "./review/hunk";
@@ -33,8 +33,11 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
 
   // Nothing to review: leave at once.
   useEffect(() => {
-    if (finished && files !== null && files.length === 0 && dropped === 0 && !error) onDone();
-  }, [finished, files, dropped, error, onDone]);
+    if (finished && files !== null && files.length === 0 && dropped === 0 && !error) {
+      markReviewed(session.id, 0);
+      onDone();
+    }
+  }, [finished, files, dropped, error, onDone, session.id]);
 
   const file = list[Math.min(fileAt, list.length - 1)];
   const total = list.reduce((n, f) => n + f.hunks.length, 0) + dropped;
@@ -64,7 +67,10 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
     if (!file || !file.hunks[hunkAt]) return;
     drop(file.path, hunkAt, 1);
   }, [file, hunkAt, drop]);
-  const finish = useCallback(() => onDone(), [onDone]);
+  const finish = useCallback(() => {
+    markReviewed(session.id, left);
+    onDone();
+  }, [onDone, session.id, left]);
   const acceptRemaining = useCallback(() => {
     setKept((k) => new Set([...k, ...list.flatMap((f) => f.hunks.map((h) => keyOf(f, h)))]));
   }, [list]);

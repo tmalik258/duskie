@@ -106,6 +106,11 @@ export function openReview(id: string) {
   sessionView(id, { reviewing: true });
 }
 
+/** Remember that this turn's review was finished, so the chip says Reviewed. */
+export function markReviewed(id: string, left: number) {
+  update(id, (s) => ({ ...s, reviewed: { turnAt: s.turnAt, left } }));
+}
+
 /** Close the Review dock for a session (or whichever is open). */
 export function closeReview(id?: string) {
   const target = id ?? reviewingSessionId();

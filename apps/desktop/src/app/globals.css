@@ -1531,6 +1531,8 @@ body {
   border-radius: 14px 14px 4px 14px;
   font-size: 13.5px;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 .ak-foot {
   display: flex;
