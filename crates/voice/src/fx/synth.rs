@@ -115,6 +115,79 @@ fn ops(name: &str) -> Option<Vec<Op>> {
         ],
         "tap" => vec![Noise(0.06, 2200., 0.16, 0., 1600., 1.2)],
         "down" => vec![tone(880., 560., 0.08, 0.12, 0.)],
+        // The mascot's own life sounds, from the Mascot Lab.
+        "sigh" => vec![
+            Noise(0.3, 900., 0.03, 0., 1200., 0.9),
+            Tone(290., 190., 0.5, Triangle, 0.05, 0.25),
+            Noise(0.5, 1400., 0.03, 0.25, 900., 0.7),
+        ],
+        "doze" => vec![
+            Noise(1.1, 380., 0.1, 0., 520., 2.5),
+            Noise(1.3, 520., 0.08, 1.15, 300., 2.5),
+        ],
+        "shake" => {
+            let mut v: Vec<Op> = (0..6)
+                .map(|i| {
+                    let (a, b) = if i % 2 == 1 {
+                        (300., 280.)
+                    } else {
+                        (360., 340.)
+                    };
+                    Tone(a, b, 0.06, Triangle, 0.05, i as f32 * 0.075)
+                })
+                .collect();
+            v.push(Noise(0.45, 1800., 0.03, 0., 1200., 2.));
+            v
+        }
+        "tapeOn" => vec![
+            Noise(0.09, 3200., 0.1, 0., 2200., 1.4),
+            Noise(0.07, 2600., 0.08, 0.11, 1900., 1.4),
+            tone(900., 700., 0.05, 0.05, 0.2),
+        ],
+        "tapeOff" => vec![Noise(0.18, 2600., 0.07, 0., 1400., 1.2)],
+        "startle" => vec![
+            Noise(0.08, 2200., 0.06, 0., 3400., 1.5),
+            tone(560., 820., 0.08, 0.06, 0.),
+        ],
+        // Panels: a soft rise when one opens, the same notes falling when it
+        // closes. Each panel has its own colour so you can tell them apart.
+        "askOpen" => vec![
+            Noise(0.12, 900., 0.025, 0., 2600., 0.8),
+            tone(660., 990., 0.09, 0.07, 0.02),
+            tone(990., 1320., 0.12, 0.05, 0.1),
+        ],
+        "askClose" => vec![
+            Noise(0.1, 2400., 0.02, 0., 800., 0.8),
+            tone(1320., 990., 0.08, 0.05, 0.),
+            tone(990., 660., 0.11, 0.05, 0.08),
+        ],
+        "agentsOpen" => vec![
+            Noise(0.12, 700., 0.025, 0., 2000., 0.8),
+            Tone(440., 660., 0.1, Triangle, 0.07, 0.02),
+            Tone(660., 880., 0.14, Triangle, 0.05, 0.11),
+        ],
+        "agentsClose" => vec![
+            Noise(0.1, 2000., 0.02, 0., 700., 0.8),
+            Tone(880., 660., 0.09, Triangle, 0.05, 0.),
+            Tone(660., 440., 0.12, Triangle, 0.05, 0.09),
+        ],
+        "gitOpen" => vec![
+            Noise(0.02, 3200., 0.05, 0., 3200., 2.),
+            Noise(0.02, 3600., 0.04, 0.07, 3600., 2.),
+            tone(784., 1047., 0.14, 0.06, 0.08),
+        ],
+        "gitClose" => vec![
+            Noise(0.02, 3200., 0.04, 0., 3200., 2.),
+            tone(1047., 784., 0.12, 0.05, 0.03),
+        ],
+        "settingsOpen" => vec![
+            Noise(0.04, 2400., 0.06, 0., 1800., 1.2),
+            tone(1047., 1175., 0.12, 0.05, 0.03),
+        ],
+        "settingsClose" => vec![
+            Noise(0.04, 1800., 0.05, 0., 1400., 1.2),
+            tone(1175., 880., 0.1, 0.04, 0.02),
+        ],
         _ => return None,
     })
 }

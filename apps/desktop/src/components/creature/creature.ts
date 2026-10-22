@@ -42,8 +42,9 @@ function boot() {
   // Expressions follow the Mascot Lab: a mouth only on reactions, the resting moods keep a quiet face.
   const X = { ...X_A, ...X_B };
 
-  // The app plays its own sounds; the creature stays quiet.
-  const Sound = { play() {} };
+  // Mood sounds come from the app; only the island's mascot (sound: true)
+  // makes its life sounds (a yawn, dozing, tape) through Duskie's own player.
+  const Sound = { play: (name) => name && soundHook?.(name) };
   const XS = {};
 
   const all = [];
@@ -810,6 +811,12 @@ export function creatureMayRetry() {
 export function creatureSupported() {
   if (!api && !failed && typeof window !== "undefined") api = boot();
   return !!api;
+}
+
+let soundHook = null;
+/** Who plays the mascot's life sounds; null keeps it quiet. */
+export function setCreatureSound(fn) {
+  soundHook = fn;
 }
 
 export function createCreature(slot, opts) {

@@ -140,7 +140,29 @@ mod tests {
     #[test]
     fn every_kit_sound_renders_quietly() {
         for name in [
-            "chirp", "pop", "coo", "tada", "fanfare", "snore", "tap", "click", "buzz",
+            "chirp",
+            "pop",
+            "coo",
+            "tada",
+            "fanfare",
+            "snore",
+            "tap",
+            "click",
+            "buzz",
+            "sigh",
+            "doze",
+            "shake",
+            "tapeOn",
+            "tapeOff",
+            "startle",
+            "askOpen",
+            "askClose",
+            "agentsOpen",
+            "agentsClose",
+            "gitOpen",
+            "gitClose",
+            "settingsOpen",
+            "settingsClose",
         ] {
             let s = synth::render(name, 1.0).expect(name);
             assert!(s.len() > 1000, "{name} too short");

@@ -69,6 +69,14 @@ export const SND_FOR: Partial<Record<SynthSound, SndSound>> = {
   disconnect: "transition_down",
   reconnect: "transition_up",
   click: "select",
+  askOpen: "transition_up",
+  askClose: "transition_down",
+  agentsOpen: "transition_up",
+  agentsClose: "transition_down",
+  gitOpen: "toggle_on",
+  gitClose: "toggle_off",
+  settingsOpen: "select",
+  settingsClose: "toggle_off",
 };
 
 /** Decodes a kit and reports why it could not load, for the settings screen. */
