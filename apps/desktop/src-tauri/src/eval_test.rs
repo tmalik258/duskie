@@ -205,10 +205,10 @@ async fn local_model_picks_the_right_tools() {
     );
 }
 
-/// One Jarvis case: the tools the model should reach for, and what its
+/// One Ask case: the tools the model should reach for, and what its
 /// answer should and should not say (the answer scoring runs in the Ask eval).
 #[derive(Deserialize)]
-struct Jarvis {
+struct AskCase {
     group: String,
     q: String,
     tools_must: Vec<String>,
@@ -219,17 +219,17 @@ struct Jarvis {
     _answer_forbid: Vec<String>,
 }
 
-/// Runs every Jarvis case through xAI Grok with the full tool loop and
+/// Runs every Ask case through xAI Grok with the full tool loop and
 /// writes evals/report.md. Needs XAI_API_KEY; ignored by default.
 #[tokio::test]
-#[ignore = "needs XAI_API_KEY; run: cargo test -p duskie-desktop jarvis -- --ignored --nocapture"]
-async fn jarvis_with_grok() {
+#[ignore = "needs XAI_API_KEY; run: cargo test -p duskie-desktop ask_cases -- --ignored --nocapture"]
+async fn ask_cases_with_grok() {
     let key = std::env::var("XAI_API_KEY").expect("set XAI_API_KEY");
     let model = std::env::var("DUSKIE_EVAL_MODEL").ok();
     let model_name = model.clone().unwrap_or_else(|| "grok-4-fast".into());
     let ai = OpenAiCompat::cloud("xai", &key, model).expect("xai is a known provider");
-    let cases: Vec<Jarvis> = serde_json::from_str(include_str!("../evals/jarvis.json"))
-        .expect("evals/jarvis.json parses");
+    let cases: Vec<AskCase> = serde_json::from_str(include_str!("../evals/ask-cases.json"))
+        .expect("evals/ask-cases.json parses");
     let defs = crate::ask_tools::defs();
     let mut rows = Vec::new();
     let mut passed = 0;
@@ -295,7 +295,7 @@ async fn jarvis_with_grok() {
     );
     let rate = passed as f64 / cases.len() as f64 * 100.0;
     let report = format!(
-        "# Jarvis eval\n\nModel: {}\n\nTool choice: {passed} of {} ({rate:.0}%). Target: 90%.\n\n\
+        "# Ask eval\n\nModel: {}\n\nTool choice: {passed} of {} ({rate:.0}%). Target: 90%.\n\n\
          | Result | Group | Question | Tools called | Time |\n|---|---|---|---|---|\n{}\n",
         model_name,
         cases.len(),
