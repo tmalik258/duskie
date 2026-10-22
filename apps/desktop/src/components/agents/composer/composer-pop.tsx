@@ -6,6 +6,7 @@ import { Fragment, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import type { AgentCommand } from "@/lib/agent-commands";
 import { scrollIfActive } from "../../ask/parts";
+import { fromPick, parents } from "../../attach/context";
 import type { PopPlace } from "./use-pop-place";
 
 export function ComposerPop({
@@ -72,11 +73,11 @@ export function ComposerPop({
         })
       ) : (
         <>
-          <p className="g">Files in {project}</p>
+          <p className="g">Files and folders in {project}</p>
           {files.map((f, i) => (
             <button key={f} {...option(i)} onClick={() => onFile(f)}>
-              <span className="c mono">{f.split("/").pop()}</span>
-              <span className="d">{f.split("/").slice(0, -1).join("/")}</span>
+              <span className="c mono">{fromPick(f).name}</span>
+              <span className="d">{parents(f)}</span>
             </button>
           ))}
         </>

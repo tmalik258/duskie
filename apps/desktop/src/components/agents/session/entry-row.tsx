@@ -8,6 +8,7 @@ import { AnswerOptions } from "@/components/ask/proposals";
 import type { Entry, Step } from "@/lib/agents";
 import { Markdown } from "@/lib/markdown";
 import { extractChoices } from "@/lib/options";
+import { MessageText } from "../../attach/message-text";
 import { Icon } from "../../icon";
 import { STEP_TAG } from "./format";
 
@@ -36,13 +37,20 @@ export function EntryRow({
     );
   }
   if (e.kind === "you") {
-    if (!onRewind) return <div className="ak-um ak-in">{e.text}</div>;
+    if (!onRewind)
+      return (
+        <div className="ak-um ak-in">
+          <MessageText text={e.text} />
+        </div>
+      );
     return (
       <div className="ak-um-wrap ak-in">
         <button type="button" onClick={onRewind} className="ak-rwb chip">
           ↺ Rewind to here
         </button>
-        <div className="ak-um">{e.text}</div>
+        <div className="ak-um">
+          <MessageText text={e.text} />
+        </div>
       </div>
     );
   }

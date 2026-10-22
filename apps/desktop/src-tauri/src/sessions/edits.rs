@@ -175,8 +175,20 @@ pub fn files_in(root: std::path::PathBuf, query: &str) -> Vec<String> {
         })
         .collect(),
     };
+    // Folders too, so @ can point at a whole folder: "src/components/".
+    let mut folders: Vec<String> = all
+        .iter()
+        .flat_map(|p| {
+            p.match_indices('/')
+                .map(|(i, _)| p[..=i].to_string())
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    folders.sort();
+    folders.dedup();
     let mut hits: Vec<String> = all
         .into_iter()
+        .chain(folders)
         .filter(|p| {
             let l = p.to_lowercase();
             words.iter().all(|w| l.contains(w.as_str()))
@@ -184,6 +196,7 @@ pub fn files_in(root: std::path::PathBuf, query: &str) -> Vec<String> {
         .collect();
     // A match in the file name beats one in a folder name; then shorter paths.
     let name_hit = |p: &str| {
+        let p = p.trim_end_matches('/');
         let name = p.rsplit('/').next().unwrap_or(p).to_lowercase();
         !words.iter().all(|w| name.contains(w.as_str()))
     };

@@ -8,6 +8,7 @@ const mockFiles = (a: Record<string, unknown>) =>
     "apps/desktop/src-tauri/src/island.rs",
     "apps/desktop/src-tauri/src/island_tests.rs",
     "apps/desktop/src/components/Island.tsx",
+    "apps/desktop/src/components/island/",
   ].filter((f) => f.toLowerCase().includes(String(a.query ?? "").toLowerCase()));
 
 export const agentCommands: Record<string, (args: Record<string, unknown>) => unknown> = {

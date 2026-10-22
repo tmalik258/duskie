@@ -6,8 +6,9 @@
 import { useEffect, useRef } from "react";
 import { type Session, SLOTS } from "@/lib/agents";
 import type { CursorChat } from "@/lib/types";
-import { AttachButton, AttachChips } from "../attach/attach-bar";
-import { useAttachments } from "../attach/use-attachments";
+import { AttachButton, ContextChips } from "../attach/attach-bar";
+import { withRefs } from "../attach/context";
+import { useContextItems } from "../attach/use-context-items";
 import { Ic } from "../icon";
 import { ComposerPop } from "./composer/composer-pop";
 import { ChatControls } from "./controls";
@@ -24,8 +25,11 @@ import { SessionList } from "./session-list";
 export function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorChat[] }) {
   const n = useNewSession(sessions);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const att = useAttachments(n.prompt, n.setPrompt);
-  const m = useNewMention(n.prompt, n.setPrompt, n.pickedPath || null);
+  const ctx = useContextItems();
+  const start = () => {
+    if (n.go(withRefs(n.prompt, ctx.items))) ctx.clear();
+  };
+  const m = useNewMention(n.prompt, n.setPrompt, n.pickedPath || null, ctx.pick);
   useEffect(() => {
     requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
   }, []);
@@ -88,16 +92,16 @@ export function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: 
                 onFile={m.pickFile}
               />
             )}
-            <AttachChips items={att.items} error={att.error} onRemove={att.remove} />
+            <ContextChips items={ctx.items} error={ctx.error} onRemove={ctx.remove} />
             {/* biome-ignore lint/a11y/noStaticElementInteractions: a drop zone for files; the paperclip is the keyboard path */}
-            <div ref={m.wrapRef} onDrop={att.onDrop} onDragOver={att.onDragOver}>
+            <div ref={m.wrapRef} onDrop={ctx.onDrop} onDragOver={ctx.onDragOver}>
               <textarea
                 className="no-scrollbar"
                 ref={inputRef}
                 rows={2}
                 value={n.prompt}
                 onChange={(e) => n.setPrompt(e.target.value)}
-                onPaste={att.onPaste}
+                onPaste={ctx.onPaste}
                 onKeyDown={(e) => {
                   if (m.onKey(e)) return;
                   if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key === ".") {
@@ -107,7 +111,7 @@ export function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: 
                   }
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    n.go();
+                    start();
                   }
                 }}
                 placeholder="What should it do? @ for files"
@@ -122,7 +126,7 @@ export function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: 
                 onEffort={n.pickEffort}
                 lead={
                   <>
-                    <AttachButton onFiles={(f) => void att.add(f)} />
+                    <AttachButton onFiles={(f) => void ctx.upload(f)} />
                     <ModeChip mode={n.mode} onChange={n.pickMode} />
                   </>
                 }
@@ -141,7 +145,7 @@ export function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: 
                       aria-label={n.full ? "Queue" : "Start"}
                       title={n.full ? "Queue (Enter)" : "Start (Enter)"}
                       disabled={n.busy || !n.prompt.trim()}
-                      onClick={n.go}
+                      onClick={start}
                     >
                       <Ic name="send" size={13} />
                     </button>

@@ -4,17 +4,24 @@
 
 import { type KeyboardEvent, useRef, useState } from "react";
 import { api } from "@/lib/bridge";
+import { dropMention } from "../../attach/context";
 import { useMentionFiles } from "../composer/use-mention-files";
 import { usePopPlace } from "../composer/use-pop-place";
 
-export function useNewMention(prompt: string, setPrompt: (t: string) => void, path: string | null) {
+export function useNewMention(
+  prompt: string,
+  setPrompt: (t: string) => void,
+  path: string | null,
+  onPick: (f: string) => void,
+) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [sel, setSel] = useState(0);
-  const { files, pick } = useMentionFiles(prompt, path ? (q) => api.projectFiles(path, q) : null, path ?? "");
+  const { files } = useMentionFiles(prompt, path ? (q) => api.projectFiles(path, q) : null, path ?? "");
   const { float, popRef } = usePopPlace(wrapRef, files.length, prompt);
   const at = Math.min(sel, Math.max(files.length - 1, 0));
   const pickFile = (f: string) => {
-    setPrompt(pick(f));
+    setPrompt(dropMention(prompt));
+    onPick(f);
     setSel(0);
   };
   /** Handles the list keys; true when the key was used. */
