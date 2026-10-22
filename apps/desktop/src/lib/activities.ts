@@ -74,6 +74,22 @@ export function finishActivity(id: string, ok: boolean, outcome: string) {
 export function dismissLocal(id: string) {
   useActivities.setState((s) => ({ local: s.local.map((a) => (a.id === id ? { ...a, dismissed: true } : a)) }));
 }
+/** Percent done, bytes per second and seconds left, from what is known so far. */
+export function downloadProgress(a: Activity): { pct: number | null; speed: number | null; left: number | null } {
+  if (a.transferred === null) return { pct: null, speed: null, left: null };
+  const secs = (a.lastProgressAt - a.startedAt) / 1000;
+  const speed = secs >= 1 && a.transferred > 0 ? a.transferred / secs : null;
+  const pct = a.total && a.total > 0 ? Math.min(100, (a.transferred / a.total) * 100) : null;
+  const left = speed && a.total && a.total > a.transferred ? (a.total - a.transferred) / speed : null;
+  return { pct, speed, left };
+}
+/** "45 s left", "3 min left". */
+export function timeLeft(secs: number): string {
+  if (secs < 60) return `${Math.max(1, Math.round(secs))} s left`;
+  if (secs < 3600) return `${Math.round(secs / 60)} min left`;
+  return `${Math.floor(secs / 3600)} h ${Math.round((secs % 3600) / 60)} min left`;
+}
+const rate = (bps: number) => `${(bps / 1_000_000).toFixed(bps < 10_000_000 ? 1 : 0)} MB/s`;
 const size = (bytes: number) => `${(bytes / 1_000_000).toFixed(bytes < 10_000_000 ? 1 : 0)} MB`;
 
 /** Check again / Dismiss: always for downloads & setup; chat/agent only when stuck or done. */
@@ -116,10 +132,14 @@ export function activityLabel(a: Activity, now: number, opts?: { elapsed?: boole
     return `${label} · ${a.phase === "downloading" ? "no new data" : "no confirmed progress"} for ${Math.max(0, Math.floor(idle / 60_000))}m`;
   }
   if (a.transferred !== null) {
-    const progress =
-      a.total && a.total > 0
-        ? `${Math.min(100, Math.floor((a.transferred / a.total) * 100))}% · ${size(a.transferred)} of ${size(a.total)}`
-        : `${size(a.transferred)} received`;
+    const { pct, speed, left } = downloadProgress(a);
+    const parts =
+      pct !== null
+        ? [`${Math.floor(pct)}%`, `${size(a.transferred)} of ${size(a.total ?? 0)}`]
+        : [`${size(a.transferred)} received`];
+    if (left !== null) parts.push(timeLeft(left));
+    else if (speed !== null) parts.push(rate(speed));
+    const progress = parts.join(" · ");
     return `${label} · ${progress}`;
   }
   if (opts?.elapsed === false) return `${label}…`;

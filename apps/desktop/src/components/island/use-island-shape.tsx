@@ -2,7 +2,7 @@
 
 import { animate } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { activityLabel } from "@/lib/activities";
+import { activityLabel, downloadProgress } from "@/lib/activities";
 import { wideScreen } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { PANEL_PAD } from "@/lib/island-size";
@@ -59,7 +59,15 @@ export function useIslandShape(c: IslandStore & IslandWork & IslandHover & Islan
                       label: displayedActivity
                         ? activityLabel(displayedActivity, activityNow, { elapsed: false }).replace(/(\.\.\.|…)$/, "")
                         : (voiceQuestion ?? working ?? "").replace(/(\.\.\.|…)$/, ""),
-                      startedAt: displayedActivity?.startedAt,
+                      // The edge ring fills with real progress; a known time
+                      // left replaces the elapsed timer.
+                      ...(() => {
+                        const p = displayedActivity ? downloadProgress(displayedActivity) : null;
+                        return {
+                          startedAt: p?.left == null ? displayedActivity?.startedAt : undefined,
+                          progress: p?.pct == null ? undefined : p.pct / 100,
+                        };
+                      })(),
                     }
                   : focusLeft !== null
                     ? {
