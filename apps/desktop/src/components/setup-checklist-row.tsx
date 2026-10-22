@@ -2,43 +2,22 @@
 
 // One setup checklist row: status, Run / Add for me / Set up, and inline guides.
 
-import { memo, type ReactNode, useEffect, useRef, useState } from "react";
-import { api } from "@/lib/bridge";
-import { friendlyError } from "@/lib/friendly";
-import { useCopy } from "@/lib/hooks";
-import { startWaiting, stopWaiting, useDuskie } from "@/lib/store";
+import { memo, type ReactNode, useState } from "react";
+import { stopWaiting } from "@/lib/store";
 import type { SetupItem } from "@/lib/types";
+import {
+  Code,
+  CopyCommand,
+  ONE_CLICK,
+  oneClickLabel,
+  SetupStatusMark,
+  SmallButton,
+  TAB_LABELS,
+} from "./setup-checklist-row/parts";
+import { useSetupActions } from "./setup-checklist-row/use-setup-actions";
 import { ItemGuide } from "./setup-guides";
-import { Tip } from "./tip";
 
-const TAB_LABELS: Record<string, string> = {
-  ai: "AI",
-  browser: "Browser",
-  general: "General",
-  search: "Search",
-  today: "Today",
-  voice: "Voice",
-  connections: "Apps",
-  privacy: "Privacy",
-};
-
-const ONE_CLICK = new Set([
-  "claude_hooks",
-  "claude_mcp",
-  "codex_notify",
-  "codex_mcp",
-  "browser",
-  "code_folders",
-  "search_folders",
-  "voice",
-  "composio",
-]);
-
-function oneClickLabel(id: string): string {
-  if (id === "claude_hooks" || id === "claude_mcp" || id === "codex_notify" || id === "codex_mcp") return "Add for me";
-  if (id === "composio") return "Connect";
-  return "Set up";
-}
+export { SetupSpinner, SetupStatusMark, SmallButton } from "./setup-checklist-row/parts";
 
 /** Memoized: re-renders only when this row's own data or open state changes. */
 export const SetupRow = memo(function SetupRow({
@@ -64,18 +43,12 @@ export const SetupRow = memo(function SetupRow({
   /** Shown under the row, done or not (the Composio row's apps). */
   children?: ReactNode;
 }) {
-  const [busy, setBusy] = useState(false);
-  const waiting = useDuskie((s) => s.waiting);
-  // App connects (app:notion) highlight the Composio row, that is the island done ring.
-  const justDone = useDuskie(
-    (s) => s.justDone === item.id || (item.id === "composio" && (s.justDone?.startsWith("app:") ?? false)),
+  const { busy, actionError, runDirect, run, isWaiting, isDirect, justDone, rowRef } = useSetupActions(
+    item,
+    onRun,
+    onDone,
+    onToggleGuide,
   );
-  // When Settings reopens after a step finished, show that step.
-  const rowRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (justDone) rowRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
-  }, [justDone]);
-  const [actionError, setActionError] = useState<string | null>(null);
   // The command is there for those who want it, not the first thing you see.
   const [showCommand, setShowCommand] = useState(false);
   const multiline = item.command?.includes("\n") ?? false;
@@ -84,70 +57,6 @@ export const SetupRow = memo(function SetupRow({
   const showInline = Boolean(inlineGuides && needsGuide);
   const showOpenTab = Boolean(!inlineGuides && needsGuide && onOpenTab && item.tab);
   const showRun = Boolean(item.runnable && item.id !== "claude_hooks");
-
-  const runDirect = () => {
-    if (item.id === "browser" || item.id === "code_folders" || item.id === "search_folders" || item.id === "voice") {
-      onToggleGuide(item.id);
-      return;
-    }
-    setBusy(true);
-    setActionError(null);
-    const work =
-      item.id === "claude_hooks"
-        ? api.claudeAddHooks().then(() => undefined)
-        : item.id === "claude_mcp"
-          ? api.claudeAddMcp().catch(() => api.setupRun("claude_mcp"))
-          : item.id === "codex_notify"
-            ? api.codexAddNotify().then(() => undefined)
-            : item.id === "codex_mcp"
-              ? api.codexAddMcp().then(() => undefined)
-              : api.composioSignIn();
-    const outside = item.id === "composio";
-    void work
-      .then(() => {
-        onDone();
-        // Finishing happens in the browser: the island keeps the steps until it connects.
-        if (outside)
-          startWaiting(item.id, item.title, {
-            resumeTab: item.tab ?? "connections",
-            steps: ["Composio opened in your browser.", "Sign in and press Allow."],
-            again: runDirect,
-          });
-      })
-      .catch((e) => setActionError(friendlyError(e)))
-      .finally(() => setBusy(false));
-  };
-  const run = () => {
-    onRun(item.id);
-    // The island keeps the steps until setup status flips.
-    startWaiting(item.id, item.title, {
-      resumeTab: item.tab ?? "home",
-      steps: item.opensApp
-        ? [`Duskie is starting ${item.title} in the background.`, "This finishes by itself when it is running."]
-        : item.opensTerminal
-          ? [
-              "PowerShell is open. The command is already on the clipboard.",
-              "Replace your-key with your API key, paste (Ctrl+V), press Enter.",
-              "Come back here. Duskie notices when the key is set. No restart needed.",
-            ]
-          : [
-              `A PowerShell window is running: ${item.action} ${item.title}.`,
-              "Leave it open and answer any prompts there.",
-              "This finishes by itself when it is ready.",
-            ],
-      copies: item.command ? [{ label: "Copy the command", text: item.command }] : undefined,
-      again: () => onRun(item.id),
-      doneLine: item.opensApp ? `All set. ${item.title} is running.` : undefined,
-    });
-  };
-  const isWaiting = waiting?.id === item.id && !item.done;
-
-  const isDirect =
-    item.id === "claude_hooks" ||
-    item.id === "claude_mcp" ||
-    item.id === "codex_notify" ||
-    item.id === "codex_mcp" ||
-    item.id === "composio";
 
   return (
     <div
@@ -241,68 +150,3 @@ export const SetupRow = memo(function SetupRow({
     </div>
   );
 });
-
-function Code({ text }: { text: string }) {
-  return (
-    <Tip label={text} className="block min-w-0 max-w-full">
-      <code className="block truncate rounded-lg bg-black/30 px-2.5 py-1.5 font-mono text-[11px] text-white/80 select-all">
-        {text}
-      </code>
-    </Tip>
-  );
-}
-
-export function SmallButton({
-  children,
-  onClick,
-  disabled,
-  primary,
-}: {
-  children: ReactNode;
-  onClick: () => void;
-  disabled?: boolean;
-  primary?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={disabled}
-      className={`chip inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12px] font-medium disabled:opacity-50 ${
-        primary ? "bg-white text-black hover:bg-white/90" : "bg-white/12 text-white/90 hover:bg-white/20"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-/** Tiny ring for Check again / other short waits. */
-export function SetupSpinner({ className = "" }: { className?: string }) {
-  return (
-    <span
-      aria-hidden="true"
-      className={`size-3 shrink-0 animate-spin rounded-full border border-current border-r-transparent ${className}`}
-    />
-  );
-}
-
-/** One status circle for rows and the folded "ready" bar, checking pulses. */
-export function SetupStatusMark({ checking, done }: { checking: boolean; done: boolean }) {
-  return (
-    <span
-      role="img"
-      aria-label={checking ? "Checking" : done ? "Done" : "Not done"}
-      className={`grid size-[18px] shrink-0 place-items-center rounded-full text-[10px] font-bold transition-colors duration-300 ${
-        checking ? "animate-pulse bg-white/15" : done ? "bg-[#30d158] text-black" : "ring-1 ring-white/30 ring-inset"
-      }`}
-    >
-      {!checking && done ? "✓" : ""}
-    </span>
-  );
-}
-
-function CopyCommand({ text }: { text: string }) {
-  const { copied, copy } = useCopy(text);
-  return <SmallButton onClick={copy}>{copied ? "Copied" : "Copy"}</SmallButton>;
-}
