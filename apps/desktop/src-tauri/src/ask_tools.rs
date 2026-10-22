@@ -15,6 +15,7 @@ use duskie_actions::pc;
 
 use crate::state::{AppState, executor, lock};
 mod defs;
+mod diagnose;
 mod open;
 mod pick;
 mod proposals;
@@ -23,6 +24,7 @@ mod screen;
 mod system;
 
 pub use defs::*;
+pub use diagnose::*;
 pub use open::*;
 pub use pick::*;
 pub use proposals::*;
@@ -59,6 +61,8 @@ const USE_SKILL: &str = "use_skill";
 const HELP: &str = "duskie_help";
 const SYSTEM: &str = "system";
 const RUN: &str = "run";
+const APP_INFO: &str = "app_info";
+const DIAGNOSE: &str = "diagnose";
 
 /// The Ask chat answering right now, so tools called through Duskie's
 /// MCP server (by Claude Code or Codex) put their buttons in it.
@@ -323,6 +327,11 @@ async fn run_tool(app: &AppHandle, chat_id: &str, name: &str, args: &Value) -> O
             let args = args.clone();
             blocking(move || system_tool(&args)).await
         }
+        APP_INFO => {
+            let name = args["name"].as_str().unwrap_or_default().to_owned();
+            blocking(move || duskie_actions::app_info::app_info(&name)).await
+        }
+        DIAGNOSE => diagnose(args).await,
         RUN => {
             let args = args.clone();
             tokio::task::spawn_blocking(move || run_command(&args))
@@ -716,7 +725,7 @@ mod tests {
         let mut expected = vec![
             SEARCH, TODAY, RECENT, OPEN, SCREEN, PROPOSE, FIND, REVEAL, PC_STATUS, STORAGE, HELP,
             DOCTOR, GIT, PC, WINDOWS, NOTIFS, DESKTOP, OFFICE, RECIPES, REMEMBER, USE_SKILL,
-            SYSTEM, RUN,
+            SYSTEM, RUN, APP_INFO, DIAGNOSE,
         ];
         let mut got: Vec<&str> = offline.iter().map(String::as_str).collect();
         expected.sort_unstable();
@@ -836,7 +845,8 @@ mod tests {
             [
                 USE_SKILL, SEARCH, FIND, REVEAL, TODAY, RECENT, SCREEN, PROPOSE, WEB_SEARCH,
                 READ_PAGE, BROWSER, APP_ACTION, DESKTOP, APPS, OFFICE, RECIPES, REMEMBER, NOTIFS,
-                PC_STATUS, STORAGE, HELP, DOCTOR, GIT, GITHUB, PC, WINDOWS, OPEN, SYSTEM, RUN
+                PC_STATUS, STORAGE, HELP, DOCTOR, GIT, GITHUB, PC, WINDOWS, OPEN, SYSTEM, RUN,
+                APP_INFO, DIAGNOSE
             ]
         );
     }

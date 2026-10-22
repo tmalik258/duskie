@@ -4,6 +4,7 @@
 //! Every external program is started with an argument list, never a shell
 //! string built from event data.
 
+pub mod app_info;
 mod capabilities;
 pub mod cleanup;
 mod convert;
