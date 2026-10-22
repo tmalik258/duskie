@@ -57,3 +57,15 @@ export function upsertFile(list: FileChange[], file: FileChange): FileChange[] {
   next[i] = file;
   return next;
 }
+
+/** Files grouped by folder, in list order. */
+export function groupByDir(list: FileChange[]) {
+  const g: { dir: string; items: { f: FileChange; i: number }[] }[] = [];
+  list.forEach((f, i) => {
+    const [dir] = split(f.path);
+    const last = g[g.length - 1];
+    if (last && last.dir === dir) last.items.push({ f, i });
+    else g.push({ dir, items: [{ f, i }] });
+  });
+  return g;
+}
