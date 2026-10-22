@@ -207,8 +207,8 @@ async fn ensure_model(
         .flatten()
         .filter_map(|m| m["name"].as_str().map(String::from))
         .collect();
-    // A coding model you already chose or have wins over downloading one.
-    if let Some(m) = chosen.filter(|m| m.contains("coder") && have.contains(m)) {
+    // A model you chose, or a coding model you have, wins over downloading one.
+    if let Some(m) = chosen.filter(|m| have.contains(m)) {
         return Ok(m);
     }
     if let Some(m) = have.iter().find(|m| m.contains("coder")) {
@@ -268,6 +268,13 @@ pub async fn run(
             Cmd::Restart => return Ok(()),
         };
         emit(app, id, json!({"kind":"working"}));
+        // A model picked in the chat box takes over from the next turn.
+        if let Some(t) = super::tuned(id).model
+            && model.as_ref() != Some(&t)
+        {
+            emit(app, id, json!({"kind":"model","name":t}));
+            model = Some(t);
+        }
         let m = match &model {
             Some(m) => m.clone(),
             None => match ensure_model(app, id, &http, &root, chosen.clone()).await {

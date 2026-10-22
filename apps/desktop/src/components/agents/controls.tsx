@@ -19,6 +19,7 @@ import {
   modelsFor,
   Pop,
 } from "./controls/levels";
+import { LocalModelChip } from "./controls/local-model";
 import { NoLimits } from "./controls/no-limits";
 import { ThinkingBody } from "./controls/thinking-body";
 import { UsageBody } from "./controls/usage-body";
@@ -107,10 +108,7 @@ export function ChatControls({
         </Pop>
       )}
       {local ? (
-        <span className="ak-cchip">
-          <i className="ak-cdot" style={{ background: "#30d158" }} />
-          {localModel ?? "Local model"}
-        </span>
+        <LocalModelChip shown={model ?? localModel} onModel={onModel} />
       ) : (
         models.length > 0 && (
           <span className="ak-cmodel">
