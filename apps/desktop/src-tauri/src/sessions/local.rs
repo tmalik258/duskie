@@ -373,6 +373,7 @@ pub async fn run(
                                     match std::fs::write(&p, content) {
                                         Ok(()) => {
                                             wrote = true;
+                                            emit(app, id, json!({"kind":"touch","paths":[path]}));
                                             ("Written.".into(), true)
                                         }
                                         Err(e) => (format!("Could not write: {e}"), false),

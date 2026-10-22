@@ -412,11 +412,21 @@ pub fn codex_events(v: &Value) -> Vec<Value> {
             }
             let (tool, label, detail) = match item["type"].as_str() {
                 Some("commandExecution") => (
-                    "Bash",
+                    {
+                        out.push(json!({ "kind": "shell" }));
+                        "Bash"
+                    },
                     "Run a command".to_owned(),
                     shown_command(item["command"].as_str().unwrap_or_default()),
                 ),
                 Some("fileChange") => {
+                    let paths: Vec<&str> = item["changes"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|c| c["path"].as_str())
+                        .collect();
+                    out.push(json!({ "kind": "touch", "paths": paths }));
                     let files: Vec<String> = item["changes"]
                         .as_array()
                         .into_iter()
