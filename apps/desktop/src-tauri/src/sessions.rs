@@ -16,11 +16,13 @@ mod local_calls;
 mod plain;
 mod plans;
 pub mod reviews;
+mod trial;
 
 pub use claude::*;
 pub use codex::*;
 pub use edits::*;
 pub use plain::*;
+pub use trial::{discard_trial, keep_trial};
 
 use duskie_sensors::classify::mask;
 use std::borrow::Cow;
@@ -60,6 +62,8 @@ pub enum Mode {
     Debug,
     /// Does everything without asking.
     Full,
+    /// Like Edit, on a throwaway copy; Keep brings the changes over.
+    Try,
 }
 
 /// What Debug mode asks of the agent before the user's own words.
@@ -74,7 +78,7 @@ impl Mode {
         match self {
             Mode::Plan => "plan",
             Mode::Ask => "default",
-            Mode::Edit | Mode::Debug => "acceptEdits",
+            Mode::Edit | Mode::Debug | Mode::Try => "acceptEdits",
             Mode::Full => "bypassPermissions",
         }
     }
@@ -84,7 +88,7 @@ impl Mode {
         match self {
             Mode::Plan => ("read-only", "never"),
             Mode::Ask => ("workspace-write", "untrusted"),
-            Mode::Edit | Mode::Debug => ("workspace-write", "on-request"),
+            Mode::Edit | Mode::Debug | Mode::Try => ("workspace-write", "on-request"),
             Mode::Full => ("danger-full-access", "never"),
         }
     }
@@ -190,6 +194,14 @@ fn tuned(id: &str) -> Tune {
 }
 
 pub fn set_mode(id: &str, mode: Mode) -> Result<(), String> {
+    let trying = with(&trial::TRIALS, |t| t.contains_key(id));
+    if (mode == Mode::Try) != trying {
+        return Err(if trying {
+            "This session works on a copy. Keep or throw it away first.".into()
+        } else {
+            "Try starts with a new session, so it can work on a copy.".into()
+        });
+    }
     let claude = with(&SESSIONS, |s| {
         let h = s.get_mut(id).ok_or("That session is gone.")?;
         h.mode = mode;
@@ -387,6 +399,8 @@ pub struct Started {
     pub branch: Option<String>,
     /// Changes can be reviewed and undone (the project uses git).
     pub reviewable: bool,
+    /// Try mode: the copy's branch. The user's folder is untouched.
+    pub trial: Option<String>,
 }
 
 /// Starts an agent in `path` with `prompt`.
@@ -430,6 +444,22 @@ pub async fn start_tuned(
             )
         });
     }
+    let copy = if mode == Mode::Try {
+        let (path, prompt, id) = (path.to_owned(), prompt.to_owned(), id.clone());
+        Some(
+            tokio::task::spawn_blocking(move || trial::make(&path, &prompt, &id))
+                .await
+                .map_err(|e| e.to_string())??,
+        )
+    } else {
+        None
+    };
+    let project = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    let (copy_dir, trial) = copy.unzip();
+    let path: &Path = copy_dir.as_deref().unwrap_or(path);
     let baseline = {
         let path = path.to_owned();
         tokio::task::spawn_blocking(move || review::capture(&path, shadow_root().as_deref()))
@@ -442,12 +472,10 @@ pub async fn start_tuned(
     let started = Started {
         id: id.clone(),
         agent: agent.name(),
-        project: path
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default(),
+        project,
         branch,
         reviewable: baseline.is_some(),
+        trial,
     };
     with(&SESSIONS, |s| {
         s.insert(
@@ -1029,7 +1057,14 @@ mod tests {
     #[test]
     fn codex_turn_settings_include_real_plan_and_restore_default() {
         let path = Path::new("C:/project");
-        for mode in [Mode::Plan, Mode::Ask, Mode::Edit, Mode::Debug, Mode::Full] {
+        for mode in [
+            Mode::Plan,
+            Mode::Ask,
+            Mode::Edit,
+            Mode::Debug,
+            Mode::Full,
+            Mode::Try,
+        ] {
             let params = codex_turn_params(
                 "protocol-test",
                 "t",
@@ -1366,13 +1401,25 @@ mod tests {
         );
     }
 
+    /// Events without the review's touch and shell markers.
+    fn no_touch(ev: Vec<Value>) -> Vec<Value> {
+        ev.into_iter()
+            .filter(|e| !matches!(e["kind"].as_str(), Some("touch" | "shell")))
+            .collect()
+    }
+
     #[test]
     fn reads_claude_steps_plans_and_turns() {
         let tool: Value = serde_json::from_str(
             r#"{"type":"assistant","message":{"content":[{"type":"text","text":"ok"},{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"C:\\code\\app\\src\\main.rs"}}]}}"#,
         )
         .unwrap();
-        let ev = claude_events(&tool, None);
+        let all = claude_events(&tool, None);
+        assert!(
+            all.iter().any(|e| e["kind"] == "touch"),
+            "edits are tracked for review"
+        );
+        let ev = no_touch(all);
         assert_eq!(ev[0]["label"], "Edit main.rs");
         assert_eq!(ev[0]["state"], "running");
 
@@ -1439,7 +1486,7 @@ mod tests {
             r#"{"method":"item/completed","params":{"item":{"type":"commandExecution","id":"i1","command":"cargo test","exitCode":1,"status":"completed"}}}"#,
         )
         .unwrap();
-        let ev = codex_events(&cmd);
+        let ev = no_touch(codex_events(&cmd));
         assert_eq!(ev[0]["detail"], "cargo test");
         assert_eq!(ev[0]["state"], "failed");
 

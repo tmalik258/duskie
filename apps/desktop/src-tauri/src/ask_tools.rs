@@ -706,6 +706,7 @@ mod tests {
         let mut expected = vec![
             SEARCH, TODAY, RECENT, OPEN, SCREEN, PROPOSE, FIND, REVEAL, PC_STATUS, STORAGE, HELP,
             DOCTOR, GIT, PC, WINDOWS, NOTIFS, DESKTOP, OFFICE, RECIPES, REMEMBER, USE_SKILL,
+            SYSTEM,
         ];
         let mut got: Vec<&str> = offline.iter().map(String::as_str).collect();
         expected.sort_unstable();
@@ -825,7 +826,7 @@ mod tests {
             [
                 USE_SKILL, SEARCH, FIND, REVEAL, TODAY, RECENT, SCREEN, PROPOSE, WEB_SEARCH,
                 READ_PAGE, BROWSER, APP_ACTION, DESKTOP, APPS, OFFICE, RECIPES, REMEMBER, NOTIFS,
-                PC_STATUS, STORAGE, HELP, DOCTOR, GIT, GITHUB, PC, WINDOWS, OPEN
+                PC_STATUS, STORAGE, HELP, DOCTOR, GIT, GITHUB, PC, WINDOWS, OPEN, SYSTEM
             ]
         );
     }

@@ -106,7 +106,7 @@ export interface RoutineItem {
 
 /** Coding agents on this PC, and which one gets handoffs. */
 /** How much an agent may do without asking. */
-export type AgentMode = "plan" | "ask" | "edit" | "debug" | "full";
+export type AgentMode = "plan" | "ask" | "edit" | "debug" | "full" | "try";
 
 export interface AgentStarted {
   id: string;
@@ -115,6 +115,8 @@ export interface AgentStarted {
   branch: string | null;
   /** Changes can be reviewed and undone (the project uses git). */
   reviewable: boolean;
+  /** Try mode: the copy's branch. The project folder is untouched. */
+  trial?: string | null;
 }
 
 export interface FileChange {

@@ -82,6 +82,8 @@ export const agentApi = {
     invoke<void>("agent_review_decide", { id, turn, path, hunk, accept }),
   agentTune: (id: string, model: string | null, effort: string | null) =>
     invoke<void>("agent_tune", { id, model, effort }),
+  agentKeep: (id: string) => invoke<string>("agent_keep", { id }),
+  agentDiscard: (id: string) => invoke<string>("agent_discard", { id }),
   agentStop: (id: string) => invoke<void>("agent_stop", { id }),
   agentAnswer: (question: string, answer: "allow" | "always" | "deny") =>
     invoke<void>("agent_answer", { question, answer }),

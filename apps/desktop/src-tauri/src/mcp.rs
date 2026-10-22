@@ -457,6 +457,7 @@ mod tests {
                 "duskie_pc_control",
                 "duskie_windows",
                 "duskie_open",
+                "duskie_system",
             ]
         );
         assert!(
