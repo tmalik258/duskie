@@ -575,7 +575,6 @@ mod tests {
         assert!(looks_like_request("my battery is low right now"));
     }
 
-
     #[test]
     fn spells_a_name_in_wake_tokens() {
         let vocab: Vocab = [

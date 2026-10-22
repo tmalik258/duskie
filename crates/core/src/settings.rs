@@ -31,7 +31,7 @@ impl Pause {
 
 /// Shortcuts besides Ask, with their defaults.
 pub const SHORTCUTS: &[(&str, &str)] = &[
-    ("agents", "Ctrl+Alt+A"),
+    ("agents", "Ctrl+Alt+Super+Space"),
     ("git", "Ctrl+Alt+G"),
     ("talk", "Ctrl+Alt+T"),
     ("accept", "Ctrl+Alt+Enter"),
@@ -805,14 +805,16 @@ impl Default for Settings {
 
 pub const DEFAULT_PALETTE_HOTKEY: &str = "Super+Alt+Space";
 
-/// Defaults before shortcuts version 1, moved once when still unchanged:
-/// Ctrl+Space is VS Code's suggestions and Ctrl+Alt+Space the Google app's.
-const OLD_DEFAULT_KEYS: &[(&str, &str)] = &[
-    ("ask", "Ctrl+Space"),
-    ("agents", "Ctrl+Shift+Space"),
-    ("talk", "Ctrl+Alt+Space"),
+/// Old defaults, each with the shortcuts version that replaced it, moved
+/// once when still unchanged: Ctrl+Space is VS Code's suggestions and
+/// Ctrl+Alt+Space the Google app's.
+const OLD_DEFAULT_KEYS: &[(u32, &str, &str)] = &[
+    (1, "ask", "Ctrl+Space"),
+    (1, "agents", "Ctrl+Shift+Space"),
+    (1, "talk", "Ctrl+Alt+Space"),
+    (2, "agents", "Ctrl+Alt+A"),
 ];
-const SHORTCUTS_VERSION: u32 = 1;
+const SHORTCUTS_VERSION: u32 = 2;
 /// Screens in the first-run welcome (Welcome, Your AI, Connect, Tools, Extras).
 pub const WELCOME_STEP_COUNT: u32 = 5;
 
@@ -932,7 +934,8 @@ impl Settings {
         // Old defaults nobody changed move to the new ones, once; keys you
         // picked yourself stay.
         if self.shortcuts_version < SHORTCUTS_VERSION {
-            for (action, old) in OLD_DEFAULT_KEYS {
+            let version = self.shortcuts_version;
+            for (_, action, old) in OLD_DEFAULT_KEYS.iter().filter(|(v, ..)| version < *v) {
                 if *action == "ask" {
                     if self.palette_hotkey == *old {
                         self.palette_hotkey = DEFAULT_PALETTE_HOTKEY.into();
@@ -1087,7 +1090,7 @@ mod tests {
         s.shortcuts.insert("talk".into(), "Ctrl+Q".into());
         let s = s.sanitized();
         assert_eq!(s.palette_hotkey, DEFAULT_PALETTE_HOTKEY);
-        assert_eq!(s.shortcuts["agents"], "Ctrl+Alt+A");
+        assert_eq!(s.shortcuts["agents"], "Ctrl+Alt+Super+Space");
         assert_eq!(s.shortcuts["talk"], "Ctrl+Q");
         assert_eq!(s.shortcuts["git"], "Ctrl+Alt+G");
         // Picked again after the move: stays.

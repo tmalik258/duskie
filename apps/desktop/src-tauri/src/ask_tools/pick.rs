@@ -236,7 +236,6 @@ pub fn by_intent(question: &str) -> Vec<&'static str> {
     }
     if has(&[
         "duskie",
-        " you ",
         "how do you",
         "can you do",
         "what can you",

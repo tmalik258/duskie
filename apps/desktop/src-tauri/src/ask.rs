@@ -1,5 +1,5 @@
 //! Ask mode: the island itself grows into a panel for commands
-//! and chat. Win+Alt+Space opens Ask; Ctrl+Alt+A opens Agents. Esc or
+//! and chat. Win+Alt+Space opens Ask; Win+Ctrl+Alt+Space opens Agents. Esc or
 //! clicking anywhere else closes it. Until onboarding is finished, the island
 //! stays locked on welcome: blur, Esc and the Ask shortcut cannot dismiss it
 //! for good. Hide parks it (other apps stay usable); hovering the island

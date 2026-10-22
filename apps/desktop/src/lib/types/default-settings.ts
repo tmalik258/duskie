@@ -16,9 +16,9 @@ export const DEFAULT_SETTINGS: Settings = {
   islandColor: "atelier",
   soundKit: "sidekick",
   paletteHotkey: "Super+Alt+Space",
-  shortcutsVersion: 1,
+  shortcutsVersion: 2,
   shortcuts: {
-    agents: "Ctrl+Alt+A",
+    agents: "Ctrl+Alt+Super+Space",
     git: "Ctrl+Alt+G",
     talk: "Ctrl+Alt+T",
     accept: "Ctrl+Alt+Enter",

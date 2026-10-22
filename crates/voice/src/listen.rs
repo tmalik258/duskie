@@ -429,6 +429,7 @@ impl Engine {
             // Only the voice that talked over is primed, not the echo.
             self.recent = std::mem::take(&mut self.barge.voice).into();
             self.barged = true;
+            log::info!("barge-in: a voice talked over Duskie");
             self.start_listening();
             return vec![Heard::Wake];
         }
