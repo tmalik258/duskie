@@ -3,7 +3,6 @@
 // Part of ui: Switch, Toggle, Slider, TextField, Field, SelectOption.
 
 import { type ReactNode, useEffect, useState } from "react";
-import { Tip } from "../../tip";
 import { Segmented } from "./settings-query";
 
 /** On or off, as the plan's two-part switch. */

@@ -18,7 +18,7 @@ import {
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import type { AgentMode, Agents } from "@/lib/types";
-import { DEFAULT_EFFORT, defaultModel } from "../controls";
+import { DEFAULT_EFFORT, defaultModel } from "../controls/levels";
 import { agentMarkId } from "../marks";
 import { ready } from "./agent-status";
 

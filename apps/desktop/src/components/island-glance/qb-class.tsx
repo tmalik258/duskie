@@ -9,7 +9,6 @@ import { updateSettings, useDuskie } from "@/lib/store";
 import { minutesText } from "@/lib/time-text";
 import { pickTip } from "@/lib/tips";
 import { type AppTime, type CalendarToday, formatDuration } from "@/lib/types";
-import { Tip } from "../tip";
 
 /** Round quick-action button (porcelain chrome). */
 export const qbClass = "rd-qb chip relative grid size-7 place-items-center overflow-hidden";

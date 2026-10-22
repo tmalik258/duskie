@@ -6,7 +6,6 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/bridge";
 import { askAgain, thinkHarder, useDuskie } from "@/lib/store";
 import { Tip } from "../../tip";
-import { Retry } from "./retry";
 import { ActIcon, SaveRecipe, StopIcon } from "./yaml-block";
 
 /** The coding agent that gets handoffs, or null when neither is installed. */

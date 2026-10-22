@@ -1,8 +1,6 @@
 // Part of types: ComposioStatus, BrowserStatus, ExtensionGuide, Folder, Found, SetupFound, SetupPlan, LocalModels, LaterItem, ChatSummary, SHORTCUT_ACTIONS, RoutineItem, AgentMode, AgentStarted, FileChange, CursorChat, RepoPr.
 
 import type { ComposioApp, SetupItem } from "./action-result";
-import { Settings } from "./ai-settings";
-import { Agents } from "./voice-heard";
 
 export interface ComposioStatus {
   signedIn: boolean;

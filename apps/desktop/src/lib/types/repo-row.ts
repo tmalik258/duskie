@@ -1,6 +1,5 @@
 // Part of types: RepoRow, ReposOverview, LimitState, ServerTool, MailState, MailStatus, GitFile, GitBranch, CommitRow, StashRow, MessageDiff, LearnedLevel, LessonRow, InboxItem, InboxStatus, InstantResults, Learned.
 
-import { Settings } from "./ai-settings";
 import type { RepoPr } from "./composio-status";
 import type { NotifyLevel } from "./cues";
 
