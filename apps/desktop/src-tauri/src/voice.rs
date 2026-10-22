@@ -1289,16 +1289,11 @@ fn keep_waiting(app: &AppHandle, id: String, labels: Vec<String>) {
     }
 }
 
-/// True while the mic is open for an answer after the question was read.
-/// The card waits for that, never for the voice itself.
+/// True from the moment the card is read out until a choice is heard or
+/// the wait runs out, so the card never goes mid-sentence or before you
+/// can answer. Only the short prompt is read (headline and choices).
 pub fn awaiting_choice(app: &AppHandle) -> bool {
-    let v = voice(app);
-    lock(&v.choosing).is_some()
-        && mascot::current(app) == duskie_core::MascotState::Listening
-        && !lock(&v.runtime)
-            .as_ref()
-            .and_then(|r| r.speaker.as_ref())
-            .is_some_and(Speaker::busy)
+    lock(&voice(app).choosing).is_some()
 }
 
 /// A reply that is basically just a choice ("open", "open it", "not now"),
