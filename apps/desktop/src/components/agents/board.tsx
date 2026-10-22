@@ -8,7 +8,6 @@ import {
   openReview,
   type Session,
   sendToSession,
-  sessionView,
   setLayout,
   startHere,
   usageLine,
@@ -20,6 +19,7 @@ import { useDuskie } from "@/lib/store";
 import { EmptySlot } from "./board/empty-slot";
 import { state } from "./board/state";
 import { Tile } from "./board/tile";
+import { useDraft } from "./board/use-draft";
 import { Composer } from "./composer";
 import { AgentMark } from "./marks";
 
@@ -38,27 +38,7 @@ export function Board({
   const paused = sessions.filter((s) => s.restored && s.status === "ended");
   const target = live.find((s) => s.id === focus) ?? live.find((s) => s.question) ?? live[0] ?? null;
   const targetId = target?.id;
-  const [text, setLocalText] = useState("");
-  const textRef = useRef("");
-  // biome-ignore lint/correctness/useExhaustiveDependencies: restore draft only when the focused target switches
-  useEffect(() => {
-    const draft = target?.view?.draft ?? "";
-    textRef.current = draft;
-    setLocalText(draft);
-  }, [targetId]);
-  const setText = (draft: string) => {
-    textRef.current = draft;
-    setLocalText(draft);
-  };
-  const flushDraft = () => {
-    if (targetId) sessionView(targetId, { draft: textRef.current });
-  };
-  useEffect(
-    () => () => {
-      if (targetId) sessionView(targetId, { draft: textRef.current });
-    },
-    [targetId],
-  );
+  const { text, setText, flushDraft, clearDraft } = useDraft(target);
   const grid = useRef<HTMLDivElement>(null);
   const [below, setBelow] = useState(0);
   const [openNew, setOpenNew] = useState(0);
@@ -114,9 +94,7 @@ export function Board({
     const t = text.trim();
     if (!t || !target) return;
     sendToSession(target.id, t);
-    setLocalText("");
-    textRef.current = "";
-    sessionView(target.id, { draft: "" });
+    clearDraft();
   };
 
   if (live.length === 0 && paused.length === 0) {
