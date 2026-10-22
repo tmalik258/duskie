@@ -8,6 +8,8 @@
 //   pnpm --filter desktop ask-eval                 (all cases)
 //   pnpm --filter desktop ask-eval -- --only files (cases whose group or question matches)
 //
+//   pnpm --filter desktop ask-eval -- --commit     (also commits and pushes the report)
+//
 // Writes e2e/ask-report.md with every question, answer and problem.
 
 import { spawn } from "node:child_process";
@@ -170,4 +172,18 @@ const md = [
 ].join("\n");
 writeFileSync(join(OUT, "ask-report.md"), md);
 console.log(`\n${results.length - failed.length} passed, ${failed.length} failed. Report: e2e/ask-report.md`);
+// --commit: commit and push only the report, so the result can be read from git.
+if (process.argv.includes("--commit")) {
+  const { execFileSync } = await import("node:child_process");
+  const git = (...a) => execFileSync("git", a, { cwd: OUT, stdio: "inherit" });
+  git("add", "ask-report.md");
+  git(
+    "commit",
+    "-m",
+    `Ask eval on Windows: ${results.length - failed.length} of ${results.length} pass`,
+    "--",
+    "ask-report.md",
+  );
+  git("push");
+}
 process.exit(failed.length ? 1 : 0);

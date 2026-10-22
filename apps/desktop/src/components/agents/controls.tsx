@@ -145,41 +145,38 @@ export function ChatControls({
         </Pop>
       )}
       <span className="flex-1" />
-      {!tail && (
-        <>
-          {local ? (
-            <NoLimits />
-          ) : (
-            (usageText || panel?.name === "usage") && (
-              <Pop
-                label="Usage"
-                requested={panel?.name === "usage" ? panel.at : undefined}
-                className="ak-cusage"
-                chip={
-                  <>
-                    <span className="ak-ring" aria-hidden="true">
-                      <i className="ak-cring" style={{ "--p": ringPct } as CSSProperties} />
-                    </span>
-                    {usageText || "Usage"}
-                  </>
-                }
-              >
-                {() => (
-                  <UsageBody
-                    usage={usage}
-                    ctxPct={ctxPct}
-                    plans={plans}
-                    now={now}
-                    agent={agent}
-                    onCompact={onCompact}
-                    onRefresh={onRefresh}
-                  />
-                )}
-              </Pop>
-            )
-          )}
-        </>
-      )}
+      {!tail &&
+        (local ? (
+          <NoLimits />
+        ) : (
+          (usageText || panel?.name === "usage") && (
+            <Pop
+              label="Usage"
+              requested={panel?.name === "usage" ? panel.at : undefined}
+              className="ak-cusage"
+              chip={
+                <>
+                  <span className="ak-ring" aria-hidden="true">
+                    <i className="ak-cring" style={{ "--p": ringPct } as CSSProperties} />
+                  </span>
+                  {usageText || "Usage"}
+                </>
+              }
+            >
+              {() => (
+                <UsageBody
+                  usage={usage}
+                  ctxPct={ctxPct}
+                  plans={plans}
+                  now={now}
+                  agent={agent}
+                  onCompact={onCompact}
+                  onRefresh={onRefresh}
+                />
+              )}
+            </Pop>
+          )
+        ))}
       {keys && <span className="ckeys mono">{keys}</span>}
       {tail}
     </div>

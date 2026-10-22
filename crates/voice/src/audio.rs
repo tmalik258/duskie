@@ -3,7 +3,7 @@
 //! handle is dropped.
 
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
@@ -161,10 +161,11 @@ fn open_mic(chunks: SyncSender<Vec<f32>>) -> Result<cpal::Stream> {
     Ok(stream)
 }
 
-/// Plays mono audio on the default output device.
+/// Plays mono audio on the default output device, and moves to the new
+/// default when it changes (earbuds connected), like the app's sounds do.
 pub struct Output {
     queue: Arc<Mutex<VecDeque<f32>>>,
-    rate: u32,
+    rate: Arc<AtomicU32>,
     playing: Arc<AtomicBool>,
     stop: Option<Sender<()>>,
     thread: Option<JoinHandle<()>>,
@@ -175,19 +176,44 @@ impl Output {
         let queue = Arc::new(Mutex::new(VecDeque::<f32>::new()));
         let playing = Arc::new(AtomicBool::new(false));
         let (stop_tx, stop_rx) = mpsc::channel::<()>();
-        let (ready_tx, ready_rx) = mpsc::channel::<Result<u32>>();
+        let (ready_tx, ready_rx) = mpsc::channel::<Result<Arc<AtomicU32>>>();
         let (q, p) = (queue.clone(), playing.clone());
         let thread = std::thread::Builder::new()
             .name("sidekick-speaker".into())
-            .spawn(move || match open_output(q, p) {
-                Ok((stream, rate)) => {
-                    let _ = ready_tx.send(Ok(rate));
-                    let _ = stop_rx.recv();
+            .spawn(move || {
+                let (mut stream, rate) = match open_output(q.clone(), p.clone()) {
+                    Ok(opened) => opened,
+                    Err(e) => {
+                        let _ = ready_tx.send(Err(e));
+                        return;
+                    }
+                };
+                let rate = Arc::new(AtomicU32::new(rate));
+                let _ = ready_tx.send(Ok(rate.clone()));
+                let mut device = default_output_name();
+                // Every second: when Windows' default speaker changed and
+                // nothing is mid-sentence, reopen on the new one.
+                while let Err(mpsc::RecvTimeoutError::Timeout) =
+                    stop_rx.recv_timeout(Duration::from_secs(1))
+                {
+                    let now = default_output_name();
+                    if now.is_none() || now == device || p.load(Ordering::Relaxed) {
+                        continue;
+                    }
                     drop(stream);
+                    match open_output(q.clone(), p.clone()) {
+                        Ok((s, r)) => {
+                            log::info!("voice: speaker moved to {}", now.as_deref().unwrap_or("?"));
+                            (stream, device) = (s, now);
+                            rate.store(r, Ordering::Relaxed);
+                        }
+                        Err(e) => {
+                            log::warn!("voice: could not open the new speaker: {e}");
+                            return;
+                        }
+                    }
                 }
-                Err(e) => {
-                    let _ = ready_tx.send(Err(e));
-                }
+                drop(stream);
             })?;
         let rate = ready_rx
             .recv()
@@ -204,7 +230,7 @@ impl Output {
     /// Queues mono samples recorded at `rate`. Returns how long until they
     /// start sounding and how long they last.
     pub fn play(&self, samples: &[f32], rate: u32) -> (Duration, Duration) {
-        let resampled = Resampler::new(rate, self.rate).process(samples);
+        let resampled = Resampler::new(rate, self.rate()).process(samples);
         let length = self.duration(resampled.len());
         match self.queue.lock() {
             Ok(mut q) => {
@@ -216,13 +242,17 @@ impl Output {
         }
     }
 
+    fn rate(&self) -> u32 {
+        self.rate.load(Ordering::Relaxed)
+    }
+
     /// How long the audio still queued will take to play.
     pub fn queued(&self) -> Duration {
         self.duration(self.queue.lock().map(|q| q.len()).unwrap_or(0))
     }
 
     fn duration(&self, samples: usize) -> Duration {
-        Duration::from_secs_f64(samples as f64 / f64::from(self.rate.max(1)))
+        Duration::from_secs_f64(samples as f64 / f64::from(self.rate().max(1)))
     }
 
     /// Stops at once and forgets what was queued.
@@ -246,6 +276,11 @@ impl Drop for Output {
             let _ = t.join();
         }
     }
+}
+
+/// The name of the speaker Windows plays to now.
+fn default_output_name() -> Option<String> {
+    cpal::default_host().default_output_device()?.name().ok()
 }
 
 fn open_output(
