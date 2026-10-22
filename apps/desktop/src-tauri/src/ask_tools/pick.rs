@@ -94,7 +94,7 @@ pub fn needs_no_tools(question: &str) -> bool {
 
 pub(super) const CORE: &[&str] = &[SEARCH, FIND, OPEN, PROPOSE];
 /// Tools offered beyond the core, picked by meaning.
-pub(super) const PICKED: usize = 4;
+pub(super) const PICKED: usize = 6;
 /// Each tool's name and the embedding of its description.
 pub(super) type ToolVectors = Vec<(String, Vec<f32>)>;
 /// Tool descriptions embedded once per embedding model.
@@ -144,9 +144,85 @@ pub async fn pick(app: &AppHandle, question: &str, defs: Vec<ToolDef>) -> Vec<To
         return by_words(question, defs);
     };
     let names = closest(&q, &tools, PICKED);
+    let intent = by_intent(question);
     defs.into_iter()
-        .filter(|d| CORE.contains(&d.name.as_str()) || names.contains(&d.name))
+        .filter(|d| {
+            CORE.contains(&d.name.as_str())
+                || names.contains(&d.name)
+                || intent.contains(&d.name.as_str())
+        })
         .collect()
+}
+
+/// Tools a question's intent always needs, on top of the picked ones, so a
+/// "why" question is never left without the tools that can find out why.
+pub fn by_intent(question: &str) -> Vec<&'static str> {
+    let q = format!(" {} ", question.to_lowercase());
+    let has = |words: &[&str]| words.iter().any(|w| q.contains(w));
+    let mut out: Vec<&'static str> = Vec::new();
+    if has(&[
+        "why",
+        "not working",
+        "won't",
+        "wont",
+        "can't",
+        "cannot",
+        "stuck",
+        "not updating",
+        "update",
+        "error",
+        "crash",
+        "broken",
+        "freez",
+        "not open",
+        "not start",
+    ]) {
+        out.extend([DIAGNOSE, APP_INFO, RUN, SYSTEM, WEB_SEARCH]);
+    }
+    if has(&[
+        "port",
+        "localhost",
+        "server",
+        "wifi",
+        "wi-fi",
+        "internet",
+        "network",
+        "ping",
+        " ip ",
+        "dns",
+        "vpn",
+        "proxy",
+    ]) {
+        out.extend([SYSTEM, RUN]);
+    }
+    if has(&[
+        "slow",
+        "lag",
+        "slower",
+        " vs ",
+        "compared",
+        "memory",
+        " ram",
+        "cpu",
+        "running hot",
+        "eating",
+    ]) {
+        out.extend([SYSTEM, DIAGNOSE, RUN, PC_STATUS]);
+    }
+    if has(&[
+        "duskie",
+        " you ",
+        "how do you",
+        "can you do",
+        "what can you",
+        "setting",
+        "shortcut",
+        "wake word",
+    ]) {
+        out.push(HELP);
+    }
+    out.dedup();
+    out
 }
 
 /// Without an embedding model: the tools whose name or description share
@@ -172,16 +248,21 @@ pub fn by_words(question: &str, defs: Vec<ToolDef>) -> Vec<ToolDef> {
         .collect();
     // Nothing matches ("hi", "rewrite this"): the core tools only, not all
     // twenty. Every tool is prompt the model must read before its first word.
+    let intent = by_intent(question);
     if scored.is_empty() {
         return defs
             .into_iter()
-            .filter(|d| CORE.contains(&d.name.as_str()))
+            .filter(|d| CORE.contains(&d.name.as_str()) || intent.contains(&d.name.as_str()))
             .collect();
     }
     scored.sort_by_key(|a| std::cmp::Reverse(a.0));
     let names: Vec<String> = scored.into_iter().take(PICKED).map(|(_, n)| n).collect();
     defs.into_iter()
-        .filter(|d| CORE.contains(&d.name.as_str()) || names.contains(&d.name))
+        .filter(|d| {
+            CORE.contains(&d.name.as_str())
+                || names.contains(&d.name)
+                || intent.contains(&d.name.as_str())
+        })
         .collect()
 }
 
@@ -205,4 +286,23 @@ pub fn is_web(name: &str) -> bool {
         name,
         WEB_SEARCH | READ_PAGE | BROWSER | APP_ACTION | APPS | GITHUB
     )
+}
+
+#[cfg(test)]
+mod intent_tests {
+    use super::*;
+
+    #[test]
+    fn intents_bring_the_tools_that_can_answer() {
+        assert!(by_intent("Why is Cursor not updating?").contains(&DIAGNOSE));
+        assert!(by_intent("Which port is free?").contains(&SYSTEM));
+        assert!(by_intent("Zen loads sites slower than Chrome").contains(&SYSTEM));
+        assert!(by_intent("How do you work?").contains(&HELP));
+        assert!(by_intent("Rewrite this sentence").is_empty());
+        let names: Vec<String> = by_words("Is localhost busy?", defs())
+            .into_iter()
+            .map(|d| d.name)
+            .collect();
+        assert!(names.iter().any(|n| n == SYSTEM), "{names:?}");
+    }
 }

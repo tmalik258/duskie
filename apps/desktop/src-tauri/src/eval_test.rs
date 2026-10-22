@@ -242,7 +242,7 @@ async fn ask_cases_with_grok() {
     let ai = std::sync::Arc::new(ai);
     let defs = std::sync::Arc::new(crate::ask_tools::defs());
     // A few at a time, each capped, so one slow answer cannot stall the run.
-    let gate = std::sync::Arc::new(tokio::sync::Semaphore::new(4));
+    let gate = std::sync::Arc::new(tokio::sync::Semaphore::new(1));
     let mut set = tokio::task::JoinSet::new();
     for (i, c) in cases.iter().enumerate() {
         let (ai, defs, gate, q) = (ai.clone(), defs.clone(), gate.clone(), c.q.clone());
@@ -259,13 +259,31 @@ async fn ask_cases_with_grok() {
             };
             let (sink, cancel) = (Sink::new(tx), CancellationToken::new());
             let started = std::time::Instant::now();
-            let call = ai.chat_with_tools(&req, &defs, &runner, &sink, &cancel);
-            let answer = match tokio::time::timeout(std::time::Duration::from_secs(90), call).await
-            {
-                Ok(Ok(_)) => Ok(()),
-                Ok(Err(e)) => Err(e.to_string()),
-                Err(_) => Err("no answer in 90 s".to_owned()),
+            // The tools Ask would offer for this question, as in the app.
+            let picked = crate::ask_tools::by_words(&req.messages[0].content, (*defs).clone());
+            let picked = if crate::ask_tools::needs_no_tools(&req.messages[0].content) {
+                Vec::new()
+            } else {
+                picked
             };
+            // Free tiers limit tokens per minute: wait out a limit and try again.
+            let mut answer = Err("not run".to_owned());
+            for _ in 0..6 {
+                runner.0.lock().map(|mut c| c.clear()).ok();
+                let call = ai.chat_with_tools(&req, &picked, &runner, &sink, &cancel);
+                answer = match tokio::time::timeout(std::time::Duration::from_secs(120), call).await
+                {
+                    Ok(Ok(_)) => Ok(()),
+                    Ok(Err(e)) => Err(e.to_string()),
+                    Err(_) => Err("no answer in 120 s".to_owned()),
+                };
+                match &answer {
+                    Err(e) if e.contains("429") || e.contains("paused") => {
+                        tokio::time::sleep(std::time::Duration::from_secs(62)).await;
+                    }
+                    _ => break,
+                }
+            }
             let calls: Vec<String> = runner
                 .0
                 .into_inner()
