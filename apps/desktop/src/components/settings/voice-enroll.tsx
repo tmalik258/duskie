@@ -83,6 +83,7 @@ export function VoiceEnroll({
     setAdding(more);
     setNote(null);
     setActive(true);
+    api.voiceEnrollOpen().catch(() => undefined);
   };
   // Cancel keeps the taught voice; only the takes in progress go.
   const stop = () => {

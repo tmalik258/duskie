@@ -373,7 +373,7 @@ pub fn start_echo_guard(app: &AppHandle) {
         .spawn(move || {
             let mut quiet_since: Option<std::time::Instant> = None;
             // The listener told last, and what it was told.
-            let mut told: Option<(usize, bool)> = None;
+            let mut told: Option<(usize, bool, bool)> = None;
             // What the island was told about Duskie talking.
             let mut said_speaking = false;
             loop {
@@ -413,9 +413,10 @@ pub fn start_echo_guard(app: &AppHandle) {
                     since.elapsed() < ECHO_TAIL
                 };
                 let id = std::ptr::from_ref(listener) as usize;
-                if told != Some((id, muted)) {
+                if told != Some((id, muted, teaching)) {
                     listener.send(Control::Mute(muted));
-                    told = Some((id, muted));
+                    listener.send(Control::Pause(teaching));
+                    told = Some((id, muted, teaching));
                 }
             }
         })

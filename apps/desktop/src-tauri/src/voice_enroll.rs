@@ -26,12 +26,14 @@ pub struct Takes {
     /// Where this "Add samples" round starts in [`MORE_SENTENCES`]. Picked
     /// once per round so the lines stay put while you read them.
     more_from: Option<usize>,
+    /// The teach card is open, so "Duskie" said to it never wakes Duskie.
+    open: bool,
 }
 
 /// Teaching is under way; the wake word listener is muted meanwhile.
 pub fn busy(app: &AppHandle) -> bool {
     let t = lock(takes(app));
-    t.recording || !t.names.is_empty() || !t.sentences.is_empty() || !t.more.is_empty()
+    t.open || t.recording || !t.names.is_empty() || !t.sentences.is_empty() || !t.more.is_empty()
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -211,6 +213,11 @@ pub fn finish(app: &AppHandle, more: bool) -> Result<EnrollState, String> {
     }
     crate::voice::refresh(app);
     Ok(state(app))
+}
+
+/// The teach card opened: the wake word listener pauses until it closes.
+pub fn open(app: &AppHandle) {
+    lock(takes(app)).open = true;
 }
 
 /// Drops takes in progress. A taught voice stays.

@@ -279,6 +279,7 @@ pub fn run() {
             commands::voice_enroll_state,
             commands::voice_enroll_record,
             commands::voice_enroll_finish,
+            commands::voice_enroll_open,
             commands::voice_enroll_cancel,
             commands::voice_enroll_reset,
             commands::voice_welcome,

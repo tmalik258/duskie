@@ -47,6 +47,8 @@ pub enum Control {
     Mute(bool),
     /// Talking over Duskie's voice is heard (true) or not (false), for now.
     Interrupt(bool),
+    /// Teaching: hear nothing at all, not even a voice talking over.
+    Pause(bool),
 }
 
 #[derive(Debug, Clone)]
@@ -161,6 +163,8 @@ pub struct Engine {
     said: Vec<f32>,
     /// Whose voice the question is, once judged: yours (true) or not.
     judged: Option<bool>,
+    /// Teaching is under way: nothing heard counts.
+    teaching: bool,
 }
 
 /// The keyword bar, tuned with the wake bench (10 voices, two speeds, 100
@@ -337,6 +341,7 @@ impl Engine {
             you: None,
             said: Vec::new(),
             judged: None,
+            teaching: false,
         })
     }
 
@@ -350,6 +355,13 @@ impl Engine {
         self.muted = muted;
         self.barged = false;
         self.barge = Barge::default();
+    }
+
+    pub fn set_teaching(&mut self, on: bool) {
+        self.teaching = on;
+        if on {
+            self.cancel();
+        }
     }
 
     pub fn set_interrupt(&mut self, on: bool) {
@@ -422,6 +434,9 @@ impl Engine {
 
     /// Feeds 16 kHz mono audio and returns what was heard.
     pub fn feed(&mut self, chunk: &[f32]) -> Vec<Heard> {
+        if self.teaching {
+            return Vec::new();
+        }
         if self.muted && !self.barged {
             if !self.talks_over(chunk) {
                 return Vec::new();
@@ -705,6 +720,7 @@ impl Listener {
                             Control::Cancel => engine.cancel(),
                             Control::Mute(muted) => engine.set_muted(muted),
                             Control::Interrupt(on) => engine.set_interrupt(on),
+                            Control::Pause(on) => engine.set_teaching(on),
                         }
                     }
                     match chunks.recv_timeout(Duration::from_millis(100)) {

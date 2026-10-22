@@ -100,6 +100,7 @@ export const toolsApi = {
   voiceEnrollRecord: (sentence?: number, more = false) =>
     invoke<EnrollState>("voice_enroll_record", { sentence: sentence ?? null, more }),
   voiceEnrollFinish: (more = false) => invoke<EnrollState>("voice_enroll_finish", { more }),
+  voiceEnrollOpen: () => invoke<void>("voice_enroll_open"),
   voiceEnrollCancel: () => invoke<EnrollState>("voice_enroll_cancel"),
   voiceEnrollReset: () => invoke<EnrollState>("voice_enroll_reset"),
   voiceWelcome: () => invoke<WelcomeSpeech>("voice_welcome"),
