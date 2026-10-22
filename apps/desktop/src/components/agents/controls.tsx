@@ -5,7 +5,7 @@
 // that opens a small popover above it, so no slash commands are needed.
 
 import type { CSSProperties, ReactNode } from "react";
-import { type Session, seenUsage, seenWindows } from "@/lib/agents";
+import type { Session } from "@/lib/agents";
 import { Select, type SelectOption } from "../settings/ui";
 import {
   ABOUT,
@@ -19,8 +19,10 @@ import {
   modelsFor,
   Pop,
 } from "./controls/levels";
-import { windowName } from "./controls/mode-chip";
+import { NoLimits } from "./controls/no-limits";
+import { ThinkingBody } from "./controls/thinking-body";
 import { UsageBody } from "./controls/usage-body";
+import { usageStats } from "./controls/usage-stats";
 import { AGENT_IMAGES } from "./marks";
 
 export function ChatControls({
@@ -65,34 +67,7 @@ export function ChatControls({
   const shownEffort = local ? effort : (effort ?? DEFAULT_EFFORT);
   const level = LEVELS.find(([v]) => v === shownEffort);
 
-  // Plan windows: this session's warning plus every window Duskie has seen.
-  const now = Date.now();
-  const byWindow = new Map<string, { used: number; window: string; resetsAt: number | null; at: number }>();
-  for (const u of seenWindows(agent)) {
-    byWindow.set(u.window, u);
-  }
-  if (limit && limit.used !== null) {
-    byWindow.set(limit.window, {
-      used: limit.used,
-      window: limit.window,
-      resetsAt: limit.resetsAt,
-      at: now,
-    });
-  }
-  const plans = [...byWindow.values()].sort((a, b) => {
-    const rank = (w: string) => (w === "five_hour" ? 0 : w.startsWith("seven_day") ? 1 : 2);
-    return rank(a.window) - rank(b.window);
-  });
-  const top = seenUsage(agent);
-  const planPct = top ? Math.round(top.used <= 1 ? top.used * 100 : top.used) : null;
-  const ctxPct = usage && usage.window > 0 ? Math.round(Math.min(1, usage.used / usage.window) * 100) : null;
-  const ringPct = ctxPct ?? planPct ?? 0;
-  const usageText = [
-    ctxPct !== null ? `${ctxPct}% context` : null,
-    top && planPct !== null ? `${planPct}% ${windowName(top.window).toLowerCase()}` : null,
-  ]
-    .filter(Boolean)
-    .join(" \u00b7 ");
+  const { now, plans, ctxPct, ringPct, usageText } = usageStats(agent, usage, limit);
 
   const image = AGENT_IMAGES[idOf(agent)];
   const modelOptions: SelectOption[] = [
@@ -166,75 +141,16 @@ export function ChatControls({
             </>
           }
         >
-          {(close) =>
-            local ? (
-              <>
-                <div className="ak-pop-h">
-                  <span>Thinking</span>
-                </div>
-                <fieldset className="ak-tseg" aria-label="Thinking">
-                  {[
-                    ["", "On"],
-                    ["off", "Off"],
-                  ].map(([v, l]) => (
-                    <button
-                      key={v}
-                      type="button"
-                      aria-pressed={(effort ?? "") === v}
-                      onClick={() => {
-                        onEffort(v || null);
-                        close();
-                      }}
-                    >
-                      {l}
-                    </button>
-                  ))}
-                </fieldset>
-                <p className="ak-pop-m">For models that think. Off answers faster.</p>
-              </>
-            ) : (
-              <>
-                <div className="ak-pop-h">
-                  <span>How hard it thinks</span>
-                  <span className="ak-dots" aria-hidden="true">
-                    {LEVELS.map(([v], i) => (
-                      <i key={v} className="ak-dot" data-on={level ? i <= LEVELS.indexOf(level) : false} />
-                    ))}
-                  </span>
-                </div>
-                <fieldset className="ak-tseg" aria-label="How hard it thinks">
-                  {LEVELS.map(([v, l]) => (
-                    <button key={v} type="button" aria-pressed={shownEffort === v} onClick={() => onEffort(v)}>
-                      {l}
-                    </button>
-                  ))}
-                </fieldset>
-                <p className="ak-pop-m">{level?.[2]}</p>
-              </>
-            )
-          }
+          {(close) => (
+            <ThinkingBody local={local} effort={effort} shown={shownEffort} onEffort={onEffort} close={close} />
+          )}
         </Pop>
       )}
       <span className="flex-1" />
       {!tail && (
         <>
           {local ? (
-            <span className="ak-cchip ak-cquiet">
-              <svg viewBox="0 0 16 16" aria-hidden="true" className="size-3">
-                <rect
-                  x="3.5"
-                  y="7"
-                  width="9"
-                  height="6.5"
-                  rx="1.5"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="1.3"
-                />
-                <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" strokeWidth="1.3" />
-              </svg>
-              On this PC {"\u00b7"} no limits
-            </span>
+            <NoLimits />
           ) : (
             (usageText || panel?.name === "usage") && (
               <Pop
