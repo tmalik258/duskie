@@ -69,6 +69,7 @@ export function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: 
               </span>
             </div>
             <textarea
+              className="no-scrollbar"
               ref={inputRef}
               rows={2}
               value={n.prompt}

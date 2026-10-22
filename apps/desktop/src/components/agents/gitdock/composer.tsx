@@ -70,7 +70,7 @@ export function Composer({
     <div className="composer-g">
       <div className="msgbox sumrow">
         <textarea
-          className="field"
+          className="field no-scrollbar"
           rows={4}
           value={message}
           placeholder={

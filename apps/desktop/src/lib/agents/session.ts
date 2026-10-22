@@ -50,6 +50,8 @@ export interface Session extends AgentStarted {
   tookMs: number | null;
   /** Files changed when it ended, from Rust. */
   changes: number;
+  /** The turn whose review was finished, and how many changes were left undecided. */
+  reviewed?: { turnAt: number; left: number } | null;
   /** Said before the next message after a rewind, so the agent knows. */
   note?: string | null;
   /** Cut off by a restart: nothing runs until Resume. */
