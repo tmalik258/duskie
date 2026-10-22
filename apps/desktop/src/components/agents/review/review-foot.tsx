@@ -2,7 +2,7 @@
 
 import { Ic } from "../../icon";
 
-/** What is left, file arrows, Accept all remaining and Finish. */
+/** What is left, file arrows and Accept all remaining. The review ends on its own. */
 export function ReviewFoot({
   left,
   filesLeft,
@@ -11,7 +11,6 @@ export function ReviewFoot({
   fileCount,
   goFile,
   acceptRemaining,
-  finish,
 }: {
   left: number;
   filesLeft: number;
@@ -20,7 +19,6 @@ export function ReviewFoot({
   fileCount: number;
   goFile: (i: number) => void;
   acceptRemaining: () => void;
-  finish: () => void;
 }) {
   return (
     <div className="rv-foot">
@@ -52,11 +50,8 @@ export function ReviewFoot({
       >
         <Ic name="chevr" size={13} />
       </button>
-      <button type="button" className="rv-btn" disabled={left === 0} onClick={acceptRemaining}>
+      <button type="button" className="rv-btn primary" disabled={left === 0} onClick={acceptRemaining}>
         Accept all remaining
-      </button>
-      <button type="button" className="rv-btn primary" disabled={left > 0} onClick={finish}>
-        Finish review
       </button>
     </div>
   );

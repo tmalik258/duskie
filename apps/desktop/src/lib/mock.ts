@@ -36,6 +36,12 @@ if (typeof window !== "undefined") {
 if (typeof window !== "undefined") {
   Object.assign(window, {
     __mockEmit: emit,
+    __mockReview: async (title: string) => {
+      const { openReview, useAgents } = await import("./agents");
+      const s = useAgents.getState().sessions.find((x) => x.title.includes(title));
+      if (s) openReview(s.id);
+      return s?.id ?? null;
+    },
     __mockGo: go,
     __mockCall: (name: string, args: Record<string, unknown> = {}) => commands[name]?.(args),
     __mockAgents: async (calm = false) => {

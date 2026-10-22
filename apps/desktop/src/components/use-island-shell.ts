@@ -79,20 +79,25 @@ export function shellGeom(opts: {
     take = TAKE_A_ASK;
   } else if (opts.id === "agents") {
     // Board always gets room for its tiles - never fall back to Ask width.
-    width = opts.boardWide
-      ? BOARD_WIDE_WIDTH
-      : opts.agentsBoard
-        ? BOARD_WIDTH
-        : opts.agentsWide
-          ? SHELL_AGENTS.one
-          : SHELL_AGENTS.width;
+    // Review beside: the list side follows the seam, like Git beside Repos.
+    width =
+      opts.gitListW != null
+        ? opts.gitListW
+        : opts.boardWide
+          ? BOARD_WIDE_WIDTH
+          : opts.agentsBoard
+            ? BOARD_WIDTH
+            : opts.agentsWide
+              ? SHELL_AGENTS.one
+              : SHELL_AGENTS.width;
     height = Math.max(SHELL_COMPACT.height, opts.contentHeight + 8);
     radius = SHELL_AGENTS.radius;
     take = TAKE_A_ASK;
   } else if (opts.id === "ask") {
-    // Repos + side Git: narrow list; otherwise the full Ask width.
+    // A dock beside (Git on Repos, Review on Agents): the list side follows
+    // the seam; otherwise the full Ask width. gitListW is only set then.
     const listW = opts.gitListW;
-    const gitBeside = listW != null && opts.askTab === "repos";
+    const gitBeside = listW != null;
     width = gitBeside ? listW : SHELL_ASK.width;
     // Soft floor when Git is beside - hug content above it, avoid a hard snap.
     height = gitBeside
