@@ -26,7 +26,8 @@ import type { Agents } from "@/lib/types";
 import { Composer } from "./Composer";
 import { AgentMark, agentMarkId } from "./marks";
 import { folderName, ProjectPicker } from "./ProjectPicker";
-import { NameField, STEP_TAG } from "./SessionView";
+import { STEP_TAG } from "./session/format";
+import { NameField } from "./session/NameField";
 
 function state(s: Session): [string, string] {
   if (s.question) return ["ask", "Needs you"];

@@ -61,7 +61,7 @@ export function AgentsTab({
   const watched = current?.startsWith(CURSOR) ? cursor.find((c) => CURSOR + c.id === current) : undefined;
   if (watched) return <CursorView chat={watched} sessions={sessions} cursor={cursor} />;
   return session ? (
-    <SessionView key={session.id} session={session} sessions={sessions} maxHeight={maxHeight} active={active} />
+    <SessionView key={session.id} session={session} maxHeight={maxHeight} active={active} />
   ) : (
     <NewSession sessions={sessions} cursor={cursor} />
   );
