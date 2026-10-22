@@ -204,3 +204,104 @@ async fn local_model_picks_the_right_tools() {
         min * 100.0
     );
 }
+
+/// One Jarvis case: the tools the model should reach for, and what its
+/// answer should and should not say (the answer scoring runs in the Ask eval).
+#[derive(Deserialize)]
+struct Jarvis {
+    group: String,
+    q: String,
+    tools_must: Vec<String>,
+    /// Read by the answer scoring in scripts/ask-eval.mjs, not here.
+    #[serde(default, rename = "answer_expect")]
+    _answer_expect: Vec<String>,
+    #[serde(default, rename = "answer_forbid")]
+    _answer_forbid: Vec<String>,
+}
+
+/// Runs every Jarvis case through xAI Grok with the full tool loop and
+/// writes evals/report.md. Needs XAI_API_KEY; ignored by default.
+#[tokio::test]
+#[ignore = "needs XAI_API_KEY; run: cargo test -p duskie-desktop jarvis -- --ignored --nocapture"]
+async fn jarvis_with_grok() {
+    let key = std::env::var("XAI_API_KEY").expect("set XAI_API_KEY");
+    let model = std::env::var("DUSKIE_EVAL_MODEL").ok();
+    let model_name = model.clone().unwrap_or_else(|| "grok-4-fast".into());
+    let ai = OpenAiCompat::cloud("xai", &key, model).expect("xai is a known provider");
+    let cases: Vec<Jarvis> = serde_json::from_str(include_str!("../evals/jarvis.json"))
+        .expect("evals/jarvis.json parses");
+    let defs = crate::ask_tools::defs();
+    let mut rows = Vec::new();
+    let mut passed = 0;
+    let mut failed = 0;
+    for c in &cases {
+        let runner = Recorder(Mutex::new(Vec::new()));
+        let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+        let req = ChatRequest {
+            system: crate::ai::SYSTEM.to_owned(),
+            messages: vec![Message::user(c.q.clone())],
+            image: None,
+            more_images: Vec::new(),
+            think: false,
+        };
+        let started = std::time::Instant::now();
+        let answer = ai
+            .chat_with_tools(
+                &req,
+                &defs,
+                &runner,
+                &Sink::new(tx),
+                &CancellationToken::new(),
+            )
+            .await;
+        let secs = started.elapsed().as_secs_f32();
+        if let Err(e) = &answer {
+            failed += 1;
+            println!("ERR {}: {e}", c.q);
+        }
+        let calls: Vec<String> = runner
+            .0
+            .into_inner()
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(n, _)| n)
+            .collect();
+        let ok = match &answer {
+            Err(_) => false,
+            Ok(_) if c.tools_must.is_empty() => calls.is_empty(),
+            Ok(_) => calls.first().is_some_and(|n| c.tools_must.contains(n)),
+        };
+        if ok {
+            passed += 1;
+        }
+        let shown = if calls.is_empty() {
+            "none".into()
+        } else {
+            calls.join(", ")
+        };
+        rows.push(format!(
+            "| {} | {} | {} | {} | {:.1}s |",
+            if ok { "pass" } else { "FAIL" },
+            c.group,
+            c.q,
+            shown,
+            secs
+        ));
+    }
+    // Every request refused (a bad key, no network): say so, do not write a 0% report.
+    assert!(
+        failed < cases.len(),
+        "every request failed; check XAI_API_KEY is an xAI key (starts with xai-)"
+    );
+    let rate = passed as f64 / cases.len() as f64 * 100.0;
+    let report = format!(
+        "# Jarvis eval\n\nModel: {}\n\nTool choice: {passed} of {} ({rate:.0}%). Target: 90%.\n\n\
+         | Result | Group | Question | Tools called | Time |\n|---|---|---|---|---|\n{}\n",
+        model_name,
+        cases.len(),
+        rows.join("\n")
+    );
+    let out = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("evals/report.md");
+    std::fs::write(&out, report).expect("write report");
+    println!("{rate:.0}% tool choice; report at {}", out.display());
+}
