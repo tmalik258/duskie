@@ -42,6 +42,8 @@ export interface DuskieState {
   hovered: boolean;
   /** The card waits for a spoken answer, so its countdown is paused (Rust). */
   choiceHeld: boolean;
+  /** Hovered with jobs running, the glance was picked over the activities card. */
+  glancePicked: boolean;
   /** Shift (hovered) or Shift+Alt (suggestion), Rust polls; webview has no focus. */
   shiftHeld: boolean;
   /** Extra interactive area while a floating menu is open (unioned into the hit rect). */
@@ -111,6 +113,7 @@ export const useDuskie = create<DuskieState>(() => ({
   netNotice: null,
   hovered: false,
   choiceHeld: false,
+  glancePicked: false,
   shiftHeld: false,
   overlayHit: null,
   visible: true,

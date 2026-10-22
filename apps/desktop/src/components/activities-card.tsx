@@ -6,13 +6,17 @@
 import { activityLabel, dismissLocal, useActivities, visibleActivities } from "@/lib/activities";
 import { api } from "@/lib/bridge";
 import { useNow } from "@/lib/hooks";
+import { useDuskie } from "@/lib/store";
 import type { Activity } from "@/lib/types";
 import { Ic, type IcName } from "./icon";
+import { RoundButton } from "./island-glance/settings-shift-history-button";
 
 const MB = 1_000_000;
 
-function activityIcon(source: string): IcName {
-  if (source === "browser" || source === "file") return "dl";
+function activityIcon(a: Activity): IcName {
+  const source = a.source;
+  // Anything that reports bytes is a download, whoever started it.
+  if (source === "browser" || source === "file" || a.total != null || a.transferred != null) return "dl";
   if (source === "update") return "update";
   if (source === "open") return "open";
   if (source === "agent") return "term";
@@ -27,6 +31,10 @@ function sizeLine(a: Activity, now: number): string | null {
   if (a.total == null) {
     const secs = Math.max(0, Math.round((now - a.startedAt) / 1000));
     return `${Math.round(a.transferred / MB)} MB received  ·  ${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, "0")}`;
+  }
+  // Every byte is in, but the job runs on: the file is being checked and unpacked.
+  if (a.transferred >= a.total) {
+    return `${Math.round(a.total / MB)} MB  ·  ${a.source === "browser" ? "Finishing…" : "Unpacking…"}`;
   }
   const secs = Math.max(1, (now - a.startedAt) / 1000);
   const rate = a.transferred / secs;
@@ -58,10 +66,16 @@ export function ActivitiesCard() {
           : `${list.length} jobs, see below`;
   return (
     <div className="rd-glance flex flex-col gap-2.5">
-      <div className="rd-card-head">
-        <p className="rd-eyebrow">Activities</p>
-        <p className="rd-title">{title}</p>
-        <p className="rd-detail">{detail}</p>
+      <div className="flex items-start gap-2">
+        <div className="rd-card-head min-w-0 flex-1">
+          <p className="rd-eyebrow">Activities</p>
+          <p className="rd-title">{title}</p>
+          <p className="rd-detail">{detail}</p>
+        </div>
+        {/* The usual glance (quick actions, today) until the cursor leaves. */}
+        <RoundButton label="Show glance" onClick={() => useDuskie.setState({ glancePicked: true })}>
+          <Ic name="home" size={15} />
+        </RoundButton>
       </div>
       <div className="flex flex-col gap-1.5" style={{ marginLeft: "calc(var(--orb-indent, 0px) * -1)" }}>
         {list.map((a) => {
@@ -70,7 +84,7 @@ export function ActivitiesCard() {
           return (
             <div key={a.id} className="act-row">
               <span className="act-ic" aria-hidden>
-                <Ic name={activityIcon(a.source)} size={13} />
+                <Ic name={activityIcon(a)} size={13} />
               </span>
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-[13px]">

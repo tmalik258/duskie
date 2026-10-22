@@ -112,6 +112,12 @@ export function useIslandShape(c: IslandStore & IslandWork & IslandHover & Islan
       : null;
   const [pillMeasured, setPillMeasured] = useState(0);
 
+  const glancePicked = useDuskie((s) => s.glancePicked);
+  // Picking the glance lasts until the cursor leaves the island.
+  useEffect(() => {
+    if (!expanded && glancePicked) useDuskie.setState({ glancePicked: false });
+  }, [expanded, glancePicked]);
+
   const registryId = resolveIslandState({
     asking,
     askTab: view === "settings" ? "settings" : asking ? askTab : null,
@@ -135,7 +141,7 @@ export function useIslandShape(c: IslandStore & IslandWork & IslandHover & Islan
     paused: showPausedPill,
     notifyFresh: !!notifyFresh && !busy && !expanded,
     unread: later,
-    activitiesOpen: expanded && liveActivities.length > 0 && !suggestion,
+    activitiesOpen: expanded && liveActivities.length > 0 && !suggestion && !glancePicked,
     mascot,
     quietGlance:
       expanded &&
