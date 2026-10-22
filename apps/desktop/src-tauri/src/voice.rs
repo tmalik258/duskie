@@ -1134,15 +1134,18 @@ fn suggestion_speech_blocked(app: &AppHandle) -> bool {
         || !lock(&app.state::<AppState>().chats).is_empty()
 }
 
-/// The card went (dismissed, acted on, or replaced): stop reading it and
-/// stop waiting for a spoken choice.
-pub fn silence_suggestion(app: &AppHandle) {
+/// The card went: stop waiting for a spoken choice. A card dismissed or
+/// acted on also stops the voice; one that timed out lets the headline
+/// finish (`stop_voice` false).
+pub fn silence_suggestion(app: &AppHandle, stop_voice: bool) {
     let v = voice(app);
     if lock(&v.choosing).take().is_none() {
         return;
     }
     *lock(&v.detailed) = None;
-    stop_speaking(app);
+    if stop_voice {
+        stop_speaking(app);
+    }
     if let Some(l) = lock(&v.runtime).as_ref().and_then(|r| r.listener.as_ref()) {
         l.send(Control::Cancel);
     }

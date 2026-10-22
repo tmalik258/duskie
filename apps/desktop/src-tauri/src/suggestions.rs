@@ -625,6 +625,7 @@ pub fn choose_by_voice(app: &AppHandle, id: &str, index: usize) -> Result<(), St
 
 fn run_choice(app: &AppHandle, id: &str, index: usize, auto: bool) -> Result<(), String> {
     let active = take(app, id)?;
+    crate::voice::silence_suggestion(app, true);
     let option = active
         .proposal
         .options
@@ -1015,6 +1016,7 @@ fn log_action(
 
 pub fn dismiss(app: &AppHandle, id: &str, reason: &str) -> Result<(), String> {
     let active = take(app, id)?;
+    crate::voice::silence_suggestion(app, reason != "timeout");
     log::info!(
         "suggestion from {} dismissed: {reason}",
         active.proposal.skill_id
@@ -1041,7 +1043,6 @@ fn take(app: &AppHandle, id: &str) -> Result<Active, String> {
         }
     };
     let active = taken.ok_or("suggestion is no longer active")?;
-    crate::voice::silence_suggestion(app);
     unbind_keys(app);
     let _ = app.emit(SUGGESTION_CLEAR, &active.ui.id);
     Ok(active)
