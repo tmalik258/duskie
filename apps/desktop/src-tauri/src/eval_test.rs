@@ -219,15 +219,24 @@ struct AskCase {
     _answer_forbid: Vec<String>,
 }
 
-/// Runs every Ask case through xAI Grok with the full tool loop and
+/// Runs every Ask case through the configured cloud model (Groq, xAI or OpenAI) with the full tool loop and
 /// writes evals/report.md. Needs XAI_API_KEY; ignored by default.
 #[tokio::test]
-#[ignore = "needs XAI_API_KEY; run: cargo test -p duskie-desktop ask_cases -- --ignored --nocapture"]
+#[ignore = "needs a cloud key; run: cargo test -p duskie-desktop ask_cases -- --ignored --nocapture"]
 async fn ask_cases_with_grok() {
-    let key = std::env::var("XAI_API_KEY").expect("set XAI_API_KEY");
+    // The configured cloud key; its prefix says which provider it belongs to.
+    let key = ["GROQ_API_KEY", "XAI_API_KEY", "OPENAI_API_KEY"]
+        .iter()
+        .find_map(|k| std::env::var(k).ok().filter(|v| !v.trim().is_empty()))
+        .expect("set a cloud key (GROQ_API_KEY, XAI_API_KEY or OPENAI_API_KEY)");
+    let provider = match key.trim() {
+        k if k.starts_with("gsk_") => "groq",
+        k if k.starts_with("xai-") => "xai",
+        _ => "openai",
+    };
     let model = std::env::var("DUSKIE_EVAL_MODEL").ok();
-    let model_name = model.clone().unwrap_or_else(|| "grok-4-fast".into());
-    let ai = OpenAiCompat::cloud("xai", &key, model).expect("xai is a known provider");
+    let model_name = format!("{provider} {}", model.as_deref().unwrap_or("default"));
+    let ai = OpenAiCompat::cloud(provider, &key, model).expect("a known provider");
     let cases: Vec<AskCase> = serde_json::from_str(include_str!("../evals/ask-cases.json"))
         .expect("evals/ask-cases.json parses");
     let defs = crate::ask_tools::defs();
@@ -291,7 +300,7 @@ async fn ask_cases_with_grok() {
     // Every request refused (a bad key, no network): say so, do not write a 0% report.
     assert!(
         failed < cases.len(),
-        "every request failed; check XAI_API_KEY is an xAI key (starts with xai-)"
+        "every request failed; check the cloud key"
     );
     let rate = passed as f64 / cases.len() as f64 * 100.0;
     let report = format!(
