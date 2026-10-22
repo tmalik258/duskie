@@ -1,6 +1,7 @@
 // Sending a chat question, and the early answer started while you pause mid-sentence.
 
 import { api } from "../bridge";
+import { followUp } from "../follow-up";
 import { isThanks } from "../mood";
 import { timings } from "../timings";
 import { toolStatus } from "../tools";
@@ -8,6 +9,7 @@ import type { ChatMessage } from "../types";
 import { takeAskFiles } from "./ask-files";
 import { autoContext, type ChatAttach, type EarlyChat } from "./ask-types";
 import { setMood, useDuskie } from "./duskie-state";
+import { runProposal } from "./proposals";
 
 /** "Thanks" in Ask: a little shy, then warm. */
 function thanked() {
@@ -66,11 +68,19 @@ export function startEarly(q: string, speak: boolean) {
 /** Sends a question; false when it could not start (empty, or one running). */
 export function sendChat(prompt: string, attach?: ChatAttach): boolean {
   const { turns, chatId, ask } = useDuskie.getState();
-  const q = prompt.trim();
+  let q = prompt.trim();
   if (!q || chatId) {
     dropEarly();
     return false;
   }
+  // "do it" taps the top offer; "is it fixed now?" asks the last check again.
+  const follow = followUp(q, turns);
+  if (follow?.kind === "run") {
+    dropEarly();
+    void runProposal(follow.id);
+    return true;
+  }
+  if (follow?.kind === "send") q = follow.text;
   if (isThanks(q)) thanked();
   const adopted = early?.q === q && (attach?.screen ?? false) === false ? early : null;
   if (!adopted) dropEarly();
