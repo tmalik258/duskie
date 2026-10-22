@@ -75,6 +75,7 @@ const SMALL = {
   info: '<circle cx="8" cy="8" r="6"/><path d="M8 7.2v3.6"/><circle cx="8" cy="5" r=".4" fill="currentColor"/>',
   diff: '<path d="M5 2.5v5M2.5 5h5M2.5 11.5h5"/><path d="M11 2v12"/><path d="M13.5 9.5 11 12l-2.5-2.5" opacity=".55"/>',
   check: '<path d="M3.5 8.5l3 3 6-7"/>',
+  pencil: '<path d="M10.6 2.6l2.8 2.8L5.6 13.2H2.8v-2.8zM9.2 4l2.8 2.8"/>',
   x: '<path d="M4 4l8 8M12 4l-8 8"/>',
   mic: '<rect x="6" y="1.8" width="4" height="8" rx="2"/><path d="M3.5 7.8a4.5 4.5 0 009 0M8 12.3v1.9"/>',
   send: '<path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"/>',
