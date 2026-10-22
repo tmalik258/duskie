@@ -2,7 +2,7 @@
 // name (instant, no AI), then Search and Teach at the end.
 
 import { sendChat, setAskFormText } from "@/lib/store";
-import type { Command } from "../Starters";
+import type { Command } from "../starters";
 import type { OpenHow } from "./file-open";
 import { commandItem, type Item } from "./item";
 import { openWhereItems } from "./open-where-items";

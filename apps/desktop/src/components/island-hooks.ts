@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import type { Suggestion } from "@/lib/types";
-import { choose, dismiss } from "./IslandParts";
 import { HOVER_IN_MS, HOVER_OUT_MS } from "./island-layout";
+import { choose, dismiss } from "./island-parts";
 
 export function useIntent(raw: boolean, inMs = HOVER_IN_MS): boolean {
   const [value, setValue] = useState(false);

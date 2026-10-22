@@ -4,10 +4,10 @@
 // states, the event wash). Open /dev/foundation/ in the browser to check them.
 
 import { useRef, useState } from "react";
-import { Creature } from "@/components/Creature";
+import { Creature } from "@/components/creature";
 import { EXPRESSIONS } from "@/components/creature/expressions";
-import { GrainWash, type GrainWashHandle } from "@/components/GrainWash";
-import { IslandWash } from "@/components/IslandWash";
+import { GrainWash, type GrainWashHandle } from "@/components/grain-wash";
+import { IslandWash } from "@/components/island-wash";
 import { SPRINGS, spring } from "@/lib/spring";
 import { MASCOT_STATES, type MascotState } from "@/lib/types";
 import { WASH_EVENTS, washFor } from "@/lib/wash";

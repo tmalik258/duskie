@@ -1,4 +1,4 @@
-import { Island } from "@/components/Island";
+import { Island } from "@/components/island";
 
 export default function IslandPage() {
   return <Island />;

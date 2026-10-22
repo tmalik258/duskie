@@ -5,9 +5,9 @@
 import { api } from "@/lib/bridge";
 import { openChat, runOpen, setAsk, setAskHits, startSkill, useDuskie } from "@/lib/store";
 import type { ChatSummary, InstantResults } from "@/lib/types";
-import { Ic } from "../../Icon";
-import { SETTINGS_TABS } from "../../SettingsPanel";
-import type { Command } from "../Starters";
+import { Ic } from "../../icon";
+import { SETTINGS_TABS } from "../../settings-panel";
+import type { Command } from "../starters";
 import { appItems } from "./app-items";
 import type { OpenHow } from "./file-open";
 import { commandItem, type Item } from "./item";

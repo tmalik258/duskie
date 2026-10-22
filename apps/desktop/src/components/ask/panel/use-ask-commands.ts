@@ -7,7 +7,7 @@ import { openGit } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { sendChat, setAsk, updateSettings, useDuskie } from "@/lib/store";
 import { isPaused } from "@/lib/types";
-import type { Command } from "../Starters";
+import type { Command } from "../starters";
 
 export function useAskCommands(
   setClips: (clips: { text: string; ts: string }[]) => void,

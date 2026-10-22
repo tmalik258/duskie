@@ -18,9 +18,9 @@ import {
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import type { AgentMode, Agents } from "@/lib/types";
-import { DEFAULT_EFFORT, defaultModel } from "../Controls";
+import { DEFAULT_EFFORT, defaultModel } from "../controls";
 import { agentMarkId } from "../marks";
-import { ready } from "./AgentStatus";
+import { ready } from "./agent-status";
 
 export function useNewSession(sessions: Session[]) {
   const { data: agents, refreshing, refresh } = useCached<Agents>("agents", api.agentsStatus);

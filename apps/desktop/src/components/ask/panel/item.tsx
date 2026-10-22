@@ -1,8 +1,8 @@
 // One row under the Ask input, and which row Enter picks before you move.
 
 import type { ReactNode } from "react";
-import { Ic } from "../../Icon";
-import type { Command } from "../Starters";
+import { Ic } from "../../icon";
+import type { Command } from "../starters";
 
 /** One row under the input. */
 export interface Item {
