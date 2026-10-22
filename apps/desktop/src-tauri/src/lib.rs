@@ -354,6 +354,8 @@ pub fn run() {
             commands::project_files,
             commands::save_attachment,
             commands::island_dialog,
+            commands::play_sfx,
+            commands::check_kit,
             commands::agent_commands,
             commands::agent_open_editor,
             commands::agent_tune,

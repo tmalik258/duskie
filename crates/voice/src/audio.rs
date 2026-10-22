@@ -246,6 +246,19 @@ impl Output {
         self.rate.load(Ordering::Relaxed)
     }
 
+    /// Adds mono samples recorded at `rate` over what is already queued, so
+    /// sound effects overlap each other and the voice instead of waiting.
+    pub fn mix(&self, samples: &[f32], rate: u32) {
+        let resampled = Resampler::new(rate, self.rate()).process(samples);
+        if let Ok(mut q) = self.queue.lock() {
+            let overlap = q.len().min(resampled.len());
+            for (slot, s) in q.iter_mut().zip(&resampled[..overlap]) {
+                *slot += s;
+            }
+            q.extend(&resampled[overlap..]);
+        }
+    }
+
     /// How long the audio still queued will take to play.
     pub fn queued(&self) -> Duration {
         self.duration(self.queue.lock().map(|q| q.len()).unwrap_or(0))

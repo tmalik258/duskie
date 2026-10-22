@@ -5,6 +5,7 @@
 
 pub mod audio;
 pub mod enroll;
+pub mod fx;
 pub mod listen;
 pub mod models;
 pub mod speak;
