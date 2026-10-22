@@ -14,7 +14,6 @@ import {
   interruptSession,
   listenToAgents,
   openGit,
-  type Session,
   setTab,
   setView,
   showGit,
@@ -53,13 +52,16 @@ import { staggerChild, staggerChildReduced, staggerParent } from "@/lib/ui-motio
 import { AgentsTab } from "./agents/AgentsTab";
 import { Repos } from "./agents/Repos";
 import { Chat, useAgentName } from "./ask/Chat";
+import { type HistoryKind, HistoryList, historyRows } from "./ask/History";
 import { Clips, Results } from "./ask/Lists";
 import { ModelPicker } from "./ask/ModelPicker";
-import { ago, KeyHint, scrollIfActive } from "./ask/parts";
+import { KeyHint, scrollIfActive } from "./ask/parts";
 import type { Command } from "./ask/Starters";
 import { ContextLine, contextStarters, soonestMeeting } from "./ask/Starters";
 import { FirstRun } from "./ask/States";
 import { Timings } from "./ask/Timings";
+import { Hearing } from "./ask/Voice";
+import { WINDOWS_PAGES } from "./ask/windowsPages";
 import { Ic, Icon } from "./Icon";
 import { markSeen } from "./IslandAgents";
 import { LayoutSwitch } from "./LayoutSwitch";
@@ -98,52 +100,6 @@ function askScrollMax(): number {
   const available = window.innerHeight - ASK_CHROME - 40;
   return Math.min(ASK_SCROLL_CAP, Math.max(ASK_SCROLL_FLOOR, available));
 }
-
-/** Windows Settings pages Ask can open by name, with the words people type. */
-const WINDOWS_PAGES: { page: string; label: string; words: string[]; switch?: string }[] = [
-  { page: "display", label: "Display", words: ["display", "screen", "resolution", "brightness", "scale"] },
-  {
-    page: "nightlight",
-    label: "Night light",
-    words: ["night", "nightlight", "night light", "blue light"],
-    switch: "night_light",
-  },
-  { page: "sound", label: "Sound", words: ["sound", "audio", "speaker", "microphone", "volume"] },
-  { page: "notifications", label: "Notifications", words: ["notifications"] },
-  { page: "focus", label: "Do Not Disturb", words: ["focus", "do not disturb", "dnd"], switch: "dnd" },
-  { page: "bluetooth", label: "Bluetooth", words: ["bluetooth", "devices", "headphones"], switch: "bluetooth" },
-  { page: "wifi", label: "Wi-Fi", words: ["wifi", "wi-fi", "wireless"], switch: "wifi" },
-  {
-    page: "hotspot",
-    label: "Mobile hotspot",
-    words: ["hotspot", "mobile hotspot", "tethering", "share internet"],
-    switch: "hotspot",
-  },
-  { page: "airplane", label: "Airplane mode", words: ["airplane", "aeroplane", "flight mode"], switch: "airplane" },
-  { page: "network", label: "Network & internet", words: ["network", "internet", "ethernet", "vpn", "proxy"] },
-  { page: "battery", label: "Battery saver", words: ["battery", "saver"] },
-  { page: "power", label: "Power & sleep", words: ["power", "sleep"] },
-  { page: "storage", label: "Storage", words: ["storage", "disk", "space"] },
-  { page: "apps", label: "Installed apps", words: ["apps", "uninstall", "programs"] },
-  { page: "default_apps", label: "Default apps", words: ["default"] },
-  { page: "startup_apps", label: "Startup apps", words: ["startup"] },
-  {
-    page: "colors",
-    label: "Dark mode",
-    words: ["dark mode", "dark", "light mode", "colors", "colours", "theme"],
-    switch: "dark_mode",
-  },
-  { page: "background", label: "Background", words: ["background", "wallpaper"] },
-  { page: "mouse", label: "Mouse & touchpad", words: ["mouse", "touchpad", "trackpad"] },
-  { page: "keyboard", label: "Keyboard", words: ["keyboard"] },
-  { page: "printers", label: "Printers & scanners", words: ["printer", "scanner"] },
-  { page: "updates", label: "Windows Update", words: ["update", "updates"] },
-  { page: "privacy", label: "Privacy & security", words: ["privacy", "security", "permissions"] },
-  { page: "accounts", label: "Your account", words: ["account", "profile"] },
-  { page: "time", label: "Date & time", words: ["date", "time", "clock", "timezone"] },
-  { page: "language", label: "Language & region", words: ["language", "region"] },
-  { page: "about", label: "About this PC", words: ["about", "specs", "system info"] },
-];
 
 export function AskPanel() {
   const assistant = useAssistantName();
@@ -1332,126 +1288,6 @@ function commandItem(c: Command): Item {
   };
 }
 
-type HistoryKind = "all" | "chats" | "agents" | "live";
-
-interface HistoryRow {
-  id: string;
-  group: string;
-  agent: boolean;
-  title: string;
-  meta: string;
-  open: () => void;
-  remove?: () => void;
-}
-
-/** Past chats and agent sessions, newest first, under Today / Yesterday / Earlier. */
-function historyRows(
-  chats: ChatSummary[],
-  sessions: Session[],
-  kind: HistoryKind,
-  q: string,
-  removeChat: (id: string) => void,
-): HistoryRow[] {
-  const day = (ms: number) => {
-    const d = new Date(ms);
-    const today = new Date();
-    const start = new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime();
-    return ms >= start ? "Today" : ms >= start - 86_400_000 ? "Yesterday" : d.toLocaleDateString();
-  };
-  const all: (HistoryRow & { at: number })[] = [];
-  if (kind !== "agents") {
-    for (const c of kind === "live" ? chats.filter((c) => c.live) : chats) {
-      const at = Date.parse(c.updated) || 0;
-      all.push({
-        id: `chat:${c.id}`,
-        group: day(at),
-        agent: false,
-        title: c.title,
-        meta: ago(c.updated),
-        at,
-        open: () => {
-          setTab("ask");
-          void openChat(c.id);
-        },
-        remove: () => removeChat(c.id),
-      });
-    }
-  }
-  if (kind !== "chats" && kind !== "live") {
-    for (const s of sessions) {
-      all.push({
-        id: `agent:${s.id}`,
-        group: day(s.startedAt),
-        agent: true,
-        title: s.title,
-        meta: [
-          s.agent,
-          s.project.split(/[\\/]/).filter(Boolean).pop(),
-          s.changes ? `${s.changes} ${s.changes === 1 ? "change" : "changes"}` : "",
-        ]
-          .filter(Boolean)
-          .join(" · "),
-        at: s.startedAt,
-        open: () => useAgents.setState({ current: s.id, tab: "agents" }),
-      });
-    }
-  }
-  return all
-    .filter((r) => !q || r.title.toLowerCase().includes(q))
-    .sort((a, b) => b.at - a.at)
-    .map(({ at: _, ...r }) => r);
-}
-
-function HistoryList({
-  rows,
-  active,
-  onHover,
-  onClear,
-}: {
-  rows: HistoryRow[];
-  active: number;
-  onHover: (i: number) => void;
-  onClear?: () => void;
-}) {
-  if (rows.length === 0) return <p className="ak-group py-2">Nothing here yet.</p>;
-  return (
-    <ul className="ak-list" aria-label="History">
-      {rows.map((r, i) => (
-        <li key={r.id} ref={scrollIfActive(i === active)}>
-          {(i === 0 || rows[i - 1].group !== r.group) && <p className="ak-group">{r.group}</p>}
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              data-sel={i === active}
-              onMouseMove={() => onHover(i)}
-              onClick={r.open}
-              className="ak-row min-w-0 flex-1"
-            >
-              <span className="ak-ico">
-                <Ic name={r.agent ? "cpu" : "spark"} size={12} />
-              </span>
-              <span className="min-w-0 flex-1 truncate">{r.title}</span>
-              <span className="ak-hint">{r.meta}</span>
-            </button>
-            {r.remove && (
-              <button type="button" aria-label={`Delete ${r.title}`} className="chip ak-del" onClick={r.remove}>
-                <Ic name="x" size={12} />
-              </button>
-            )}
-          </div>
-        </li>
-      ))}
-      {onClear && rows.some((r) => r.remove) && (
-        <li className="flex justify-end pt-1">
-          <button type="button" className="chip" onClick={onClear}>
-            Clear chats
-          </button>
-        </li>
-      )}
-    </ul>
-  );
-}
-
 /** A round header button with its key badge while Alt is held. */
 function IconButton({
   label,
@@ -1513,35 +1349,4 @@ export function looksLikeName(text: string): boolean {
   if (/^(what|why|how|who|when|where|which|can|could|should|is|are|do|does|explain|tell|write|summari[sz]e)\b/i.test(t))
     return false;
   return t.split(/\s+/).length <= 3;
-}
-
-/** The voice's rainbow bars. */
-export function VoiceBars() {
-  return (
-    <span className="voice-bars shrink-0" role="img" aria-label="Listening">
-      <i />
-      <i />
-      <i />
-      <i />
-      <i />
-      <i />
-    </span>
-  );
-}
-
-/** Live transcript while listening: the bars, then your words a size
- * larger, or "Listening..." until the first one. */
-export function Hearing({ text }: { text: string }) {
-  return (
-    <div className="flex min-w-0 flex-1 items-center gap-2.5" aria-live="polite">
-      <VoiceBars />
-      <span
-        className={`min-w-0 flex-1 truncate font-display text-[17px] tracking-[-0.015em] ${
-          text ? "text-white" : "text-[rgb(235_235_245/0.45)]"
-        }`}
-      >
-        {text || "Listening..."}
-      </span>
-    </div>
-  );
 }

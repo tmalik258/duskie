@@ -7,7 +7,7 @@ import { useAgents } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { useNow } from "@/lib/hooks";
 import type { Activity as ActivityItem } from "@/lib/types";
-import { VoiceBars } from "./AskPanel";
+import { VoiceBars } from "./ask/Voice";
 import { Ic } from "./Icon";
 import { Activity } from "./IslandParts";
 import { COMPACT, SHELL_COMPACT } from "./island-layout";
