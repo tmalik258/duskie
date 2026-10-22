@@ -191,6 +191,14 @@ pub fn report(
     if old.is_some_and(|a| matches!(a.phase, Phase::Completed | Phase::Failed)) {
         return;
     }
+    // A status line without numbers keeps the last known progress, so the
+    // ring and percentage never drop back to a spinner mid-download.
+    let in_flight = matches!(
+        phase,
+        Phase::Downloading | Phase::Verifying | Phase::Installing
+    );
+    let bytes = bytes.or_else(|| old.filter(|_| in_flight).and_then(|a| a.transferred));
+    let total = total.or_else(|| old.filter(|_| in_flight).and_then(|a| a.total));
     let meaningful = meaningful_progress(old, &phase, label, bytes, &outcome);
     if old.is_some_and(|a| !meaningful && a.total == total && a.transferred == bytes) {
         return;

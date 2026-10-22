@@ -74,11 +74,30 @@ export function finishActivity(id: string, ok: boolean, outcome: string) {
 export function dismissLocal(id: string) {
   useActivities.setState((s) => ({ local: s.local.map((a) => (a.id === id ? { ...a, dismissed: true } : a)) }));
 }
+/** Last byte count per activity, for the speed of the last few seconds. */
+const samples = new Map<string, { at: number; bytes: number; speed: number | null }>();
+/** Bytes per second lately (smoothed), so a new file or a slowdown shows at once. */
+function recentSpeed(a: Activity): number | null {
+  const bytes = a.transferred ?? 0;
+  const at = a.lastProgressAt;
+  const prev = samples.get(a.id);
+  if (!prev || bytes < prev.bytes) {
+    // First look: the average so far; a restart (fewer bytes) starts over.
+    const secs = (at - a.startedAt) / 1000;
+    const speed = secs >= 1 && bytes > 0 && !prev ? bytes / secs : null;
+    samples.set(a.id, { at, bytes, speed });
+    return speed;
+  }
+  if (bytes === prev.bytes || at <= prev.at) return prev.speed;
+  const now = (bytes - prev.bytes) / ((at - prev.at) / 1000);
+  const speed = prev.speed === null ? now : prev.speed * 0.7 + now * 0.3;
+  samples.set(a.id, { at, bytes, speed });
+  return speed;
+}
 /** Percent done, bytes per second and seconds left, from what is known so far. */
 export function downloadProgress(a: Activity): { pct: number | null; speed: number | null; left: number | null } {
   if (a.transferred === null) return { pct: null, speed: null, left: null };
-  const secs = (a.lastProgressAt - a.startedAt) / 1000;
-  const speed = secs >= 1 && a.transferred > 0 ? a.transferred / secs : null;
+  const speed = recentSpeed(a);
   const pct = a.total && a.total > 0 ? Math.min(100, (a.transferred / a.total) * 100) : null;
   const left = speed && a.total && a.total > a.transferred ? (a.total - a.transferred) / speed : null;
   return { pct, speed, left };
