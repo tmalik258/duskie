@@ -163,6 +163,14 @@ pub async fn agent_files(id: String, query: String) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Files in a project folder for @ in the new-session box.
+#[tauri::command]
+pub async fn project_files(path: String, query: String) -> Vec<String> {
+    tauri::async_runtime::spawn_blocking(move || crate::sessions::files_in(path.into(), &query))
+        .await
+        .unwrap_or_default()
+}
+
 /// Opens the session's project in the user's editor ("Open in Cursor").
 #[tauri::command]
 pub async fn agent_open_editor(app: AppHandle, id: String) -> CmdResult<()> {

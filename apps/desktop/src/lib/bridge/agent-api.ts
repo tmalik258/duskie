@@ -100,6 +100,7 @@ export const agentApi = {
   agentRewindPreview: (id: string, index: number) => invoke<number>("agent_rewind_preview", { id, index }),
   agentRewind: (id: string, index: number) => invoke<number>("agent_rewind", { id, index }),
   agentFiles: (id: string, query: string) => invoke<string[]>("agent_files", { id, query }),
+  projectFiles: (path: string, query: string) => invoke<string[]>("project_files", { path, query }),
   agentCommands: (id: string) => invoke<AgentCommand[]>("agent_commands", { id }),
   aiOpenLink: (target: string) => invoke<string>("ai_open_link", { target }),
   reposOverview: (fresh: boolean) => invoke<ReposOverview>("repos_overview", { fresh }),
