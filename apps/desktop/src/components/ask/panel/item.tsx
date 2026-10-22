@@ -2,7 +2,7 @@
 
 import type { ReactNode } from "react";
 import { Ic } from "../../icon";
-import type { Command } from "../starters";
+import type { Command } from "../starters/command";
 
 /** One row under the input. */
 export interface Item {

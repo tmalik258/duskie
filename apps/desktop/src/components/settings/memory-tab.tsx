@@ -8,7 +8,7 @@ import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { updateSettings, useDuskie } from "@/lib/store";
 import type { Learned, Settings, SuggestionRate } from "@/lib/types";
-import { Memory } from "./privacy-tab";
+import { Memory } from "./privacy-tab/memory";
 import { Button, Field, Section, Segmented, TextField, Toggle } from "./ui";
 
 export function MemoryTab({ onError }: { onError: (e: string) => void }) {

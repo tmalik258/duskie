@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api } from "@/lib/bridge";
 import { filterRows, groupsOf, type LearnedSort, lean, reasonFor, sortRows, splitKey } from "@/lib/learned";
-import { playSound } from "@/lib/sound";
+import { playSound } from "@/lib/sound/play-mood";
 import { uiVolume, useDuskie } from "@/lib/store";
 import type { LearnedLevel, LessonRow } from "@/lib/types";
 import { Button, Field, Segmented, Select } from "./ui";
