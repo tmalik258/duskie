@@ -1380,13 +1380,6 @@ fn keep_waiting(app: &AppHandle, id: String, labels: Vec<String>) {
     }
 }
 
-/// True from the moment the card is read out until a choice is heard or
-/// the wait runs out, so the card never goes mid-sentence or before you
-/// can answer. Only the short prompt is read (headline and choices).
-pub fn awaiting_choice(app: &AppHandle) -> bool {
-    lock(&voice(app).choosing).is_some()
-}
-
 /// True while any speaker still has audio queued or playing.
 pub fn speaker_busy(app: &AppHandle) -> bool {
     let v = voice(app);
