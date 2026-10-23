@@ -391,14 +391,13 @@ pub struct ComposioSettings {
     pub headers: BTreeMap<String, String>,
 }
 
-/// Voice: on by default. Speech models download on launch when
-/// missing. The microphone is open only while voice is on and Duskie is not
-/// paused.
+/// Voice: wake word on by default. Speech models download on launch when
+/// missing. The microphone is always available for push-to-talk (mic button),
+/// but passive listening only when wake word is on and Duskie is not paused.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct VoiceSettings {
-    pub enabled: bool,
-    /// Listen for "Duskie" (with or without "hey"). Off leaves push to talk in Ask mode.
+    /// Listen for "Duskie" (with or without "hey"). Off means push to talk only.
     pub wake_word: bool,
     /// Read answers aloud when the question was spoken.
     pub speak_answers: bool,
@@ -423,7 +422,7 @@ pub struct VoiceSettings {
     /// previous default moves once; a voice picked on purpose is kept.
     #[serde(default = "voice_model_v1")]
     pub model: u32,
-    /// Words voice gets wrong, comma separated: "horsepot = hotspot".
+    /// Extra wake names, comma separated: "desky, desuki, deskie".
     pub fixes: String,
     /// Old Live switch, kept so older settings files load. Live answers are
     /// always on now.
@@ -444,10 +443,13 @@ pub const VOICE_MODEL: u32 = 4;
 /// Default voice before [`VOICE_MODEL`] 4 (Supertonic launch default).
 const PREVIOUS_DEFAULT_VOICE: &str = "f5";
 
+/// Common ASR mishearings of "Duskie", filled into Words voice gets wrong
+/// by default. A comma list of names; rename the assistant and update it.
+pub const DEFAULT_VOICE_FIXES: &str = "desky, desuki, deskie, deski, duskee, dusuke, desuke";
+
 impl Default for VoiceSettings {
     fn default() -> Self {
         Self {
-            enabled: true,
             wake_word: true,
             speak_answers: true,
             listening_style: "compact".into(),
@@ -458,7 +460,7 @@ impl Default for VoiceSettings {
             voice: "f4".into(),
             speed: 1.0,
             model: VOICE_MODEL,
-            fixes: String::new(),
+            fixes: DEFAULT_VOICE_FIXES.into(),
             live: false,
             live_history: true,
             only_me: false,
@@ -972,6 +974,10 @@ impl Settings {
         }
         if self.voice.voice.trim().is_empty() {
             self.voice.voice = VoiceSettings::default().voice;
+        }
+        // Empty fixes: seed the name list once. An edited list is left alone.
+        if self.voice.fixes.trim().is_empty() {
+            self.voice.fixes = DEFAULT_VOICE_FIXES.into();
         }
         if self.welcome_step >= WELCOME_STEP_COUNT {
             self.welcome_step = WELCOME_STEP_COUNT.saturating_sub(1);

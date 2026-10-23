@@ -1,11 +1,49 @@
 // Voice status and heard speech.
 
 import { api, type EVENTS, type EventPayloads } from "../bridge";
+import { wordWindows } from "../spoken-caption";
 import { clearInFlightChat } from "./chat-turns";
 import { voiceReady } from "./done-pill";
 import { useDuskie } from "./duskie-state";
 import { dropEarly, early, sendChat, startEarly } from "./send-chat";
 import { liveIds, watchVoice } from "./waiting";
+
+let sayingTimers: ReturnType<typeof setTimeout>[] = [];
+
+function clearSayingTimers() {
+  for (const t of sayingTimers) clearTimeout(t);
+  sayingTimers = [];
+}
+
+/** Karaoke: a few words at a time, timed to a spoken piece. */
+export function onVoiceSaying({ text, startsInMs, ms }: EventPayloads[typeof EVENTS.voiceSaying]) {
+  clearSayingTimers();
+  const windows = wordWindows(text);
+  if (windows.length === 0) {
+    useDuskie.setState({ spokenCaption: null });
+    return;
+  }
+  const slice = Math.max(40, Math.floor(ms / windows.length));
+  windows.forEach((caption, i) => {
+    const at = startsInMs + i * slice;
+    sayingTimers.push(
+      setTimeout(() => {
+        useDuskie.setState({ spokenCaption: caption });
+      }, at),
+    );
+  });
+  // Clear shortly after the piece ends so the next one can take over.
+  sayingTimers.push(
+    setTimeout(
+      () => {
+        if (useDuskie.getState().spokenCaption === windows.at(-1)) {
+          useDuskie.setState({ spokenCaption: null });
+        }
+      },
+      startsInMs + ms + 80,
+    ),
+  );
+}
 
 export function onVoiceState(voiceStatus: EventPayloads[typeof EVENTS.voiceState]) {
   useDuskie.setState({ voiceStatus });

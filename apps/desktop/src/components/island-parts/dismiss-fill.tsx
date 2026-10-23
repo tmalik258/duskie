@@ -3,7 +3,7 @@
 // Part of island-parts: DismissFill, choose, showLess, privateOpenLabel, Options.
 
 import { motion, useReducedMotion } from "motion/react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { api } from "@/lib/bridge";
 import { playSound } from "@/lib/sound/play-mood";
 import { notePick, showDone, uiVolume, useDuskie } from "@/lib/store";
@@ -13,23 +13,31 @@ import { Tip } from "../tip";
 import { ALWAYS_GLANCE, always, dismiss, runningLabel } from "./activity";
 
 /** A fill inside Dismiss that drains while the card waits to close on its
- * own. Rust restarts that clock while the island is hovered or the mic
- * waits for a spoken answer, so it refills then and drains from full after.
- * With reduced motion it stays still. */
+ * own. Rust restarts that clock while the island is hovered, voice is
+ * speaking, or the mic waits for a spoken answer, so it refills then and
+ * drains from full after. With reduced motion it stays still. */
 function DismissFill() {
   const secs = useDuskie((s) => s.settings.collapseAfterSecs);
-  const hovered = useDuskie((s) => s.hovered || s.choiceHeld);
+  const held = useDuskie((s) => s.hovered || s.choiceHeld || s.speaking);
   const reduced = useReducedMotion() ?? false;
+  // Remount when a hold ends so the drain always restarts from full - even
+  // if the bar had already emptied before voice/choice paused the clock.
+  const [runId, setRunId] = useState(0);
+  const wasHeld = useRef(held);
+  useEffect(() => {
+    if (wasHeld.current && !held) setRunId((n) => n + 1);
+    wasHeld.current = held;
+  }, [held]);
   if (!secs || reduced) return null;
   return (
     <motion.i
-      key={hovered ? "held" : "running"}
+      key={held ? "held" : `run-${runId}`}
       className="rd-dz-fill"
       aria-hidden
       style={{ originX: 0 }}
       initial={{ scaleX: 1 }}
-      animate={{ scaleX: hovered ? 1 : 0 }}
-      transition={hovered ? { duration: 0 } : { duration: secs, ease: "linear" }}
+      animate={{ scaleX: held ? 1 : 0 }}
+      transition={held ? { duration: 0 } : { duration: secs, ease: "linear" }}
     />
   );
 }
@@ -82,6 +90,8 @@ export function Options({ suggestion }: { suggestion: Suggestion }) {
   const canShowLess = !ALWAYS_GLANCE.has(suggestion.skillId);
   // Shift while hovered, or Shift+Alt anywhere, Rust polls; no hover required.
   const priv = useDuskie((s) => s.shiftHeld);
+  // Suggestion layout wins over the listening pill - show mic state here.
+  const listening = useDuskie((s) => s.mascot === "listening");
   const [why, setWhy] = useState(false);
   return (
     <div className="mt-2.5 flex min-w-0 flex-col gap-1.5" style={FULL}>
@@ -125,6 +135,16 @@ export function Options({ suggestion }: { suggestion: Suggestion }) {
           <button type="button" onClick={() => showLess(suggestion)} className="rd-gfoot-btn chip">
             Show less
           </button>
+        )}
+        {listening && (
+          <span className="inline-flex items-center gap-1.5 text-[11.5px] text-(--ink-3)" aria-live="polite">
+            <span className="voice-bars shrink-0" role="img" aria-label="Listening">
+              <i />
+              <i />
+              <i />
+            </span>
+            Listening
+          </span>
         )}
         <span className="ml-auto" />
         {suggestion.why && (

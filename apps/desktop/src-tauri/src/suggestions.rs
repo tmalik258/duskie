@@ -577,9 +577,9 @@ fn expire_when_ignored(app: &AppHandle, id: String) {
                 return;
             }
             let limit = Duration::from_secs(u64::from(lock(&state.settings).collapse_after_secs));
-            // The mic is open for a spoken answer: the card waits for it,
-            // and the Dismiss fill shows that it does.
-            let held = crate::voice::awaiting_choice(&app);
+            // Prompt still playing: pause the clock. Mic open for a spoken
+            // answer does not hold - the fill drains so the card can time out.
+            let held = crate::voice::suggestion_dismiss_held(&app);
             if held != was_held {
                 was_held = held;
                 let _ = app.emit(SUGGESTION_HELD, held);

@@ -89,7 +89,7 @@ pub async fn live_state(app: &AppHandle) -> String {
         None => "up to date as far as the last check knows".into(),
     };
     let voice = {
-        let enabled = lock(&app.state::<AppState>().settings).voice.enabled;
+        let enabled = lock(&app.state::<AppState>().settings).voice.wake_word;
         let v = crate::voice::status(app);
         let mut line = match (enabled, v.listening, v.downloading) {
             (false, ..) => "off".to_owned(),
@@ -148,7 +148,11 @@ pub async fn diagnostics(app: AppHandle) -> String {
     ));
     out.push_str(&format!(
         "Voice: {}, Island: {}, Transparency effects: {}, Battery saver: {}\n",
-        if settings.voice.enabled { "on" } else { "off" },
+        if settings.voice.wake_word {
+            "on"
+        } else {
+            "off"
+        },
         settings.island_color,
         duskie_sensors::transparency_effects(),
         duskie_sensors::battery_saver(),

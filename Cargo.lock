@@ -1579,6 +1579,7 @@ dependencies = [
 name = "duskie-desktop"
 version = "0.2.2"
 dependencies = [
+ "active-win-pos-rs",
  "arboard",
  "async-trait",
  "base64 0.22.1",

@@ -136,13 +136,13 @@ export const welcomeSpoken = { v: false };
 
 export const voiceStatus = () => ({
   models: [
-    { id: "wake", label: "Wake word", size: 17_626_723, installed: settings.v.voice.enabled },
-    { id: "speech", label: "Speech to text", size: 57_267_600, installed: settings.v.voice.enabled },
-    { id: "voice", label: "Supertonic voice", size: 128_774_318, installed: settings.v.voice.enabled },
+    { id: "wake", label: "Wake word", size: 17_626_723, installed: settings.v.voice.wakeWord },
+    { id: "speech", label: "Speech to text", size: 57_267_600, installed: settings.v.voice.wakeWord },
+    { id: "voice", label: "Supertonic voice", size: 128_774_318, installed: settings.v.voice.wakeWord },
   ],
-  missingBytes: settings.v.voice.enabled ? 0 : 203_669_641,
+  missingBytes: settings.v.voice.wakeWord ? 0 : 203_669_641,
   downloading: false,
-  listening: settings.v.voice.enabled,
+  listening: settings.v.voice.wakeWord,
   error: null,
   voices: [
     { id: "f5", label: "Female 5 (warm)" },

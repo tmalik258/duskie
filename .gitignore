@@ -1,4 +1,5 @@
 /target/
+/target*/
 node_modules/
 .DS_Store
 *.log
@@ -14,3 +15,5 @@ apps/desktop/.parity/
 # Local AI assistant notes (Next.js dev writes the apps/desktop ones)
 CLAUDE.md
 AGENTS.md
+
+graphify-out/

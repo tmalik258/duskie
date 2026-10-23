@@ -11,7 +11,7 @@ import { onActionResult, onMascotState, onSuggestionLater, onSuggestionNew } fro
 import { setHovered, showDone } from "./done-pill";
 import { setMood, uiVolume, useDuskie } from "./duskie-state";
 import { onAskClose, onAskOpen, onBrowsersChanged, onComposioChanged } from "./panel-events";
-import { onVoiceHeard, onVoiceState } from "./voice-events";
+import { onVoiceHeard, onVoiceSaying, onVoiceState } from "./voice-events";
 
 export function connect({ sounds }: { sounds: boolean }): () => void {
   let disposed = false;
@@ -85,7 +85,16 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
       listen(EVENTS.askOpen, onAskOpen),
       listen(EVENTS.askClose, onAskClose),
       listen(EVENTS.voiceState, onVoiceState),
-      listen(EVENTS.voiceSpeaking, (speaking) => useDuskie.setState({ speaking })),
+      listen(EVENTS.voiceSpeaking, (speaking) => {
+        useDuskie.setState({ speaking });
+        // Keep the last words up a beat after audio ends.
+        if (!speaking) {
+          window.setTimeout(() => {
+            if (!useDuskie.getState().speaking) useDuskie.setState({ spokenCaption: null });
+          }, 600);
+        }
+      }),
+      listen(EVENTS.voiceSaying, (p) => onVoiceSaying(p)),
       listen(EVENTS.voiceHeard, onVoiceHeard),
       listen(EVENTS.aiDelta, (p) => onAiDelta(p, sounds)),
       listen(EVENTS.connectorsDuplicate, ({ app, used, unused }) =>

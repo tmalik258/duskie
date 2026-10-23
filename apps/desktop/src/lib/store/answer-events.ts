@@ -24,15 +24,20 @@ export function onAiDelta({ id, text }: EventPayloads[typeof EVENTS.aiDelta], so
   // Live: the answer stays a caption in the island; Ask stays closed.
   if (liveAnswer(id)) {
     liveText.set(id, (liveText.get(id) ?? "") + text);
-    const caption = captionOf(liveText.get(id) ?? "");
     const prev = useDuskie.getState().live;
+    const speak = useDuskie.getState().settings.voice.speakAnswers;
+    // When reading aloud, karaoke captions come from speech timing - not the
+    // whole sentence at once from the stream.
+    const caption = speak ? (prev?.caption ?? "") : captionOf(liveText.get(id) ?? "");
     useDuskie.setState({ voiceQuestion: null, live: { caption, tool: prev?.tool ?? null, done: false } });
     return;
   }
-  // The first words of a spoken question's answer: open to show it.
+  // The first words of a spoken question's answer: open to show it, unless
+  // it will be read aloud (karaoke stays on the compact pill).
   if (sounds && useDuskie.getState().voiceQuestion !== null) {
     useDuskie.setState({ voiceQuestion: null });
-    if (!useDuskie.getState().ask) void api.askOpen();
+    const speak = useDuskie.getState().settings.voice.speakAnswers;
+    if (!useDuskie.getState().ask && !speak) void api.askOpen();
   }
 }
 

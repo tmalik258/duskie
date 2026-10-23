@@ -33,7 +33,25 @@ export function IslandPill({ model, onWidth }: { model: PillModel; onWidth: (w: 
         {model.endsAt !== undefined ? clock(Math.max(0, model.endsAt - now)) : clock(now - (model.startedAt ?? now))}
       </span>
     );
-  else if (kind === "listening") trail = <Bars />;
+  else if (kind === "listening")
+    trail = (
+      <>
+        <Bars />
+        {model.onChip && (
+          <button
+            type="button"
+            className="chip-s ic-only"
+            aria-label="Stop listening"
+            onClick={(e) => {
+              e.stopPropagation();
+              model.onChip?.();
+            }}
+          >
+            <Ic name="x" size={12} />
+          </button>
+        )}
+      </>
+    );
   else if (kind === "caption")
     trail = (
       <>

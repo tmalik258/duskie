@@ -33,12 +33,12 @@ export function VoiceSection({ voice, onError }: { voice: VoiceSettings; onError
   return (
     <>
       <Toggle
-        label={`Talk to ${name}`}
-        hint={voice.wakeWord ? `Say "${name}"` : "Use the mic button or the Talk shortcut"}
-        checked={voice.enabled}
-        onChange={(enabled) => {
-          void set({ enabled });
-          if (enabled && missing > 0 && !downloading) api.voiceDownload().catch((e) => onError(String(e)));
+        label="Wake word"
+        hint={`Off: only the mic button listens. On: say "${name}"`}
+        checked={voice.wakeWord}
+        onChange={(wakeWord) => {
+          void set({ wakeWord });
+          if (wakeWord && missing > 0 && !downloading) api.voiceDownload().catch((e) => onError(String(e)));
         }}
       />
       {missing > 0 && (
@@ -67,23 +67,13 @@ export function VoiceSection({ voice, onError }: { voice: VoiceSettings; onError
           )}
         </div>
       )}
-      {voice.enabled && missing === 0 && (
+      {voice.wakeWord && missing === 0 && (
         <p className="text-[12px] text-(--muted)">
-          {status?.listening
-            ? voice.wakeWord
-              ? `Listening for "${name}".`
-              : "Ready. Use the mic button or the Talk shortcut."
-            : "Starting the microphone..."}
+          {status?.listening ? `Listening for "${name}".` : "Starting the microphone..."}
         </p>
       )}
       {status?.error && <p className="text-[12px] text-red-400">{status.error}</p>}
-      <Toggle
-        label="Wake word"
-        hint="Off: only the mic button listens"
-        checked={voice.wakeWord}
-        onChange={(wakeWord) => void set({ wakeWord })}
-      />
-      {voice.enabled && voice.wakeWord && missing === 0 && (
+      {voice.wakeWord && missing === 0 && (
         <VoiceEnroll name={name} voice={voice} set={(p) => void set(p)} onError={onError} />
       )}
       <div className="flex items-center justify-between gap-4 text-[14px]">
@@ -116,11 +106,14 @@ export function VoiceSection({ voice, onError }: { voice: VoiceSettings; onError
         checked={voice.interrupt}
         onChange={(interrupt) => void set({ interrupt })}
       />
-      <Field label="Words voice gets wrong" hint="Comma separated. Duskie fixes them as you talk.">
+      <Field
+        label="Extra names"
+        hint="Comma-separated. ASR mishearings that should still wake. Rename the assistant and update this list."
+      >
         <TextField
-          label="Words voice gets wrong"
+          label="Extra names"
           value={voice.fixes ?? ""}
-          placeholder="horsepot = hotspot, sidekik = Duskie"
+          placeholder="desky, desuki, dusuke, desuke"
           onCommit={(fixes) => void set({ fixes })}
         />
       </Field>

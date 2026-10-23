@@ -93,7 +93,6 @@ export const DEFAULT_SETTINGS: Settings = {
   learning: true,
   agent: { ask: "outward", places: {} },
   voice: {
-    enabled: true,
     wakeWord: true,
     speakAnswers: true,
     listeningStyle: "compact",
@@ -106,6 +105,7 @@ export const DEFAULT_SETTINGS: Settings = {
     onlyMe: false,
     voice: "f4",
     speed: 1,
+    fixes: "desky, desuki, deskie, deski, duskee, dusuke, desuke",
   },
 };
 

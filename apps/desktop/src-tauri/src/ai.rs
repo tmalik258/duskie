@@ -747,6 +747,9 @@ fn log_ask_user(id: &str, question: &str, attach: &Attach, local_only: bool) {
     if attach.voice {
         flags.push("voice");
     }
+    if attach.speak {
+        flags.push("speak");
+    }
     if attach.clipboard {
         flags.push("clipboard");
     }
@@ -876,7 +879,7 @@ pub fn chat(
             .flatten()
         {
             lock(&app.state::<AppState>().chats).remove(&id);
-            let speak = attach.speak && crate::voice::begin_answer(&app, &id, attach.voice);
+            let speak = start_speaking(&app, &id, &attach);
             let text = duskie_calc::format(answer);
             log_ask_reply(&id, "instant", started, &text, None);
             send_text(&app, &id, text, speak);
@@ -914,7 +917,7 @@ pub fn chat(
                 .unwrap_or_else(|e| Err(e.to_string())),
             };
             lock(&app.state::<AppState>().chats).remove(&id);
-            let speak = attach.speak && crate::voice::begin_answer(&app, &id, attach.voice);
+            let speak = start_speaking(&app, &id, &attach);
             let (text, error) = match result {
                 Ok(message) => (message, None),
                 Err(e) => (String::new(), Some(e.to_string())),
@@ -983,6 +986,7 @@ pub fn chat(
         let forward = {
             let app = app.clone();
             let id = id.clone();
+            let attach = attach.clone();
             tauri::async_runtime::spawn(async move {
                 // Held: keep the words until the chat is released, or drop
                 // them when it is cancelled.
@@ -1003,7 +1007,9 @@ pub fn chat(
                             },
                         }
                     }
-                    let speak = attach.speak && crate::voice::begin_answer(&app, &id, attach.voice);
+                    // Released: the final question is locked in, so speaking
+                    // now is safe (unlike starting at chat open).
+                    let speak = start_speaking(&app, &id, &attach);
                     for text in kept {
                         send_text(&app, &id, text, speak);
                     }
@@ -1012,8 +1018,17 @@ pub fn chat(
                     }
                     return Some(speak);
                 }
-                let speak = attach.speak && crate::voice::begin_answer(&app, &id, attach.voice);
+                // Do not begin speaking until the first words arrive. The mic
+                // goes back to the wake word as soon as the question ends; a
+                // wake during the model wait would stop an early utterance
+                // and the answer would never be heard.
+                let mut speak = false;
+                let mut started = false;
                 while let Some(text) = rx.recv().await {
+                    if !started && text != duskie_ai::CLEAR {
+                        started = true;
+                        speak = start_speaking(&app, &id, &attach);
+                    }
                     send_text(&app, &id, text, speak);
                 }
                 Some(speak)
@@ -1023,7 +1038,7 @@ pub fn chat(
         let result = router.chat(&req, &sink, &cancel, local_only).await;
         let cost = sink.cost();
         drop(sink);
-        let Some(speak) = forward.await.ok().flatten() else {
+        let Some(mut speak) = forward.await.ok().flatten() else {
             // Dropped before it was ever shown: nothing to report to chat UI.
             crate::activity::forget(&app, &format!("chat:{id}"));
             lock(&app.state::<AppState>().chats).remove(&id);
@@ -1044,6 +1059,13 @@ pub fn chat(
         let handoff = lock(&handoff).take();
         let done = match result {
             Ok(answer) => {
+                // No streamed deltas (or only CLEAR): still read the final text.
+                if !speak && attach.speak && !answer.text.trim().is_empty() {
+                    speak = start_speaking(&app, &id, &attach);
+                    if speak {
+                        crate::voice::answer_text(&app, &id, &no_dashes(&answer.text));
+                    }
+                }
                 log_ask_reply(&id, &answer.provider, started, &answer.text, None);
                 Done {
                     id,
@@ -1105,6 +1127,20 @@ pub fn cancel(app: &AppHandle, id: &str) {
         token.cancel();
     }
     crate::activity::forget(app, &format!("chat:{id}"));
+}
+
+/// Starts reading the answer aloud when Speak is on. Logs when the speaker
+/// could not start, so a silent Live reply is visible in the log.
+fn start_speaking(app: &AppHandle, id: &str, attach: &Attach) -> bool {
+    if !attach.speak {
+        return false;
+    }
+    if crate::voice::begin_answer(app, id, attach.voice) {
+        true
+    } else {
+        log::warn!("voice: could not speak answer {id}: no speaker");
+        false
+    }
 }
 
 fn send_text(app: &AppHandle, id: &str, text: String, speak: bool) {

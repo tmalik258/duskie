@@ -123,7 +123,7 @@ export function AskField(p: {
               >
                 <Icon name={p.speak ? "speaker" : "speakerOff"} size={14} />
               </IconButton>
-              {p.voiceReady && !p.streaming && (
+              {!p.streaming && (
                 <IconButton
                   label={`Talk, or say ${p.assistant} (Alt V)`}
                   keys={p.alt}

@@ -190,6 +190,50 @@ fn offline_text(asr: &OfflineRecognizer, audio: &[f32]) -> String {
         .unwrap_or_default()
 }
 
+fn final_recognizer(models: &Path) -> Result<OfflineRecognizer> {
+    if !FINAL.installed(models) {
+        return Err(VoiceError::MissingModels);
+    }
+    OfflineRecognizer::create(&OfflineRecognizerConfig {
+        model_config: OfflineModelConfig {
+            transducer: OfflineTransducerModelConfig {
+                encoder: Some(FINAL.file(models, "encoder.int8.onnx")),
+                decoder: Some(FINAL.file(models, "decoder.int8.onnx")),
+                joiner: Some(FINAL.file(models, "joiner.int8.onnx")),
+            },
+            tokens: Some(FINAL.file(models, "tokens.txt")),
+            model_type: Some("nemo_transducer".into()),
+            num_threads: 2,
+            ..Default::default()
+        },
+        ..Default::default()
+    })
+    .ok_or_else(|| VoiceError::Engine("final transcript model did not load".into()))
+}
+
+/// What the final recognizer hears in a short clip. Keeps the model loaded
+/// so teaching several takes does not reload it each time.
+pub fn transcribe(models: &Path, audio: &[f32]) -> Result<String> {
+    use std::sync::{Mutex, OnceLock};
+    struct Cached {
+        dir: PathBuf,
+        asr: OfflineRecognizer,
+    }
+    static CACHE: OnceLock<Mutex<Option<Cached>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new(None));
+    let mut slot = cache
+        .lock()
+        .map_err(|_| VoiceError::Engine("transcript cache".into()))?;
+    let reuse = slot.as_ref().is_some_and(|c| c.dir == models);
+    if !reuse {
+        *slot = Some(Cached {
+            dir: models.to_path_buf(),
+            asr: final_recognizer(models)?,
+        });
+    }
+    Ok(offline_text(&slot.as_ref().expect("just set").asr, audio))
+}
+
 pub(crate) fn spotter_config(models: &Path, threshold: f32) -> KeywordSpotterConfig {
     KeywordSpotterConfig {
         model_config: model(
@@ -306,21 +350,7 @@ impl Engine {
         let recognizer = OnlineRecognizer::create(&config)
             .ok_or_else(|| VoiceError::Engine("speech model did not load".into()))?;
         let stream = recognizer.create_stream();
-        let final_asr = OfflineRecognizer::create(&OfflineRecognizerConfig {
-            model_config: OfflineModelConfig {
-                transducer: OfflineTransducerModelConfig {
-                    encoder: Some(FINAL.file(models, "encoder.int8.onnx")),
-                    decoder: Some(FINAL.file(models, "decoder.int8.onnx")),
-                    joiner: Some(FINAL.file(models, "joiner.int8.onnx")),
-                },
-                tokens: Some(FINAL.file(models, "tokens.txt")),
-                model_type: Some("nemo_transducer".into()),
-                num_threads: 2,
-                ..Default::default()
-            },
-            ..Default::default()
-        })
-        .ok_or_else(|| VoiceError::Engine("final transcript model did not load".into()))?;
+        let final_asr = final_recognizer(models)?;
         Ok(Self {
             spotter,
             recognizer,
@@ -346,10 +376,11 @@ impl Engine {
     }
 
     /// While muted, audio is dropped: the speakers' sound must not wake
-    /// Duskie, nor be primed into the next question. Muting also ends
-    /// waiting on anything half heard. A push to talk unmutes.
+    /// Duskie, nor be primed into the next question. A push-to-talk or
+    /// choice listen stays armed and keeps any in-progress words so a brief
+    /// TTS/echo mute cannot wipe "not now". Wake-word wait still resets.
     pub fn set_muted(&mut self, muted: bool) {
-        if muted && !self.muted {
+        if muted && !self.muted && !self.listening {
             self.reset();
         }
         self.muted = muted;
@@ -358,7 +389,13 @@ impl Engine {
     }
 
     pub fn set_teaching(&mut self, on: bool) {
+        if on == self.teaching {
+            return;
+        }
         self.teaching = on;
+        // Drop any half-heard words so teaching chatter cannot wake later.
+        self.recognizer.reset(&self.stream);
+        self.recent.clear();
         if on {
             self.cancel();
         }
@@ -551,14 +588,13 @@ impl Engine {
         self.judged = None;
         self.said.clear();
         self.question = prime.to_vec();
-        if self.you.is_some() {
-            self.said.extend_from_slice(prime);
-        }
+        // Do not seed `said` with the primed window: room noise before the
+        // wake word pulls the embedding away from the clean teach takes.
     }
 
     /// Whether the question is in your voice. Without a voiceprint every
     /// voice is. None while there is too little voice to tell, unless
-    /// `last`: then too little voice counts as not yours.
+    /// `last`: then too little voice counts as yours (wake already passed).
     fn judge(&mut self, last: bool) -> Option<bool> {
         let Some((extractor, you)) = &self.you else {
             return Some(true);
@@ -566,12 +602,23 @@ impl Engine {
         if self.judged.is_none() {
             let voice = crate::enroll::voiced(&self.said);
             if voice.len() >= crate::enroll::JUDGE_VOICE || last {
-                let score = crate::enroll::embed(extractor, &self.said)
-                    .map(|e| (crate::enroll::similarity(&e, &you.print), you.matches(&e)));
-                // Shown in the log so a miss is visible: same voice is 0.65 and up.
-                log::info!("voice match: {score:?} for {:?}", self.said.len());
-                let yours = score.is_some_and(|(_, m)| m);
-                self.judged = Some(yours);
+                if voice.len() < crate::enroll::JUDGE_VOICE {
+                    // Too short to tell - the wake phrase already matched.
+                    log::info!(
+                        "voice match: skipped (only {:?} voiced samples)",
+                        voice.len()
+                    );
+                    self.judged = Some(true);
+                } else {
+                    let score = crate::enroll::embed(extractor, &self.said).map(|e| {
+                        let best = you.score(&e);
+                        (best, best >= crate::enroll::SAME_VOICE)
+                    });
+                    // Same voice is about 0.55 and up on a live mic.
+                    log::info!("voice match: {score:?} for {:?}", self.said.len());
+                    let yours = score.is_some_and(|(_, m)| m);
+                    self.judged = Some(yours);
+                }
                 self.said = Vec::new();
             }
         }
@@ -582,7 +629,10 @@ impl Engine {
     /// if nothing was said, so it is never answered.
     fn end(&mut self, streamed: String) -> Heard {
         let text = self.final_text(streamed);
-        log::info!("question heard: {} words", text.split_whitespace().count());
+        log::info!(
+            "question heard: {text:?} ({} words)",
+            text.split_whitespace().count()
+        );
         let yours = text.is_empty() || self.judge(true) == Some(true);
         self.judged = None;
         self.said = Vec::new();
@@ -597,9 +647,7 @@ impl Engine {
         // The window can start mid-word ("a duskie"), so the name may sit
         // anywhere in it.
         let found = crate::text::has_name(&text);
-        if !found {
-            log::info!("wake: final recognizer heard {text:?}");
-        }
+        log::info!("wake: final recognizer heard {text:?}");
         found
     }
 

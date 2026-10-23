@@ -42,6 +42,7 @@ export const EVENTS = {
   voiceState: "voice://state",
   voiceHeard: "voice://heard",
   voiceSpeaking: "voice://speaking",
+  voiceSaying: "voice://saying",
   agentEvent: "agent://event",
   voiceDownload: "voice://download",
   suggestionLater: "suggestion://later",
@@ -98,6 +99,7 @@ export interface EventPayloads {
   [EVENTS.voiceState]: VoiceStatus;
   [EVENTS.voiceHeard]: VoiceHeard;
   [EVENTS.voiceSpeaking]: boolean;
+  [EVENTS.voiceSaying]: { text: string; startsInMs: number; ms: number };
   [EVENTS.agentEvent]: { session: string; kind: string } & Record<string, unknown>;
   [EVENTS.voiceDownload]: VoiceDownload;
   [EVENTS.suggestionLater]: number;

@@ -9,6 +9,10 @@ pub const WAKE_KEYWORDS: &str = "▁ D U S K I E @duskie\n";
 /// means only "Duskie". The default name always keeps working too.
 static CUSTOM_NAME: std::sync::RwLock<Vec<String>> = std::sync::RwLock::new(Vec::new());
 
+/// Extra wake names from "Words voice gets wrong" (left sides that map to
+/// the assistant name). Each entry is one phrase as lowercase words.
+static NAME_ALIASES: std::sync::RwLock<Vec<Vec<String>>> = std::sync::RwLock::new(Vec::new());
+
 /// Sets the assistant's name for wake matching. "Duskie" or blank clears it.
 pub fn set_name(name: &str) {
     let words: Vec<String> = name
@@ -26,8 +30,30 @@ pub fn set_name(name: &str) {
     }
 }
 
+/// Sets extra wake names (ASR mishearings of the assistant name). Pass the
+/// left sides of fixes that map to the name, e.g. `["desky", "desk key"]`.
+pub fn set_name_aliases(aliases: &[String]) {
+    let names: Vec<Vec<String>> = aliases
+        .iter()
+        .map(|a| {
+            a.split(|c: char| !c.is_alphanumeric())
+                .filter(|w| !w.is_empty())
+                .map(str::to_lowercase)
+                .collect()
+        })
+        .filter(|w: &Vec<String>| !w.is_empty())
+        .collect();
+    if let Ok(mut n) = NAME_ALIASES.write() {
+        *n = names;
+    }
+}
+
 fn custom_name() -> Vec<String> {
     CUSTOM_NAME.read().map(|n| n.clone()).unwrap_or_default()
+}
+
+fn name_aliases() -> Vec<Vec<String>> {
+    NAME_ALIASES.read().map(|n| n.clone()).unwrap_or_default()
 }
 
 /// Pieces of the wake model's BPE vocabulary with their merge scores.
@@ -175,15 +201,25 @@ pub fn wake_keywords(vocab: Option<&Vocab>) -> String {
 const GREETINGS: &[&str] = &["hey", "hi", "ok", "okay", "a"];
 
 /// How the name comes out of speech to text, as one word or two ("dusky",
-/// "dusk key"). The old name, Sidekick, no longer wakes it.
+/// "dusk key", "desky"). The old name, Sidekick, no longer wakes it.
 const NAMES: &[&[&str]] = &[
     &["duskie"],
     &["dusky"],
     &["duskey"],
+    &["duskee"],
+    &["duskii"],
+    &["desky"],
+    &["desuki"],
+    &["deskie"],
+    &["deski"],
+    &["dusuke"],
+    &["desuke"],
     &["dusk", "e"],
     &["dusk", "ee"],
     &["dusk", "key"],
     &["dust", "key"],
+    &["desk", "key"],
+    &["desk", "e"],
 ];
 
 /// After a greeting, any word starting with one of these counts as the name,
@@ -214,6 +250,7 @@ pub fn strip_wake(text: &str) -> String {
         }
     }
     let custom = custom_name();
+    let aliases = name_aliases();
     let name_at = |at: usize| {
         let fits = |name: &[&str]| {
             name.len() <= words.len().saturating_sub(at)
@@ -222,6 +259,12 @@ pub fn strip_wake(text: &str) -> String {
         let own: Vec<&str> = custom.iter().map(String::as_str).collect();
         if !own.is_empty() && fits(&own) {
             return Some(at + own.len());
+        }
+        for alias in &aliases {
+            let parts: Vec<&str> = alias.iter().map(String::as_str).collect();
+            if fits(&parts) {
+                return Some(at + parts.len());
+            }
         }
         NAMES
             .iter()
@@ -561,7 +604,20 @@ mod tests {
         assert!(has_name("duskie"));
         assert!(has_name("a duskie"));
         assert!(has_name("the dusky"));
+        assert!(has_name("Desky"));
+        assert!(has_name("hey desuki open mail"));
+        assert!(has_name("Dusuke"));
+        assert!(has_name("hey desuke"));
         assert!(!has_name("open the folder"));
+    }
+
+    #[test]
+    fn name_aliases_from_fixes_wake() {
+        set_name_aliases(&["sidekik".into(), "or bee".into()]);
+        assert!(has_name("sidekik"));
+        assert_eq!(strip_wake("hey or bee open mail"), "open mail");
+        set_name_aliases(&[]);
+        assert!(!has_name("sidekik"));
     }
 
     #[test]
@@ -691,8 +747,11 @@ mod tests {
             strip_wake("Hey duskee, open my downloads"),
             "open my downloads"
         );
+        assert_eq!(strip_wake("Desky open settings"), "open settings");
+        assert_eq!(strip_wake("hey desuki, open mail"), "open mail");
+        assert_eq!(strip_wake("Okay desk key open settings"), "open settings");
         assert_eq!(strip_wake("hey dusk open settings"), "open settings");
-        assert_eq!(strip_wake("duskee open settings"), "duskee open settings");
+        assert_eq!(strip_wake("duskee open settings"), "open settings");
         // The old name no longer wakes it.
         assert_eq!(
             strip_wake("Hey sidekick, open mail"),
