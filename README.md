@@ -70,7 +70,7 @@ Updates come to the island on their own (Settings > Home > Tell me about new ver
 - **Go fullscreen** (video, game, slides). The island hides and comes back after.
 - **Settings > Skills**: switch skills on or off, or set them to Auto. Destructive actions always ask.
 - **Your own skills**: drop YAML files into the folder shown in Settings > Found on this PC (format in `skills/README.md`).
-- **Press Ctrl+Space** (or the search button on the island) and the island becomes Ask mode: type a command or ask anything, and the answer streams right there. Attach the app you were in or your clipboard with the chips; "This PC only" keeps the chat on a local model. Esc or a click elsewhere folds it back; the conversation stays for next time.
+- **Press Win+Alt+Space** (or the search button on the island) and the island becomes Ask mode: type a command or ask anything, and the answer streams right there. Attach the app you were in or your clipboard with the chips; "This PC only" keeps the chat on a local model. Esc or a click elsewhere folds it back; the conversation stays for next time.
 - **Copy an error or stack trace.** The island offers Explain and fix, which asks AI with the error attached.
 - **Claude Code sessions**: add the hook from Settings > AI and the island tells you when a session finishes or is waiting for you.
 - **Undo**: files Duskie creates (conversions, extracted folders) can be sent to the Recycle Bin from the island or Settings > History for 24 hours.
@@ -201,7 +201,7 @@ crates/sensors/          downloads, ports, clipboard, window, Claude Code hooks,
 crates/skills/           YAML skill engine
 crates/actions/          built-in actions and detection of installed browsers and tools
 crates/ai/               AI providers (Claude Code, Codex, local, Anthropic API), router, SemIf decisions
-crates/voice/            Hey Duskie wake word, live speech to text, Supertonic speech
+crates/voice/            Duskie wake word, live speech to text, Supertonic speech
 skills/                  built-in skills
 assets/                  app icon and social preview
 ```

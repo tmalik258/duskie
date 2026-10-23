@@ -7,7 +7,16 @@ import { Ic } from "../../icon";
 import { Caret, MODE_INFO, type ModeId, Pop } from "./levels";
 
 /** The mode as one chip with its icon; the menu lists every mode with its note. */
-export function ModeChip({ mode, onChange }: { mode: ModeId; onChange?: (m: ModeId) => void }) {
+export function ModeChip({
+  mode,
+  onChange,
+  only,
+}: {
+  mode: ModeId;
+  onChange?: (m: ModeId) => void;
+  /** The modes offered; all when not given. */
+  only?: (m: ModeId) => boolean;
+}) {
   const cur = MODE_INFO.find((m) => m.id === mode) ?? MODE_INFO[2];
   if (!onChange)
     return (
@@ -34,7 +43,7 @@ export function ModeChip({ mode, onChange }: { mode: ModeId; onChange?: (m: Mode
             <span>Mode</span>
             <kbd className="mono">Ctrl .</kbd>
           </div>
-          {MODE_INFO.map((m) => (
+          {MODE_INFO.filter((m) => !only || only(m.id)).map((m) => (
             <button
               key={m.id}
               type="button"

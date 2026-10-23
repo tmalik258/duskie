@@ -3,6 +3,7 @@ mod activity;
 mod agents;
 mod ai;
 mod ask;
+mod ask_files;
 mod ask_tools;
 mod audit;
 mod brief;
@@ -278,6 +279,7 @@ pub fn run() {
             commands::voice_enroll_state,
             commands::voice_enroll_record,
             commands::voice_enroll_finish,
+            commands::voice_enroll_open,
             commands::voice_enroll_cancel,
             commands::voice_enroll_reset,
             commands::voice_welcome,
@@ -350,6 +352,11 @@ pub fn run() {
             commands::agent_rewind_preview,
             commands::agent_rewind,
             commands::agent_files,
+            commands::project_files,
+            commands::save_attachment,
+            commands::island_dialog,
+            commands::play_sfx,
+            commands::check_kit,
             commands::agent_commands,
             commands::agent_open_editor,
             commands::agent_tune,
@@ -358,7 +365,8 @@ pub fn run() {
             commands::agent_project,
             commands::agent_reviews,
             commands::agent_review_decide,
-            commands::agent_finish,
+            commands::agent_keep,
+            commands::agent_discard,
             commands::cursor_chats,
             commands::cursor_open,
             commands::repos_overview,

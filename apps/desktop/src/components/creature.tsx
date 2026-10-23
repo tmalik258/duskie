@@ -36,6 +36,8 @@ export function Creature(props: {
   alive?: boolean;
   /** Battery saver: no motion beyond what a state needs. */
   simple?: boolean;
+  /** Makes its life sounds (yawn, doze, tape). The island's mascot only. */
+  sound?: boolean;
   /** False while nothing is on screen: the creature stops drawing. */
   active?: boolean;
   /**
@@ -52,6 +54,7 @@ export function Creature(props: {
     magnetic = true,
     alive = false,
     simple = false,
+    sound = false,
     active = true,
     bust,
   } = props;
@@ -87,6 +90,7 @@ export function Creature(props: {
       alive: now.alive,
       active: now.active,
       blink: !reduced,
+      sound,
       ...(bust !== undefined ? { bust } : {}),
     }) as Live | null;
     live.current = c;
@@ -94,7 +98,7 @@ export function Creature(props: {
       c?.destroy();
       live.current = null;
     };
-  }, [supported, size, reduced, bust]);
+  }, [supported, size, reduced, bust, sound]);
 
   useEffect(() => {
     const c = live.current;

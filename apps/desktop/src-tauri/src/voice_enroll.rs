@@ -26,12 +26,14 @@ pub struct Takes {
     /// Where this "Add samples" round starts in [`MORE_SENTENCES`]. Picked
     /// once per round so the lines stay put while you read them.
     more_from: Option<usize>,
+    /// The teach card is open, so "Duskie" said to it never wakes Duskie.
+    open: bool,
 }
 
 /// Teaching is under way; the wake word listener is muted meanwhile.
 pub fn busy(app: &AppHandle) -> bool {
     let t = lock(takes(app));
-    t.recording || !t.names.is_empty() || !t.sentences.is_empty() || !t.more.is_empty()
+    t.open || t.recording || !t.names.is_empty() || !t.sentences.is_empty() || !t.more.is_empty()
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -121,6 +123,19 @@ pub fn record(app: &AppHandle, sentence: Option<usize>, more: bool) -> Result<En
     let clip = capture(Duration::from_secs_f32(seconds));
     lock(takes(app)).recording = false;
     let clip = trim(&clip?).ok_or("Didn't catch that. Try again a little closer to the mic.")?;
+    let kind = if more {
+        "sample"
+    } else if sentence.is_some() {
+        "sentence"
+    } else {
+        "name"
+    };
+    // The teach card pauses the wake listener, so it never hears these takes.
+    // Transcribe the clip itself so each Record click shows what was said.
+    match duskie_voice::listen::transcribe(&models_dir(app), &clip) {
+        Ok(text) => log::info!("enroll: {kind} take heard {text:?}"),
+        Err(e) => log::warn!("enroll: could not transcribe {kind} take: {e}"),
+    }
     {
         let mut t = lock(takes(app));
         match sentence {
@@ -209,8 +224,20 @@ pub fn finish(app: &AppHandle, more: bool) -> Result<EnrollState, String> {
         drop((names, sentences));
         std::fs::write(path(&models), learned.to_json()).map_err(|e| e.to_string())?;
     }
+    // Teach card closed in the UI, but `open` stayed true and kept the wake
+    // listener paused (and the Ask mic deaf). Clear it so listening resumes.
+    {
+        let mut t = lock(takes(app));
+        t.open = false;
+        t.recording = false;
+    }
     crate::voice::refresh(app);
     Ok(state(app))
+}
+
+/// The teach card opened: the wake word listener pauses until it closes.
+pub fn open(app: &AppHandle) {
+    lock(takes(app)).open = true;
 }
 
 /// Drops takes in progress. A taught voice stays.

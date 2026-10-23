@@ -1,0 +1,45 @@
+# --- Graphify Internal Output ---
+graphify-out/
+.code-review-graph/
+
+# --- Next.js & Frontend Artifacts ---
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+
+# --- Frontend Package Managers Lockfiles ---
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+bun.lockb
+.pnpm-store/
+
+# --- Tauri & Rust Build Artifacts ---
+src-tauri/target/
+src-tauri/gen/
+src-tauri/binaries/
+
+# --- Logs and System Files ---
+*.log
+.DS_Store
+Thumbs.db
+.env*
+!.env.example
+
+# --- Media, Fonts & Design Assets ---
+# Excluding these ensures Graphify only tracks layout/logic files, not massive binaries
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.webp
+*.ico
+*.mp4
+*.woff
+*.woff2
+*.ttf
+*.eot

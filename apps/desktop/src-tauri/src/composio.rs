@@ -25,6 +25,8 @@ use crate::composio_api as api;
 use crate::state::{AppState, lock};
 
 pub const TOOL_EVENT: &str = "ai://tool";
+/// A first status line from the question alone, before any tool runs.
+pub const ACK_EVENT: &str = "ai://ack";
 /// The tool the local model calls when a request is beyond it.
 pub const HANDOFF_TOOL: &str = "continue_in_claude_code";
 /// Most Composio tools offered to the local model at once; small models do
@@ -622,6 +624,12 @@ impl AiProvider for LocalWithTools {
             .map(|m| m.content.as_str())
             .unwrap_or_default();
         let started = std::time::Instant::now();
+        // Say at once what Duskie is about to do, before the model replies.
+        if let Some(label) = crate::ask_tools::first_step(question) {
+            let _ = self
+                .app
+                .emit(ACK_EVENT, json!({ "id": self.chat_id, "label": label }));
+        }
         let mut with_tools = req.clone();
         // Screen first: local vision describes then chat answers; cloud keeps
         // the image for native multimodal; OCR when vision is off or fails.
@@ -643,6 +651,7 @@ Be concise."
                         .into(),
                     messages: vec![Message::user("What is on this screen?")],
                     image: Some(png.clone()),
+                    more_images: Vec::new(),
                     think: false,
                 };
                 match vision.complete(&desc, json!({})).await {
@@ -661,6 +670,46 @@ Be concise."
                 inject_screen_ocr(&self.app, &mut with_tools, png).await;
             }
             // Cloud OpenAI-compat: leave image on the request for native vision.
+        }
+        // A local text model cannot take pictures: describe the other
+        // attached images too, or say they were left out.
+        if self.inner.id() == "local" && !with_tools.more_images.is_empty() {
+            let more = std::mem::take(&mut with_tools.more_images);
+            let ai = lock(&self.app.state::<AppState>().settings)
+                .ai
+                .local
+                .clone();
+            let vision = ai.vision_model.trim();
+            for (i, png) in more.into_iter().enumerate() {
+                let seen = if vision.is_empty() || vision.eq_ignore_ascii_case("off") {
+                    None
+                } else {
+                    let desc = ChatRequest {
+                        system: "Describe this image for another assistant: readable text, \
+what it shows, anything that looks wrong. Be concise."
+                            .into(),
+                        messages: vec![Message::user("What is in this image?")],
+                        image: Some(png),
+                        ..Default::default()
+                    };
+                    OpenAiCompat::new(Some(ai.base_url.clone()), Some(ai.vision_model.clone()))
+                        .complete(&desc, json!({}))
+                        .await
+                        .ok()
+                        .filter(|t| !t.trim().is_empty())
+                };
+                with_tools.system.push_str(&match seen {
+                    Some(t) => format!(
+                        "\n\nAttached image {} (seen by a vision model):\n```\n{}\n```",
+                        i + 2,
+                        t.trim()
+                    ),
+                    None => format!(
+                        "\n\nAttached image {} could not be read: no vision model is set up.",
+                        i + 2
+                    ),
+                });
+            }
         }
         // Embedding tool pick for local and cloud (by_words if embedder missing).
         let mut defs = crate::ask_tools::pick(&self.app, question, crate::ask_tools::defs()).await;

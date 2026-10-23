@@ -19,6 +19,69 @@ pub(super) static WRITING: Mutex<Option<HashMap<String, bool>>> = Mutex::new(Non
 pub(super) static DIFF_HINT: Mutex<Option<HashMap<String, bool>>> = Mutex::new(None);
 static DECISION_LOCK: Mutex<()> = Mutex::new(());
 
+/// What the agent itself wrote this turn, from its own tool calls, so review
+/// leaves out the user's edits. A shell command can change anything, so after
+/// one the whole folder diff is used.
+#[derive(Default)]
+struct Touched {
+    paths: std::collections::HashSet<String>,
+    shell: bool,
+    /// The agent reported at least one tool call this turn.
+    tracked: bool,
+}
+static TOUCHED: Mutex<Option<HashMap<String, Touched>>> = Mutex::new(None);
+
+/// A new turn starts with nothing touched.
+pub(super) fn begin_touch(id: &str) {
+    with(&TOUCHED, |t| t.insert(id.into(), Touched::default()));
+}
+
+/// Records a `touch` or `shell` event; true when `data` was one.
+pub(super) fn note_touch(id: &str, data: &Value) -> bool {
+    match data["kind"].as_str() {
+        Some("touch") => with(&TOUCHED, |t| {
+            let e = t.entry(id.into()).or_default();
+            e.tracked = true;
+            for p in data["paths"]
+                .as_array()
+                .into_iter()
+                .flatten()
+                .filter_map(Value::as_str)
+            {
+                e.paths.insert(norm(p));
+            }
+            true
+        }),
+        Some("shell") => with(&TOUCHED, |t| {
+            let e = t.entry(id.into()).or_default();
+            e.tracked = true;
+            e.shell = true;
+            true
+        }),
+        _ => false,
+    }
+}
+
+fn norm(p: &str) -> String {
+    p.replace('\\', "/").trim_start_matches("./").to_lowercase()
+}
+
+/// Keeps only files the agent wrote, when its tool calls say so.
+fn own_files(id: &str, files: Vec<review::FileChange>) -> Vec<review::FileChange> {
+    with(&TOUCHED, |t| match t.get(id) {
+        Some(tc) if tc.tracked && !tc.shell => files
+            .into_iter()
+            .filter(|f| {
+                let rel = norm(&f.path);
+                tc.paths
+                    .iter()
+                    .any(|p| *p == rel || p.ends_with(&format!("/{rel}")))
+            })
+            .collect(),
+        _ => files,
+    })
+}
+
 pub(super) fn note_diff(id: &str) {
     with(&DIFF_HINT, |h| {
         h.insert(id.into(), true);
@@ -73,6 +136,7 @@ pub(super) fn capture_turn(id: &str) {
         files_error = snapshot_between(&before, &path);
     }
     let (files, error) = files_error;
+    let files = own_files(id, files);
     let fingerprints = before
         .as_ref()
         .map(|b| {
@@ -276,6 +340,20 @@ mod tests {
                 lines: vec!["+x".into()],
             }],
         }
+    }
+
+    #[test]
+    fn review_keeps_only_files_the_agent_wrote() {
+        let id = "touch-test";
+        begin_touch(id);
+        let both = || vec![file("src/a.rs", "@@"), file("notes.md", "@@")];
+        assert_eq!(own_files(id, both()).len(), 2, "untracked turns keep all");
+        note_touch(id, &json!({"kind":"touch","paths":["C:\\repo\\src\\A.rs"]}));
+        let kept = own_files(id, both());
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].path, "src/a.rs");
+        note_touch(id, &json!({"kind":"shell"}));
+        assert_eq!(own_files(id, both()).len(), 2, "a shell command keeps all");
     }
 
     fn turn(entry: usize, files: Vec<FileChange>) -> ReviewTurn {

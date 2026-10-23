@@ -19,20 +19,22 @@ export interface DirectMcp {
 }
 
 export interface VoiceSettings {
-  enabled: boolean;
+  /** Listen for "Duskie" (with or without "hey"). Off means push to talk only. */
   wakeWord: boolean;
   speakAnswers: boolean;
   /** While you talk: one slim line, or a waveform and larger words. */
   listeningStyle: "compact" | "full";
   /** After a spoken answer, listen for a reply without the wake word. */
   conversation: boolean;
+  /** Seconds of silence after an answer before the conversation ends. */
+  replyWait?: number;
   /** Read suggestions aloud and take a spoken choice. */
   speakSuggestions: boolean;
   /** Talking over a spoken answer stops it and listens. */
   interrupt: boolean;
   voice: string;
   speed: number;
-  /** Words voice gets wrong: "horsepot = hotspot, sidekik = Duskie". */
+  /** Extra wake names: "desky, desuki, deskie". */
   fixes?: string;
   /** Which voice model the voice was picked for (3 = Supertonic 3). */
   model?: number;

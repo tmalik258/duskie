@@ -9,7 +9,6 @@ import type { InboxStatus, NotifyLevel } from "@/lib/types";
 import { updateBusy } from "@/lib/updates";
 import { UpdateProgress } from "../../update-progress";
 import { LearnedList, NotificationProfile } from "../learned-list";
-import { MailCard } from "../mail-card";
 import { Button, ChipList, Field, Select, Toggle } from "../ui";
 import { DoNotDisturb, LEVEL_TONE, LEVELS } from "./time-today";
 
@@ -61,7 +60,6 @@ export function NotificationInbox({ onError }: { onError: (e: string) => void })
             onChange={(vip) => save({ vip })}
           />
           <NotificationProfile onError={onError} />
-          <MailCard onError={onError} />
           <LearnedList onError={onError} />
           {status && status.apps.length > 0 && (
             <div className="flex flex-col gap-2">

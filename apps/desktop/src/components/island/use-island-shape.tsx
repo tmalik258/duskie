@@ -2,13 +2,13 @@
 
 import { animate } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { activityLabel } from "@/lib/activities";
+import { activityLabel, downloadProgress } from "@/lib/activities";
 import { wideScreen } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { PANEL_PAD } from "@/lib/island-size";
 import { resolveIslandState } from "@/lib/resolve-island-state";
 import { DOCK_MIN, dockTotal, SEAM_W } from "@/lib/seam";
-import { stopLive, useDuskie } from "@/lib/store";
+import { stopListening, stopLive, useDuskie } from "@/lib/store";
 import { useBlockBrowserKeys, useSuggestionKeys } from "../island-hooks";
 import { SHELL_SETTINGS, TOP } from "../island-layout";
 import type { PillModel } from "../island-pill/pill-kind";
@@ -26,82 +26,105 @@ export function useIslandShape(c: IslandStore & IslandWork & IslandHover & Islan
   const { asksYou, bare, bump, busy, cardAgent, contentHeight, displayedActivity, dockBeside, donePill } = c;
   const { doneUndo, expanded, focusLeft, focusUntil, fullVoice, gitListW, guiding, hearing, hovered, later } = c;
   const { live, liveActivities, mascot, meetingSoon, merging, netShown, notifyFresh, online, paused, pillWidth } = c;
-  const { questionId, reduced, screenW, setNetOpen, settings, settled, showPausedPill, suggestion } = c;
+  const { questionId, reduced, screenW, setNetOpen, settings, settled, showPausedPill, spokenCaption, suggestion } = c;
   const { updateProgress, updateWorking, view, voicePill, voiceQuestion, waiting, working } = c;
 
   const lastError = useDuskie((s) => (s.lastResult && !s.lastResult.ok ? s.lastResult.message : null));
   const pillModel: PillModel | null =
-    !expanded && !asking
-      ? hearing !== null || mascot === "listening"
-        ? { kind: "listening", label: hearing?.trim() ? hearing : "", dim: hearing?.trim() ? undefined : "Listening" }
-        : live !== null
+    // Karaoke while speaking: a few words on the compact pill, even if Ask is open.
+    !expanded && spokenCaption !== null
+      ? { kind: "caption", label: spokenCaption }
+      : !expanded && !asking
+        ? hearing !== null || mascot === "listening"
           ? {
-              kind: "caption",
-              label: live.caption || (live.tool ?? "Thinking"),
-              chip: live.caption && live.tool ? live.tool : undefined,
-              onChip: stopLive,
+              kind: "listening",
+              label: hearing?.trim() ? hearing : "",
+              dim: hearing?.trim() ? undefined : "Listening",
+              onChip: stopListening,
             }
-          : mascot === "error"
-            ? { kind: "error", label: shortError(lastError) }
-            : donePill !== null
-              ? { kind: "done", label: donePill, ...(doneUndo ? { chip: "Undo", onChip: doneUndo } : {}) }
-              : asksYou && askingTitle && voiceQuestion === null
-                ? {
-                    kind: "waiting",
-                    label: askingTitle,
-                    dim: "waiting for you",
-                    count: askingCount,
-                    onOpen: () => void api.askOpen(),
-                  }
-                : working !== null || voiceQuestion !== null
+          : live !== null
+            ? {
+                kind: "caption",
+                label: live.caption || live.tool || "Thinking",
+                chip: live.caption && live.tool ? live.tool : undefined,
+                onChip: stopLive,
+              }
+            : mascot === "error"
+              ? { kind: "error", label: shortError(lastError) }
+              : donePill !== null
+                ? { kind: "done", label: donePill, ...(doneUndo ? { chip: "Undo", onChip: doneUndo } : {}) }
+                : asksYou && askingTitle && voiceQuestion === null
                   ? {
-                      kind: "working",
-                      label: displayedActivity
-                        ? activityLabel(displayedActivity, activityNow, { elapsed: false }).replace(/(\.\.\.|…)$/, "")
-                        : (voiceQuestion ?? working ?? "").replace(/(\.\.\.|…)$/, ""),
-                      startedAt: displayedActivity?.startedAt,
+                      kind: "waiting",
+                      label: askingTitle,
+                      dim: "waiting for you",
+                      count: askingCount,
+                      onOpen: () => void api.askOpen(),
                     }
-                  : focusLeft !== null
+                  : working !== null || voiceQuestion !== null
                     ? {
-                        kind: "focus",
-                        label: "Focus",
-                        dim: focusUntil ? `until ${clockTime(focusUntil)}` : undefined,
-                        left: focusLeft,
+                        kind: "working",
+                        label: displayedActivity
+                          ? activityLabel(displayedActivity, activityNow, { elapsed: false }).replace(/(\.\.\.|…)$/, "")
+                          : (voiceQuestion ?? working ?? "").replace(/(\.\.\.|…)$/, ""),
+                        // The edge ring fills with real progress; a known time
+                        // left turns the timer into a countdown.
+                        ...(() => {
+                          const p = displayedActivity ? downloadProgress(displayedActivity) : null;
+                          return {
+                            startedAt: p?.left == null ? displayedActivity?.startedAt : undefined,
+                            endsAt: p?.left == null ? undefined : activityNow + p.left * 1000,
+                            progress: p?.pct == null ? undefined : p.pct / 100,
+                          };
+                        })(),
                       }
-                    : meetingSoon && !paused
+                    : focusLeft !== null
                       ? {
-                          kind: "notify",
-                          label: meetingSoon.title,
-                          dim: meetingSoon.mins < 1 ? "starting now" : `starts in ${meetingSoon.mins} minutes`,
-                          chip: meetingSoon.join ? "Join the call" : undefined,
-                          onChip: () => meetingSoon.join && void api.openReference("page", meetingSoon.join),
+                          kind: "focus",
+                          label: "Focus",
+                          dim: focusUntil ? `until ${clockTime(focusUntil)}` : undefined,
+                          left: focusLeft,
                         }
-                      : later > 0 && !paused
+                      : meetingSoon && !paused
                         ? {
-                            kind: "waiting",
-                            label: later === 1 ? "1 suggestion" : `${later} suggestions`,
-                            dim: "held while you were busy",
-                            count: later,
+                            kind: "notify",
+                            label: meetingSoon.title,
+                            dim: meetingSoon.mins < 1 ? "starting now" : `starts in ${meetingSoon.mins} minutes`,
+                            chip: meetingSoon.join ? "Join the call" : undefined,
+                            onChip: () => meetingSoon.join && void api.openReference("page", meetingSoon.join),
                           }
-                        : showPausedPill
+                        : later > 0 && !paused
                           ? {
-                              kind: "paused",
-                              label: "Paused",
-                              dim: pauseDim(settings.pause),
-                              onCancel: () => void api.sensorsResume(),
+                              kind: "waiting",
+                              label: later === 1 ? "1 suggestion" : `${later} suggestions`,
+                              dim: "held while you were busy",
+                              count: later,
                             }
-                          : !online
+                          : showPausedPill
                             ? {
-                                kind: "offline",
-                                label: "Offline",
-                                dim: "catching up when back",
-                                onOpen: () => setNetOpen(true),
+                                kind: "paused",
+                                label: "Paused",
+                                dim: pauseDim(settings.pause),
+                                onCancel: () => void api.sensorsResume(),
                               }
-                            : mascot === "noticing"
-                              ? { kind: "noticing", label: "Taking a look" }
-                              : null
-      : null;
+                            : !online
+                              ? {
+                                  kind: "offline",
+                                  label: "Offline",
+                                  dim: "catching up when back",
+                                  onOpen: () => setNetOpen(true),
+                                }
+                              : mascot === "noticing"
+                                ? { kind: "noticing", label: "Taking a look" }
+                                : null
+        : null;
   const [pillMeasured, setPillMeasured] = useState(0);
+
+  const glancePicked = useDuskie((s) => s.glancePicked);
+  // Picking the glance lasts until the cursor leaves the island.
+  useEffect(() => {
+    if (!expanded && glancePicked) useDuskie.setState({ glancePicked: false });
+  }, [expanded, glancePicked]);
 
   const registryId = resolveIslandState({
     asking,
@@ -126,7 +149,7 @@ export function useIslandShape(c: IslandStore & IslandWork & IslandHover & Islan
     paused: showPausedPill,
     notifyFresh: !!notifyFresh && !busy && !expanded,
     unread: later,
-    activitiesOpen: expanded && liveActivities.length > 0 && !suggestion,
+    activitiesOpen: expanded && liveActivities.length > 0 && !suggestion && !glancePicked,
     mascot,
     quietGlance:
       expanded &&
@@ -169,7 +192,11 @@ export function useIslandShape(c: IslandStore & IslandWork & IslandHover & Islan
     clearTimeout(hitRectTimer.current);
     hitRectTimer.current = setTimeout(() => {
       const hitH = dockBeside ? sideDockH : height;
-      const base = { x: (window.innerWidth - dockPairW) / 2, y: TOP, width: dockPairW, height: hitH };
+      const x = (window.innerWidth - dockPairW) / 2;
+      // The dock beside the island runs the full height; the space under
+      // the island stays click-through.
+      const gap = dockBeside && hitH > height ? { x, y: TOP + height, width, height: hitH - height } : null;
+      const base = { x, y: TOP, width: dockPairW, height: hitH, gap, keep: overlayHit };
       const rect = overlayHit
         ? {
             x: Math.min(base.x, overlayHit.x),
@@ -181,7 +208,7 @@ export function useIslandShape(c: IslandStore & IslandWork & IslandHover & Islan
       void api.islandSetHitRect(rect);
     }, 16);
     return () => clearTimeout(hitRectTimer.current);
-  }, [dockPairW, height, dockBeside, sideDockH, overlayHit]);
+  }, [dockPairW, width, height, dockBeside, sideDockH, overlayHit]);
 
   // A small squish when something gets the mascot's attention while compact.
   useEffect(() => {

@@ -6,12 +6,17 @@
 import { useEffect, useRef } from "react";
 import { type Session, SLOTS } from "@/lib/agents";
 import type { CursorChat } from "@/lib/types";
+import { AttachButton, ContextChips } from "../attach/attach-bar";
+import { withRefs } from "../attach/context";
+import { useContextItems } from "../attach/use-context-items";
 import { Ic } from "../icon";
+import { ComposerPop } from "./composer/composer-pop";
 import { ChatControls } from "./controls";
 import { ModeChip } from "./controls/mode-chip";
 import { AgentMark } from "./marks";
 import { MODES, nextAgentMode } from "./modes";
 import { FixLine, NewSessionLoading, NoAgentsReady, pickerNote, ready } from "./new-session/agent-status";
+import { useNewMention } from "./new-session/use-new-mention";
 import { useNewSession } from "./new-session/use-new-session";
 import { ProjectPicker } from "./project-picker";
 import { SessionChips } from "./session-chips";
@@ -20,6 +25,11 @@ import { SessionList } from "./session-list";
 export function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: CursorChat[] }) {
   const n = useNewSession(sessions);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const ctx = useContextItems();
+  const start = () => {
+    if (n.go(withRefs(n.prompt, ctx.items))) ctx.clear();
+  };
+  const m = useNewMention(n.prompt, n.setPrompt, n.pickedPath || null, ctx.pick);
   useEffect(() => {
     requestAnimationFrame(() => inputRef.current?.focus({ preventScroll: true }));
   }, []);
@@ -68,24 +78,45 @@ export function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: 
                 <ProjectPicker projects={n.projects ?? []} path={n.pickedPath} onChange={n.pickPath} />
               </span>
             </div>
-            <textarea
-              ref={inputRef}
-              rows={2}
-              value={n.prompt}
-              onChange={(e) => n.setPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key === ".") {
-                  e.preventDefault();
-                  n.pickMode(nextAgentMode(n.mode));
-                  return;
-                }
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  n.go();
-                }
-              }}
-              placeholder="What should it do? / for commands, @ for files"
-            />
+            {m.files.length > 0 && m.float && (
+              <ComposerPop
+                popRef={m.popRef}
+                float={m.float}
+                slash={false}
+                commands={[]}
+                files={m.files}
+                project={n.pickedPath.split(/[\\/]/).pop() ?? ""}
+                at={m.at}
+                onHover={m.setSel}
+                onCommand={() => undefined}
+                onFile={m.pickFile}
+              />
+            )}
+            <ContextChips items={ctx.items} error={ctx.error} onRemove={ctx.remove} />
+            {/* biome-ignore lint/a11y/noStaticElementInteractions: a drop zone for files; the paperclip is the keyboard path */}
+            <div ref={m.wrapRef} onDrop={ctx.onDrop} onDragOver={ctx.onDragOver}>
+              <textarea
+                className="no-scrollbar"
+                ref={inputRef}
+                rows={2}
+                value={n.prompt}
+                onChange={(e) => n.setPrompt(e.target.value)}
+                onPaste={ctx.onPaste}
+                onKeyDown={(e) => {
+                  if (m.onKey(e)) return;
+                  if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key === ".") {
+                    e.preventDefault();
+                    n.pickMode(nextAgentMode(n.mode));
+                    return;
+                  }
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    start();
+                  }
+                }}
+                placeholder="What should it do? @ for files"
+              />
+            </div>
             <div className="ag-comp-foot">
               <ChatControls
                 agent={n.pickedAgent}
@@ -93,7 +124,12 @@ export function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: 
                 effort={n.effort}
                 onModel={n.pickModel}
                 onEffort={n.pickEffort}
-                lead={<ModeChip mode={n.mode} onChange={n.pickMode} />}
+                lead={
+                  <>
+                    <AttachButton onFiles={(f) => void ctx.upload(f)} />
+                    <ModeChip mode={n.mode} onChange={n.pickMode} />
+                  </>
+                }
                 tail={
                   <>
                     <span className="ag-note">
@@ -109,7 +145,7 @@ export function NewSession({ sessions, cursor }: { sessions: Session[]; cursor: 
                       aria-label={n.full ? "Queue" : "Start"}
                       title={n.full ? "Queue (Enter)" : "Start (Enter)"}
                       disabled={n.busy || !n.prompt.trim()}
-                      onClick={n.go}
+                      onClick={start}
                     >
                       <Ic name="send" size={13} />
                     </button>

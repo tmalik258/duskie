@@ -161,6 +161,7 @@ export function IslandView(c: IslandStore & IslandWork & IslandHover & IslandFac
               simple={look.simple}
               active={shown}
               bust={false}
+              sound
             />
           </span>
         </motion.div>

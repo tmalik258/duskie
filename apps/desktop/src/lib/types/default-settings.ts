@@ -15,10 +15,12 @@ export const DEFAULT_SETTINGS: Settings = {
   codeEditor: "auto",
   islandColor: "atelier",
   soundKit: "sidekick",
-  paletteHotkey: "Ctrl+Space",
+  paletteHotkey: "Super+Alt+Space",
+  shortcutsVersion: 2,
   shortcuts: {
-    agents: "Ctrl+Shift+Space",
-    talk: "Ctrl+Alt+Space",
+    agents: "Ctrl+Alt+Super+Space",
+    git: "Ctrl+Alt+G",
+    talk: "Ctrl+Alt+T",
     accept: "Ctrl+Alt+Enter",
     dismiss: "Ctrl+Alt+Backspace",
     screen: "Ctrl+Alt+S",
@@ -91,11 +93,11 @@ export const DEFAULT_SETTINGS: Settings = {
   learning: true,
   agent: { ask: "outward", places: {} },
   voice: {
-    enabled: true,
     wakeWord: true,
     speakAnswers: true,
     listeningStyle: "compact",
     conversation: true,
+    replyWait: 8,
     speakSuggestions: true,
     interrupt: true,
     live: false,
@@ -103,6 +105,7 @@ export const DEFAULT_SETTINGS: Settings = {
     onlyMe: false,
     voice: "f4",
     speed: 1,
+    fixes: "desky, desuki, deskie, deski, duskee, dusuke, desuke",
   },
 };
 

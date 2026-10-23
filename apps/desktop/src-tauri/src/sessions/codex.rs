@@ -232,7 +232,7 @@ pub(super) async fn run_codex(
                     if pending.values().any(|m| m == "turn/start") { queued.push(text); continue; }
                     if turn.is_some() && selected_mode(id, mode) != active_mode { queued.push(text); continue; }
                     next_id += 1;
-                    let input = json!([{ "type": "text", "text": text }]);
+                    let input = super::images::codex_input(&text);
                     let msg = match &turn {
                         Some(active) => json!({ "id": next_id, "method": "turn/steer",
                             "params": { "threadId": t, "expectedTurnId": active, "input": input } }),
@@ -412,11 +412,21 @@ pub fn codex_events(v: &Value) -> Vec<Value> {
             }
             let (tool, label, detail) = match item["type"].as_str() {
                 Some("commandExecution") => (
-                    "Bash",
+                    {
+                        out.push(json!({ "kind": "shell" }));
+                        "Bash"
+                    },
                     "Run a command".to_owned(),
                     shown_command(item["command"].as_str().unwrap_or_default()),
                 ),
                 Some("fileChange") => {
+                    let paths: Vec<&str> = item["changes"]
+                        .as_array()
+                        .into_iter()
+                        .flatten()
+                        .filter_map(|c| c["path"].as_str())
+                        .collect();
+                    out.push(json!({ "kind": "touch", "paths": paths }));
                     let files: Vec<String> = item["changes"]
                         .as_array()
                         .into_iter()

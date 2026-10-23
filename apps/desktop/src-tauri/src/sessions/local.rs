@@ -207,8 +207,8 @@ async fn ensure_model(
         .flatten()
         .filter_map(|m| m["name"].as_str().map(String::from))
         .collect();
-    // A coding model you already chose or have wins over downloading one.
-    if let Some(m) = chosen.filter(|m| m.contains("coder") && have.contains(m)) {
+    // A model you chose, or a coding model you have, wins over downloading one.
+    if let Some(m) = chosen.filter(|m| have.contains(m)) {
         return Ok(m);
     }
     if let Some(m) = have.iter().find(|m| m.contains("coder")) {
@@ -268,6 +268,13 @@ pub async fn run(
             Cmd::Restart => return Ok(()),
         };
         emit(app, id, json!({"kind":"working"}));
+        // A model picked in the chat box takes over from the next turn.
+        if let Some(t) = super::tuned(id).model
+            && model.as_ref() != Some(&t)
+        {
+            emit(app, id, json!({"kind":"model","name":t}));
+            model = Some(t);
+        }
         let m = match &model {
             Some(m) => m.clone(),
             None => match ensure_model(app, id, &http, &root, chosen.clone()).await {
@@ -287,6 +294,7 @@ pub async fn run(
         let mut error = None;
         let mut done = false;
         let mut stopped = false;
+        let mut wrote = false;
         for _ in 0..MAX_ROUNDS {
             let req = http
                 .post(format!("{root}/api/chat"))
@@ -312,11 +320,16 @@ pub async fn run(
                 },
             };
             let msg = reply["message"].clone();
-            if let Some(t) = msg["content"].as_str().filter(|t| !t.trim().is_empty()) {
-                emit(app, id, json!({"kind":"text","text":t}));
+            let content = msg["content"].as_str().unwrap_or_default();
+            let mut calls = msg["tool_calls"].as_array().cloned().unwrap_or_default();
+            // Some models write the call as text; run it rather than show JSON.
+            if calls.is_empty() {
+                calls = super::local_calls::text_calls(content);
+            }
+            if calls.is_empty() && !content.trim().is_empty() {
+                emit(app, id, json!({"kind":"text","text":content}));
             }
             messages.push(msg.clone());
-            let calls = msg["tool_calls"].as_array().cloned().unwrap_or_default();
             if calls.is_empty() {
                 done = true;
                 break;
@@ -365,7 +378,11 @@ pub async fn run(
                                         let _ = std::fs::create_dir_all(dir);
                                     }
                                     match std::fs::write(&p, content) {
-                                        Ok(()) => ("Written.".into(), true),
+                                        Ok(()) => {
+                                            wrote = true;
+                                            emit(app, id, json!({"kind":"touch","paths":[path]}));
+                                            ("Written.".into(), true)
+                                        }
                                         Err(e) => (format!("Could not write: {e}"), false),
                                     }
                                 }
@@ -381,6 +398,14 @@ pub async fn run(
                 );
                 messages.push(json!({"role":"tool","content":result}));
             }
+        }
+        // Say so rather than a bare Done when an edit turn changed nothing.
+        if done && !wrote && mode != Mode::Plan {
+            emit(
+                app,
+                id,
+                json!({"kind":"text","text":"The model answered without changing any files."}),
+            );
         }
         if !stopped && !done && error.is_none() {
             emit(app, id, json!({"kind":"stuck"}));

@@ -79,6 +79,7 @@ fn now_ms() -> u64 {
 /// What the runtime was built from; a change rebuilds it.
 #[derive(Debug, Clone, PartialEq)]
 struct Key {
+    /// Whether the wake word (passive listening) is enabled.
     wake_word: bool,
     interrupt: bool,
     voice: String,
@@ -132,6 +133,8 @@ pub struct Voice {
     /// A suggestion read aloud, waiting for a spoken choice: its id and
     /// option labels.
     choosing: Mutex<Option<(String, Vec<String>)>>,
+    /// The suggestion whose details were read or are queued to be read.
+    detailed: Mutex<Option<String>>,
     last_error: Mutex<Option<String>>,
 }
 
@@ -159,6 +162,7 @@ impl Voice {
                 ..Default::default()
             }),
             choosing: Mutex::default(),
+            detailed: Mutex::default(),
             last_error: Mutex::default(),
         }
     }
@@ -259,10 +263,11 @@ pub fn refresh(app: &AppHandle) {
         )
     };
     duskie_voice::text::set_name(&name);
+    duskie_voice::text::set_name_aliases(&name_aliases_from_fixes(&settings.fixes));
     let v = voice(app);
-    // The speaker also runs for typed answers when "Speak answers" is on,
-    // even with the wake word and microphone off.
-    let listen = settings.enabled && models::all_installed(&v.models);
+    // The speaker also runs for typed answers when "Speak answers" is on.
+    // Voice runtime always runs for push-to-talk, even with wake word off.
+    let listen = models::all_installed(&v.models);
     let speak = settings.speak_answers && models::VOICE.installed(&v.models);
     let wanted = !paused && (listen || speak);
     if !wanted {
@@ -353,13 +358,23 @@ pub fn refresh(app: &AppHandle) {
 
 /// True while Duskie's voice plays, false when it stops.
 pub const SPEAKING_EVENT: &str = "voice://speaking";
+/// A piece of speech with when it starts and how long it lasts, for captions.
+pub const SAYING_EVENT: &str = "voice://saying";
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SayingPiece {
+    text: String,
+    starts_in_ms: u64,
+    ms: u64,
+}
 /// How often the echo guard checks whether Duskie is speaking.
 const ECHO_CHECK: std::time::Duration = std::time::Duration::from_millis(50);
 /// The room still rings a moment after the speakers go quiet.
 const ECHO_TAIL: std::time::Duration = std::time::Duration::from_millis(400);
 
 /// Keeps the microphone deaf while Duskie's own voice plays, so a line
-/// like "just say Hey Duskie" never wakes it, and while you teach it your
+/// like "just say Duskie" never wakes it, and while you teach it your
 /// voice. Runs for the whole process.
 /// Only changes are sent (and the current state to a newly built listener):
 /// a push to talk right after speaking unmutes and must stay unmuted.
@@ -370,13 +385,18 @@ pub fn start_echo_guard(app: &AppHandle) {
         .spawn(move || {
             let mut quiet_since: Option<std::time::Instant> = None;
             // The listener told last, and what it was told.
-            let mut told: Option<(usize, bool)> = None;
+            let mut told: Option<(usize, bool, bool)> = None;
             // What the island was told about Duskie talking.
             let mut said_speaking = false;
             loop {
                 std::thread::sleep(ECHO_CHECK);
                 let v = voice(&app);
-                let talking = lock(&v.greeter).as_ref().is_some_and(Speaker::busy)
+                // Answering covers the synth gap before samples hit the queue;
+                // without it a short "Yes." can be cancelled by wake/barge
+                // while TTS is still working, and nothing is heard.
+                let answering = lock(&v.speaking).is_some();
+                let talking = answering
+                    || lock(&v.greeter).as_ref().is_some_and(Speaker::busy)
                     || lock(&v.runtime)
                         .as_ref()
                         .and_then(|r| r.speaker.as_ref())
@@ -395,7 +415,8 @@ pub fn start_echo_guard(app: &AppHandle) {
                     told = None;
                     continue;
                 };
-                let speaking = greeting
+                let speaking = answering
+                    || greeting
                     || runtime
                         .as_ref()
                         .and_then(|r| r.speaker.as_ref())
@@ -410,9 +431,10 @@ pub fn start_echo_guard(app: &AppHandle) {
                     since.elapsed() < ECHO_TAIL
                 };
                 let id = std::ptr::from_ref(listener) as usize;
-                if told != Some((id, muted)) {
+                if told != Some((id, muted, teaching)) {
                     listener.send(Control::Mute(muted));
-                    told = Some((id, muted));
+                    listener.send(Control::Pause(teaching));
+                    told = Some((id, muted, teaching));
                 }
             }
         })
@@ -579,6 +601,32 @@ fn speech_events(app: &AppHandle) -> duskie_voice::SpeechEvents {
             let ms = (ended.elapsed() + *starts_in).as_millis() as u64;
             crate::timings::record(&app, crate::timings::SPEECH_TO_FIRST_SOUND, ms);
         }
+        // TTS finished queueing this answer; samples may still be playing.
+        // Clear so the echo guard can unmute once the speaker queue drains.
+        if let SpeechEvent::End { utterance, .. } = &event {
+            let mut sp = lock(&v.speaking);
+            if sp.as_ref().is_some_and(|(_, u)| u == utterance) {
+                sp.take();
+            }
+        }
+        // Captions: every spoken piece, timed so the island can show a few
+        // words at a time instead of the whole sentence at once.
+        if let SpeechEvent::Piece {
+            text,
+            starts_in,
+            length,
+            ..
+        } = &event
+        {
+            let _ = app.emit(
+                SAYING_EVENT,
+                SayingPiece {
+                    text: text.clone(),
+                    starts_in_ms: starts_in.as_millis() as u64,
+                    ms: length.as_millis() as u64,
+                },
+            );
+        }
         let mut w = lock(&v.welcome);
         match event {
             SpeechEvent::Piece {
@@ -672,10 +720,10 @@ pub fn welcome_greet(app: &AppHandle) {
 fn enable_voice_for_onboarding(app: &AppHandle) {
     let state = app.state::<AppState>();
     let mut settings = lock(&state.settings).clone();
-    if settings.onboarded || settings.voice.enabled {
+    if settings.onboarded || settings.voice.wake_word {
         return;
     }
-    settings.voice.enabled = true;
+    settings.voice.wake_word = true;
     if let Err(err) = crate::commands::apply_settings(app, settings) {
         log::warn!("could not enable voice for welcome: {err}");
     }
@@ -732,20 +780,32 @@ fn build(app: &AppHandle, key: Key, settings: &VoiceSettings) -> Runtime {
     }
 }
 
-/// Your fixes for words voice gets wrong ("horsepot = hotspot"), applied
-/// to whole words, any case.
-pub fn apply_fixes(text: &str, fixes: &str) -> String {
-    let pairs: Vec<(String, &str)> = fixes
+/// Extra names from settings ("desky, desuki"), comma or newline separated.
+fn name_aliases_from_fixes(fixes: &str) -> Vec<String> {
+    fixes
         .split(['\n', ','])
-        .filter_map(|l| l.split_once('='))
-        .map(|(wrong, right)| (wrong.trim().to_lowercase(), right.trim()))
-        .filter(|(wrong, right)| !wrong.is_empty() && !right.is_empty())
+        .map(str::trim)
+        .filter(|l| !l.is_empty())
+        .map(str::to_owned)
+        .collect()
+}
+
+/// Replaces extra names in `text` with the assistant name (whole words).
+pub fn apply_fixes(text: &str, fixes: &str, name: &str) -> String {
+    let display = {
+        let n = name.trim();
+        if n.is_empty() { "Duskie" } else { n }
+    };
+    let aliases: Vec<String> = name_aliases_from_fixes(fixes)
+        .into_iter()
+        .map(|a| a.to_lowercase())
+        .filter(|a| !a.is_empty())
         .collect();
-    if pairs.is_empty() {
+    if aliases.is_empty() {
         return text.to_owned();
     }
     let mut out = text.to_owned();
-    for (wrong, right) in &pairs {
+    for wrong in &aliases {
         let mut result = String::with_capacity(out.len());
         let lower = out.to_lowercase();
         // Lowercasing changed byte offsets (rare letters): leave it as heard.
@@ -758,7 +818,7 @@ pub fn apply_fixes(text: &str, fixes: &str) -> String {
             let edge = |c: Option<char>| c.is_none_or(|c| !c.is_alphanumeric());
             if edge(lower[..at].chars().next_back()) && edge(lower[end..].chars().next()) {
                 result.push_str(&out[i..at]);
-                result.push_str(right);
+                result.push_str(display);
             } else {
                 result.push_str(&out[i..end]);
             }
@@ -771,23 +831,25 @@ pub fn apply_fixes(text: &str, fixes: &str) -> String {
 }
 
 fn fixed(app: &AppHandle, text: String) -> String {
-    let fixes = lock(&app.state::<AppState>().settings).voice.fixes.clone();
-    apply_fixes(&text, &fixes)
+    let state = app.state::<AppState>();
+    let s = lock(&state.settings);
+    apply_fixes(&text, &s.voice.fixes, &s.assistant_name)
 }
 
 fn on_heard(app: &AppHandle, heard: Heard) {
     let v = voice(app);
     match heard {
         Heard::Wake => {
+            if lock(&v.choosing).is_some() {
+                // Listening for a choice, not a question: Ask stays closed,
+                // and the voice goes on until a choice is really heard.
+                mascot::dispatch(app, MascotEvent::ListenStart);
+                return;
+            }
             // Talking over an answer stops it.
             stop_speaking(app);
             // Load the model while the question is still being spoken.
             crate::ai::warm_up(app);
-            if lock(&v.choosing).is_some() {
-                // Listening for a choice, not a question: Ask stays closed.
-                mascot::dispatch(app, MascotEvent::ListenStart);
-                return;
-            }
             // The island listens in its compact shape; Ask opens only when
             // the answer starts coming in.
             if !ask::is_open(app) {
@@ -806,8 +868,7 @@ fn on_heard(app: &AppHandle, heard: Heard) {
         // A choice ("open", "not now") is taken when it is final.
         Heard::Pause(text) if lock(&v.choosing).is_none() => {
             let text = fixed(app, strip_wake(&text));
-            let live = lock(&app.state::<AppState>().settings).voice.live;
-            if live && duskie_voice::text::looks_like_request(&text) {
+            if duskie_voice::text::looks_like_request(&text) {
                 emit_pause(app, text);
             }
         }
@@ -815,14 +876,28 @@ fn on_heard(app: &AppHandle, heard: Heard) {
         Heard::Final(text) => {
             let mut text = fixed(app, strip_wake(&text));
             let pushed = v.pushed.swap(false, Ordering::SeqCst);
-            if let Some((id, labels)) = lock(&v.choosing).take() {
+            let choosing = lock(&v.choosing).take();
+            if let Some((id, labels)) = choosing {
+                let choice = pick_spoken_choice(&text, &labels);
                 mascot::dispatch(app, MascotEvent::Cancelled);
                 // Clears what showed as heard; an empty answer asks nothing.
                 emit_heard(app, String::new(), true);
-                let result = match match_choice(&text, &labels) {
-                    Choice::Option(i) => crate::suggestions::choose_by_voice(app, &id, i),
-                    Choice::Dismiss => crate::suggestions::dismiss(app, &id, "voice"),
-                    Choice::Unclear => Ok(()),
+                let result = match choice {
+                    Choice::Option(i) => {
+                        stop_speaking(app);
+                        restore_interrupt(app);
+                        crate::suggestions::choose_by_voice(app, &id, i)
+                    }
+                    Choice::Dismiss => {
+                        stop_speaking(app);
+                        restore_interrupt(app);
+                        crate::suggestions::dismiss(app, &id, "voice")
+                    }
+                    // Probably talk in the room: ignore it and keep waiting.
+                    Choice::Unclear => {
+                        keep_waiting(app, id, labels);
+                        Ok(())
+                    }
                 };
                 if let Err(err) = result {
                     log::debug!("spoken choice ignored: {err}");
@@ -833,6 +908,10 @@ fn on_heard(app: &AppHandle, heard: Heard) {
             // ("byzant mixed"); that is not a question, so go back to rest.
             if !pushed && !text.is_empty() && !duskie_voice::text::looks_like_request(&text) {
                 log::debug!("voice: ignored {text:?}");
+                text.clear();
+            }
+            // "That's all" or "thanks Duskie" ends a conversation quietly.
+            if pushed && ends_conversation(&text) {
                 text.clear();
             }
             mascot::dispatch(app, MascotEvent::Cancelled);
@@ -900,7 +979,7 @@ pub fn listen(app: &AppHandle) -> Result<(), String> {
     let v = voice(app);
     let runtime = lock(&v.runtime);
     let Some(listener) = runtime.as_ref().and_then(|r| r.listener.as_ref()) else {
-        return Err("Voice is off. Turn it on in Settings > Voice.".into());
+        return Err("Voice models are not installed. Enable wake word in Settings > Voice to download them.".into());
     };
     v.pushed.store(true, Ordering::SeqCst);
     listener.send(Control::ListenNow);
@@ -923,6 +1002,8 @@ pub fn stop(app: &AppHandle) {
 fn stop_speaking(app: &AppHandle) {
     let v = voice(app);
     lock(&v.speaking).take();
+    // So conversation follow-up does not reopen the mic after a barge/stop.
+    lock(&v.asked_by_voice).take();
     if let Some(s) = lock(&v.runtime).as_ref().and_then(|r| r.speaker.as_ref()) {
         s.stop();
     }
@@ -943,6 +1024,7 @@ pub fn begin_answer(app: &AppHandle, id: &str, by_voice: bool) -> bool {
     };
     *lock(&v.speaking) = Some((id.to_owned(), utterance));
     *lock(&v.asked_by_voice) = by_voice.then(|| id.to_owned());
+    log::info!("voice: speaking answer {}", &id[..id.len().min(8)]);
     true
 }
 
@@ -976,23 +1058,27 @@ pub fn answer_done(app: &AppHandle, id: &str, error: Option<&str>) {
         s.finish(u);
         spoke = true;
     });
-    let conversation = lock(&app.state::<AppState>().settings).voice.conversation;
+    let (conversation, wait) = {
+        let state = app.state::<AppState>();
+        let s = lock(&state.settings);
+        (s.voice.conversation, s.voice.reply_wait.clamp(3, 30))
+    };
     // Keep listening only after a question that was spoken, never a typed one.
     let asked_by_voice = lock(&voice(app).asked_by_voice).as_deref() == Some(id);
     if spoke && conversation && asked_by_voice && error.is_none() {
         let (app, id) = (app.clone(), id.to_owned());
         // Listen for a reply once the answer has been read out, unless the
-        // user moved on (closed Ask, or another answer started).
+        // user moved on (Esc, typing, or another answer started). The compact
+        // island answers without opening Ask, so Ask need not be open.
         listen_after_speaking(
             &app,
             move |app| {
-                ask::is_open(app)
-                    && !user_typing(app)
-                    && lock(&voice(app).speaking)
-                        .as_ref()
-                        .is_some_and(|(chat, _)| *chat == id)
+                // speaking clears when TTS finishes queueing; asked_by_voice
+                // lasts until a new answer or stop.
+                !user_typing(app)
+                    && lock(&voice(app).asked_by_voice).as_deref() == Some(id.as_str())
             },
-            Some(REPLY_WAIT),
+            Some(std::time::Duration::from_secs(u64::from(wait))),
         );
     }
 }
@@ -1007,10 +1093,13 @@ fn listen_after_speaking(
     let app = app.clone();
     std::thread::spawn(move || {
         let busy = || {
-            lock(&voice(&app).runtime)
-                .as_ref()
-                .and_then(|r| r.speaker.as_ref())
-                .is_some_and(Speaker::busy)
+            let v = voice(&app);
+            // Wait through synth too, not only samples already in the queue.
+            lock(&v.speaking).is_some()
+                || lock(&v.runtime)
+                    .as_ref()
+                    .and_then(|r| r.speaker.as_ref())
+                    .is_some_and(Speaker::busy)
         };
         wait_until_quiet(busy, QUIET_HOLD, MAX_SPEECH);
         if !still_wanted(&app) {
@@ -1031,8 +1120,37 @@ fn listen_after_speaking(
     });
 }
 
-/// How long the mic waits for a spoken reply after an answer.
-const REPLY_WAIT: std::time::Duration = std::time::Duration::from_secs(5);
+/// A reply that closes the conversation instead of asking something.
+fn ends_conversation(text: &str) -> bool {
+    let t: String = text
+        .to_lowercase()
+        .chars()
+        .filter(|c| c.is_alphanumeric() || c.is_whitespace())
+        .collect();
+    let t = t.split_whitespace().collect::<Vec<_>>().join(" ");
+    const ENDS: &[&str] = &[
+        "thats all",
+        "that is all",
+        "thanks",
+        "thank you",
+        "thanks duskie",
+        "thank you duskie",
+        "stop",
+        "stop listening",
+        "never mind",
+        "nevermind",
+        "no thanks",
+        "nothing",
+        "bye",
+        "goodbye",
+        "ok thanks",
+        "okay thanks",
+        "im done",
+        "done",
+    ];
+    ENDS.contains(&t.as_str())
+}
+
 /// A key pressed in Ask this recently counts as typing.
 const TYPING_GRACE_MS: u64 = 3000;
 
@@ -1090,17 +1208,94 @@ const CHOICE_WAIT: std::time::Duration = std::time::Duration::from_secs(6);
 const SPEAK_FROM_PRIORITY: i32 = 50;
 
 fn suggestion_speech_blocked(app: &AppHandle) -> bool {
+    let v = voice(app);
     mascot::current(app) == duskie_core::MascotState::Listening
-        || lock(&voice(app).speaking).is_some()
+        || lock(&v.speaking).is_some()
+        || lock(&v.runtime)
+            .as_ref()
+            .and_then(|r| r.speaker.as_ref())
+            .is_some_and(Speaker::busy)
         || !lock(&app.state::<AppState>().chats).is_empty()
+        || media_playback_likely()
+}
+
+/// Foreground looks like video/music the user is watching - don't talk over it.
+/// Card can still show; only the spoken prompt is skipped. True peak-meter
+/// detection (WASAPI sessions) can replace this title/exe heuristic later.
+fn media_playback_likely() -> bool {
+    let Ok(win) = active_win_pos_rs::get_active_window() else {
+        return false;
+    };
+    if win.process_id == u64::from(std::process::id()) {
+        return false;
+    }
+    let title = win.title.to_lowercase();
+    let exe = win
+        .process_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_ascii_lowercase();
+    const TITLE_HINTS: &[&str] = &[
+        "youtube",
+        "netflix",
+        "prime video",
+        "disney+",
+        "disney plus",
+        "hulu",
+        "twitch",
+        "vimeo",
+        "spotify",
+        " - vlc",
+        "media player",
+        "plex",
+        "crunchyroll",
+        "hbo ",
+        "max -",
+    ];
+    const EXE_HINTS: &[&str] = &[
+        "vlc.exe",
+        "spotify.exe",
+        "wmplayer.exe",
+        "microsoft.media.player.exe",
+        "moviesandtv.exe",
+        "plex.exe",
+        "potplayer",
+        "mpv.exe",
+    ];
+    TITLE_HINTS.iter().any(|h| title.contains(h)) || EXE_HINTS.iter().any(|h| exe.contains(h))
+}
+
+/// The card went: stop waiting for a spoken choice. A card dismissed or
+/// acted on also stops the voice; one that timed out lets the headline
+/// finish (`stop_voice` false).
+pub fn silence_suggestion(app: &AppHandle, stop_voice: bool) {
+    let v = voice(app);
+    if lock(&v.choosing).take().is_none() {
+        return;
+    }
+    restore_interrupt(app);
+    *lock(&v.detailed) = None;
+    if stop_voice {
+        stop_speaking(app);
+    }
+    if let Some(l) = lock(&v.runtime).as_ref().and_then(|r| r.listener.as_ref()) {
+        l.send(Control::Cancel);
+    }
+}
+
+/// Hover used to read details aloud after the headline. That TTS runs the
+/// echo guard mute while the mic is open for "not now", so details stay on
+/// the card only - never spoken during a choice wait.
+pub fn read_details(app: &AppHandle, hovered: bool) {
+    let _ = (app, hovered);
 }
 
 /// Reads a suggestion aloud ("Report.pdf downloaded. Say open, show in
 /// folder, or not now.") and takes a spoken choice.
 pub fn offer_spoken(app: &AppHandle, ui: &crate::state::Suggestion, priority: i32) {
     let settings = lock(&app.state::<AppState>().settings).voice.clone();
-    if !settings.enabled
-        || !settings.speak_suggestions
+    if !settings.speak_suggestions
         || priority < SPEAK_FROM_PRIORITY
         || ui.options.is_empty()
         || ask::is_open(app)
@@ -1115,9 +1310,17 @@ pub fn offer_spoken(app: &AppHandle, ui: &crate::state::Suggestion, priority: i3
         let Some(speaker) = runtime.as_ref().and_then(|r| r.speaker.as_ref()) else {
             return;
         };
-        speaker.say(&spoken_prompt(&ui.title, &ui.detail, &ui.options));
+        let Some(listener) = runtime.as_ref().and_then(|r| r.listener.as_ref()) else {
+            // No microphone: never ask for an answer that cannot be heard.
+            speaker.say(ui.title.trim());
+            return;
+        };
+        // You can answer while it is still talking.
+        listener.send(Control::Interrupt(true));
+        speaker.say(&spoken_prompt(&ui.title, &ui.options));
     }
     *lock(&v.speaking) = None;
+    *lock(&v.detailed) = None;
     let (id, labels) = (ui.id.clone(), ui.options.clone());
     *lock(&v.choosing) = Some((id.clone(), labels));
     let wanted_id = id.clone();
@@ -1139,6 +1342,7 @@ pub fn offer_spoken(app: &AppHandle, ui: &crate::state::Suggestion, priority: i3
             .is_some_and(|(cid, _)| *cid == id);
         if stale {
             lock(&v.choosing).take();
+            restore_interrupt(&app);
             if let Some(l) = lock(&v.runtime).as_ref().and_then(|r| r.listener.as_ref()) {
                 l.send(Control::Cancel);
             }
@@ -1146,14 +1350,113 @@ pub fn offer_spoken(app: &AppHandle, ui: &crate::state::Suggestion, priority: i3
     });
 }
 
-/// "Report.pdf. Downloaded, 2 MB. Say open, show in folder, or not now."
-pub fn spoken_prompt(title: &str, detail: &str, options: &[String]) -> String {
-    let mut out = title.trim().trim_end_matches('.').to_owned();
-    let detail = detail.replace('·', ",");
-    if !detail.trim().is_empty() {
-        out.push_str(". ");
-        out.push_str(detail.trim().trim_end_matches('.'));
+/// Talking over Duskie goes back to what Settings say once a spoken
+/// suggestion is over.
+fn restore_interrupt(app: &AppHandle) {
+    if let Some(r) = lock(&voice(app).runtime).as_ref()
+        && let Some(l) = r.listener.as_ref()
+    {
+        l.send(Control::Interrupt(r.key.interrupt));
     }
+}
+
+/// Something was heard that is not a choice: keep waiting for one while
+/// the card is up. The mic reopens without counting as a question.
+fn keep_waiting(app: &AppHandle, id: String, labels: Vec<String>) {
+    if crate::suggestions::current(app).is_none_or(|s| s.id != id) {
+        restore_interrupt(app);
+        return;
+    }
+    let v = voice(app);
+    *lock(&v.choosing) = Some((id, labels));
+    let runtime = lock(&v.runtime);
+    let speaking = runtime
+        .as_ref()
+        .and_then(|r| r.speaker.as_ref())
+        .is_some_and(Speaker::busy);
+    // While it talks, talking over it is heard again on its own.
+    if !speaking && let Some(l) = runtime.as_ref().and_then(|r| r.listener.as_ref()) {
+        l.send(Control::ListenNow);
+    }
+}
+
+/// True while any speaker still has audio queued or playing.
+pub fn speaker_busy(app: &AppHandle) -> bool {
+    let v = voice(app);
+    lock(&v.greeter).as_ref().is_some_and(Speaker::busy)
+        || lock(&v.runtime)
+            .as_ref()
+            .and_then(|r| r.speaker.as_ref())
+            .is_some_and(Speaker::busy)
+}
+
+/// Pause the suggestion dismiss clock only while the prompt (or details)
+/// are still playing. Once quiet, the fill drains so the card can time out
+/// even if the mic is open for "not now".
+pub fn suggestion_dismiss_held(app: &AppHandle) -> bool {
+    speaker_busy(app)
+}
+
+/// A reply that is basically just a choice ("open", "open it", "not now"),
+/// not a sentence that happens to hold one ("can you open the door").
+pub fn is_short_reply(text: &str, labels: &[String]) -> bool {
+    let words = |s: &str| s.split_whitespace().count();
+    let longest = labels.iter().map(|l| words(l)).max().unwrap_or(1).max(2);
+    let n = words(text);
+    n > 0 && n <= longest + 1
+}
+
+/// Short replies match as-is. Longer ones often start with the end of the
+/// spoken prompt ("…or not now?") before the real answer - try the tail.
+/// Only a trailing dismiss, or a reply that ends with an option name, counts
+/// so "open the door please" stays unclear.
+pub fn pick_spoken_choice(text: &str, labels: &[String]) -> Choice {
+    if is_short_reply(text, labels) {
+        return match_choice(text, labels);
+    }
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let longest = labels
+        .iter()
+        .map(|l| l.split_whitespace().count())
+        .max()
+        .unwrap_or(1)
+        .max(2);
+    let take = (longest + 1).min(words.len());
+    if take == 0 {
+        return Choice::Unclear;
+    }
+    let tail = words[words.len() - take..].join(" ");
+    if !is_short_reply(&tail, labels) {
+        return Choice::Unclear;
+    }
+    match match_choice(&tail, labels) {
+        Choice::Dismiss => Choice::Dismiss,
+        Choice::Option(i) => {
+            let norm = |s: &str| -> String {
+                s.to_lowercase()
+                    .chars()
+                    .map(|c| if c.is_alphanumeric() { c } else { ' ' })
+                    .collect::<String>()
+                    .split_whitespace()
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            };
+            let label = labels.get(i).map(|l| norm(l)).unwrap_or_default();
+            let said = norm(&tail);
+            if !label.is_empty() && (said == label || said.ends_with(&format!(" {label}"))) {
+                Choice::Option(i)
+            } else {
+                Choice::Unclear
+            }
+        }
+        Choice::Unclear => Choice::Unclear,
+    }
+}
+
+/// Only the headline is read, so it ends about when the card would go:
+/// "Report.pdf downloaded. Say open, show in folder, or not now."
+pub fn spoken_prompt(title: &str, options: &[String]) -> String {
+    let mut out = title.trim().trim_end_matches('.').to_owned();
     let names: Vec<String> = options.iter().take(3).map(|o| o.to_lowercase()).collect();
     out.push_str(". Say ");
     out.push_str(&names.join(", "));
@@ -1404,6 +1707,21 @@ pub fn cancel_download(app: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
+
+    #[test]
+    fn short_closings_end_a_conversation() {
+        for t in ["That's all.", "Thanks, Duskie!", "never mind", "Stop"] {
+            assert!(ends_conversation(t), "{t}");
+        }
+        for t in [
+            "thanks, now open Spotify",
+            "stop the server on port 3000",
+            "what's next",
+        ] {
+            assert!(!ends_conversation(t), "{t}");
+        }
+    }
+
     #[test]
     fn a_pause_between_sentences_is_not_the_end() {
         use std::time::Duration;
@@ -1440,19 +1758,28 @@ mod tests {
     }
 
     #[test]
-    fn fixes_words_voice_gets_wrong() {
-        let fixes = "horsepot = hotspot, bad line\nsidekik = Duskie";
+    fn extra_names_rewrite_to_the_assistant() {
+        let fixes = "desky, desuki";
+        assert_eq!(apply_fixes("hey desky", fixes, "Duskie"), "hey Duskie");
         assert_eq!(
-            apply_fixes("Turn on Horsepot please", fixes),
-            "Turn on hotspot please"
+            apply_fixes("Desuki open mail", fixes, "Duskie"),
+            "Duskie open mail"
         );
         assert_eq!(
-            apply_fixes("horsepots", fixes),
-            "horsepots",
+            apply_fixes("deskys", fixes, "Duskie"),
+            "deskys",
             "whole words only"
         );
-        assert_eq!(apply_fixes("no change", ""), "no change");
-        assert_eq!(apply_fixes("hey sidekik", fixes), "hey Duskie");
+        assert_eq!(apply_fixes("no change", "", "Duskie"), "no change");
+        assert_eq!(apply_fixes("hey desky", "desky", "Orbi"), "hey Orbi");
+    }
+
+    #[test]
+    fn name_aliases_are_a_comma_list() {
+        assert_eq!(
+            name_aliases_from_fixes("desky, desuki\ndeskie"),
+            vec!["desky".to_owned(), "desuki".to_owned(), "deskie".to_owned()]
+        );
     }
 
     use super::*;
@@ -1486,14 +1813,43 @@ mod tests {
     }
 
     #[test]
+    fn takes_only_short_replies() {
+        let l = labels(&["Open", "Show in folder"]);
+        assert!(is_short_reply("open", &l));
+        assert!(is_short_reply("open it", &l));
+        assert!(is_short_reply("show in folder", &l));
+        assert!(is_short_reply("not now", &l));
+        assert!(!is_short_reply("can you open the door please", &l));
+        assert!(!is_short_reply("", &l));
+    }
+
+    #[test]
+    fn picks_choice_after_prompt_echo() {
+        let l = labels(&["Pull"]);
+        // ASR often glues the spoken prompt onto the answer.
+        assert_eq!(
+            pick_spoken_choice("or not now? Not now.", &l),
+            Choice::Dismiss
+        );
+        assert_eq!(
+            pick_spoken_choice("Say pull, or not now. Pull.", &l),
+            Choice::Option(0)
+        );
+        let open = labels(&["Open", "Show in folder"]);
+        assert_eq!(
+            pick_spoken_choice("can you open the door please", &open),
+            Choice::Unclear
+        );
+    }
+
+    #[test]
     fn reads_a_suggestion_aloud() {
         assert_eq!(
             spoken_prompt(
-                "report.pdf",
-                "Downloaded · 2 MB",
+                "report.pdf downloaded",
                 &labels(&["Open", "Show in folder"])
             ),
-            "report.pdf. Downloaded , 2 MB. Say open, show in folder, or not now."
+            "report.pdf downloaded. Say open, show in folder, or not now."
         );
     }
 }

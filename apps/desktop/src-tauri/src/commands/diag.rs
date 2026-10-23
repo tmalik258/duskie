@@ -63,6 +63,65 @@ fn log_file(app: &AppHandle) -> Option<std::path::PathBuf> {
         .max_by_key(|p| p.metadata().and_then(|m| m.modified()).ok())
 }
 
+/// Errors and warnings near the end of Duskie's log.
+const ERROR_LINES: usize = 5;
+
+/// Duskie right now, for its own help answers: version and update, which
+/// providers answer, voice, and the last errors in its log.
+pub async fn live_state(app: &AppHandle) -> String {
+    let providers: Vec<String> = crate::ai::status(app)
+        .await
+        .iter()
+        .filter_map(|p| serde_json::to_value(p).ok())
+        .map(|p| {
+            let state = if p["available"] == true {
+                "ready"
+            } else if p["configured"] == true {
+                "set up, not reachable now"
+            } else {
+                "not set up"
+            };
+            format!("{} ({state})", p["id"].as_str().unwrap_or_default())
+        })
+        .collect();
+    let update = match crate::updates::found() {
+        Some(a) => format!("update {} available", a.version),
+        None => "up to date as far as the last check knows".into(),
+    };
+    let voice = {
+        let enabled = lock(&app.state::<AppState>().settings).voice.wake_word;
+        let v = crate::voice::status(app);
+        let mut line = match (enabled, v.listening, v.downloading) {
+            (false, ..) => "off".to_owned(),
+            (_, _, true) => "downloading its models".into(),
+            (_, true, _) => "on, listening".into(),
+            _ if v.missing_bytes > 0 => "on, models missing".into(),
+            _ => "on, not listening".into(),
+        };
+        if let Some(e) = v.error {
+            line.push_str(&format!(", last error: {e}"));
+        }
+        line
+    };
+    let mut out = format!(
+        "Duskie now:\nVersion {} ({update})\nProviders: {}\nVoice: {voice}\n",
+        app.package_info().version,
+        providers.join(", "),
+    );
+    let errors: Vec<String> = log_file(app)
+        .map(|p| last_lines(&p, 400))
+        .unwrap_or_default()
+        .lines()
+        .filter(|l| l.contains("ERROR") || l.contains("WARN"))
+        .map(str::to_owned)
+        .collect();
+    if !errors.is_empty() {
+        let tail = &errors[errors.len().saturating_sub(ERROR_LINES)..];
+        out.push_str(&format!("Recent errors:\n{}\n", tail.join("\n")));
+    }
+    scrub(&out)
+}
+
 /// Version, Windows, which models answer, recent timings, the last crash and
 /// the end of the log, ready to paste into an issue.
 #[tauri::command]
@@ -89,7 +148,11 @@ pub async fn diagnostics(app: AppHandle) -> String {
     ));
     out.push_str(&format!(
         "Voice: {}, Island: {}, Transparency effects: {}, Battery saver: {}\n",
-        if settings.voice.enabled { "on" } else { "off" },
+        if settings.voice.wake_word {
+            "on"
+        } else {
+            "off"
+        },
         settings.island_color,
         duskie_sensors::transparency_effects(),
         duskie_sensors::battery_saver(),

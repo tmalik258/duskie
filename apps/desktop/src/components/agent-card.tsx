@@ -53,7 +53,7 @@ export function AgentCard({ id }: { id: string }) {
     void api.askOpen();
   };
   return (
-    <div className="rd-glance flex flex-col gap-2.5">
+    <div className="rd-glance flex flex-col gap-3">
       <div className="rd-card-head">
         <p className="rd-eyebrow flex items-center gap-1.5">
           <span className="rd-dot" style={{ background: s.status === "waiting" ? "var(--warn)" : "#a8c0cc" }} />
@@ -88,60 +88,62 @@ export function AgentCard({ id }: { id: string }) {
           </button>
         </div>
       )}
-      <div className="flex flex-col gap-1 pb-0.5">
-        {plan.length > 1 && (
-          <div className="rd-steps" aria-hidden>
-            {plan.map((p, i) => (
-              <i key={p.text} data-s={p.status === "completed" ? "done" : i === step ? "now" : undefined} />
-            ))}
-          </div>
-        )}
-        {steps.map((st) => (
-          <div key={st.id} className="rd-list-row mg-row">
-            <span style={{ color: st.state === "failed" ? "var(--err)" : "var(--ink-3)", display: "inline-flex" }}>
-              <Ic name={st.state === "failed" ? "x" : st.state === "running" ? "dot" : "check"} size={12} />
-            </span>
-            <span className="t mono">{st.label}</span>
-            {st.detail && <span className="r">{st.detail}</span>}
-          </div>
-        ))}
-        <div className="mt-1.5 flex items-center gap-1.5">
-          <button type="button" className="rd-btn primary" onClick={open}>
-            Open session <kbd className="rd-kbd">Enter</kbd>
-          </button>
-          <button type="button" className="rd-btn ghost" onClick={() => laterCard(s.id)}>
-            Later
-          </button>
-          {(s.status === "working" || s.paused) && (
-            <button
-              type="button"
-              className="rd-btn ghost chip-s ic-only"
-              aria-label={s.paused ? "Resume" : "Pause"}
-              title={s.paused ? "Resume" : "Pause"}
-              onClick={() => (s.paused ? resumePaused(s.id) : pauseSession(s.id))}
-            >
-              <Ic name={s.paused ? "play" : "pause"} size={12} />
-            </button>
+      {(plan.length > 1 || steps.length > 0) && (
+        <div className="flex flex-col gap-1.5">
+          {plan.length > 1 && (
+            <div className="rd-steps" aria-hidden>
+              {plan.map((p, i) => (
+                <i key={p.text} data-s={p.status === "completed" ? "done" : i === step ? "now" : undefined} />
+              ))}
+            </div>
           )}
-          {s.status === "working" && (
-            <button
-              type="button"
-              className="rd-btn ghost ml-auto chip-s ic-only"
-              aria-label="Stop"
-              style={{ color: "var(--err)" }}
-              onClick={() => interruptSession(s.id)}
-            >
-              <Ic name="stop" size={12} />
-            </button>
-          )}
+          {steps.map((st) => (
+            <div key={st.id} className="rd-list-row mg-row">
+              <span style={{ color: st.state === "failed" ? "var(--err)" : "var(--ink-3)", display: "inline-flex" }}>
+                <Ic name={st.state === "failed" ? "x" : st.state === "running" ? "dot" : "check"} size={12} />
+              </span>
+              <span className="t mono">{st.label}</span>
+              {st.detail && <span className="r">{st.detail}</span>}
+            </div>
+          ))}
         </div>
+      )}
+      <div className="flex items-center gap-2">
+        <button type="button" className="rd-btn primary" onClick={open}>
+          Open session <kbd className="rd-kbd">Enter</kbd>
+        </button>
+        <button type="button" className="rd-btn ghost" onClick={() => laterCard(s.id)}>
+          Later
+        </button>
+        {(s.status === "working" || s.paused) && (
+          <button
+            type="button"
+            className="rd-btn ghost chip-s ic-only"
+            aria-label={s.paused ? "Resume" : "Pause"}
+            title={s.paused ? "Resume" : "Pause"}
+            onClick={() => (s.paused ? resumePaused(s.id) : pauseSession(s.id))}
+          >
+            <Ic name={s.paused ? "play" : "pause"} size={12} />
+          </button>
+        )}
+        {s.status === "working" && (
+          <button
+            type="button"
+            className="rd-btn ghost ml-auto chip-s ic-only"
+            aria-label="Stop"
+            style={{ color: "var(--err)" }}
+            onClick={() => interruptSession(s.id)}
+          >
+            <Ic name="stop" size={12} />
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
 function detail(s: Session, step: number): string {
-  const where = s.worktree ?? s.branch;
+  const where = s.branch;
   if (s.status === "waiting") return s.question?.label ?? "Waiting for your answer.";
   if (s.plan.length > 1)
     return `Step ${Math.min(step + 1, s.plan.length)} of ${s.plan.length}${where ? `, on ${where}` : ""}`;

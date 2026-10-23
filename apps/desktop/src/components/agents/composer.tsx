@@ -7,8 +7,12 @@ import { type KeyboardEvent, useEffect, useRef, useState } from "react";
 import type { AgentCommand } from "@/lib/agent-commands";
 import { type Session, setSessionMode, tuneSession } from "@/lib/agents";
 import { api } from "@/lib/bridge";
+import { AttachButton, ContextChips } from "../attach/attach-bar";
+import { dropMention, withRefs } from "../attach/context";
+import { useContextItems } from "../attach/use-context-items";
 import { ComposerPop } from "./composer/composer-pop";
 import { runCommand } from "./composer/run-command";
+import { TerminalOnly } from "./composer/terminal-only";
 import { useComposerLists } from "./composer/use-composer-lists";
 import { usePopPlace } from "./composer/use-pop-place";
 import { ChatControls } from "./controls";
@@ -34,7 +38,8 @@ export function Composer({
   setText: (t: string) => void;
   /** After rewind: focus the box and select the restored draft (Cursor-style edit). */
   editFocus?: number;
-  onSend: () => void;
+  /** Sends `text` (what was typed plus its context chips). */
+  onSend: (text: string) => void;
   onClear: () => void;
   onReview: () => void;
   onRewind: () => void;
@@ -48,6 +53,7 @@ export function Composer({
   const wrapRef = useRef<HTMLDivElement>(null);
   const { commands, shownCommands, files, slash, mention, count } = useComposerLists(s, text);
   const { float, popRef } = usePopPlace(wrapRef, count, text);
+  const ctx = useContextItems();
   const at = Math.min(sel, Math.max(count - 1, 0));
   // biome-ignore lint/correctness/useExhaustiveDependencies: focus again when the session changes
   useEffect(() => {
@@ -69,7 +75,8 @@ export function Composer({
   const submit = () => {
     const match = /^\/(\S+)(?:\s+(.*))?$/.exec(text.trim());
     if (!match) {
-      onSend();
+      onSend(withRefs(text, ctx.items));
+      ctx.clear();
       return;
     }
     const command = commands.find((c) => c.name === `/${match[1].toLowerCase()}`);
@@ -78,14 +85,15 @@ export function Composer({
   };
   const pickFile = (f: string) => {
     if (!mention) return;
-    setText(`${text.slice(0, text.length - mention[2].length - 1)}@${f} `);
+    setText(dropMention(text));
+    ctx.pick(f);
     inputRef.current?.focus({ preventScroll: true });
   };
   const onKey = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.ctrlKey && !e.metaKey && !e.altKey && !e.shiftKey && e.key === ".") {
       e.preventDefault();
       e.stopPropagation();
-      void setSessionMode(s.id, nextAgentMode(s.mode));
+      if (!s.trial) void setSessionMode(s.id, nextAgentMode(s.mode, false));
       return;
     }
     if (count && (e.key === "ArrowDown" || e.key === "ArrowUp")) {
@@ -129,8 +137,11 @@ export function Composer({
         </p>
       )}
       {terminal && <TerminalOnly id={s.id} command={terminal} onError={setNotice} />}
-      <div ref={wrapRef} className="ak-composer ak-two relative">
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: a drop zone for files; the paperclip is the keyboard path */}
+      <div ref={wrapRef} className="ak-composer ak-two relative" onDrop={ctx.onDrop} onDragOver={ctx.onDragOver}>
+        <ContextChips items={ctx.items} error={ctx.error} onRemove={ctx.remove} />
         <div className="ak-row">
+          <AttachButton onFiles={(f) => void ctx.upload(f)} />
           <input
             ref={inputRef}
             value={text}
@@ -139,6 +150,7 @@ export function Composer({
               setSel(0);
             }}
             onBlur={() => onBlur?.()}
+            onPaste={ctx.onPaste}
             onKeyDown={onKey}
             placeholder={working ? "Steer it, it reads this next" : "Ask for more, / for commands, @ for files"}
           />
@@ -149,7 +161,13 @@ export function Composer({
           effort={s.effort}
           onModel={(m) => tuneSession(s.id, m, s.effort ?? null)}
           onEffort={(e) => tuneSession(s.id, s.model ?? null, e)}
-          lead={<ModeChip mode={s.mode} onChange={(mode) => void setSessionMode(s.id, mode)} />}
+          lead={
+            <ModeChip
+              mode={s.mode}
+              only={(m) => (s.trial ? m === "try" : m !== "try")}
+              onChange={(mode) => void setSessionMode(s.id, mode)}
+            />
+          }
           usage={s.usage}
           panel={panel}
           onRefresh={
@@ -168,30 +186,5 @@ export function Composer({
         />
       </div>
     </>
-  );
-}
-
-/** A command only the agent's own terminal can run: open it there, or copy it. */
-function TerminalOnly({ id, command, onError }: { id: string; command: string; onError: (e: string) => void }) {
-  return (
-    <div className="ak-chips">
-      <span className="ak-note">
-        Terminal only: <code className="mono">{command}</code>
-      </span>
-      <button
-        type="button"
-        className="ak-chip chip"
-        onClick={() => void api.agentTerminal(id).catch((e) => onError(String(e)))}
-      >
-        Open in terminal
-      </button>
-      <button
-        type="button"
-        className="ak-chip chip"
-        onClick={() => void navigator.clipboard.writeText(command).catch((e) => onError(String(e)))}
-      >
-        Copy command
-      </button>
-    </div>
   );
 }

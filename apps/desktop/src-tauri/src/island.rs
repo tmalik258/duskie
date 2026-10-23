@@ -215,6 +215,9 @@ pub fn follow_active_monitor(app: &AppHandle, payload: &serde_json::Value) {
 /// keeps the island above it. Exclusive-fullscreen games still win.
 #[cfg(windows)]
 pub fn keep_on_top(window: &WebviewWindow) {
+    if DIALOG.load(Ordering::Relaxed) {
+        return;
+    }
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE, SetWindowPos,
     };
@@ -237,7 +240,28 @@ pub fn keep_on_top(window: &WebviewWindow) {
 
 #[cfg(not(windows))]
 pub fn keep_on_top(window: &WebviewWindow) {
-    let _ = window.set_always_on_top(true);
+    if !DIALOG.load(Ordering::Relaxed) {
+        let _ = window.set_always_on_top(true);
+    }
+}
+
+/// A file dialog opened from the island is up: the island steps down so
+/// the dialog is not hidden behind it.
+static DIALOG: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// The island steps down from always-on-top while a file dialog is open,
+/// and back up when it closes.
+pub fn dialog_open(app: &AppHandle, open: bool) {
+    DIALOG.store(open, Ordering::Relaxed);
+    let Some(window) = app.get_webview_window(LABEL) else {
+        return;
+    };
+    if open {
+        let _ = window.set_always_on_top(false);
+    } else {
+        let _ = window.set_always_on_top(true);
+        keep_on_top(&window);
+    }
 }
 
 /// Keeps the island above other windows: right away when the window in
@@ -367,6 +391,7 @@ fn spawn_hover_tracker(app: AppHandle, window: WebviewWindow) {
                 // The UI decides what hover shows (a waiting guide, or the
                 // parked welcome), after its hover-intent delay.
                 let _ = app.emit_to(LABEL, HOVER_EVENT, inside);
+                crate::voice::read_details(&app, inside);
             }
             // Poll modifiers here: the webview stays unfocused / click-through.
             // Hovered → Shift alone (glance Ask↔Agents, Focus↔Pause).

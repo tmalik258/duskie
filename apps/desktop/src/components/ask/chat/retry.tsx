@@ -125,6 +125,7 @@ export function LiveStep({ step, since }: { step: string | null; since?: number 
   const elapsed = since ? Math.max(0, now - since) : null;
   return (
     <p className="ak-status" role="status" aria-live="polite">
+      <span className="ak-spin" aria-hidden="true" />
       <span className="shimmer-text text-[rgb(235_235_245/0.6)]">
         {step ? `${step}...` : elapsed !== null && elapsed > 4000 ? "Waking up the AI..." : "Thinking..."}
       </span>

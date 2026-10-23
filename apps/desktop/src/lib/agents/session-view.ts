@@ -173,12 +173,5 @@ export function tuneSession(id: string, model: string | null, effort: string | n
   void api.agentTune(id, model, effort).catch((e) => update(id, (s) => ({ ...s, error: String(e) })));
 }
 
-/** Merges a session's own worktree back into its repo. */
-export async function finishSession(id: string): Promise<string> {
-  const msg = await api.agentFinish(id);
-  update(id, (s) => ({ ...s, finished: true }));
-  return msg;
-}
-
 /** Cap persisted sessions so streaming does not stringify unbounded timelines. */
 export const SAVE_CAP = 20;

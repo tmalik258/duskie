@@ -211,7 +211,7 @@ pub async fn setup_apply(app: AppHandle, plan: Plan) -> CmdResult<Vec<String>> {
         settings.ai.local.model = m;
         settings.ai.local.enabled = true;
     }
-    settings.voice.enabled |= plan.voice;
+    settings.voice.wake_word |= plan.voice;
     settings.launch_at_login = plan.launch_at_login;
     apply_settings(&app, settings)?;
     if plan.voice {

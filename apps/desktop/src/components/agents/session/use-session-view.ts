@@ -84,8 +84,8 @@ export function useSessionView(s: Session, active: boolean) {
     const el = e.currentTarget;
     scrollState.current = { scroll: el.scrollTop, follow: el.scrollHeight - el.scrollTop - el.clientHeight < 48 };
   };
-  const send = () => {
-    const t = text.trim();
+  const send = (full = text) => {
+    const t = full.trim();
     if (!t) return;
     sendToSession(s.id, t);
     setText("");

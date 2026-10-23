@@ -8,6 +8,7 @@ import { type ReactNode, useState } from "react";
 import { bubblesOf } from "@/lib/peek";
 import { motionFor, SPRINGS } from "@/lib/spring";
 import { Ic, type IcName } from "./icon";
+import { EdgeRing } from "./island-pill/pill-kind";
 
 export interface BubbleItem {
   id: string;
@@ -20,7 +21,7 @@ export interface BubbleItem {
   mark?: string;
   /** Icon in the round badge, instead of a mark. */
   icon?: IcName;
-  /** Download or install progress, 0..1, drawn along the bottom edge. */
+  /** Download or install progress, 0..1, traced along the pill's edge. */
   progress?: number | null;
   tone?: "err";
 }
@@ -55,6 +56,7 @@ export function IslandBubbles({
             animate={{ opacity: 1, x: 0, scale: 1 }}
             transition={spring}
             aria-expanded={openId === it.id}
+            title={it.sub ? `${it.label} · ${it.sub}` : it.label}
             onClick={() => onOpen?.(it.id)}
           >
             {it.ring ? (
@@ -76,14 +78,7 @@ export function IslandBubbles({
                 </span>
               </span>
             )}
-            {it.progress != null && (
-              <span className="absolute right-3 bottom-[3px] left-3 h-[2px] overflow-hidden rounded-[2px] bg-[rgb(242_240_235_/_0.08)]">
-                <i
-                  className="block h-full bg-(--listen) transition-[width] duration-500"
-                  style={{ width: `${Math.round(Math.min(1, Math.max(0, it.progress)) * 100)}%` }}
-                />
-              </span>
-            )}
+            {it.progress != null && <EdgeRing progress={Math.min(1, Math.max(0, it.progress))} />}
           </motion.button>
           {openId === it.id && peek}
         </li>

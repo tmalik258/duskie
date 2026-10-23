@@ -13,6 +13,7 @@ const BODIES = {
   close:
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><path d="M14.5 9.50002L9.5 14.5M9.49998 9.5L14.5 14.5"/></g>',
   // Drawn for Duskie (not from Solar), in the same 1.5 stroke style.
+  clip: '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="m20 11.5-7.8 7.8a5 5 0 0 1-7.1-7.1l8.3-8.3a3.3 3.3 0 0 1 4.7 4.7l-8.3 8.3a1.7 1.7 0 0 1-2.4-2.4l7.6-7.6"/>',
   plus: '<path fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5" d="M12 5v14M5 12h14"/>',
   ask: '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="1.5"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></g>',
   focus:
@@ -22,6 +23,7 @@ const BODIES = {
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><rect x="2.5" y="3.5" width="19" height="13" rx="2.5"/><path d="M8 20.5h8M12 16.5v4"/></g>',
   speaker:
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11"/></g>',
+  bell: '<g fill="none" stroke="currentColor" stroke-width="1.5"><path d="M18.75 9.71v-.705C18.75 5.136 15.726 2 12 2S5.25 5.136 5.25 9.005v.705a4.4 4.4 0 0 1-.692 2.375L3.45 13.81c-1.011 1.575-.239 3.716 1.52 4.214a25.8 25.8 0 0 0 14.06 0c1.759-.498 2.531-2.639 1.52-4.213l-1.108-1.725a4.4 4.4 0 0 1-.693-2.375Z"/><path stroke-linecap="round" d="M7.5 19c.655 1.748 2.422 3 4.5 3s3.845-1.252 4.5-3"/></g>',
   speakerOff:
     '<g fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"><path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="m16 9.5 5 5M21 9.5l-5 5"/></g>',
   chevron:
@@ -74,6 +76,7 @@ const SMALL = {
   info: '<circle cx="8" cy="8" r="6"/><path d="M8 7.2v3.6"/><circle cx="8" cy="5" r=".4" fill="currentColor"/>',
   diff: '<path d="M5 2.5v5M2.5 5h5M2.5 11.5h5"/><path d="M11 2v12"/><path d="M13.5 9.5 11 12l-2.5-2.5" opacity=".55"/>',
   check: '<path d="M3.5 8.5l3 3 6-7"/>',
+  pencil: '<path d="M10.6 2.6l2.8 2.8L5.6 13.2H2.8v-2.8zM9.2 4l2.8 2.8"/>',
   x: '<path d="M4 4l8 8M12 4l-8 8"/>',
   mic: '<rect x="6" y="1.8" width="4" height="8" rx="2"/><path d="M3.5 7.8a4.5 4.5 0 009 0M8 12.3v1.9"/>',
   send: '<path d="M8 13V3M3.5 7.5L8 3l4.5 4.5"/>',
@@ -134,6 +137,7 @@ const BIG: Record<string, IconName> = {
   check: "check",
   folder: "folder",
   file: "file",
+  clip: "clip",
   clock: "history",
   history: "history",
   mic: "mic",
@@ -148,6 +152,8 @@ const BIG: Record<string, IconName> = {
   wifi: "wifi",
   update: "update",
   lock: "lock",
+  bell: "bell",
+  speaker: "speaker",
 };
 
 export type IcName = keyof typeof SMALL | keyof typeof BIG;

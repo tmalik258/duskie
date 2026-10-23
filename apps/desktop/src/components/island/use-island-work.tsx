@@ -164,6 +164,9 @@ export function useIslandWork(c: IslandStore) {
   // island opens only when the answer starts.
   const hearing = useDuskie((s) => (s.ask ? null : s.hearing));
   const live = useDuskie((s) => (s.ask ? null : s.live));
+  // Karaoke words while speaking, even with Ask open - the compact pill
+  // still shows what is being said.
+  const spokenCaption = useDuskie((s) => s.spokenCaption);
   const voiceQuestion = useDuskie((s) => (s.ask ? null : s.voiceQuestion));
   // Something finished that needs nothing more: a short done pill.
   // Also covers mascot success without Undo / Open (e.g. "Switched to Claude"
@@ -189,7 +192,18 @@ export function useIslandWork(c: IslandStore) {
   const paused = isPaused(settings.pause, now);
   const out0 = { activityNow, activityWaiting, askingCount, askingTitle, asksYou, cardAgent, displayedActivity };
   const out1 = { dndOn, doneOpen, donePill, doneUndo, focusLeft, focusUntil, fullscreen, guide, hearing, live };
-  const out2 = { liveActivities, look, meetingSoon, paused, peekId, questionId, reduced, setPeekId, skillWorking };
+  const out2 = {
+    liveActivities,
+    look,
+    meetingSoon,
+    paused,
+    peekId,
+    questionId,
+    reduced,
+    setPeekId,
+    skillWorking,
+    spokenCaption,
+  };
   const out3 = { splitAgent, successCard, voiceQuestion, working };
   return { ...out0, ...out1, ...out2, ...out3 };
 }

@@ -359,6 +359,7 @@ pub async fn git_write_message(app: AppHandle, path: String) -> CmdResult<String
         system: MESSAGE_SYSTEM.into(),
         messages: vec![duskie_ai::Message::user(message_prompt(&diff))],
         image: None,
+        more_images: Vec::new(),
         think: false,
     };
     let answer = tokio::time::timeout(

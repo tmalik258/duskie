@@ -28,7 +28,6 @@ pub struct Codex {
     pub mcp: Option<(String, String)>,
 }
 
-const SCREENSHOT: &str = "screen.png";
 /// Codex reads the token for Duskie's server from this variable, so it
 /// never appears on a command line.
 const TOKEN_VAR: &str = "DUSKIE_MCP_TOKEN";
@@ -41,7 +40,7 @@ impl Codex {
             .or_else(|| which::which("codex").ok())
     }
 
-    fn args(&self, image: bool) -> Vec<String> {
+    fn args(&self, images: usize) -> Vec<String> {
         let mut args: Vec<String> = [
             "exec",
             "--json",
@@ -58,9 +57,9 @@ impl Codex {
             args.push(model.into());
         }
         args.extend(self.mcp_args());
-        if image {
+        for i in 0..images {
             args.push("--image".into());
-            args.push(SCREENSHOT.into());
+            args.push(ChatRequest::shot_name(i));
         }
         // The prompt comes on stdin.
         args.push("-".into());
@@ -414,9 +413,9 @@ impl AiProvider for Codex {
             .resolve()
             .ok_or_else(|| AiError::Failed("Codex (codex) is not installed".into()))?;
         let _ = std::fs::create_dir_all(&self.workdir);
-        if let Some(png) = &req.image {
-            std::fs::write(self.workdir.join(SCREENSHOT), png)
-                .map_err(|e| AiError::Failed(format!("could not save the screenshot: {e}")))?;
+        for (i, png) in req.images().iter().enumerate() {
+            std::fs::write(self.workdir.join(ChatRequest::shot_name(i)), png)
+                .map_err(|e| AiError::Failed(format!("could not save the image: {e}")))?;
         }
         let key = self.key(&exe);
         let earlier = &req.messages[..req.messages.len().saturating_sub(1)];
@@ -443,10 +442,10 @@ impl AiProvider for Codex {
                 transcript(req)
             };
             let mut input = vec![json!({ "type": "text", "text": text })];
-            if req.image.is_some() {
+            for i in 0..req.images().len() {
                 input.push(json!({
                     "type": "localImage",
-                    "path": self.workdir.join(SCREENSHOT).to_string_lossy(),
+                    "path": self.workdir.join(ChatRequest::shot_name(i)).to_string_lossy(),
                 }));
             }
             input
@@ -534,7 +533,7 @@ impl Codex {
         cancel: &CancellationToken,
     ) -> Result<String, AiError> {
         // The prompt goes in on stdin, never as an argument.
-        let mut cmd = self.command(exe, &self.args(req.image.is_some()));
+        let mut cmd = self.command(exe, &self.args(req.images().len()));
         cmd.stderr(Stdio::piped());
         let mut child = cmd
             .spawn()
@@ -733,11 +732,11 @@ mod tests {
             workdir: PathBuf::from("."),
             mcp: Some(("http://127.0.0.1:47823/mcp".into(), "secret".into())),
         };
-        let args = c.args(true);
+        let args = c.args(2);
         let joined = args.join(" ");
         assert!(joined.contains("--sandbox read-only"));
         assert!(joined.contains("--model gpt-6-luna"));
-        assert!(joined.contains("--image screen.png"));
+        assert!(joined.contains("--image screen.png --image screen-2.png"));
         assert!(joined.contains("default_tools_approval_mode=\"approve\""));
         assert!(
             !joined.contains("secret"),

@@ -130,6 +130,8 @@ export const appApi = {
       hold?: boolean;
       /** "Think harder": let the local model reason before answering. */
       think?: boolean;
+      /** Files attached in the Ask box (saved paths). */
+      files?: string[];
     },
     localOnly: boolean,
   ) => invoke<void>("ai_chat", { id, messages, attach, localOnly }),

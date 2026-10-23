@@ -742,7 +742,7 @@ pub async fn status(app: &AppHandle) -> Vec<SetupItem> {
             "Say \"Duskie\" and hear answers. About 205 MB, all on this PC.",
         )
         .done(
-            voice_ready && settings.voice.enabled,
+            voice_ready && settings.voice.wake_word,
             "On",
             if voice.downloading {
                 "Downloading"

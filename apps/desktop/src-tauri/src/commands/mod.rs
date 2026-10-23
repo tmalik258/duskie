@@ -17,6 +17,7 @@ use crate::state::{AppState, HitRect, Suggestion, executor, gate_state, lock};
 use crate::suggestions;
 use crate::windows;
 
+mod attach;
 mod attention;
 mod chat;
 mod cloud;
@@ -29,7 +30,9 @@ mod mcp;
 mod notify;
 pub(crate) mod servers;
 mod setup;
+mod sound;
 mod voice;
+pub use attach::*;
 pub use attention::*;
 pub use chat::*;
 pub use cloud::*;
@@ -42,6 +45,7 @@ pub use mcp::*;
 pub use notify::*;
 pub use servers::*;
 pub use setup::*;
+pub use sound::*;
 pub use voice::*;
 
 pub const SETTINGS_CHANGED: &str = "settings://changed";

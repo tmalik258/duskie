@@ -1,13 +1,17 @@
 //! Text helpers: the wake phrase out of transcripts, and answers made fit to
 //! be read aloud, a sentence at a time.
 
-/// "Hey Duskie" letter by letter, for when the wake model's vocabulary cannot
+/// "Duskie" letter by letter, for when the wake model's vocabulary cannot
 /// be read; `wake_keywords` spells it properly from the vocabulary otherwise.
-pub const WAKE_KEYWORDS: &str = "▁HE Y ▁ D U S K I E @hey_duskie\n▁HI ▁ D U S K I E @hey_duskie\n▁O K ▁ D U S K I E @hey_duskie\n";
+pub const WAKE_KEYWORDS: &str = "▁ D U S K I E @duskie\n";
 
 /// A name the user gave the assistant ("Orbi"), as lowercase words. Empty
 /// means only "Duskie". The default name always keeps working too.
 static CUSTOM_NAME: std::sync::RwLock<Vec<String>> = std::sync::RwLock::new(Vec::new());
+
+/// Extra wake names from "Words voice gets wrong" (left sides that map to
+/// the assistant name). Each entry is one phrase as lowercase words.
+static NAME_ALIASES: std::sync::RwLock<Vec<Vec<String>>> = std::sync::RwLock::new(Vec::new());
 
 /// Sets the assistant's name for wake matching. "Duskie" or blank clears it.
 pub fn set_name(name: &str) {
@@ -26,8 +30,30 @@ pub fn set_name(name: &str) {
     }
 }
 
+/// Sets extra wake names (ASR mishearings of the assistant name). Pass the
+/// left sides of fixes that map to the name, e.g. `["desky", "desk key"]`.
+pub fn set_name_aliases(aliases: &[String]) {
+    let names: Vec<Vec<String>> = aliases
+        .iter()
+        .map(|a| {
+            a.split(|c: char| !c.is_alphanumeric())
+                .filter(|w| !w.is_empty())
+                .map(str::to_lowercase)
+                .collect()
+        })
+        .filter(|w: &Vec<String>| !w.is_empty())
+        .collect();
+    if let Ok(mut n) = NAME_ALIASES.write() {
+        *n = names;
+    }
+}
+
 fn custom_name() -> Vec<String> {
     CUSTOM_NAME.read().map(|n| n.clone()).unwrap_or_default()
+}
+
+fn name_aliases() -> Vec<Vec<String>> {
+    NAME_ALIASES.read().map(|n| n.clone()).unwrap_or_default()
 }
 
 /// Pieces of the wake model's BPE vocabulary with their merge scores.
@@ -150,17 +176,13 @@ fn spell_word(vocab: &Vocab, word: &str) -> Option<Vec<String>> {
     best.remove(&text.len()).map(|(_, p)| p)
 }
 
-/// The wake phrases for the keyword model: "hey Duskie" always, plus
-/// "hey <name>" when the user renamed the assistant.
+/// The wake word for the keyword model: the name alone ("Duskie, what time
+/// is it"), plus the new name when the user renamed the assistant.
 pub fn wake_keywords(vocab: Option<&Vocab>) -> String {
     let mut out = String::new();
     // The app's own name, spelled from the model's vocabulary.
-    if let Some(vocab) = vocab {
-        for greeting in ["hey", "hi", "ok"] {
-            if let Some(spelled) = spell(vocab, &format!("{greeting} duskie")) {
-                out.push_str(&format!("{spelled} @hey_duskie\n"));
-            }
-        }
+    if let Some(spelled) = vocab.and_then(|v| spell(v, "duskie")) {
+        out.push_str(&format!("{spelled} @duskie\n"));
     }
     if out.is_empty() {
         out.push_str(WAKE_KEYWORDS);
@@ -168,10 +190,8 @@ pub fn wake_keywords(vocab: Option<&Vocab>) -> String {
     let name = custom_name();
     if let (Some(vocab), false) = (vocab, name.is_empty()) {
         let name = name.join(" ");
-        for greeting in ["hey", "hi", "ok"] {
-            if let Some(spelled) = spell(vocab, &format!("{greeting} {name}")) {
-                out.push_str(&format!("{spelled} @hey_{}\n", name.replace(' ', "_")));
-            }
+        if let Some(spelled) = spell(vocab, &name) {
+            out.push_str(&format!("{spelled} @{}\n", name.replace(' ', "_")));
         }
     }
     out
@@ -181,15 +201,25 @@ pub fn wake_keywords(vocab: Option<&Vocab>) -> String {
 const GREETINGS: &[&str] = &["hey", "hi", "ok", "okay", "a"];
 
 /// How the name comes out of speech to text, as one word or two ("dusky",
-/// "dusk key"). The old name, Sidekick, no longer wakes it.
+/// "dusk key", "desky"). The old name, Sidekick, no longer wakes it.
 const NAMES: &[&[&str]] = &[
     &["duskie"],
     &["dusky"],
     &["duskey"],
+    &["duskee"],
+    &["duskii"],
+    &["desky"],
+    &["desuki"],
+    &["deskie"],
+    &["deski"],
+    &["dusuke"],
+    &["desuke"],
     &["dusk", "e"],
     &["dusk", "ee"],
     &["dusk", "key"],
     &["dust", "key"],
+    &["desk", "key"],
+    &["desk", "e"],
 ];
 
 /// After a greeting, any word starting with one of these counts as the name,
@@ -220,6 +250,7 @@ pub fn strip_wake(text: &str) -> String {
         }
     }
     let custom = custom_name();
+    let aliases = name_aliases();
     let name_at = |at: usize| {
         let fits = |name: &[&str]| {
             name.len() <= words.len().saturating_sub(at)
@@ -228,6 +259,12 @@ pub fn strip_wake(text: &str) -> String {
         let own: Vec<&str> = custom.iter().map(String::as_str).collect();
         if !own.is_empty() && fits(&own) {
             return Some(at + own.len());
+        }
+        for alias in &aliases {
+            let parts: Vec<&str> = alias.iter().map(String::as_str).collect();
+            if fits(&parts) {
+                return Some(at + parts.len());
+            }
         }
         NAMES
             .iter()
@@ -250,6 +287,22 @@ pub fn strip_wake(text: &str) -> String {
 /// Where the wake phrase starts in a running transcript: a greeting and the
 /// name anywhere ("so, hey duskie, what..."), or the bare name as the
 /// first word. None when it is not there.
+/// Whether the name is anywhere in `text`, not just at its start.
+pub fn has_name(text: &str) -> bool {
+    text.char_indices()
+        .filter(|&(i, c)| {
+            (c.is_alphanumeric() || c == '\'')
+                && text[..i]
+                    .chars()
+                    .last()
+                    .is_none_or(|p| !(p.is_alphanumeric() || p == '\''))
+        })
+        .any(|(i, _)| {
+            let rest = &text[i..];
+            strip_wake(rest) != rest.trim()
+        })
+}
+
 pub fn find_wake(text: &str) -> Option<usize> {
     let mut starts = Vec::new();
     let mut in_word = false;
@@ -544,6 +597,29 @@ impl Sentences {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
+    #[test]
+    fn the_name_counts_anywhere_in_the_wake_window() {
+        assert!(has_name("duskie"));
+        assert!(has_name("a duskie"));
+        assert!(has_name("the dusky"));
+        assert!(has_name("Desky"));
+        assert!(has_name("hey desuki open mail"));
+        assert!(has_name("Dusuke"));
+        assert!(has_name("hey desuke"));
+        assert!(!has_name("open the folder"));
+    }
+
+    #[test]
+    fn name_aliases_from_fixes_wake() {
+        set_name_aliases(&["sidekik".into(), "or bee".into()]);
+        assert!(has_name("sidekik"));
+        assert_eq!(strip_wake("hey or bee open mail"), "open mail");
+        set_name_aliases(&[]);
+        assert!(!has_name("sidekik"));
+    }
+
     #[test]
     fn tells_requests_from_noise() {
         assert!(!looks_like_request("Byzant mixed."));
@@ -554,8 +630,6 @@ mod tests {
         assert!(looks_like_request("mute"));
         assert!(looks_like_request("my battery is low right now"));
     }
-
-    use super::*;
 
     #[test]
     fn spells_a_name_in_wake_tokens() {
@@ -581,6 +655,22 @@ mod tests {
     }
 
     #[test]
+    fn the_name_alone_is_the_wake_word() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../apps/desktop/src-tauri/resources/voice-models/",
+            "sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01/bpe.model"
+        );
+        let Ok(bytes) = std::fs::read(path) else {
+            return;
+        };
+        let vocab = read_vocab(&bytes);
+        let words = wake_keywords(Some(&vocab));
+        assert!(words.contains(" @duskie\n"));
+        assert!(!words.contains("HE Y"));
+    }
+
+    #[test]
     fn spells_names_from_the_wake_model() {
         let path = concat!(
             env!("CARGO_MANIFEST_DIR"),
@@ -593,7 +683,7 @@ mod tests {
         };
         let vocab = read_vocab(&bytes);
         assert!(spell(&vocab, "hey duskie").is_some_and(|s| s.starts_with("▁HE Y ")));
-        assert!(wake_keywords(Some(&vocab)).contains("@hey_duskie"));
+        assert!(wake_keywords(Some(&vocab)).contains("@duskie"));
         assert!(!wake_keywords(Some(&vocab)).contains("SIDE"));
         // Checked against the sentencepiece library.
         assert_eq!(spell(&vocab, "hey orbi").as_deref(), Some("▁HE Y ▁OR B I"));
@@ -657,8 +747,11 @@ mod tests {
             strip_wake("Hey duskee, open my downloads"),
             "open my downloads"
         );
+        assert_eq!(strip_wake("Desky open settings"), "open settings");
+        assert_eq!(strip_wake("hey desuki, open mail"), "open mail");
+        assert_eq!(strip_wake("Okay desk key open settings"), "open settings");
         assert_eq!(strip_wake("hey dusk open settings"), "open settings");
-        assert_eq!(strip_wake("duskee open settings"), "duskee open settings");
+        assert_eq!(strip_wake("duskee open settings"), "open settings");
         // The old name no longer wakes it.
         assert_eq!(
             strip_wake("Hey sidekick, open mail"),

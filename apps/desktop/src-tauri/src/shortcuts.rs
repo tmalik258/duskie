@@ -57,7 +57,8 @@ pub fn register_all(app: &AppHandle) -> Vec<String> {
                 let action = action.clone();
                 // Ask/Agents/Settings must run in order with window focus; other
                 // actions may re-register keys and stay off the handler thread.
-                if action == "ask" || action == "agents" || action == "settings" {
+                if action == "ask" || action == "agents" || action == "git" || action == "settings"
+                {
                     run(&app, &action);
                 } else {
                     tauri::async_runtime::spawn(async move { run(&app, &action) });
@@ -86,6 +87,7 @@ fn run(app: &AppHandle, action: &str) {
     match action {
         "ask" => ask::toggle(app),
         "agents" => ask::toggle_agents(app),
+        "git" => ask::toggle_git(app),
         "settings" => ask::toggle_settings(app),
         "talk" => {
             if !ask::is_open(app) {

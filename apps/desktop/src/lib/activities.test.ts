@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ACTIVITY_HOLD_MS, INACTIVITY_MS, visibleActivities } from "./activities";
+import { ACTIVITY_HOLD_MS, activityLabel, downloadProgress, INACTIVITY_MS, visibleActivities } from "./activities";
 import type { Activity } from "./types";
 
 const base: Activity = {
@@ -65,5 +65,27 @@ describe("visibleActivities", () => {
     expect(out).toHaveLength(1);
     expect(out[0]?.phase).toBe("completed");
     expect(out[0]?.outcome).toBe("Launch requested for Chrome");
+  });
+});
+
+describe("download progress", () => {
+  it("shows percent, size and time left", () => {
+    const a = {
+      id: "d",
+      source: "browser",
+      parentId: null,
+      label: "Downloading a.zip",
+      phase: "downloading" as const,
+      startedAt: 0,
+      lastProgressAt: 10_000,
+      transferred: 20_000_000,
+      total: 100_000_000,
+      outcome: null,
+      dismissed: false,
+      revision: 1,
+      destination: null,
+    };
+    expect(downloadProgress(a).left).toBe(40);
+    expect(activityLabel(a, 10_000)).toBe("Downloading a.zip · 20% · 20 MB of 100 MB · 40 s left");
   });
 });
