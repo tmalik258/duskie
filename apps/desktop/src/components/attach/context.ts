@@ -12,13 +12,17 @@ export interface ContextItem {
   url?: string | null;
 }
 
+/** Upload storage is an implementation detail, including in hover labels. */
+export const isUpload = (path: string) => /(?:^|[\\/])duskie-attachments[\\/][^\\/]+$/.test(path);
+export const contextLabel = (item: ContextItem) => (isUpload(item.path) ? item.name : parents(item.path));
+
 /** "src/components/agents/" -> { name: "agents", folder: true }. */
 export function fromPick(path: string): ContextItem {
   const folder = path.endsWith("/");
   const parts = path.replace(/\/+$/, "").split(/[\\/]/);
   const last = parts[parts.length - 1] || path;
   // Uploads are saved as "<id>-name"; show just the name.
-  const name = /duskie-attachments/.test(path) ? last.replace(/^[0-9A-Z]+-/, "") : last;
+  const name = isUpload(path) ? last.replace(/^[0-9A-Z]+-/, "") : last;
   return { name, path, folder };
 }
 

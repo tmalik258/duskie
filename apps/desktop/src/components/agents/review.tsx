@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { markReviewed, type Session, sendToSession } from "@/lib/agents";
 import { api } from "@/lib/bridge";
+import { Ic } from "../icon";
 import { FileTree } from "./review/file-tree";
 import { groupByDir, keyOf, letter, rows } from "./review/hunk";
 import { HunkView } from "./review/hunk-view";
@@ -93,7 +94,7 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
 
   const groups = useMemo(() => groupByDir(list), [list]);
 
-  if (files === null && !error) return <ReviewLoading slow={slow} />;
+  if (files === null && !error) return <ReviewLoading slow={slow} onClose={onDone} />;
 
   if (error && list.length === 0) return <ReviewError error={error} onRetry={load} onClose={onDone} />;
 
@@ -110,6 +111,12 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
       <FileTree done={done} total={total} groups={groups} kept={kept} fileAt={fileAt} goFile={goFile} />
 
       <section className="rv-pane">
+        <div className="rv-dhead">
+          <b className="p">Review changes</b>
+          <button type="button" className="rv-ico" aria-label="Close review" title="Close review" onClick={onDone}>
+            <Ic name="x" size={14} />
+          </button>
+        </div>
         {file ? (
           <>
             <div className="rv-dhead">

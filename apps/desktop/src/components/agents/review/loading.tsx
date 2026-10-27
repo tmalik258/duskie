@@ -1,12 +1,19 @@
 "use client";
 
+import { Ic } from "../../icon";
+
 /** Placeholder rows while diffs stream in. */
-export function ReviewLoading({ slow }: { slow?: boolean }) {
+export function ReviewLoading({ slow, onClose }: { slow?: boolean; onClose?: () => void }) {
   return (
     <div className="ak-rv-load" role="status" aria-busy="true" aria-label="Reading changes">
       <div className="ak-rv-head">
         <b>Review changes</b>
         <span className="shimmer-text">{slow ? "Still reading diffs..." : "Reading diffs"}</span>
+        {onClose && (
+          <button type="button" className="rv-ico" aria-label="Close review" title="Close review" onClick={onClose}>
+            <Ic name="x" size={14} />
+          </button>
+        )}
       </div>
       {[72, 54, 63].map((w, i) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: fixed placeholder rows

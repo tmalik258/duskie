@@ -37,9 +37,9 @@ export function QuietTip() {
   const [tip] = useState(pickTip);
   if (!on || later > 0 || !tip) return null;
   return (
-    <p className="rd-list-row flex items-baseline gap-2" style={{ marginLeft: "calc(var(--orb-indent, 0px) * -1)" }}>
+    <p className="rd-quiet-tip">
       <span className="rd-eyebrow shrink-0">Tip</span>
-      {tip}
+      <span>{tip}</span>
     </p>
   );
 }

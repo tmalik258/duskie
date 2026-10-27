@@ -42,7 +42,7 @@ duskie-sensors.workspace = true
 duskie-layout.workspace = true
 duskie-skills.workspace = true
 duskie-voice.workspace = true
-tauri = { version = "2", features = ["tray-icon"] }
+tauri = { version = "2", features = ["tray-icon", "protocol-asset"] }
 tauri-plugin-autostart = "2"
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-log = "2"

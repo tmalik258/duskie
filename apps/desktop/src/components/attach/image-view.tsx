@@ -7,6 +7,7 @@ import { createPortal } from "react-dom";
 
 export function Thumb({ url, name, size = 22 }: { url: string; name: string; size?: number }) {
   const [open, setOpen] = useState(false);
+  const [failedUrl, setFailedUrl] = useState<string | null>(null);
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -17,6 +18,13 @@ export function Thumb({ url, name, size = 22 }: { url: string; name: string; siz
     window.addEventListener("keydown", onKey, true);
     return () => window.removeEventListener("keydown", onKey, true);
   }, [open]);
+  if (failedUrl === url) {
+    return (
+      <span className="ak-att ak-att-sent" title={`${name} (preview unavailable)`}>
+        {name}
+      </span>
+    );
+  }
   return (
     <>
       <button
@@ -26,12 +34,26 @@ export function Thumb({ url, name, size = 22 }: { url: string; name: string; siz
         style={{ width: size, height: size }}
         onClick={() => setOpen(true)}
       >
-        <img src={url} alt="" />
+        <img
+          src={url}
+          alt=""
+          onError={() => {
+            setFailedUrl(url);
+            setOpen(false);
+          }}
+        />
       </button>
       {open &&
         createPortal(
           <button type="button" className="ak-lightbox" aria-label="Close image" onClick={() => setOpen(false)}>
-            <img src={url} alt={name} />
+            <img
+              src={url}
+              alt={name}
+              onError={() => {
+                setFailedUrl(url);
+                setOpen(false);
+              }}
+            />
           </button>,
           document.body,
         )}

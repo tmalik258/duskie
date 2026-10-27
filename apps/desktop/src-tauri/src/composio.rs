@@ -289,6 +289,10 @@ fn collect_slugs(v: &Value, out: &mut Vec<String>) {
 /// meta tool that runs other tools is judged by the tools it would run,
 /// and refused when it names none.
 pub fn blocked(name: &str, args: &Value) -> Option<String> {
+    // Built-in tools enforce their own approval rules; they are not Composio actions.
+    if crate::ask_tools::is_own(name) {
+        return None;
+    }
     let upper = name.to_ascii_uppercase();
     let runs_others = upper.contains("EXECUTE") && !upper.contains("BASH");
     if runs_others {
@@ -454,6 +458,9 @@ impl ToolRunner for Runner {
             log_call(&self.app, name, !out.starts_with("Error:"), &out);
             return out;
         }
+        if let Some(out) = crate::ask_tools::run(&self.app, &self.chat_id, name, arguments).await {
+            return out;
+        }
         if let Some(what) = blocked(name, arguments) {
             // A change in an app: prepared as a button, run on the user's tap.
             log_call(&self.app, name, true, "prepared for a tap");
@@ -461,9 +468,6 @@ impl ToolRunner for Runner {
                 return format!("Error: {what}; name the tool to run.");
             }
             return crate::act::offer_app_change(&self.app, &self.chat_id, name, arguments);
-        }
-        if let Some(out) = crate::ask_tools::run(&self.app, &self.chat_id, name, arguments).await {
-            return out;
         }
         let Some(client) = &self.client else {
             return format!("Error: there is no tool called {name}.");
@@ -1219,6 +1223,17 @@ pub async fn connect_app(app: &AppHandle, slug: &str) -> Result<(), String> {
 mod tests {
     use super::*;
     use serde_json::json;
+
+    #[test]
+    fn built_in_run_is_not_a_composio_action() {
+        assert_eq!(blocked("run", &json!({ "command": "Get-Process" })), None);
+        assert!(blocked("GITHUB_RUN_WORKFLOW", &json!({})).is_some());
+        assert!(crate::ask_tools::is_safe("Get-Process"));
+        assert!(
+            crate::ask_tools::run_command(&json!({ "command": "Get-Process | Sort-Object CPU" }))
+                .contains("propose run_command")
+        );
+    }
 
     #[test]
     fn tells_reads_from_writes() {

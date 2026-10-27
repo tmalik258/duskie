@@ -5,7 +5,7 @@
 
 import { Ic } from "../icon";
 import { Tip } from "../tip";
-import { fromPick, parents } from "./context";
+import { contextLabel, fromPick } from "./context";
 import { Thumb } from "./image-view";
 import { previewOf } from "./save-file";
 
@@ -26,7 +26,7 @@ export function MessageText({ text }: { text: string }) {
       continue;
     }
     parts.push(
-      <Tip key={m.index} label={parents(path)} className="inline-flex min-w-0 align-middle">
+      <Tip key={m.index} label={contextLabel(item)} className="inline-flex min-w-0 align-middle">
         <span className="ak-att ak-att-sent">
           <Ic name={item.folder ? "folder" : "file"} size={11} />
           <span className="truncate">{item.name}</span>

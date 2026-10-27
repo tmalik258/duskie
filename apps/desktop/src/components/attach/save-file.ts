@@ -1,7 +1,9 @@
 // Saves one pasted, dropped or picked file where Duskie can read it.
 // Images are saved as PNG, the format every vision model here takes.
 
-import { api } from "@/lib/bridge";
+import { convertFileSrc } from "@tauri-apps/api/core";
+import { api, isTauri } from "@/lib/bridge";
+import { isUpload } from "./context";
 
 export interface Attachment {
   name: string;
@@ -27,7 +29,8 @@ async function asPng(f: File): Promise<Blob> {
 
 /** Thumbnails by saved path, so sent messages can show them too. */
 const previews = new Map<string, string>();
-export const previewOf = (path: string) => previews.get(path) ?? null;
+export const previewOf = (path: string) =>
+  previews.get(path) ?? (isTauri() && isUpload(path) && /\.png$/i.test(path) ? convertFileSrc(path) : null);
 
 export async function saveFile(f: File): Promise<Attachment> {
   if (f.size > MAX_BYTES) throw new Error(`${f.name} is over 20 MB`);

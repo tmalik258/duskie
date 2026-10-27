@@ -44,7 +44,9 @@ export function SessionHeader({
         {s.usage && s.usage.window > 0 && <ContextRing used={s.usage.used} window={s.usage.window} />}
         <span className="ag-acts">
           <SessionMemory id={s.id} live={active && s.status !== "ended" && s.status !== "failed" && !s.restored} />
-          {s.changes > 0 && <HeaderButton tip="Diff (Alt 1)" label="Diff" icon="diff" size={14} onClick={onReview} />}
+          {s.changes > 0 && (
+            <HeaderButton tip="Diff (Alt 1)" label="Diff" icon="diff" size={14} pressed={s.view?.reviewing ?? false} onClick={onReview} />
+          )}
           <HeaderButton
             tip="Continue in a terminal (Alt 2)"
             label="Continue in a terminal"
@@ -79,6 +81,7 @@ function HeaderButton({
   icon,
   size = 13,
   danger,
+  pressed,
   onClick,
 }: {
   tip: string;
@@ -86,11 +89,12 @@ function HeaderButton({
   icon: IcName;
   size?: number;
   danger?: boolean;
+  pressed?: boolean;
   onClick: () => void;
 }) {
   return (
     <Tip label={tip}>
-      <button type="button" aria-label={label} onClick={onClick} className={`ak-ibtn chip${danger ? " danger" : ""}`}>
+      <button type="button" aria-label={label} aria-pressed={pressed} onClick={onClick} className={`ak-ibtn chip${danger ? " danger" : ""}`}>
         <Ic name={icon} size={size} />
       </button>
     </Tip>

@@ -6,7 +6,7 @@ import { useEffect, useRef } from "react";
 import { api } from "@/lib/bridge";
 import { Ic } from "../icon";
 import { Tip } from "../tip";
-import { type ContextItem, parents } from "./context";
+import { type ContextItem, contextLabel } from "./context";
 import { Thumb } from "./image-view";
 
 export function AttachButton({ onFiles }: { onFiles: (files: File[]) => void }) {
@@ -65,7 +65,7 @@ export function ContextChips({
   return (
     <div className="ak-attachments">
       {items.map((i) => (
-        <Tip key={i.path} label={parents(i.path)} className="inline-flex min-w-0">
+        <Tip key={i.path} label={contextLabel(i)} className="inline-flex min-w-0">
           <span className="ak-att">
             {i.url ? <Thumb url={i.url} name={i.name} /> : <Ic name={i.folder ? "folder" : "file"} size={12} />}
             <span className="truncate">{i.name}</span>
