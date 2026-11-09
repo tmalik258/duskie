@@ -4,28 +4,56 @@ All notable changes to Duskie are listed here. The format follows [Keep a Change
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-11-09
+
 ### Look and feel
 
-- The new island look is now on by default. Settings > Appearance turns it off for one more release.
+- Duskie is the new name. Existing Sidekick installs keep their settings, history, skills, voice models and work log: the old folders move into the Duskie folders on first start, the database is renamed, and the browser extension's old folder keeps working.
+- The new island look is the look now: compact pills and cards for suggestions, meetings, agents, updates and offline, with a word by word label morph.
 - The editor and terminal use Duskie's own colours, glass panels and tabs.
-- Duskie, a small furry creature, replaces the orb. The island grows into compact pills and cards for suggestions, meetings, agents, updates and offline, with a word by word label morph.
-- Settings have a grouped sidebar; the welcome and setup guide are cards with one step at a time.
+- Duskie, a small furry creature, replaces the orb. It has its own life sounds: a yawn, a doze, a head shake, tape and a startle.
+- Ask, Agents, Git and Settings open and close with their own soft sounds. Duskie plays them itself, so they follow your speaker and the mixer shows one Duskie.
+- Settings have a grouped sidebar with a title and a line per section; the welcome and setup guide are cards with one step at a time.
 - The island turns solid when Windows transparency is off or reduced transparency is asked for.
+- The file picker opens above the island, and empty space beside the Git dock lets clicks through.
 
 ### Notifications and mail
 
 - Notifications are scored and only the ones that matter get loud. A shared budget stops bursts, and Focus holds everything for later.
-- Gmail and any IMAP server: mail that needs you shows in the island. Composio Gmail fills in until Gmail is connected directly.
-- Settings show your notification profile and what Duskie learned from your choices.
+- Gmail and any IMAP server: mail that needs you shows in the island. Composio Gmail fills in until Gmail is connected directly. Mail now lives in Settings > Apps; what Duskie learned about your senders stays in Settings > Notifications.
+- Settings show your notification profile and what Duskie learned from your choices, with a level per sender, Undo after Show less, a preview of the notification sound, and when mail was last checked.
+
+### Activities and downloads
+
+- Downloads fill the pill's edge ring with real progress and show the time left. A finished file shows as done, a deleted one as cancelled, and a job is never stuck on progress unconfirmed.
+- The Activities card lists background work with real progress, a Show glance button, a download icon for byte jobs, Unpacking once all bytes are in, and Stop.
+- The update card says what is new and how big, from the first line of the release notes.
 
 ### Ask and agents
 
 - Claude Code and Codex questions show as option cards; plans say which steps can be undone.
 - Agent card on hover, agent ring next to a busy pill, Pause for an agent, and a card listing background work with Stop.
+- Ask shows what it is doing the moment you ask, picks tools by intent, and checks before it answers.
+- Ask can compare two apps, read an app's version, updates and logs, diagnose why something is not working, list ports and busy processes, and run read-only commands as a button you tap.
+- Duskie help answers from the bundled docs: where a setting lives, and for crashes or errors, the health report and a likely fix.
+- Agents have One and Board views, queue new sessions past four, and remember the agent, model and effort per project.
+- Try mode runs an agent on a throwaway copy, then Keep brings the changes over or Throw away deletes them.
+- Attach files and images by paste, drop or the paperclip, and @ mentions project files and folders. Pasted images reach Claude Code and Codex as pictures.
+- Review shows only the agent's own changes, with a file tree, one change at a time (Y and N), J and K to move, Unified or Split, C to comment to the agent, Accept all remaining and Finish.
+- Debug mode adds temporary logs, reproduces the bug, fixes the cause and removes the logs, with a panel of the probes and what they logged.
+- The local agent can be picked from the models on this PC, and says when a model answered without changing files.
+- Every session works in your own project folder; worktrees are gone.
+- A suggestion card waits while Duskie reads it and while it listens for your answer. You can answer by voice while Duskie is still talking, and the dismiss countdown pauses while the mic waits. The timer starts after the speech, only the headline is read, and details are read on hover.
+- Ask history can delete a past chat or clear all chats, and the Live filter shows spoken conversations.
 
 ### Voice
 
-- Live answers (Settings > AI > Voice, off by default): Duskie starts answering when you pause, and the answer shows as a caption in the island with the step it is on and a Stop button. Ask stays closed. Live conversations stay in Ask history as text unless you turn that off.
+- Live answers are always on: Duskie starts answering when you pause, and the answer shows as a caption in the island with the step it is on and a Stop button. Ask stays closed. Live conversations stay in Ask history as text unless you turn that off.
+- Captions show a few words at a time as they are spoken.
+- The name alone is the wake word. "Hey", "hi" and "ok" are gone. Duskie accepts its name anywhere in the wake window and logs each wake and drop.
+- Teach Duskie your voice: say its name five times and read three short lines. It learns how firmly to listen and, with Only answer my voice, drops questions in other voices. Recordings stay in memory and are dropped; only the learned numbers are kept, Forget removes them, and the newest 12 samples are kept.
+- A setting for how long Duskie waits for your reply after an answer. In the compact island it keeps listening and ends on "that's all".
+- The voice follows the default speaker.
 - Ask can uninstall an app: you pick it on screen, and the app's own uninstaller opens. Nothing is removed silently.
 - Ask knows its way around Duskie: it says where a setting is, and for crashes or errors it reads the health report and suggests a fix.
 - Spoken choices cannot pick an option that deletes or closes; those need a tap.
@@ -36,6 +64,7 @@ All notable changes to Duskie are listed here. The format follows [Keep a Change
 ### Git and editor
 
 - Git dock: checkbox staging, commit message writer, amend, History, Pull request and Stashes, side by side with the island (Ctrl G).
+- Pull and Push light up only when there is something to move; with both, one Sync button pulls then pushes, and a new branch offers Publish. A pull that hits conflicts opens a Merge tab: pick yours, theirs or both for each file, then Finish or Undo.
 - Full screen editor: file tree, tabs, change markers against the last commit, quick open, project search and a terminal. File access stays inside the project, and a file changed on disk is never overwritten without asking.
 
 ### Connections and AI
@@ -44,16 +73,23 @@ All notable changes to Duskie are listed here. The format follows [Keep a Change
 - OpenAI and xAI Grok as cloud providers.
 - A notice when the graphics card is too small for local chat.
 - Shared cache and rate limits with retries; a provider that keeps failing pauses for a minute and the usage popover says so. Anthropic prompt caching.
+- Help answers include Duskie's live state: version and update, providers, voice and recent log errors.
 
 ### Skills
 
-- One skills library for Claude Code, Codex and the local model, with per tool switches and sync. Copies you changed by hand are left alone, and anything replaced is backed up.
+- One skills library for Claude Code, Codex, Cursor and the local model, with per tool switches and sync. Copies you changed by hand are left alone, and anything replaced is backed up.
 - Add a skill from a GitHub folder link, pinned to a commit, and update it later. Duskie says once when a new skill appears.
+
+### Shortcuts
+
+- Ask is Win+Alt+Space, Agents Win+Ctrl+Alt+Space, Git Ctrl+Alt+G and Talk Ctrl+Alt+T. Defaults you never changed move once; a shortcut you set yourself is kept.
 
 ### Accessibility and quality
 
 - Accessibility audit (axe) in CI; contrast fixes in Git and editor.
 - No em dashes in UI text or docs, checked by a test.
+- Ask has a 93 case eval with a cloud model harness, and a 100 prompt tool choice eval against the default local model.
+- The speed check fails if the island loads the editor.
 
 ## [0.2.2] - 2026-10-14
 
@@ -320,7 +356,8 @@ The first public release.
 - Update checks once a day. A small sign on the island shows a waiting update; installs are checked against SHA256SUMS.txt and only run after your click.
 - History with Undo for files Sidekick creates (24 hours).
 
-[Unreleased]: https://github.com/tmalik258/duskie/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/tmalik258/duskie/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/tmalik258/duskie/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/tmalik258/duskie/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/tmalik258/duskie/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/tmalik258/duskie/compare/v0.1.0...v0.2.0

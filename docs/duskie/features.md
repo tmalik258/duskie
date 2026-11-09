@@ -26,7 +26,7 @@ switch skills on or off, or set them to Auto. Destructive actions always ask.
 
 ## Your own skills
 
-drop YAML files into the folder shown in Settings > Found on this PC (format in `skills/README.md`).
+drop YAML files into Duskie's skills folder (format in `skills/README.md`), or add one from a GitHub link in Settings > Skills > Library.
 
 ## Press Win+Alt+Space
 
@@ -38,11 +38,11 @@ The island offers Explain and fix, which asks AI with the error attached.
 
 ## Claude Code sessions
 
-add the hook from Settings > AI and the island tells you when a session finishes or is waiting for you.
+add the hook from Settings > Apps and the island tells you when a session finishes or is waiting for you.
 
 ## Undo
 
-files Duskie creates (conversions, extracted folders) can be sent to the Recycle Bin from the island or Settings > History for 24 hours.
+files Duskie creates (conversions, extracted folders) can be sent to the Recycle Bin from the island or Settings > General > History for 24 hours.
 
 ## Low disk or memory
 
@@ -54,7 +54,7 @@ for 5 minutes and suggestions wait for you instead of expiring unseen.
 
 ## Browser
 
-press Install next to your browser in Settings > Connections; Duskie opens the extensions page with the folder path copied, and the extension pairs on its own. Too many tabs offer cleanup, Upwork jobs offer a proposal draft.
+press Install next to your browser in Settings > Apps; Duskie opens the extensions page with the folder path copied, and the extension pairs on its own. Too many tabs offer cleanup, Upwork jobs offer a proposal draft.
 
 ## Screenshots
 
@@ -62,11 +62,11 @@ press Install next to your browser in Settings > Connections; Duskie opens the e
 
 ## Search my stuff
 
-type in Ask mode and pick Search. Pick folders under Settings > Privacy and data. With Ollama running, `ollama pull nomic-embed-text` adds search by meaning (embeddings stay on this PC).
+type in Ask mode and pick Search. Pick folders under Settings > Privacy. With Ollama running, `ollama pull nomic-embed-text` adds search by meaning (embeddings stay on this PC).
 
 ## Claude Code can use Duskie
 
-through MCP: press Add for me in Settings > Connections.
+through MCP: press Add for me in Settings > Apps.
 
 ## What's on my screen?
 
@@ -74,7 +74,7 @@ pick it in Ask mode, or turn on the Screenshot chip to send one with your next q
 
 ## Voice
 
-on by default (Settings > AI > Voice; about 690 MB of speech models download once). Say "Duskie" and your question; the island shows your words as you speak, a final pass with Parakeet writes the question you asked, and the answer is read aloud with Supertonic (10 voices to pick from in Settings > AI > Voice). Talking over an answer stops it, and after an answer you can reply without the wake word. Suggestions are read out too, and you can answer them by voice ("the first one", "not now"). There is a mic button in Ask mode for push to talk.
+on by default (Settings > Voice; about 690 MB of speech models download once). Say "Duskie" and your question; the island shows your words as you speak, a final pass with Parakeet writes the question you asked, and the answer is read aloud with Supertonic (10 voices to pick from in Settings > Voice). Live answers start when you pause, with captions that show a few words at a time. Talking over an answer stops it, and after an answer you can reply without the wake word. Suggestions are read out too, and you can answer them by voice ("the first one", "not now"). Teach Duskie your voice in Settings > Voice. There is a mic button in Ask mode for push to talk.
 
 ## Settings
 
@@ -82,7 +82,7 @@ open inside the island (tray, the island's Settings button, or "Open settings" i
 
 ## Meetings
 
-connect Composio in Settings > Connections, then Google Calendar or Outlook. A few minutes before a meeting the island offers Join call and Prep with AI; afterwards it offers to draft the follow-up from your Fathom notes (connect Fathom too). Suggestions wait quietly while you are in a meeting.
+connect Composio in Settings > Apps, then Google Calendar or Outlook. A few minutes before a meeting the island offers Join call and Prep with AI; afterwards it offers to draft the follow-up from your Fathom notes (connect Fathom too). Suggestions wait quietly while you are in a meeting.
 
 ## Morning brief
 
@@ -98,7 +98,7 @@ three Not nows in a row quiet a skill for a while; **Always do this** on a sugge
 
 ## Mail
 
-connect Gmail (or any IMAP server under Advanced) and mail that needs you shows up in the island, quiet by default and louder only for what matters. Settings > Notifications shows what Duskie has learned about your senders.
+connect Gmail (or any IMAP server under Advanced) in Settings > Apps, and mail that needs you shows up in the island, quiet by default and louder only for what matters. Settings > Notifications shows what Duskie has learned about your senders.
 
 ## Git dock
 
@@ -107,6 +107,10 @@ connect Gmail (or any IMAP server under Advanced) and mail that needs you shows 
 ## Teach Duskie your voice
 
 (Settings > Voice): say its name five times and read three short lines. Duskie learns how firmly to listen for your "Duskie" and, if you turn on "Only answer my voice", drops questions in other voices. The recordings stay in memory and are dropped; only the learned numbers are kept, and Forget removes them. Add samples reads the lines again to sharpen it; the newest 12 takes are kept.
+
+## Agents
+
+open Agents (Win+Ctrl+Alt+Space) and pick a project. One and Board views run up to four sessions, Try mode works on a throwaway copy, and files or images can be pasted, dropped or attached with the paperclip. Review keeps or undoes each change the agent made.
 
 ## Debug mode
 
@@ -118,12 +122,12 @@ Full screen in the Git dock opens the project in an editor with a file tree, cha
 
 ## Skills library
 
-(Settings > Skills > Library): skills from Claude Code and Codex in one place, written back to each tool you switch on, and readable by the local model. Add one from a GitHub link; it is pinned to a commit. Nothing in a skill runs when you add or sync it.
+(Settings > Skills > Library): skills from Claude Code, Codex and Cursor in one place, written back to each tool you switch on, and readable by the local model. Add one from a GitHub link; it is pinned to a commit. Nothing in a skill runs when you add or sync it.
 
 ## Apps over MCP
 
-add a server you run on this PC, or sign in to one online, in Settings > Connections. Tools from a direct server win over the same app through Composio, and Ask shows which one answered.
+add a server you run on this PC, or sign in to one online, in Settings > Apps. Tools from a direct server win over the same app through Composio, and Ask shows which one answered.
 
 ## Shortcuts
 
-for Talk, Accept, Not now, Ask about the screen, Clipboard history, Pause and Settings. Record your own in Settings > Home > Shortcuts.
+for Agents, Git, Talk, Accept, Not now, Ask about the screen, Clipboard history, Pause and Settings. Record your own in Settings > Shortcuts.

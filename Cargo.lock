@@ -1520,7 +1520,7 @@ checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
 name = "duskie-actions"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "arboard",
  "clipboard-win",
@@ -1542,7 +1542,7 @@ dependencies = [
 
 [[package]]
 name = "duskie-ai"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -1559,11 +1559,11 @@ dependencies = [
 
 [[package]]
 name = "duskie-calc"
-version = "0.2.2"
+version = "0.3.0"
 
 [[package]]
 name = "duskie-core"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "log",
@@ -1577,7 +1577,7 @@ dependencies = [
 
 [[package]]
 name = "duskie-desktop"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "active-win-pos-rs",
  "arboard",
@@ -1624,7 +1624,7 @@ dependencies = [
 
 [[package]]
 name = "duskie-layout"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "serde",
  "windows-sys 0.61.2",
@@ -1632,7 +1632,7 @@ dependencies = [
 
 [[package]]
 name = "duskie-sensors"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "active-win-pos-rs",
  "arboard",
@@ -1658,7 +1658,7 @@ dependencies = [
 
 [[package]]
 name = "duskie-skills"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "duskie-core",
  "log",
@@ -1671,7 +1671,7 @@ dependencies = [
 
 [[package]]
 name = "duskie-voice"
-version = "0.2.2"
+version = "0.3.0"
 dependencies = [
  "bzip2 0.4.4",
  "cpal",
@@ -2550,6 +2550,12 @@ dependencies = [
  "http-body",
  "pin-project-lite",
 ]
+
+[[package]]
+name = "http-range"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2149c4b4b83390c71fab669730347d578ec6bdf759f2160c581ad8b8819733b4"
 
 [[package]]
 name = "httparse"
@@ -5893,6 +5899,7 @@ dependencies = [
  "gtk",
  "heck 0.5.0",
  "http",
+ "http-range",
  "jni",
  "libc",
  "log",

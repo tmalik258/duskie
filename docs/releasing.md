@@ -18,8 +18,8 @@ DUSKIE_EVAL_MODEL=qwen3:4b cargo test -p duskie-desktop eval -- --ignored --noca
 4. Commit, then tag and push:
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+git tag v0.3.0
+git push origin v0.3.0
 ```
 
 5. The Release workflow builds the NSIS and MSI installers on Windows and attaches them to a draft release with generated notes. Review the draft on GitHub and publish it.
