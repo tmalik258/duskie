@@ -45,7 +45,14 @@ export function SessionHeader({
         <span className="ag-acts">
           <SessionMemory id={s.id} live={active && s.status !== "ended" && s.status !== "failed" && !s.restored} />
           {s.changes > 0 && (
-            <HeaderButton tip="Diff (Alt 1)" label="Diff" icon="diff" size={14} pressed={s.view?.reviewing ?? false} onClick={onReview} />
+            <HeaderButton
+              tip="Diff (Alt 1)"
+              label="Diff"
+              icon="diff"
+              size={14}
+              pressed={s.view?.reviewing ?? false}
+              onClick={onReview}
+            />
           )}
           <HeaderButton
             tip="Continue in a terminal (Alt 2)"
@@ -94,7 +101,13 @@ function HeaderButton({
 }) {
   return (
     <Tip label={tip}>
-      <button type="button" aria-label={label} aria-pressed={pressed} onClick={onClick} className={`ak-ibtn chip${danger ? " danger" : ""}`}>
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={pressed}
+        onClick={onClick}
+        className={`ak-ibtn chip${danger ? " danger" : ""}`}
+      >
         <Ic name={icon} size={size} />
       </button>
     </Tip>

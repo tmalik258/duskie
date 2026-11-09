@@ -35,7 +35,7 @@ Duskie lives in a small island at the top of your screen, with Duskie, a small f
 
 Released November 9, 2026. See the [full changelog](CHANGELOG.md#030---2026-11-09) for everything since v0.2.2.
 
-- **The new look:** Duskie is the new name (formerly Sidekick, and your data moves over), the creature replaces the orb, the island is compact pills and cards, and Settings has a grouped sidebar.
+- **The new look:** Duskie is the new name and your existing data moves over, the creature replaces the orb, the island is compact pills and cards, and Settings has a grouped sidebar.
 - **Notifications and mail:** scored notifications, Gmail or any IMAP server, and a profile that learns which senders matter.
 - **Live voice:** Duskie answers by voice when you pause, with word by word captions. The name alone wakes it, and you can teach it your voice.
 - **Git dock and editor:** stage, commit, sync and resolve pull conflicts beside the island, or open a full screen editor with a terminal.

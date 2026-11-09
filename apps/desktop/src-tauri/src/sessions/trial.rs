@@ -189,6 +189,12 @@ mod tests {
         git_ok(dir, args).unwrap();
     }
 
+    /// Git on Windows checks text files out with CRLF; compare the lines,
+    /// not the platform's line ending.
+    fn text(path: &Path) -> String {
+        std::fs::read_to_string(path).unwrap().replace("\r\n", "\n")
+    }
+
     #[test]
     fn keep_brings_changes_over_and_throw_away_leaves_code_alone() {
         let root = std::env::temp_dir().join(format!("duskie-try-test-{}", ulid::Ulid::new()));
@@ -204,10 +210,7 @@ mod tests {
         std::fs::write(repo.join("a.txt"), "mine\n").unwrap();
 
         let (dir, _) = make(&repo, "try it", "01TRYA").unwrap();
-        assert_eq!(
-            std::fs::read_to_string(dir.join("a.txt")).unwrap(),
-            "mine\n"
-        );
+        assert_eq!(text(&dir.join("a.txt")), "mine\n");
         std::fs::write(dir.join("b.txt"), "agent\n").unwrap();
         discard_trial("01TRYA").unwrap();
         assert!(!dir.exists());
@@ -216,14 +219,8 @@ mod tests {
         let (dir, _) = make(&repo, "try it", "01TRYB").unwrap();
         std::fs::write(dir.join("b.txt"), "agent\n").unwrap();
         keep_trial("01TRYB").unwrap();
-        assert_eq!(
-            std::fs::read_to_string(repo.join("b.txt")).unwrap(),
-            "agent\n"
-        );
-        assert_eq!(
-            std::fs::read_to_string(repo.join("a.txt")).unwrap(),
-            "mine\n"
-        );
+        assert_eq!(text(&repo.join("b.txt")), "agent\n");
+        assert_eq!(text(&repo.join("a.txt")), "mine\n");
         assert!(!dir.exists());
         let _ = std::fs::remove_dir_all(&root);
     }
