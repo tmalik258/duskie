@@ -1150,6 +1150,11 @@ commands.setup_apply = () => {
 };
 commands.claude_add_hooks = () => "C:/Users/you/.claude/settings.json.sidekick-backup-20261002-101500";
 commands.claude_add_mcp = () => undefined;
+// Accepts any command with a name; the real check also looks for it on PATH.
+commands.mcp_validate_stdio = (a) => {
+  const spec = a.spec as { command?: string } | undefined;
+  if (!spec?.command?.trim()) throw new Error("Enter a command to run.");
+};
 const browsersSeen = new Set<string>(["chrome"]);
 commands.browsers_status = () => [
   { id: "chrome", name: "Chrome", connected: browsersSeen.has("chrome") },
