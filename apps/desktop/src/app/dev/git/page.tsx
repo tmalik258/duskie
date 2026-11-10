@@ -2,7 +2,7 @@
 
 // Development page: the Git dock against the browser mock.
 
-import { GitDock } from "@/components/agents/GitDock";
+import { GitDock } from "@/components/agents/git-dock";
 
 export default function GitDockDev() {
   return (
