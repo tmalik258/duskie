@@ -3,7 +3,7 @@
 //! option five times in a row offers to make the skill automatic, once,
 //! and only when that option is safe to run on its own.
 
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Utc};
 use duskie_core::Habit;
 use duskie_skills::{Proposal, ProposedOption, Trust};
 use serde_json::json;
@@ -11,7 +11,6 @@ use tauri::{AppHandle, Manager};
 
 use crate::state::{AppState, lock};
 
-const DISMISSALS_TO_MUTE: i64 = 3;
 /// Skipped this many times in one context, never taken there: it waits in
 /// the list there instead of interrupting.
 const SKIPS_TO_QUIET_HERE: u32 = 3;
@@ -58,7 +57,6 @@ fn quiet_from(counts: &std::collections::HashMap<String, u32>) -> bool {
     counts.get("skipped").copied().unwrap_or(0) >= SKIPS_TO_QUIET_HERE
         && counts.get("taken").copied().unwrap_or(0) == 0
 }
-const MUTE_FOR: Duration = Duration::hours(24);
 const ACCEPTS_TO_OFFER: i64 = 5;
 pub const OFFER_SKILL: &str = "learn.offer-auto";
 
@@ -69,12 +67,21 @@ pub fn tracked(skill_id: &str) -> bool {
         && !skill_id.starts_with("debug.")
         // Notifications learn per app instead (inbox.rs).
         && !skill_id.starts_with("notify.")
-        // Screenshots and copied links always interrupt; no mute, no score line.
+        // Always-interrupt / self / setup / ephemeral pings: no mute, no score line.
         && !ALWAYS_SUGGEST.contains(&skill_id)
 }
 
 /// Always show these: no dismiss-streak mute, no "you skipped N of M" score.
-const ALWAYS_SUGGEST: &[&str] = &["files.screenshot", "clipboard.open-url"];
+const ALWAYS_SUGGEST: &[&str] = &[
+    "files.screenshot",
+    "clipboard.open-url",
+    "system.back",
+    "dev.open-in-browser",
+    "system.update",
+    "system.health",
+    "browser.pair",
+    "recipes.offer",
+];
 
 /// Skills never offered as automatic: each time needs its own choice.
 /// A screenshot is already on the clipboard, so "always copy" adds nothing.
@@ -109,29 +116,6 @@ pub fn is_muted(app: &AppHandle, skill_id: &str) -> bool {
         .and_then(|h| h.muted_until)
         .and_then(|t| DateTime::parse_from_rfc3339(&t).ok())
         .is_some_and(|until| until > Utc::now())
-}
-
-/// The user said "Not now" (a timeout is not a judgement).
-pub fn on_dismiss(app: &AppHandle, skill_id: &str, reason: &str) {
-    if !crate::learned::on(app) {
-        return;
-    }
-    if reason != "user" || !tracked(skill_id) {
-        return;
-    }
-    note_context(app, skill_id, "skipped");
-    let Some(mut h) = load(app, skill_id) else {
-        return;
-    };
-    h.dismiss_streak += 1;
-    h.dismissed += 1;
-    h.accept_streak = 0;
-    if h.dismiss_streak >= DISMISSALS_TO_MUTE {
-        h.dismiss_streak = 0;
-        h.muted_until = Some((Utc::now() + MUTE_FOR).to_rfc3339());
-        log::info!("{skill_id} dismissed {DISMISSALS_TO_MUTE} times in a row; quiet for a day");
-    }
-    save(app, &h);
 }
 
 /// The user picked an option. Returns an offer to make the skill automatic
@@ -201,6 +185,8 @@ fn offer_auto(skill_id: &str, label: &str) -> Proposal {
         trust: Trust::Suggest,
         remember: None,
         priority: 60,
+        compact: false,
+        silent: false,
     }
 }
 
@@ -224,8 +210,17 @@ mod tests {
         assert!(!tracked(OFFER_SKILL));
         assert!(!tracked("files.screenshot"));
         assert!(!tracked("clipboard.open-url"));
+        assert!(!tracked("system.back"));
+        assert!(!tracked("dev.open-in-browser"));
+        assert!(!tracked("system.update"));
+        assert!(!tracked("system.health"));
+        assert!(!tracked("browser.pair"));
+        assert!(!tracked("recipes.offer"));
         assert!(!can_automate("files.screenshot"));
+        assert!(!can_automate("system.back"));
+        assert!(!can_automate("dev.open-in-browser"));
         assert!(can_automate("files.download"));
+        assert!(tracked("dev.port-conflict"));
         assert!(!tracked("mcp.notify"));
     }
 

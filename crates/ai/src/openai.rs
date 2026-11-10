@@ -25,7 +25,7 @@ pub struct OpenAiCompat {
 }
 
 /// Cloud providers with an OpenAI-compatible API: (id, base URL, default model).
-pub const CLOUD: [(&str, &str, &str); 3] = [
+pub const CLOUD: [(&str, &str, &str); 5] = [
     (
         "gemini",
         "https://generativelanguage.googleapis.com/v1beta/openai",
@@ -41,6 +41,8 @@ pub const CLOUD: [(&str, &str, &str); 3] = [
         "https://openrouter.ai/api/v1",
         "openrouter/auto",
     ),
+    ("openai", "https://api.openai.com/v1", "gpt-5-mini"),
+    ("xai", "https://api.x.ai/v1", "grok-4-fast"),
 ];
 
 /// Cloud models take far longer prompts than a laptop's local model.
@@ -160,8 +162,23 @@ impl OpenAiCompat {
             .max(2_000)
     }
 
-    /// Models the server offers, or None when it is not reachable.
+    /// Models the server offers, or None when it is not reachable. Kept for
+    /// a minute per server; callers asking at once share one request.
     pub async fn models(&self) -> Option<Vec<String>> {
+        static MODELS: std::sync::LazyLock<crate::cache::Cache<Vec<String>>> =
+            std::sync::LazyLock::new(|| crate::cache::Cache::new(Duration::from_secs(60)));
+        MODELS
+            .get_or_fetch(&self.base_url, |_| async {
+                self.fetch_models()
+                    .await
+                    .map(|value| crate::cache::Fetched::Fresh { value, etag: None })
+                    .ok_or(())
+            })
+            .await
+            .ok()
+    }
+
+    async fn fetch_models(&self) -> Option<Vec<String>> {
         let resp = self
             .client
             .get(format!("{}/models", self.base_url))
@@ -183,6 +200,17 @@ impl OpenAiCompat {
                 })
                 .unwrap_or_default(),
         )
+    }
+
+    /// Sends a chat request; cloud providers go through the rate limiter,
+    /// a local server answers directly.
+    async fn post_chat(&self, body: &Value) -> Result<reqwest::Response, AiError> {
+        let url = format!("{}/chat/completions", self.base_url);
+        if self.keyed {
+            crate::limit::send(self.id, || self.client.post(&url).json(body)).await
+        } else {
+            Ok(self.client.post(&url).json(body).send().await?)
+        }
     }
 
     pub async fn pick_model(&self) -> Result<String, AiError> {
@@ -231,12 +259,7 @@ impl OpenAiCompat {
         if let (Some(b), Some(e)) = (body.as_object_mut(), extra.as_object()) {
             b.extend(e.clone());
         }
-        let resp = self
-            .client
-            .post(format!("{}/chat/completions", self.base_url))
-            .json(&body)
-            .send()
-            .await?;
+        let resp = self.post_chat(&body).await?;
         let v: Value = sse::check(resp).await?.json().await?;
         Ok(v["choices"][0]["message"]["content"]
             .as_str()
@@ -787,14 +810,9 @@ impl OpenAiCompat {
         gap: &str,
         cancel: &CancellationToken,
     ) -> Result<Round, AiError> {
-        let send = self
-            .client
-            .post(format!("{}/chat/completions", self.base_url))
-            .json(body)
-            .send();
         let resp = tokio::select! {
             _ = cancel.cancelled() => return Err(AiError::Cancelled),
-            resp = send => resp?,
+            resp = self.post_chat(body) => resp?,
         };
         let resp = sse::check(resp).await?;
         let mut raw = String::new();

@@ -1,173 +1,157 @@
 "use client";
 
-// The Git dock: changed files with checkbox staging, one commit message
-// with a sparkle button that writes it from the staged diff, Commit, and
-// Amend. It shows exactly what will be committed.
+// The Git dock host: the bar, the tabs and the active pane. Full screen opens
+// the editor; Esc closes the dock (or an open menu first).
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/bridge";
-import { baseName, countChanges, groupByFolder } from "@/lib/changes";
-import type { GitFile } from "@/lib/types";
-import { Icon } from "../Icon";
-import { Tip } from "../Tip";
+import { fetchGitCached, gitCacheKey, invalidateGitPath, peekGitCache } from "@/lib/git-cache";
+import type { MergeState, RepoRow, StashRow } from "@/lib/types";
+import { Editor } from "./Editor";
+import { ChangesPane } from "./gitdock/ChangesPane";
+import { GitBar } from "./gitdock/GitBar";
+import { type GitTab, GitTabs } from "./gitdock/GitTabs";
+import { HistoryPane } from "./gitdock/HistoryPane";
+import { MergePane } from "./gitdock/MergePane";
+import { PrPane } from "./gitdock/PrPane";
+import { StashesPane } from "./gitdock/StashesPane";
 
-const KIND: Record<string, string> = {
-  M: "changed",
-  A: "added",
-  D: "deleted",
-  R: "renamed",
-  "?": "new",
-  U: "conflict",
-};
+export function GitDock({
+  path,
+  repo,
+  onClose,
+  repos,
+  onPickRepo,
+}: {
+  path: string;
+  repo?: RepoRow | null;
+  onClose: () => void;
+  repos?: RepoRow[];
+  onPickRepo?: (path: string) => void;
+}) {
+  const [tab, setTab] = useState<GitTab>("changes");
+  const stashKey = gitCacheKey("stashes", path);
+  const [stashes, setStashes] = useState<StashRow[]>(() => peekGitCache<StashRow[]>(stashKey) ?? []);
+  const [changed, setChanged] = useState(0);
+  const [full, setFull] = useState(false);
+  const [at, setAt] = useState<{ path: string; atChange?: boolean } | null>(null);
+  // Bumps when anything changed, so every pane reads git again.
+  const [rev, setRev] = useState(0);
+  const bump = useCallback(() => {
+    invalidateGitPath(path);
+    setRev((r) => r + 1);
+  }, [path]);
 
-export function GitDock({ path, onClose }: { path: string; onClose: () => void }) {
-  const [files, setFiles] = useState<GitFile[]>([]);
-  const [message, setMessage] = useState("");
-  const [note, setNote] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [warnAmend, setWarnAmend] = useState(false);
-
-  const refresh = useCallback(() => void api.gitStatus(path).then(setFiles), [path]);
-  useEffect(refresh, [refresh]);
-
-  // Esc closes the dock.
+  // Stashes load only when that tab is open - not on every Changes open.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rev means something changed, so read stashes again
   useEffect(() => {
+    if (tab !== "stashes") return;
+    const hit = peekGitCache<StashRow[]>(stashKey);
+    if (hit) setStashes(hit);
+    void fetchGitCached(stashKey, () => api.gitStashes(path))
+      .then(setStashes)
+      .catch(() => {});
+  }, [tab, path, rev, stashKey]);
+
+  // A pull that stopped on conflicts opens the Merge tab; it goes once solved.
+  const [merge, setMerge] = useState<MergeState | null>(null);
+  const hadMerge = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: rev means something changed, so read conflicts again
+  useEffect(() => {
+    let live = true;
+    void api
+      .mergeState(path)
+      .then((m) => {
+        if (!live) return;
+        const open = m.files.length > 0 ? m : null;
+        setMerge(open);
+        if (open && !hadMerge.current) setTab("merge");
+        if (!open) setTab((t) => (t === "merge" ? "changes" : t));
+        hadMerge.current = open !== null;
+      })
+      .catch(() => live && setMerge(null));
+    return () => {
+      live = false;
+    };
+  }, [path, rev]);
+
+  // Esc closes the dock; the editor and an open menu handle their own Esc.
+  useEffect(() => {
+    if (full) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape" && !document.querySelector("[data-gmenu]")) onClose();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, full]);
 
-  const counts = countChanges(files);
-  const act = async (work: () => Promise<string>) => {
-    setBusy(true);
-    setNote(null);
-    try {
-      setNote(await work());
-    } catch (e) {
-      setNote(String(e));
-    } finally {
-      setBusy(false);
-      refresh();
-    }
-  };
-  const toggle = (f: GitFile) =>
-    act(() => (f.staged && !f.unstaged ? api.gitUnstage(path, [f.path]) : api.gitStage(path, [f.path])));
-  const write = () =>
-    act(async () => {
-      const text = await api.gitWriteMessage(path);
-      setMessage(text);
-      return "Message written from the staged changes. Edit it if you like.";
-    });
-  const commit = () =>
-    act(async () => {
-      const done = await api.gitCommit(path, message);
-      setMessage("");
-      return done;
-    });
-  const amend = async () => {
-    // Amending a commit that is already on the remote needs a force push.
-    if (!warnAmend && (await api.gitLastCommitPushed(path))) {
-      setWarnAmend(true);
-      return;
-    }
-    setWarnAmend(false);
-    await act(() => api.gitAmend(path, message.trim() || undefined));
-  };
+  if (full) {
+    return (
+      <Editor
+        root={path}
+        initial={at}
+        onClose={() => {
+          setFull(false);
+          setAt(null);
+        }}
+      />
+    );
+  }
 
+  const branch = repo?.branch ?? "";
+  const pr = repo?.prs.find((p) => p.branch === branch) ?? null;
   return (
-    <section className="ak-body flex flex-col gap-2 text-[13px]" aria-label="Git changes">
-      <div className="flex items-center justify-between">
-        <span className="font-medium">
-          Changes{" "}
-          <span className="text-white/55">
-            {counts.staged} of {counts.total} staged
-          </span>
-        </span>
-        <button
-          type="button"
-          className="ak-chip chip"
-          disabled={busy || counts.total === 0}
-          onClick={() => void act(() => (counts.all ? api.gitUnstage(path, []) : api.gitStage(path, [])))}
-        >
-          {counts.all ? "Unstage all" : "Stage all"}
-        </button>
-      </div>
-
-      {files.length === 0 ? (
-        <p className="text-white/55">Nothing has changed.</p>
-      ) : (
-        groupByFolder(files).map((g) => (
-          <div key={g.folder}>
-            <p className="mono text-[11px] text-white/45">{g.folder}</p>
-            {g.files.map((f) => (
-              <label key={f.path} className="flex cursor-pointer items-center gap-2 py-0.5">
-                <input
-                  type="checkbox"
-                  checked={f.staged}
-                  disabled={busy || f.kind === "U"}
-                  onChange={() => void toggle(f)}
-                  aria-label={`Stage ${f.path}`}
-                />
-                <span className="min-w-0 flex-1 truncate">{baseName(f.path)}</span>
-                <span className="text-[11px] text-white/45">{KIND[f.kind] ?? f.kind}</span>
-              </label>
-            ))}
-          </div>
-        ))
-      )}
-
-      <div className="relative">
-        <textarea
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          rows={3}
-          aria-label="Commit message"
-          placeholder="Commit message"
-          className="w-full resize-none rounded-lg bg-white/[0.06] p-2 pr-9 outline-none focus-visible:outline-2 focus-visible:outline-(--accent)"
+    <section className="gd-dock-panel" aria-label="Git">
+      <div className="gwin">
+        <GitBar
+          path={path}
+          repo={repo}
+          repos={repos}
+          onPickRepo={onPickRepo}
+          rev={rev}
+          onChanged={bump}
+          onPr={() => setTab("pr")}
+          onFull={() => {
+            setAt(null);
+            setFull(true);
+          }}
+          onClose={onClose}
         />
-        <Tip label="Write it from the staged changes">
-          <button
-            type="button"
-            aria-label="Write the message"
-            disabled={busy || counts.total === 0}
-            onClick={() => void write()}
-            className="absolute top-1.5 right-1.5 grid size-6 place-items-center rounded-md hover:bg-white/10 disabled:opacity-40"
-          >
-            <Icon name="sparkle" size={14} />
-          </button>
-        </Tip>
+        <GitTabs
+          tab={tab}
+          onTab={setTab}
+          changes={changed}
+          stashes={stashes.length}
+          conflicts={merge?.files.length ?? 0}
+        />
+        {tab === "merge" && merge && (
+          <MergePane
+            path={path}
+            state={merge}
+            onChanged={bump}
+            onOpen={(file) => {
+              setAt({ path: file });
+              setFull(true);
+            }}
+          />
+        )}
+        {tab === "changes" && (
+          <ChangesPane
+            path={path}
+            branch={branch}
+            rev={rev}
+            onChanged={bump}
+            onCount={setChanged}
+            onOpen={(file) => {
+              setAt({ path: file, atChange: true });
+              setFull(true);
+            }}
+          />
+        )}
+        {tab === "history" && <HistoryPane path={path} branch={branch} rev={rev} />}
+        {tab === "pr" && <PrPane pr={pr} branch={branch || null} />}
+        {tab === "stashes" && <StashesPane path={path} stashes={stashes} reload={bump} />}
       </div>
-
-      {warnAmend && (
-        <p className="text-(--warn)" role="alert">
-          That commit is already on the remote. Amending it means a force push. Press Amend again to go on.
-        </p>
-      )}
-      <div className="ak-chips">
-        <button
-          type="button"
-          className="ak-chip primary chip"
-          disabled={busy || counts.staged === 0 || message.trim() === ""}
-          onClick={() => void commit()}
-        >
-          Commit
-        </button>
-        <button
-          type="button"
-          className="ak-chip chip"
-          disabled={busy || counts.staged === 0}
-          onClick={() => void amend()}
-        >
-          Amend last commit
-        </button>
-      </div>
-      {note && (
-        <p className="text-white/60" role="status">
-          {note}
-        </p>
-      )}
     </section>
   );
 }

@@ -19,7 +19,17 @@ import { ComposioApps } from "./ComposioApps";
 import { DirectMcpCard } from "./DirectMcp";
 import { Button, CopyButton, Field, Section, Select, type SelectOption, TextField, Toggle } from "./ui";
 
-export function ConnectionsTab({ onError }: { onError: (e: string) => void }) {
+export function ConnectionsTab({ onError, part }: { onError: (e: string) => void; part?: "apps" | "code" }) {
+  if (part === "code")
+    return (
+      <Section
+        title="Code editor"
+        hint="Buttons say its name, like Open in Cursor."
+        keywords="editor ide vs code vscode cursor antigravity windsurf zed pycharm intellij webstorm visual studio open project"
+      >
+        <EditorPicker onError={onError} />
+      </Section>
+    );
   return (
     <>
       <DirectMcpCard onError={onError} />
@@ -36,13 +46,15 @@ export function ConnectionsTab({ onError }: { onError: (e: string) => void }) {
       >
         <BrowserCard />
       </Section>
-      <Section
-        title="Code editor"
-        hint="Buttons say its name, like Open in Cursor."
-        keywords="editor ide vs code vscode cursor antigravity windsurf zed pycharm intellij webstorm visual studio open project"
-      >
-        <EditorPicker onError={onError} />
-      </Section>
+      {!part && (
+        <Section
+          title="Code editor"
+          hint="Buttons say its name, like Open in Cursor."
+          keywords="editor ide vs code vscode cursor antigravity windsurf zed pycharm intellij webstorm visual studio open project"
+        >
+          <EditorPicker onError={onError} />
+        </Section>
+      )}
     </>
   );
 }
@@ -84,7 +96,7 @@ function EditorPicker({ onError }: { onError: (e: string) => void }) {
   const choice = useDuskie((s) => s.settings.codeEditor);
   const { data, refresh } = useCached<EditorList>("editors", api.editorsList);
   const editors = data?.editors ?? [];
-  // One editor: no Auto — lock to that id. Two or more: Auto is the default.
+  // One editor: no Auto, lock to that id. Two or more: Auto is the default.
   useEffect(() => {
     if (!data || editors.length !== 1) return;
     const sole = editors[0].id;

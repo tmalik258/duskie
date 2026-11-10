@@ -1,5 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { clampIsland, DOCK_MIN, defaultIsland, ISLAND_MIN, nudge, restore, stacked } from "./seam";
+import {
+  clampIsland,
+  DOCK_EDGE,
+  DOCK_MIN,
+  defaultIsland,
+  dockTotal,
+  dockWindowWidth,
+  ISLAND_MIN,
+  nudge,
+  restore,
+  SEAM_W,
+  stacked,
+} from "./seam";
 
 describe("seam", () => {
   it("never leaves the island under its minimum or the dock under its own", () => {
@@ -16,7 +28,8 @@ describe("seam", () => {
 
   it("starts at about 40 percent, inside the limits", () => {
     expect(defaultIsland(1280)).toBe(512);
-    expect(defaultIsland(1000)).toBe(400);
+    // 1000 is too narrow for island min + dock min; clamp holds the island floor.
+    expect(defaultIsland(1000)).toBe(ISLAND_MIN);
     expect(defaultIsland(900)).toBe(ISLAND_MIN);
   });
 
@@ -29,12 +42,21 @@ describe("seam", () => {
   });
 
   it("re-clamps a saved width when the window shrinks", () => {
-    expect(restore(900, 1300)).toBe(700);
+    expect(restore(900, 1300)).toBe(1300 - DOCK_MIN);
     expect(restore(null, 1280)).toBe(512);
   });
 
   it("stacks the dock under the island on narrow windows", () => {
-    expect(stacked(1099)).toBe(true);
-    expect(stacked(1100)).toBe(false);
+    expect(stacked(1199)).toBe(true);
+    expect(stacked(1200)).toBe(false);
+  });
+
+  it("sizes the Git window wider than the panels so edges are not clipped", () => {
+    const screen = 1920;
+    const panels = dockTotal(screen);
+    const win = dockWindowWidth(screen);
+    expect(win).toBe(panels + SEAM_W + DOCK_EDGE * 2);
+    expect(win).toBeGreaterThan(panels);
+    expect(win).toBeLessThanOrEqual(screen);
   });
 });

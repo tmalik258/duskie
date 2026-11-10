@@ -7,6 +7,7 @@ import { type OpenChoice, parseChoose } from "./agent-questions";
 import { api, EVENTS, listen } from "./bridge";
 import { mask } from "./mask";
 import { claimsPlanReady, parsePlanDocument } from "./plan";
+import { dockTotal, readSeam, stacked } from "./seam";
 import type { AgentMode, AgentStarted } from "./types";
 
 export interface Step {
@@ -53,9 +54,17 @@ export interface Session extends AgentStarted {
   plan: PlanItem[];
   /** Full plan write-up when parsed from prose or a Codex plan item. */
   planDoc?: PlanDoc | null;
+  /** Timeline index of the entry the Plan card is pinned to. */
+  planEntry?: number | null;
+  /** ready for Build, building, or finished (Built). */
+  planPhase?: "ready" | "building" | "built" | null;
   usage: { used: number; window: number; total?: number; at?: number } | null;
   /** The plan's usage limit, when the agent says it is close or reached. */
   limit?: { status: string; window: string; resetsAt: number | null; used: number | null } | null;
+  /** When it started waiting on you. */
+  waitingSince?: number;
+  /** Paused from its card: stopped after the current step, resumes on request. */
+  paused?: boolean;
   /** "Not now" on the compact offer, until the context is compacted. */
   compactDismissed?: boolean;
   /** The agent's own multiple-choice question, waiting for an answer. */
@@ -114,6 +123,14 @@ interface AgentsState {
   draftPath?: string | null;
   /** What New's box starts with ("Ask an agent to fix it"). */
   draftPrompt?: string | null;
+  /** New agents waiting for a free slot, oldest first. */
+  queued: QueuedStart[];
+  /** Cards put off with Later: session id to the moment it was waiting from. */
+  later: Record<string, number>;
+  /** The repo open in the Git dock; "first" picks one once the list loads. */
+  dock?: string | null;
+  /** Island list width while a side dock (Git or Review) is open beside it. */
+  listW?: number;
 }
 
 /** Sessions are kept in this window's storage, so the timeline comes back
@@ -165,19 +182,57 @@ export function sessionView(id: string, patch: Partial<NonNullable<Session["view
 export async function setSessionMode(id: string, mode: AgentMode) {
   try {
     await api.agentSetMode(id, mode);
-    update(id, (s) => ({ ...s, mode }));
+    update(id, (s) => ({
+      ...s,
+      mode,
+      // Entering Plan for a new round: drop the previous card so it cannot flash stale.
+      ...(mode === "plan" && s.mode !== "plan" ? { plan: [], planDoc: null, planEntry: null, planPhase: null } : {}),
+    }));
   } catch (e) {
     update(id, (s) => ({ ...s, error: String(e) }));
   }
 }
 
+/** Last agent text entry index, or the last entry if none. */
+function lastTextEntry(entries: Entry[]): number | null {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    if (entries[i]?.kind === "text") return i;
+  }
+  return entries.length > 0 ? entries.length - 1 : null;
+}
+
 /** Replace the session checklist and optional full plan document. */
-export function setSessionPlan(id: string, plan: PlanItem[], planDoc?: PlanDoc | null) {
+export function setSessionPlan(id: string, plan: PlanItem[], planDoc?: PlanDoc | null, planEntry?: number | null) {
   update(id, (s) => ({
     ...s,
     plan,
     planDoc: planDoc === undefined ? s.planDoc : planDoc,
+    planEntry:
+      planEntry !== undefined
+        ? planEntry
+        : plan.length === 0 && (planDoc === null || planDoc === undefined)
+          ? null
+          : (s.planEntry ?? lastTextEntry(s.entries)),
+    // A new/updated plan document is ready to Build again.
+    planPhase:
+      plan.length === 0 && (planDoc === null || planDoc === undefined)
+        ? null
+        : s.planPhase === "building" || s.planPhase === "built"
+          ? s.planPhase
+          : "ready",
   }));
+}
+
+/** Clear plan card state (fresh Plan turn, rewind). */
+export function clearSessionPlan(id: string) {
+  update(id, (s) => ({ ...s, plan: [], planDoc: null, planEntry: null, planPhase: null }));
+}
+
+/** Leave Plan mode and start building without pasting the plan into chat. */
+export async function buildSessionPlan(id: string) {
+  await setSessionMode(id, "edit");
+  update(id, (s) => ({ ...s, planPhase: "building" }));
+  sendToSession(id, "Build the approved plan.");
 }
 
 function loadLayout(): AgentsLayout {
@@ -194,6 +249,8 @@ export const useAgents = create<AgentsState>(() => ({
   current: null,
   layout: typeof window === "undefined" ? "one" : loadLayout(),
   focus: null,
+  queued: [],
+  later: {},
   ...loadView(),
 }));
 
@@ -204,6 +261,23 @@ export function setLayout(layout: AgentsLayout) {
   } catch {
     // Not kept: the layout resets after a restart.
   }
+}
+
+/** The three Agents views: every session, one big, or the board. */
+export type AgentsView = "home" | "one" | "board";
+
+export function viewOf(st: { layout: AgentsLayout; current: string | null }): AgentsView {
+  return st.layout === "board" ? "board" : st.current === null ? "home" : "one";
+}
+
+export function setView(view: AgentsView) {
+  if (view === "board") return setLayout("board");
+  setLayout("one");
+  if (view === "home") return useAgents.setState({ current: null });
+  const st = useAgents.getState();
+  if (st.current !== null) return;
+  const latest = [...st.sessions].sort((a, b) => b.turnAt - a.turnAt)[0];
+  if (latest) useAgents.setState({ current: latest.id });
 }
 
 /** Gives a session your own name; it shows in the row and the board. */
@@ -261,7 +335,7 @@ if (typeof window !== "undefined") {
   window.addEventListener("pagehide", () => saveView());
   window.addEventListener("beforeunload", () => saveView());
 }
-/** Flush session view (draft/scroll) + localStorage immediately — island hide / unmount. */
+/** Flush session view (draft/scroll) + localStorage immediately, island hide / unmount. */
 export function flushAgentsView() {
   if (saveTimer) clearTimeout(saveTimer);
   saveView();
@@ -348,9 +422,46 @@ export const startHere = (path: string, prompt?: string | null) =>
   useAgents.setState({ tab: "agents", current: null, draftPath: path, draftPrompt: prompt ?? null });
 
 function update(id: string, fn: (s: Session) => Session) {
-  useAgents.setState((st) => ({ sessions: st.sessions.map((s) => (s.id === id ? fn(s) : s)) }));
+  useAgents.setState((st) => ({
+    sessions: st.sessions.map((s) => {
+      if (s.id !== id) return s;
+      const next = fn(s);
+      // Notes when it started waiting on you, for "Waiting 3 min".
+      if (next.status === "waiting" && s.status !== "waiting") return { ...next, waitingSince: Date.now() };
+      return next;
+    }),
+  }));
 }
 
+/** "Later" on an agent's card: hides it until the agent does something new. */
+export function laterCard(id: string) {
+  const s = useAgents.getState().sessions.find((x) => x.id === id);
+  if (s) useAgents.setState((st) => ({ later: { ...st.later, [id]: s.waitingSince ?? s.turnAt } }));
+}
+
+/** True while the card was put off and the agent has not moved on since. */
+export const cardLater = (later: Record<string, number>, s: Session) =>
+  later[s.id] !== undefined && later[s.id] === (s.waitingSince ?? s.turnAt);
+
+/** How many agents run at once; the next one waits in Queued. */
+export const SLOTS = 4;
+
+/** A new agent waiting for a free slot. */
+export interface QueuedStart {
+  id: string;
+  agent: string;
+  path: string;
+  prompt: string;
+  mode: AgentMode;
+  model: string | null;
+  effort: string | null;
+  at: number;
+}
+
+export const runningCount = (sessions: Session[]) => sessions.filter((s) => s.status === "working").length;
+
+/** Starts the agent now, or queues it when every slot is busy. Returns the
+ *  session id, or the queue id when it waits. */
 export async function startSession(
   agent: string,
   path: string,
@@ -359,13 +470,68 @@ export async function startSession(
   model: string | null = null,
   effort: string | null = null,
 ): Promise<string> {
+  const st = useAgents.getState();
+  if (runningCount(st.sessions) + starting >= SLOTS) {
+    const id = `queued:${Date.now()}`;
+    useAgents.setState({ queued: [...st.queued, { id, agent, path, prompt, mode, model, effort, at: Date.now() }] });
+    return id;
+  }
+  return startNow(agent, path, prompt, mode, model, effort);
+}
+
+export function cancelQueued(id: string) {
+  useAgents.setState((st) => ({ queued: st.queued.filter((q) => q.id !== id) }));
+}
+
+/** Starts in flight, so two finishing agents do not both pull the same slot. */
+let starting = 0;
+
+async function startNow(
+  agent: string,
+  path: string,
+  prompt: string,
+  mode: AgentMode,
+  model: string | null,
+  effort: string | null,
+  focus = true,
+): Promise<string> {
+  starting += 1;
+  try {
+    return await startOne(agent, path, prompt, mode, model, effort, focus);
+  } finally {
+    starting -= 1;
+  }
+}
+
+// A freed slot starts the oldest queued agent.
+if (typeof window !== "undefined") {
+  useAgents.subscribe((st) => {
+    const next = st.queued[0];
+    if (!next || runningCount(st.sessions) + starting >= SLOTS) return;
+    useAgents.setState({ queued: st.queued.slice(1) });
+    // Started in the background: it joins the list without taking over the view.
+    void startNow(next.agent, next.path, next.prompt, next.mode, next.model, next.effort, false).catch((e: unknown) =>
+      console.warn("queued agent did not start", e),
+    );
+  });
+}
+
+async function startOne(
+  agent: string,
+  path: string,
+  prompt: string,
+  mode: AgentMode,
+  model: string | null,
+  effort: string | null,
+  focus: boolean,
+): Promise<string> {
   const started = await api.agentStart(agent, path, prompt, mode, model, effort);
-  addSession(started, prompt, mode, prompt);
+  addSession(started, prompt, mode, prompt, focus);
   update(started.id, (s) => ({ ...s, model, effort }));
   return started.id;
 }
 
-function addSession(started: AgentStarted, title: string, mode: AgentMode, first: string) {
+function addSession(started: AgentStarted, title: string, mode: AgentMode, first: string, focus = true) {
   const session: Session = {
     ...started,
     mode,
@@ -374,6 +540,9 @@ function addSession(started: AgentStarted, title: string, mode: AgentMode, first
     activeMode: mode,
     entries: [{ kind: "you", text: first }],
     plan: [],
+    planDoc: null,
+    planEntry: null,
+    planPhase: null,
     usage: null,
     question: null,
     error: null,
@@ -382,7 +551,11 @@ function addSession(started: AgentStarted, title: string, mode: AgentMode, first
     tookMs: null,
     changes: 0,
   };
-  useAgents.setState((st) => ({ sessions: [session, ...st.sessions], current: started.id, tab: "agents" }));
+  useAgents.setState((st) =>
+    focus
+      ? { sessions: [session, ...st.sessions], current: started.id, tab: "agents" }
+      : { sessions: [session, ...st.sessions] },
+  );
 }
 
 /** Hands a stuck session to the agent that gets handoffs, with what was
@@ -415,6 +588,7 @@ export function sendToSession(id: string, text: string) {
     // Sending anything answers or replaces the agent's open question.
     choose: null,
     status: "working",
+    paused: false,
     stuck: false,
     activeMode: s.status === "working" || s.status === "waiting" ? s.activeMode : s.mode,
     turnAt: Date.now(),
@@ -447,6 +621,8 @@ export async function rewindSession(id: string, entry: number): Promise<number> 
     entries: x.entries.slice(0, entry),
     plan: [],
     planDoc: null,
+    planEntry: null,
+    planPhase: null,
     note: `(I rewound this conversation to before my message "${said.slice(0, 80)}". The file changes made after it were undone. Ignore everything after that point and work from here.)`,
   }));
   return n;
@@ -546,17 +722,36 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
       return update(id, (s) => ({ ...s, stuck: true }));
     case "model":
       return update(id, (s) => ({ ...s, localModel: String(e.name ?? "") }));
-    case "plan":
-      return update(id, (s) => ({ ...s, plan: (e.items as PlanItem[]) ?? [] }));
+    case "plan": {
+      const items = (e.items as PlanItem[]) ?? [];
+      return update(id, (s) => {
+        const planDoc = s.planDoc?.markdown
+          ? { ...s.planDoc, items: items.length > 0 ? items : s.planDoc.items }
+          : s.planDoc;
+        return { ...s, plan: items, planDoc };
+      });
+    }
     case "plan_doc": {
-      const doc = parsePlanDocument(String(e.text ?? ""));
-      if (!doc)
-        return update(id, (s) => ({ ...s, planDoc: { title: "Plan", items: s.plan, markdown: String(e.text ?? "") } }));
-      return update(id, (s) => ({
-        ...s,
-        plan: doc.items.length > 0 ? doc.items : s.plan,
-        planDoc: doc,
-      }));
+      const raw = String(e.text ?? "");
+      const doc = parsePlanDocument(raw);
+      return update(id, (s) => {
+        const planEntry = lastTextEntry(s.entries);
+        if (!doc) {
+          return {
+            ...s,
+            planDoc: { title: "Plan", items: s.plan, markdown: raw },
+            planEntry,
+            planPhase: s.planPhase === "building" ? "building" : "ready",
+          };
+        }
+        return {
+          ...s,
+          plan: doc.items.length > 0 ? doc.items : s.plan,
+          planDoc: doc,
+          planEntry,
+          planPhase: s.planPhase === "building" ? "building" : "ready",
+        };
+      });
     }
     case "usage":
       return update(id, (s) => {
@@ -613,21 +808,32 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
     case "turn":
       return update(id, (s) => {
         const entries = appendReview(s.entries, e.review);
-        // Plan mode often answers in prose without turn/plan/updated — lift the doc.
+        // Plan mode often answers in prose without turn/plan/updated, lift the doc.
         let plan = s.plan;
         let planDoc = s.planDoc;
-        // Only the newest answer of this turn, and only when it says the plan
-        // is ready. Older entries are never scanned, so an old plan is not
-        // lifted again on a later turn.
-        if ((s.mode === "plan" || s.activeMode === "plan") && (plan.length === 0 || !planDoc)) {
+        let planEntry = s.planEntry ?? null;
+        if (s.mode === "plan" || s.activeMode === "plan") {
           const last = entries.at(-1);
           if (last?.kind === "text" && claimsPlanReady(last.text)) {
-            const doc = parsePlanDocument(last.text);
-            if (doc && doc.items.length > 0) {
+            const raw = last.text;
+            const doc = parsePlanDocument(raw);
+            const existingLen = planDoc?.markdown?.length ?? 0;
+            // Do not replace a fuller file/response plan with shorter chat prose.
+            if (doc && doc.items.length > 0 && doc.markdown.length >= existingLen) {
               plan = doc.items;
               planDoc = doc;
+              planEntry = entries.length - 1;
+            } else if (!planDoc && raw.trim()) {
+              // Keep the full answer even when it is not a numbered checklist.
+              planDoc = { title: "Plan", items: plan, markdown: raw };
+              planEntry = entries.length - 1;
             }
           }
+        }
+        const built = s.planPhase === "building" && !e.error;
+        if (built) {
+          plan = plan.map((p) => ({ ...p, status: "completed" as const }));
+          if (planDoc) planDoc = { ...planDoc, items: plan };
         }
         return {
           ...s,
@@ -638,6 +844,8 @@ function onEvent(e: { session: string; kind: string } & Record<string, unknown>)
           entries,
           plan,
           planDoc,
+          planEntry,
+          planPhase: built ? "built" : s.planPhase === "building" && e.error ? "ready" : s.planPhase,
         };
       });
     case "ended":
@@ -751,6 +959,18 @@ export function usageLine(agent: string, now = Date.now()): string | null {
   return `${pct(u)}% of ${span}, ${ago}`;
 }
 
+/** Pause: stop the turn but keep the session ready to pick up where it was. */
+export function pauseSession(id: string) {
+  interruptSession(id);
+  update(id, (s) => ({ ...s, paused: true }));
+}
+
+/** Resume a paused session by asking it to carry on. */
+export function resumePaused(id: string) {
+  update(id, (s) => ({ ...s, paused: false }));
+  sendToSession(id, "Continue where you left off.");
+}
+
 /** Esc / Stop: leave the session idle right away; Rust keeps it resumable on the next send. */
 export function interruptSession(id: string) {
   update(id, (s) => ({
@@ -762,4 +982,91 @@ export function interruptSession(id: string) {
     entries: entriesCancelRunning(s.entries),
   }));
   void api.agentStop(id);
+}
+
+/** Clear reviewing on every session (one Review dock at a time). */
+export function clearReviewing() {
+  const { sessions } = useAgents.getState();
+  for (const s of sessions) {
+    if (s.view?.reviewing) sessionView(s.id, { reviewing: false });
+  }
+}
+
+/** Session id currently open in the Review dock, if any. */
+export function reviewingSessionId(): string | null {
+  return useAgents.getState().sessions.find((s) => s.view?.reviewing)?.id ?? null;
+}
+
+/** Open Review beside Agents (wide) or stacked in the session column (narrow). */
+export function openReview(id: string) {
+  const { dock, listW, sessions } = useAgents.getState();
+  const screenW = typeof window === "undefined" ? 1920 : window.screen.availWidth;
+  const side = !stacked(screenW);
+  const patch: Partial<AgentsState> & { tab: AskTab } = { tab: "agents" };
+  if (dock) patch.dock = null;
+  if (side && listW == null) patch.listW = readSeam(dockTotal(screenW));
+  if (!side) patch.listW = undefined;
+  useAgents.setState(patch);
+  for (const s of sessions) {
+    if (s.id !== id && s.view?.reviewing) sessionView(s.id, { reviewing: false });
+  }
+  sessionView(id, { reviewing: true });
+}
+
+/** Close the Review dock for a session (or whichever is open). */
+export function closeReview(id?: string) {
+  const target = id ?? reviewingSessionId();
+  if (target) sessionView(target, { reviewing: false });
+  const { dock } = useAgents.getState();
+  if (!dock) useAgents.setState({ listW: undefined });
+}
+
+/** Close the Git dock. Window stays at dock-max (no OS resize). */
+export function closeDock() {
+  useAgents.setState({
+    dock: null,
+    // Keep seam width if Review is still open beside.
+    ...(reviewingSessionId() ? {} : { listW: undefined }),
+  });
+}
+
+/** Open or switch the repo shown in the Git dock. */
+export function setDock(path: string | null) {
+  if (path == null) {
+    closeDock();
+    return;
+  }
+  clearReviewing();
+  const { listW } = useAgents.getState();
+  const screenW = typeof window === "undefined" ? 1920 : window.screen.availWidth;
+  const side = !stacked(screenW);
+  useAgents.setState({
+    dock: path,
+    ...(listW == null && side ? { listW: readSeam(dockTotal(screenW)) } : {}),
+  });
+}
+
+/** Ctrl G: toggle the Git dock on the Repos tab (opens on the repo with changes). */
+export function openGit() {
+  const { dock } = useAgents.getState();
+  if (dock) {
+    closeDock();
+    return;
+  }
+  void showGit();
+}
+
+/** Open the Git tab (and dock) without toggling a dock that is already open.
+ * Layout only - the OS window stays at dock-max from launch (no set_size). */
+export async function showGit() {
+  clearReviewing();
+  const { dock, listW } = useAgents.getState();
+  const screenW = typeof window === "undefined" ? 1920 : window.screen.availWidth;
+  const side = !stacked(screenW);
+  const patch: Partial<AgentsState> & { tab: AskTab } = { tab: "repos" };
+  if (!dock) patch.dock = "first";
+  if (listW == null && side) {
+    patch.listW = readSeam(dockTotal(screenW));
+  }
+  useAgents.setState(patch);
 }

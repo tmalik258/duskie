@@ -8,6 +8,7 @@
 //! for approvals as JSON-RPC requests.
 
 mod local;
+mod plans;
 pub mod reviews;
 
 use duskie_sensors::classify::mask;
@@ -44,16 +45,25 @@ pub enum Mode {
     Ask,
     /// Edits files on its own; asks before commands.
     Edit,
+    /// Like Edit, plus temporary debug logs that are removed when done.
+    Debug,
     /// Does everything without asking.
     Full,
 }
+
+/// What Debug mode asks of the agent before the user's own words.
+const DEBUG_BRIEF: &str = "Debug mode. Find the cause before changing behavior: \
+1. Add temporary debug logs, each printing a line that starts with [dbg file:line], where the state goes wrong. \
+For each one, write a line in your reply: PROBE file:line - what it logs. \
+2. Reproduce the bug and read the logs. 3. When you know it, write a line: CAUSE: one sentence. Fix the cause, not the symptom. \
+4. Remove every [dbg] log you added, then write a line: PROBES REMOVED. Never leave debug logs behind.\n\n";
 
 impl Mode {
     fn claude(self) -> &'static str {
         match self {
             Mode::Plan => "plan",
             Mode::Ask => "default",
-            Mode::Edit => "acceptEdits",
+            Mode::Edit | Mode::Debug => "acceptEdits",
             Mode::Full => "bypassPermissions",
         }
     }
@@ -63,7 +73,7 @@ impl Mode {
         match self {
             Mode::Plan => ("read-only", "never"),
             Mode::Ask => ("workspace-write", "untrusted"),
-            Mode::Edit => ("workspace-write", "on-request"),
+            Mode::Edit | Mode::Debug => ("workspace-write", "on-request"),
             Mode::Full => ("danger-full-access", "never"),
         }
     }
@@ -149,11 +159,11 @@ fn codex_turn_params(
     // Clarifying choices become Duskie's selectable list when written as OPTION lines.
     // Plan mode also needs a structured collaboration plan Duskie can show and edit.
     let instructions = if mode == Mode::Plan {
-        "You are in Plan mode (read-only). Produce a concrete step-by-step plan the user can review before any changes. \
+        "You are in Plan mode (read-only). Produce a plan the user can review before any changes. \
 When the user must choose first, ask in one short sentence, then end with up to six lines each starting with OPTION: and a short label in their words. \
 When several choices may all apply, use OPTION_MULTI: lines instead (checkboxes + Confirm). \
-After they answer (or when no choice is needed), update the collaboration plan with clear actionable steps, then say the plan is ready for review. \
-Never say the plan is ready without those steps in the plan. Do not implement or write files in Plan mode."
+After they answer (or when no choice is needed), put the plan in the collaboration plan document and say the plan is ready for review. \
+Never say the plan is ready without that document. Do not implement or write files in Plan mode."
     } else {
         "When the user must choose before you continue, ask in one short sentence, \
 then end with up to six lines each starting with OPTION: and a short label in their words. \
@@ -270,12 +280,7 @@ async fn complete_turn(app: &AppHandle, id: &str, mut data: Value) {
     let sid = id.to_owned();
     match tokio::task::spawn_blocking(move || {
         turn_ended(&sid);
-        let live = review_count(&sid);
-        let turn_files = reviews::list(&sid)
-            .last()
-            .map(|t| t.files.len())
-            .unwrap_or(0);
-        live.max(turn_files)
+        review_count(&sid)
     })
     .await
     {
@@ -665,7 +670,12 @@ pub async fn start_tuned(
     });
     save();
     with(&reviews::WRITING, |w| w.insert(id.clone(), true));
-    let _ = tx.send(Cmd::Send(prompt.to_owned()));
+    let first = if mode == Mode::Debug {
+        format!("{DEBUG_BRIEF}{prompt}")
+    } else {
+        prompt.to_owned()
+    };
+    let _ = tx.send(Cmd::Send(first));
     crate::activity::report(
         app,
         &format!("agent:{id}"),
@@ -832,22 +842,26 @@ fn restart(app: &AppHandle, id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// When the agent finishes a turn: fingerprint what it changed, so an undo
-/// later can tell the user's own edits apart.
+/// When the agent finishes a turn: fingerprint only paths captured on that turn, so an undo later can tell the user's own edits apart.
 fn turn_ended(id: &str) {
     reviews::capture_turn(id);
     let Some(b) = with(&SESSIONS, |s| s.get(id).and_then(|h| h.baseline.clone())) else {
         save();
         return;
     };
-    let prints: HashMap<String, u64> = review::changes(&b)
-        .unwrap_or_default()
-        .iter()
-        .filter_map(|f| review::fingerprint(&b.root, &f.path).map(|h| (f.path.clone(), h)))
-        .collect();
+    let files = reviews::last_turn_files(id);
     with(&SESSIONS, |s| {
         if let Some(h) = s.get_mut(id) {
-            h.after = prints;
+            for f in &files {
+                match review::fingerprint(&b.root, &f.path) {
+                    Some(fp) => {
+                        h.after.insert(f.path.clone(), fp);
+                    }
+                    None => {
+                        h.after.remove(&f.path);
+                    }
+                }
+            }
         }
     });
     save();
@@ -870,10 +884,7 @@ fn branch(path: &Path) -> Option<String> {
 }
 
 fn review_count(id: &str) -> usize {
-    let baseline = with(&SESSIONS, |s| s.get(id).and_then(|h| h.baseline.clone()));
-    baseline
-        .and_then(|b| review::changes(&b).ok())
-        .map_or(0, |c| c.len())
+    reviews::merged_files(id).len()
 }
 
 /// Sends a follow-up or a steer to a running session, after a checkpoint
@@ -944,18 +955,46 @@ fn baseline(id: &str) -> Result<Baseline, String> {
     })
 }
 
-/// The changes to review, with secrets in them masked. Undo reads the files
-/// again, so masking here never changes what gets undone.
+/// Event name: one masked file while Review opens (`{ session, file }`).
+pub const REVIEW_FILE_EVENT: &str = "review://file";
+/// Event name: Review file stream finished (`{ session }`).
+pub const REVIEW_DONE_EVENT: &str = "review://done";
+
+/// The changes to review from this session's turn snapshots only, with secrets
+/// masked. Undo reads the files again, so masking here never changes what gets undone.
+#[cfg(test)]
 pub fn changes(id: &str) -> Result<Vec<review::FileChange>, String> {
-    let mut files = review::changes(&baseline(id)?)?;
-    for line in files
-        .iter_mut()
-        .flat_map(|f| f.hunks.iter_mut())
-        .flat_map(|h| h.lines.iter_mut())
-    {
-        if let Cow::Owned(m) = mask(line) {
-            *line = m;
+    changes_emitting(id, None)
+}
+
+/// Mask secrets in each file's hunk lines; returns paths in emit order.
+fn mask_review_files(files: &mut [review::FileChange]) -> Vec<String> {
+    let mut order = Vec::with_capacity(files.len());
+    for file in files.iter_mut() {
+        for line in file.hunks.iter_mut().flat_map(|h| h.lines.iter_mut()) {
+            if let Cow::Owned(m) = mask(line) {
+                *line = m;
+            }
         }
+        order.push(file.path.clone());
+    }
+    order
+}
+
+/// Like [`changes`], optionally emitting each masked file then a done event.
+pub fn changes_emitting(
+    id: &str,
+    app: Option<&AppHandle>,
+) -> Result<Vec<review::FileChange>, String> {
+    let _ = baseline(id)?;
+    let mut files = reviews::merged_files(id);
+    let order = mask_review_files(&mut files);
+    if let Some(app) = app {
+        for (path, file) in order.iter().zip(files.iter()) {
+            debug_assert_eq!(path, &file.path);
+            let _ = app.emit(REVIEW_FILE_EVENT, json!({ "session": id, "file": file }));
+        }
+        let _ = app.emit(REVIEW_DONE_EVENT, json!({ "session": id }));
     }
     Ok(files)
 }
@@ -1449,7 +1488,7 @@ async fn run_claude(
                     return Err(why_stopped("Claude Code", &lock(&stderr)));
                 };
                 let Ok(v) = serde_json::from_str::<Value>(&line) else { continue };
-                for data in claude_events(&v) {
+                for data in claude_events(&v, Some(path)) {
                     if data["kind"] == "session" {
                         let resume = data["resume"].as_str().map(str::to_owned);
                         with(&SESSIONS, |s| if let Some(h) = s.get_mut(id) { h.resume = resume });
@@ -1471,7 +1510,8 @@ async fn run_claude(
 }
 
 /// What one stream-json line means for the island.
-pub fn claude_events(v: &Value) -> Vec<Value> {
+/// `project` is the session cwd, used to find Claude plan files on disk.
+pub fn claude_events(v: &Value, project: Option<&Path>) -> Vec<Value> {
     let mut out = Vec::new();
     match v["type"].as_str() {
         Some("system") if v["subtype"] == "init" => {
@@ -1515,12 +1555,11 @@ pub fn claude_events(v: &Value) -> Vec<Value> {
                     out.push(json!({ "kind": "plan", "items": items }));
                     continue;
                 }
-                // The agent's own signal that its plan is ready: no need to
-                // guess from the wording of the answer.
-                if name == "ExitPlanMode"
-                    && let Some(plan) = b["input"]["plan"].as_str()
-                {
-                    out.push(json!({ "kind": "plan_doc", "text": plan }));
+                // Ready for review: prefer inline plan text, else the plan file on disk.
+                if name == "ExitPlanMode" {
+                    if let Some(plan) = plans::read_exit_plan(&b["input"], project) {
+                        out.push(json!({ "kind": "plan_doc", "text": plan }));
+                    }
                     continue;
                 }
                 // The agent's own multiple-choice question, with its options.
@@ -1529,6 +1568,27 @@ pub fn claude_events(v: &Value) -> Vec<Value> {
                         "kind": "choose", "id": b["id"], "questions": b["input"]["questions"],
                     }));
                     continue;
+                }
+                // Writing the plan file is itself the document when ExitPlanMode has no text.
+                if matches!(name, "Write" | "Edit" | "write_file") {
+                    let path = b["input"]["file_path"]
+                        .as_str()
+                        .or_else(|| b["input"]["path"].as_str())
+                        .unwrap_or_default();
+                    if plans::is_plan_file_path(path) {
+                        let from_input = b["input"]["content"]
+                            .as_str()
+                            .or_else(|| b["input"]["new_string"].as_str())
+                            .map(str::trim)
+                            .filter(|t| !t.is_empty())
+                            .map(str::to_owned);
+                        let from_disk = std::fs::read_to_string(path)
+                            .ok()
+                            .filter(|t| !t.trim().is_empty());
+                        if let Some(text) = from_input.or(from_disk) {
+                            out.push(json!({ "kind": "plan_doc", "text": text }));
+                        }
+                    }
                 }
                 let (label, detail) = describe_tool(name, &b["input"]);
                 out.push(json!({
@@ -1783,10 +1843,17 @@ async fn run_codex(
     .await?;
     // Messages typed before the thread opened.
     let mut queued: Vec<String> = Vec::new();
+    // Codex's own open question: the next message answers it.
+    let mut open_input: Option<(Value, Vec<String>)> = None;
     loop {
         tokio::select! {
             cmd = rx.recv() => match cmd {
                 Some(Cmd::Send(text)) => {
+                    if let Some((rid, ids)) = open_input.take() {
+                        write_line(&mut stdin, json!({ "id": rid, "result": codex_input_answer(&ids, &text) })).await?;
+                        emit(app, id, json!({"kind":"working"}));
+                        continue;
+                    }
                     let Some(t) = thread.clone() else { queued.push(text); continue };
                     if pending.values().any(|m| m == "turn/start") { queued.push(text); continue; }
                     if turn.is_some() && selected_mode(id, mode) != active_mode { queued.push(text); continue; }
@@ -1890,6 +1957,13 @@ async fn run_codex(
                     write_line(&mut stdin, json!({ "id": rid, "result": { "decision": decision } })).await?;
                     continue;
                 }
+                // Codex asks the user a question with options.
+                if let (Some("item/tool/requestUserInput"), Some(rid)) = (v["method"].as_str(), v.get("id")) {
+                    let (ids, questions) = codex_questions(&v["params"]);
+                    open_input = Some((rid.clone(), ids));
+                    emit(app, id, json!({ "kind": "choose", "id": rid, "questions": questions }));
+                    continue;
+                }
                 if v["method"] == "turn/started" {
                     turn = v["params"]["turn"]["id"].as_str().map(str::to_owned);
                 }
@@ -1929,7 +2003,7 @@ fn plain_args(agent: Agent, mode: Mode, text: &str, again: bool) -> Vec<String> 
             }
             match mode {
                 Mode::Full => a.push("--allow-all-tools".into()),
-                Mode::Edit | Mode::Ask => {
+                Mode::Edit | Mode::Debug | Mode::Ask => {
                     a.extend(["--allow-all-tools", "--deny-tool", "shell"].map(String::from))
                 }
                 Mode::Plan => a.extend(
@@ -1947,7 +2021,7 @@ fn plain_args(agent: Agent, mode: Mode, text: &str, again: bool) -> Vec<String> 
         _ => {
             // Cursor streams each step as JSON, so its sessions are as live as Codex.
             a.extend(["--output-format", "stream-json"].map(String::from));
-            if matches!(mode, Mode::Full | Mode::Edit) {
+            if matches!(mode, Mode::Full | Mode::Edit | Mode::Debug) {
                 a.push("--force".into());
             }
         }
@@ -2087,6 +2161,38 @@ pub fn cursor_events(v: &Value) -> Vec<Value> {
     }
 }
 
+/// Codex's question request as the same question shape Claude Code uses,
+/// with the ids to answer under.
+pub fn codex_questions(p: &Value) -> (Vec<String>, Vec<Value>) {
+    let mut ids = Vec::new();
+    let mut out = Vec::new();
+    for q in p["questions"].as_array().into_iter().flatten() {
+        ids.push(q["id"].as_str().unwrap_or_default().to_owned());
+        let options: Vec<Value> = q["options"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|o| json!({ "label": o["label"], "description": o["description"] }))
+            .collect();
+        out.push(json!({
+            "question": q["question"],
+            "header": q["header"],
+            "multiSelect": false,
+            "options": options,
+        }));
+    }
+    (ids, out)
+}
+
+/// The answer to a Codex question request: the user's reply for each question.
+pub fn codex_input_answer(ids: &[String], text: &str) -> Value {
+    let answers: serde_json::Map<String, Value> = ids
+        .iter()
+        .map(|i| (i.clone(), json!({ "answers": [text] })))
+        .collect();
+    json!({ "answers": answers })
+}
+
 /// What one app-server notification means for the island.
 pub fn codex_events(v: &Value) -> Vec<Value> {
     let p = &v["params"];
@@ -2130,7 +2236,7 @@ pub fn codex_events(v: &Value) -> Vec<Value> {
                     };
                     ("WebSearch", label, q)
                 }
-                // Plan-mode document from Codex — full markdown, not a tool step.
+                // Plan-mode document from Codex, full markdown, not a tool step.
                 Some("plan") => {
                     if done
                         && let Some(text) = item["text"].as_str().filter(|t| !t.trim().is_empty())
@@ -2252,6 +2358,39 @@ fn shown_command(cmd: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::review::{FileChange, Hunk};
+
+    #[test]
+    fn mask_review_files_keeps_merge_order() {
+        let mut files = vec![
+            FileChange {
+                path: "a.rs".into(),
+                status: "modified".into(),
+                added: 1,
+                removed: 0,
+                hunks: vec![Hunk {
+                    header: "@@ a @@".into(),
+                    lines: vec!["+plain".into()],
+                }],
+            },
+            FileChange {
+                path: "b.rs".into(),
+                status: "modified".into(),
+                added: 1,
+                removed: 0,
+                hunks: vec![Hunk {
+                    header: "@@ b @@".into(),
+                    lines: vec!["+plain".into()],
+                }],
+            },
+        ];
+        assert_eq!(mask_review_files(&mut files), ["a.rs", "b.rs"]);
+    }
+
+    #[test]
+    fn changes_without_session_errors() {
+        assert!(changes("missing-session-for-review").is_err());
+    }
 
     #[tokio::test]
     async fn mocked_app_server_initializes_before_dependent_requests() {
@@ -2329,7 +2468,7 @@ mod tests {
     #[test]
     fn codex_turn_settings_include_real_plan_and_restore_default() {
         let path = Path::new("C:/project");
-        for mode in [Mode::Plan, Mode::Ask, Mode::Edit, Mode::Full] {
+        for mode in [Mode::Plan, Mode::Ask, Mode::Edit, Mode::Debug, Mode::Full] {
             let params = codex_turn_params(
                 "protocol-test",
                 "t",
@@ -2681,7 +2820,7 @@ mod tests {
             r#"{"type":"assistant","message":{"content":[{"type":"text","text":"ok"},{"type":"tool_use","id":"t1","name":"Edit","input":{"file_path":"C:\\code\\app\\src\\main.rs"}}]}}"#,
         )
         .unwrap();
-        let ev = claude_events(&tool);
+        let ev = claude_events(&tool, None);
         assert_eq!(ev[0]["label"], "Edit main.rs");
         assert_eq!(ev[0]["state"], "running");
 
@@ -2689,13 +2828,16 @@ mod tests {
             r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t2","name":"TodoWrite","input":{"todos":[{"content":"Add retries","status":"in_progress"}]}}]}}"#,
         )
         .unwrap();
-        assert_eq!(claude_events(&todo)[0]["items"][0]["text"], "Add retries");
+        assert_eq!(
+            claude_events(&todo, None)[0]["items"][0]["text"],
+            "Add retries"
+        );
 
         let plan: Value = serde_json::from_str(
             r##"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t3","name":"ExitPlanMode","input":{"plan":"# Plan\n1. Add retries"}}]}}"##,
         )
         .unwrap();
-        let ev = claude_events(&plan);
+        let ev = claude_events(&plan, None);
         assert_eq!(ev.len(), 1, "the plan is not also a step");
         assert_eq!(ev[0]["kind"], "plan_doc");
         assert!(ev[0]["text"].as_str().unwrap().contains("Add retries"));
@@ -2704,7 +2846,7 @@ mod tests {
             r#"{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t4","name":"AskUserQuestion","input":{"questions":[{"question":"Which database?","header":"DB","multiSelect":false,"options":[{"label":"SQLite","description":"local"},{"label":"Postgres","description":"server"}]}]}}]}}"#,
         )
         .unwrap();
-        let ev = claude_events(&ask);
+        let ev = claude_events(&ask, None);
         assert_eq!(ev.len(), 1);
         assert_eq!(ev[0]["kind"], "choose");
         assert_eq!(ev[0]["questions"][0]["options"][1]["label"], "Postgres");
@@ -2713,19 +2855,19 @@ mod tests {
             r#"{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","is_error":true}]}}"#,
         )
         .unwrap();
-        assert_eq!(claude_events(&result)[0]["state"], "failed");
+        assert_eq!(claude_events(&result, None)[0]["state"], "failed");
 
         let said: Value = serde_json::from_str(
             r#"{"type":"assistant","message":{"content":[],"usage":{"input_tokens":10,"cache_read_input_tokens":90}}}"#,
         )
         .unwrap();
-        assert_eq!(claude_events(&said)[0]["used"], 100);
+        assert_eq!(claude_events(&said, None)[0]["used"], 100);
 
         let done: Value = serde_json::from_str(
             r#"{"type":"result","is_error":false,"result":"x","usage":{"input_tokens":10,"cache_read_input_tokens":90}}"#,
         )
         .unwrap();
-        let ev = claude_events(&done);
+        let ev = claude_events(&done, None);
         assert_eq!(ev[0]["kind"], "turn");
         assert!(ev[0]["error"].is_null());
 
@@ -2733,7 +2875,7 @@ mod tests {
             r#"{"type":"rate_limit_event","rate_limit_info":{"status":"allowed_warning","rateLimitType":"five_hour","resetsAt":1760000000,"utilization":0.8}}"#,
         )
         .unwrap();
-        let ev = claude_events(&limit);
+        let ev = claude_events(&limit, None);
         assert_eq!(ev[0]["kind"], "limit");
         assert_eq!(ev[0]["status"], "allowed_warning");
         assert_eq!(ev[0]["window"], "five_hour");
@@ -2793,5 +2935,25 @@ mod tests {
         assert_eq!(Mode::Edit.claude(), "acceptEdits");
         assert_eq!(Mode::Plan.codex(), ("read-only", "never"));
         assert_eq!(Mode::Ask.codex().1, "untrusted");
+    }
+    #[test]
+    fn codex_questions_read_like_claude_questions_and_answer_by_id() {
+        let p = json!({ "threadId": "t", "turnId": "u", "itemId": "i", "questions": [{
+            "id": "db", "header": "DB", "question": "Which database?",
+            "options": [{ "label": "SQLite", "description": "local" }, { "label": "Postgres", "description": "server" }],
+        }]});
+        let (ids, qs) = codex_questions(&p);
+        assert_eq!(ids, vec!["db".to_owned()]);
+        assert_eq!(qs[0]["question"], "Which database?");
+        assert_eq!(qs[0]["options"][1]["label"], "Postgres");
+        assert_eq!(
+            codex_input_answer(&ids, "SQLite"),
+            json!({ "answers": { "db": { "answers": ["SQLite"] } } })
+        );
+        // No options is a free-text question.
+        let (_, qs) = codex_questions(
+            &json!({ "questions": [{ "id": "n", "question": "Name?", "options": null }] }),
+        );
+        assert_eq!(qs[0]["options"], json!([]));
     }
 }

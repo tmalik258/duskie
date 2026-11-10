@@ -6,7 +6,7 @@ members = ["crates/*", "apps/desktop/src-tauri"]
 version = "0.2.2"
 edition = "2024"
 license = "MIT"
-repository = "https://github.com/tmalik258/sidekick"
+repository = "https://github.com/tmalik258/duskie"
 
 [workspace.dependencies]
 duskie-core = { path = "crates/core" }

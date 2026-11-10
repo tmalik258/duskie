@@ -10,6 +10,7 @@ const controls: [string, string][] = [
   ["plan", "Plan the next message"],
   ["ask", "Ask before changes"],
   ["edit", "Allow workspace edits"],
+  ["debug", "Debug with temporary logs"],
   ["full", "Allow full access"],
   ["permissions", "Choose permissions"],
   ["model", "Choose model"],

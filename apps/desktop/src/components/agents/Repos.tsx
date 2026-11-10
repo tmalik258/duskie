@@ -6,10 +6,11 @@
 // opens the Git dock for that repo (stage, commit, amend).
 
 import { useEffect, useState } from "react";
-import { setTab, startHere, startSession } from "@/lib/agents";
+import { setDock, setTab, startHere, startSession, useAgents } from "@/lib/agents";
 import { api } from "@/lib/bridge";
 import { useCached } from "@/lib/cache";
 import { useNow } from "@/lib/hooks";
+import { dockTotal, readSeam, stacked } from "@/lib/seam";
 import type { RepoRow, ReposOverview } from "@/lib/types";
 import { Tip } from "../Tip";
 import { GitDock } from "./GitDock";
@@ -23,32 +24,17 @@ function since(t: number, now: number): string {
   return `${Math.round(s / 60)} min ago`;
 }
 
-function Tags({ r }: { r: RepoRow }) {
-  return (
-    <span className="ak-rtags">
-      {r.behind > 0 && (
-        <span className="ak-rtag" data-k="behind">
-          {r.behind} behind
-        </span>
-      )}
-      {r.ahead > 0 && (
-        <span className="ak-rtag" data-k="ahead">
-          {r.ahead} ahead
-        </span>
-      )}
-      {r.prs.length > 0 && (
-        <span className="ak-rtag">
-          {r.prs.length} {r.prs.length === 1 ? "PR" : "PRs"}
-        </span>
-      )}
-      {r.ci === "pending" && <span className="ak-rtag">CI running</span>}
-      {r.reviews > 0 && (
-        <span className="ak-rtag" data-k="behind">
-          {r.reviews} to review
-        </span>
-      )}
-    </span>
-  );
+/** One plain line: what to push and pull, then the PR or checks that need you. */
+function statusLine(r: RepoRow): string {
+  const parts: string[] = [];
+  const sync = [r.ahead > 0 && `${r.ahead} to push`, r.behind > 0 && `${r.behind} to pull`].filter(Boolean).join(", ");
+  parts.push(sync ? `${sync[0].toUpperCase()}${sync.slice(1)}` : "Up to date");
+  const failing = r.prs.find((p) => p.failing);
+  if (failing) parts.push(`PR #${failing.number}: ${failing.failing?.[0] ?? "check"} failing`);
+  else if (r.reviews > 0) parts.push(`${r.reviews} to review`);
+  else if (r.ci === "pending") parts.push("Checks running");
+  if (r.changed > 0) parts.push(`${r.changed} changed`);
+  return parts.join(". ");
 }
 
 // Placeholder rows shaped like the real ones, so the list does not jump
@@ -95,7 +81,12 @@ export function Repos({ maxHeight }: { maxHeight?: number }) {
   const [checked, setChecked] = useState(() => Date.now());
   const now = useNow(10_000);
   const [open, setOpen] = useState<string | null>(null);
-  const [gitPath, setGitPath] = useState<string | null>(null);
+  const dock = useAgents((s) => s.dock ?? null);
+  const screenW = typeof window === "undefined" ? 1920 : window.screen.availWidth;
+  const side = !stacked(screenW);
+  const total = dockTotal(screenW);
+  // Ctrl G with no repo chosen: the one with changes, else the first.
+  const gitPath = dock === "first" ? ((data?.repos.find((r) => r.changed > 0) ?? data?.repos[0])?.path ?? null) : dock;
   const [note, setNote] = useState<Record<string, string>>({});
   const [error, setError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -112,10 +103,26 @@ export function Repos({ maxHeight }: { maxHeight?: number }) {
   };
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new answer means a fresh check
   useEffect(() => setChecked(Date.now()), [data]);
-  if (gitPath) {
+  const gitRepo = data?.repos.find((r) => r.path === gitPath) ?? null;
+  // Keep listW while the dock is open (even if this tab unmounts). Island owns
+  // listW; closeDock() tears it down when the dock closes.
+  const wide = Boolean(dock) && side;
+  useEffect(() => {
+    if (!wide) return;
+    const cur = useAgents.getState().listW;
+    if (cur != null) return;
+    useAgents.setState({ listW: readSeam(total) });
+  }, [wide, total]);
+  // Resolve "first" once repos are known so the path stays stable.
+  useEffect(() => {
+    if (dock !== "first" || !gitPath) return;
+    setDock(gitPath);
+  }, [dock, gitPath]);
+  // Narrow screens: the dock replaces the list (no room beside).
+  if (gitPath && !side) {
     return (
       <div className="ak-repos flex min-h-0 flex-col gap-2">
-        <GitDock path={gitPath} onClose={() => setGitPath(null)} />
+        <GitDock path={gitPath} repo={gitRepo} repos={data?.repos} onPickRepo={setDock} onClose={() => setDock(null)} />
       </div>
     );
   }
@@ -150,18 +157,16 @@ export function Repos({ maxHeight }: { maxHeight?: number }) {
       : data.via === "composio"
         ? "GitHub through Composio"
         : "GitHub not connected";
-  return (
-    <section className="ak-repos" aria-label="Repos">
-      <div className="ak-rh">
-        <span>
-          {data.repos.length} repo{data.repos.length === 1 ? "" : "s"} · {via}
-        </span>
-        <Tip label="Check now: fetch every repo and look for new commits and PRs">
-          <button type="button" className="ak-rcheck" disabled={checking} onClick={() => void check()}>
-            {checking ? "Checking..." : `checked ${since(checked, now)}`}
-          </button>
-        </Tip>
-      </div>
+  const stash = (r: RepoRow) =>
+    void api
+      .gitStashPush(r.path)
+      .then((m) => {
+        say(r.path, m);
+        void refresh?.();
+      })
+      .catch((e: unknown) => say(r.path, String(e)));
+  const list = (
+    <section className={`ak-repos${wide ? " ag-narrow" : ""}`} aria-label="Repos">
       {error && (
         <p className="ak-rnote" role="alert">
           {error}
@@ -171,16 +176,12 @@ export function Repos({ maxHeight }: { maxHeight?: number }) {
       <div className="ak-scroll ak-rlist" style={{ maxHeight: maxHeight ? maxHeight - 48 : undefined }}>
         {data.repos.map((r) => {
           const expanded = open === r.path;
+          const current = wide && r.path === gitPath;
           const failing = r.prs.find((p) => p.failing && p.mine) ?? r.prs.find((p) => p.failing);
           const review = r.prs.find((p) => p.reviewRequested);
           return (
             <div key={r.path} className="ak-repo" data-open={expanded}>
-              <button
-                type="button"
-                className="ak-rrow"
-                aria-expanded={expanded}
-                onClick={() => setOpen(expanded ? null : r.path)}
-              >
+              <div className="ak-rrow">
                 <Tip label={CI_LABEL[r.ci]} className="inline-flex shrink-0">
                   <span
                     className="ak-rdot"
@@ -189,12 +190,37 @@ export function Repos({ maxHeight }: { maxHeight?: number }) {
                     aria-label={CI_LABEL[r.ci]}
                   />
                 </Tip>
-                <span className="min-w-0">
-                  <span className="ak-rn">{r.name}</span>
-                  <span className="ak-rb">⎇ {r.branch}</span>
+                <button
+                  type="button"
+                  className="ak-rmain"
+                  aria-expanded={expanded}
+                  aria-current={current ? "true" : undefined}
+                  onClick={() => {
+                    if (wide) setDock(r.path);
+                    else setOpen(expanded ? null : r.path);
+                  }}
+                >
+                  <span className="ak-rt">
+                    <span className="ak-rn">{r.name}</span>
+                    <span className="ak-rb">{r.branch}</span>
+                  </span>
+                  <span className="ak-rs">{statusLine(r)}</span>
+                </button>
+                <span className="ak-racts">
+                  <button
+                    type="button"
+                    className="ak-rbtn"
+                    disabled={r.behind === 0}
+                    onClick={() => pull(r, r.changed > 0)}
+                  >
+                    Pull
+                  </button>
+                  <button type="button" className="ak-rbtn" disabled={r.changed === 0} onClick={() => stash(r)}>
+                    Stash
+                  </button>
                 </span>
-                <Tags r={r} />
-              </button>
+              </div>
+              {!expanded && note[r.path] && <p className="ak-rnote">{note[r.path]}</p>}
               {expanded && (
                 <div className="ak-rx ak-in">
                   {failing?.failing && (
@@ -245,7 +271,7 @@ export function Repos({ maxHeight }: { maxHeight?: number }) {
                       </button>
                     ))}
                   <div className="ak-rbtns">
-                    <button type="button" className="ak-chip primary chip" onClick={() => setGitPath(r.path)}>
+                    <button type="button" className="ak-chip primary chip" onClick={() => setDock(r.path)}>
                       Changes
                     </button>
                     {r.behind > 0 && (
@@ -276,6 +302,16 @@ export function Repos({ maxHeight }: { maxHeight?: number }) {
           );
         })}
       </div>
+      <div className="ak-rfoot">
+        <Tip label="Check now: fetch every repo and look for new commits and PRs">
+          <button type="button" className="ak-rcheck" disabled={checking} onClick={() => void check()}>
+            {checking ? "Checking..." : `Fetched ${since(checked, now)}`}
+          </button>
+        </Tip>
+        <span>{via}</span>
+      </div>
     </section>
   );
+  // Side-by-side Git is rendered as a sibling of the island shell (Island.tsx).
+  return list;
 }

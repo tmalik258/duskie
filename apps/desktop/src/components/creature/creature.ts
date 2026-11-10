@@ -357,9 +357,15 @@ class FurRenderer {
     if (!gl) throw new Error("WebGL2 unavailable");
     this.gl = gl;
     this.lost = false;
+    // Kept from the start: the extension cannot be fetched once the context is gone.
+    const loser = gl.getExtension("WEBGL_lose_context");
     this.canvas.addEventListener("webglcontextlost", (e) => {
       e.preventDefault();
       this.lost = true;
+      // The browser does not always give the context back after a GPU reset; ask for it.
+      setTimeout(() => {
+        if (this.lost) loser?.restoreContext();
+      }, 1500);
     });
     this.canvas.addEventListener("webglcontextrestored", () => {
       this.init();
@@ -429,6 +435,9 @@ class FurRenderer {
 
 let api = null;
 let failed = false;
+// Software rendering at boot is often a GPU that is still waking up; look again a few times.
+let softTries = 0;
+const SOFT_RETRIES = 4;
 
 function boot() {
   let R;
@@ -445,12 +454,10 @@ function boot() {
   const forced = (window as unknown as { __creatureForce?: boolean }).__creatureForce === true;
   if (!forced && /swiftshader|llvmpipe|softpipe|basic render|microsoft basic/i.test(gpu)) {
     R.gl.getExtension("WEBGL_lose_context")?.loseContext();
-    failed = true;
+    softTries += 1;
+    failed = softTries >= SOFT_RETRIES;
     return null;
   }
-  R.onRestore = () => {
-    for (const m of all) m.dirty = true;
-  };
   const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
   const lin = (h) => [1, 3, 5].map((i) => (parseInt(h.slice(i, i + 2), 16) / 255) ** 2.2);
   const rnd = (a, b) => a + Math.random() * (b - a);
@@ -926,7 +933,8 @@ function boot() {
       el.className = "mz";
       el.style.width = el.style.height = `${this.size}px`;
       el.style.setProperty("--s", `${this.size}px`);
-      el.setAttribute("role", "img");
+      // Parent (Creature.tsx) already exposes role="img" + aria-label.
+      el.setAttribute("aria-hidden", "true");
       el.innerHTML = `<div class="mz-move"><canvas></canvas><div class="mz-eyes"><div class="mz-pair"><svg class="mz-eye" viewBox="0 0 20 30" aria-hidden="true"></svg><svg class="mz-eye" viewBox="0 0 20 30" aria-hidden="true"></svg></div><i class="mz-tape"></i><i class="mz-tape"></i></div><div class="mz-fx"></div></div>`;
       slot.replaceChildren(el);
       this.el = el;
@@ -1600,7 +1608,21 @@ function boot() {
       raf = requestAnimationFrame(frame);
     }
   };
-  document.addEventListener("visibilitychange", wake);
+  // Mark every creature dirty and run a frame (also used after WebGL restore).
+  const dirt = () => {
+    for (const m of all) m.dirty = true;
+    wake();
+  };
+  R.onRestore = dirt;
+  // Screen lock / sleep often clears canvas pixels without a context-loss event.
+  const onVisible = () => {
+    if (document.hidden) return;
+    dirt();
+    requestAnimationFrame(dirt); // GPU may need one more frame after unlock
+  };
+  document.addEventListener("visibilitychange", onVisible);
+  window.addEventListener("pageshow", onVisible);
+  window.addEventListener("focus", onVisible);
 
   Mascot.prototype.gaze = function (x, y) {
     lastPointer = performance.now();
@@ -1645,6 +1667,11 @@ function boot() {
     };
   }
   return { Mascot, THEMES, EXPRESSIONS: X, wake };
+}
+
+/** True while a later look might still find a GPU. */
+export function creatureMayRetry() {
+  return !api && !failed;
 }
 
 /** True when this machine can draw the creature (WebGL 2). */

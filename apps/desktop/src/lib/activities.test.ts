@@ -45,4 +45,25 @@ describe("visibleActivities", () => {
     expect(out).toHaveLength(1);
     expect(out[0].label).toBe("fresh");
   });
+
+  it("keeps a finished copy over a still-running one for the same id", () => {
+    const running = {
+      ...base,
+      id: "open-1",
+      source: "open" as const,
+      label: "Opening Chrome",
+      phase: "running" as const,
+      revision: 3,
+    };
+    const done = {
+      ...running,
+      phase: "completed" as const,
+      outcome: "Launch requested for Chrome",
+      revision: 0,
+    };
+    const out = visibleActivities([running, done], 0);
+    expect(out).toHaveLength(1);
+    expect(out[0]?.phase).toBe("completed");
+    expect(out[0]?.outcome).toBe("Launch requested for Chrome");
+  });
 });

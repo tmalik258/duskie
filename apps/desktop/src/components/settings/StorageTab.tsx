@@ -2,26 +2,31 @@
 
 // Storage: what fills the disk, by group. Groups that are safe to clear
 // list their parts with a box each; nothing moves until you review and
-// confirm, and everything goes to the Recycle Bin.
+// confirm, and everything goes to the Recycle Bin. Scan results live in
+// disk-scan so they survive leaving Settings or closing the island.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api, type DiskGroup } from "@/lib/bridge";
+import { startDiskScan, useDiskScan } from "@/lib/disk-scan";
 import { Tip } from "../Tip";
 import { Button, Section } from "./ui";
 
 export function StorageTab({ onError }: { onError: (e: string) => void }) {
-  const [groups, setGroups] = useState<DiskGroup[] | null>(null);
-  const [scanning, setScanning] = useState(false);
+  const groups = useDiskScan((s) => s.groups);
+  const scanning = useDiskScan((s) => s.scanning);
+  const error = useDiskScan((s) => s.error);
   const [open, setOpen] = useState<string | null>(null);
   const [done, setDone] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (!error) return;
+    onError(error);
+    useDiskScan.setState({ error: null });
+  }, [error, onError]);
+
   const scan = () => {
-    setScanning(true);
     setDone(null);
-    api
-      .diskGroups()
-      .then(setGroups, (e: unknown) => onError(String(e)))
-      .finally(() => setScanning(false));
+    startDiskScan();
   };
   const largest = Math.max(1, ...(groups ?? []).map((g) => g.bytes));
 

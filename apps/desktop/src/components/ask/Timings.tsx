@@ -26,6 +26,7 @@ export function Timings() {
   const [values, setValues] = useState<Record<Timing["name"], number[]>>({
     open_to_ready: [],
     enter_to_first_word: [],
+    speech_to_first_word: [],
     speech_to_first_sound: [],
   });
 
