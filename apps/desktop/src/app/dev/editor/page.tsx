@@ -2,7 +2,7 @@
 
 // Development page: the full editor against the browser mock.
 
-import { Editor } from "@/components/agents/Editor";
+import { Editor } from "@/components/agents/editor";
 
 export default function EditorDev() {
   return (

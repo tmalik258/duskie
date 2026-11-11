@@ -1,11 +1,12 @@
 // In-memory stale-while-revalidate for per-repo git payloads. Remounting the
 // dock paints the last answer immediately; a quiet refresh follows.
 
+import { loadOnce } from "./cache";
+
 const TTL_MS = 60_000;
 
 type Entry = { at: number; value: unknown };
 const memory = new Map<string, Entry>();
-const pending = new Map<string, Promise<unknown>>();
 
 export function gitCacheKey(kind: string, path: string, ...rest: string[]): string {
   return ["git", kind, path, ...rest].join("\0");
@@ -28,18 +29,6 @@ export function invalidateGitPath(path: string): void {
     const parts = key.split("\0");
     if (parts[2] === path) memory.delete(key);
   }
-}
-
-function loadOnce<T>(key: string, load: () => Promise<T>): Promise<T> {
-  const active = pending.get(key);
-  if (active) return active as Promise<T>;
-  const request = Promise.resolve().then(load);
-  pending.set(key, request);
-  const clear = () => {
-    pending.delete(key);
-  };
-  void request.then(clear, clear);
-  return request;
 }
 
 /** Fresh if within TTL; otherwise still returns stale and callers should refresh. */

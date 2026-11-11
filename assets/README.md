@@ -19,5 +19,5 @@ node scripts/export-social-preview.mjs
 The social preview is `social-preview.html` (edit that, then export it to `social-preview.png`
 with the last command; it renders through headless Edge or Chrome).
 
-The live face in the app is the WebGL creature (`apps/desktop/src/components/Creature.tsx`);
+The live face in the app is the WebGL creature (`apps/desktop/src/components/creature.tsx`);
 sounds come from the SND kits (`snd-lib` on npm, see the README credits).
