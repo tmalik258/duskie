@@ -19,7 +19,7 @@ export interface AskOpen {
   /** Opens Agents with a new session in this project. */
   project?: string | null;
   /** Ask panel tab to show. */
-  tab?: "ask" | "agents" | null;
+  tab?: "ask" | "agents" | "git" | null;
   /** Rust open generation; stale opens after a close are ignored. */
   panelGen?: number;
 }
@@ -120,4 +120,8 @@ export interface HitRect {
   y: number;
   width: number;
   height: number;
+  /** Click-through space inside the rect. */
+  gap?: { x: number; y: number; width: number; height: number } | null;
+  /** A floating card inside the gap that still takes clicks. */
+  keep?: { x: number; y: number; width: number; height: number } | null;
 }

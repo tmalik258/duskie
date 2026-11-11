@@ -3,7 +3,7 @@
 // Part of board: Tile, ago, PICK_NOTE.
 
 import { useState } from "react";
-import { answerQuestion, finishSession, resumeSession, type Session, useAgents } from "@/lib/agents";
+import { answerQuestion, resumeSession, type Session, useAgents } from "@/lib/agents";
 import { agoText } from "@/lib/time-text";
 import { AgentMark, agentMarkId } from "../marks";
 import { NameField } from "../session/name-field";
@@ -47,7 +47,7 @@ export function Tile({ s, n, focused }: { s: Session; n: number; focused: boolea
           <span className="ak-tm">
             {s.agent}
             {s.project ? ` · ${s.project}` : ""}
-            {s.worktree ? ` · ⎇ ${s.worktree}` : s.branch ? ` · ⎇ ${s.branch}` : ""}
+            {s.branch ? ` · ⎇ ${s.branch}` : ""}
           </span>
         </span>
         <span className="ak-pill" data-s={st}>
@@ -55,14 +55,6 @@ export function Tile({ s, n, focused }: { s: Session; n: number; focused: boolea
           {label}
         </span>
       </div>
-      {s.worktree && !s.finished && (
-        <p className="ak-twt">
-          <span>
-            <b>Its own worktree.</b> It never edits the same files as the other session on {s.project}; Finish merges it
-            back.
-          </span>
-        </p>
-      )}
       {s.question ? (
         <>
           <p className="ak-tsay">
@@ -100,19 +92,6 @@ export function Tile({ s, n, focused }: { s: Session; n: number; focused: boolea
                 onClick={() => void resumeSession(s.id).catch((e) => setNote(String(e)))}
               >
                 Resume
-              </button>
-            )}
-            {s.worktree && st === "done" && !s.finished && (
-              <button
-                type="button"
-                className="ak-chip primary chip"
-                onClick={() =>
-                  void finishSession(s.id)
-                    .then(setNote)
-                    .catch((e: unknown) => setNote(String(e)))
-                }
-              >
-                Finish
               </button>
             )}
           </div>

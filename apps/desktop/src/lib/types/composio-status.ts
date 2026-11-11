@@ -83,6 +83,7 @@ export interface ChatSummary {
 /** Shortcut actions besides Ask, in the order Settings shows them. */
 export const SHORTCUT_ACTIONS: { id: string; label: string }[] = [
   { id: "agents", label: "Agents" },
+  { id: "git", label: "Git" },
   { id: "talk", label: "Talk" },
   { id: "accept", label: "Accept the suggestion" },
   { id: "dismiss", label: "Stop or Not now" },
@@ -106,7 +107,7 @@ export interface RoutineItem {
 
 /** Coding agents on this PC, and which one gets handoffs. */
 /** How much an agent may do without asking. */
-export type AgentMode = "plan" | "ask" | "edit" | "debug" | "full";
+export type AgentMode = "plan" | "ask" | "edit" | "debug" | "full" | "try";
 
 export interface AgentStarted {
   id: string;
@@ -115,8 +116,8 @@ export interface AgentStarted {
   branch: string | null;
   /** Changes can be reviewed and undone (the project uses git). */
   reviewable: boolean;
-  /** Its own worktree's branch, when another session was in this repo. */
-  worktree?: string | null;
+  /** Try mode: the copy's branch. The project folder is untouched. */
+  trial?: string | null;
 }
 
 export interface FileChange {

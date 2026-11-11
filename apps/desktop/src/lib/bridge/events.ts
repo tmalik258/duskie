@@ -20,6 +20,7 @@ export const EVENTS = {
   mascotState: "mascot://state",
   suggestionNew: "suggestion://new",
   suggestionClear: "suggestion://clear",
+  suggestionHeld: "suggestion://held",
   islandHover: "island://hover",
   islandCursor: "island://cursor",
   islandVisible: "island://visible",
@@ -29,6 +30,7 @@ export const EVENTS = {
   aiDelta: "ai://delta",
   aiDone: "ai://done",
   aiTool: "ai://tool",
+  aiAck: "ai://ack",
   connectorsDuplicate: "connectors://duplicate",
   libraryFound: "library://found",
   termData: "term://data",
@@ -40,6 +42,7 @@ export const EVENTS = {
   voiceState: "voice://state",
   voiceHeard: "voice://heard",
   voiceSpeaking: "voice://speaking",
+  voiceSaying: "voice://saying",
   agentEvent: "agent://event",
   voiceDownload: "voice://download",
   suggestionLater: "suggestion://later",
@@ -64,6 +67,7 @@ export interface EventPayloads {
   [EVENTS.islandFocus]: { until: number | null; held: number | unknown[]; ended?: boolean };
   [EVENTS.suggestionNew]: Suggestion;
   [EVENTS.suggestionClear]: string;
+  [EVENTS.suggestionHeld]: boolean;
   [EVENTS.islandHover]: boolean;
   [EVENTS.islandCursor]: { x: number; y: number };
   [EVENTS.islandVisible]: boolean;
@@ -82,6 +86,7 @@ export interface EventPayloads {
     /** US dollars, only for Anthropic API answers. */
     cost?: number | null;
   };
+  [EVENTS.aiAck]: { id: string; label: string };
   [EVENTS.aiTool]: { id: string; name: string; label?: string; source?: string | null };
   [EVENTS.connectorsDuplicate]: { app: string; used: string; unused: string[] };
   [EVENTS.libraryFound]: { names: string[] };
@@ -94,6 +99,7 @@ export interface EventPayloads {
   [EVENTS.voiceState]: VoiceStatus;
   [EVENTS.voiceHeard]: VoiceHeard;
   [EVENTS.voiceSpeaking]: boolean;
+  [EVENTS.voiceSaying]: { text: string; startsInMs: number; ms: number };
   [EVENTS.agentEvent]: { session: string; kind: string } & Record<string, unknown>;
   [EVENTS.voiceDownload]: VoiceDownload;
   [EVENTS.suggestionLater]: number;

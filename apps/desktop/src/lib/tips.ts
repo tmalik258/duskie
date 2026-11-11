@@ -5,7 +5,7 @@ export const TIPS = [
   "Hold Alt in Ask to see every shortcut.",
   "Type / in Ask for all commands.",
   'Say "turn on hotspot" or "mute": it happens at once.',
-  "Copy an error and press Ctrl+Space: Duskie explains it.",
+  "Copy an error and press Win+Alt+Space: Duskie explains it.",
   'Ask "what\'s taking space" to see what fills your drive.',
   "Click the info button under an answer to see which model answered.",
   "Settings > Memory shows what Duskie has learned, and lets you forget it.",

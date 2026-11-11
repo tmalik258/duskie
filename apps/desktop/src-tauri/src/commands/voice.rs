@@ -148,6 +148,12 @@ pub async fn voice_enroll_finish(
         .map_err(|e| e.to_string())?
 }
 
+/// The teach card opened: the wake word pauses while it is up.
+#[tauri::command]
+pub fn voice_enroll_open(app: AppHandle) {
+    crate::voice_enroll::open(&app);
+}
+
 /// Drops takes in progress; a taught voice stays.
 #[tauri::command]
 pub fn voice_enroll_cancel(app: AppHandle) -> crate::voice_enroll::EnrollState {

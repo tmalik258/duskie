@@ -1,13 +1,14 @@
 "use client";
 
 // Keep or drop what an agent changed, one change at a time. Files on the
-// left, the open file's changes on the right. Keeping is local until Finish;
-// dropping undoes the change on disk at once.
+// left, the open file's changes on the right. Dropping undoes the change on
+// disk at once; the review closes on its own once every change is decided.
 // Keys: Y keep, N drop, J K next and back, [ ] files, C comment, Alt 1 / Alt 2 all.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { type Session, sendToSession } from "@/lib/agents";
+import { markReviewed, type Session, sendToSession } from "@/lib/agents";
 import { api } from "@/lib/bridge";
+import { Ic } from "../icon";
 import { FileTree } from "./review/file-tree";
 import { groupByDir, keyOf, letter, rows } from "./review/hunk";
 import { HunkView } from "./review/hunk-view";
@@ -17,13 +18,14 @@ import { ReviewFoot } from "./review/review-foot";
 import { useReviewCursor } from "./review/use-review-cursor";
 import { useReviewFiles } from "./review/use-review-files";
 import { useReviewKeys } from "./review/use-review-keys";
+import { useKept, useReviewFinish } from "./review/use-review-progress";
 
 export { ReviewLoading } from "./review/loading";
 
 export function Review({ session, maxHeight, onDone }: { session: Session; maxHeight: number; onDone: () => void }) {
   const { files, finished, error, setError, slow, load } = useReviewFiles(session.id);
   // Kept changes by "path:header"; dropped ones leave the diff, so only their count stays.
-  const [kept, setKept] = useState<Set<string>>(new Set());
+  const [kept, setKept] = useKept(session.id, session.turnAt);
   const list = files ?? [];
   const { fileAt, hunkAt, setHunkAt, advance, goFile } = useReviewCursor(list, kept);
   const [dropped, setDropped] = useState(0);
@@ -33,8 +35,11 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
 
   // Nothing to review: leave at once.
   useEffect(() => {
-    if (finished && files !== null && files.length === 0 && dropped === 0 && !error) onDone();
-  }, [finished, files, dropped, error, onDone]);
+    if (finished && files !== null && files.length === 0 && dropped === 0 && !error) {
+      markReviewed(session.id, 0);
+      onDone();
+    }
+  }, [finished, files, dropped, error, onDone, session.id]);
 
   const file = list[Math.min(fileAt, list.length - 1)];
   const total = list.reduce((n, f) => n + f.hunks.length, 0) + dropped;
@@ -59,15 +64,15 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
     const next = new Set(kept).add(keyOf(file, h));
     setKept(next);
     advance(fileAt, hunkAt + 1, next);
-  }, [file, hunkAt, kept, fileAt, advance]);
+  }, [file, hunkAt, kept, setKept, fileAt, advance]);
   const no = useCallback(() => {
-    if (!file || !file.hunks[hunkAt]) return;
+    if (!file?.hunks[hunkAt]) return;
     drop(file.path, hunkAt, 1);
   }, [file, hunkAt, drop]);
-  const finish = useCallback(() => onDone(), [onDone]);
+  useReviewFinish(session.id, finished, total, left, onDone);
   const acceptRemaining = useCallback(() => {
     setKept((k) => new Set([...k, ...list.flatMap((f) => f.hunks.map((h) => keyOf(f, h)))]));
-  }, [list]);
+  }, [list, setKept]);
 
   // Keep the current change in view.
   useEffect(() => {
@@ -89,7 +94,7 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
 
   const groups = useMemo(() => groupByDir(list), [list]);
 
-  if (files === null && !error) return <ReviewLoading slow={slow} />;
+  if (files === null && !error) return <ReviewLoading slow={slow} onClose={onDone} />;
 
   if (error && list.length === 0) return <ReviewError error={error} onRetry={load} onClose={onDone} />;
 
@@ -106,6 +111,12 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
       <FileTree done={done} total={total} groups={groups} kept={kept} fileAt={fileAt} goFile={goFile} />
 
       <section className="rv-pane">
+        <div className="rv-dhead">
+          <b className="p">Review changes</b>
+          <button type="button" className="rv-ico" aria-label="Close review" title="Close review" onClick={onDone}>
+            <Ic name="x" size={14} />
+          </button>
+        </div>
         {file ? (
           <>
             <div className="rv-dhead">
@@ -184,7 +195,6 @@ export function Review({ session, maxHeight, onDone }: { session: Session; maxHe
           fileCount={list.length}
           goFile={goFile}
           acceptRemaining={acceptRemaining}
-          finish={finish}
         />
       </section>
     </div>

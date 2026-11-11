@@ -13,7 +13,7 @@ impl WindowSensor {
     pub const EVENT_KIND: &'static str = "window.focused";
 }
 
-const CHECK_EVERY: Duration = Duration::from_millis(500);
+const CHECK_EVERY: Duration = Duration::from_millis(1000);
 
 /// Windows that pass over the screen for a moment (the screenshot overlay,
 /// Notification Center): not the app the user is in, and never fullscreen.

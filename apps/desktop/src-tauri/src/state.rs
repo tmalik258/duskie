@@ -104,6 +104,23 @@ pub struct HitRect {
     pub y: f64,
     pub width: f64,
     pub height: f64,
+    /// Empty space inside the rect that lets clicks through, like the area
+    /// under the island when the Git dock beside it is taller.
+    #[serde(default)]
+    pub gap: Option<Gap>,
+    /// A floating card that takes clicks even inside the gap.
+    #[serde(default)]
+    pub keep: Option<Gap>,
+}
+
+/// A click-through cut-out of a [`HitRect`].
+#[derive(Debug, Clone, Copy, Default, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Gap {
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
 }
 
 impl HitRect {
@@ -113,10 +130,16 @@ impl HitRect {
 
     /// Like [`HitRect::contains`], with `pad` pixels to spare on every side.
     pub fn contains_within(&self, x: f64, y: f64, pad: f64) -> bool {
+        let inside = |g: &Gap, p: f64| {
+            x > g.x + p && x < g.x + g.width - p && y > g.y + p && y < g.y + g.height - p
+        };
+        let in_gap = self.gap.is_some_and(|g| inside(&g, pad))
+            && !self.keep.is_some_and(|k| inside(&k, -pad));
         x >= self.x - pad
             && x <= self.x + self.width + pad
             && y >= self.y - pad
             && y <= self.y + self.height + pad
+            && !in_gap
     }
 }
 
@@ -260,12 +283,38 @@ mod tests {
     use duskie_core::Pause;
 
     #[test]
+    fn hit_rect_gap_lets_clicks_through_unless_a_card_is_there() {
+        let mut r = HitRect {
+            width: 100.0,
+            height: 100.0,
+            gap: Some(Gap {
+                x: 0.0,
+                y: 50.0,
+                width: 50.0,
+                height: 50.0,
+            }),
+            ..Default::default()
+        };
+        assert!(r.contains(25.0, 25.0));
+        assert!(!r.contains(25.0, 75.0));
+        assert!(r.contains(75.0, 75.0));
+        r.keep = Some(Gap {
+            x: 20.0,
+            y: 70.0,
+            width: 10.0,
+            height: 10.0,
+        });
+        assert!(r.contains(25.0, 75.0));
+    }
+
+    #[test]
     fn hit_rect_contains_edges() {
         let r = HitRect {
             x: 10.0,
             y: 0.0,
             width: 100.0,
             height: 40.0,
+            ..Default::default()
         };
         assert!(r.contains(10.0, 0.0));
         assert!(r.contains(110.0, 40.0));

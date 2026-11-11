@@ -99,8 +99,9 @@ export function useNewSession(sessions: Session[]) {
     useAgents.setState({ draftPath: next });
   };
   const full = runningCount(sessions) >= SLOTS;
-  const go = () => {
-    if (!prompt.trim() || !pickedPath || busy || (picked && !ready(picked))) return;
+  /** Starts with `text` (the prompt plus its context); false when it could not. */
+  const go = (text = prompt) => {
+    if (!text.trim() || !pickedPath || busy || (picked && !ready(picked))) return false;
     setBusy(true);
     setError(null);
     // Confirm readiness right before start; avoid refresh on every open.
@@ -110,7 +111,7 @@ export function useNewSession(sessions: Session[]) {
     startSession(
       pickedAgent,
       pickedPath,
-      prompt.trim(),
+      text.trim(),
       mode,
       model ?? defaultModel(pickedAgent),
       effort ?? (pickedAgent.toLowerCase() === "local" ? effort : DEFAULT_EFFORT),
@@ -118,6 +119,7 @@ export function useNewSession(sessions: Session[]) {
       .then(() => setPrompt(""))
       .catch((e: unknown) => setError(String(e)))
       .finally(() => setBusy(false));
+    return true;
   };
   return {
     agents,

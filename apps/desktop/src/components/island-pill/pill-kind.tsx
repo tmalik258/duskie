@@ -26,6 +26,8 @@ export interface PillModel {
   dim?: string;
   /** Working: when it began, for the m:ss timer. */
   startedAt?: number;
+  /** Counts down to this instead of up from startedAt. */
+  endsAt?: number;
   /** Working: 0..1 for the edge ring; undefined runs the ring as indeterminate. */
   progress?: number;
   /** Focus: time left, already formatted. */

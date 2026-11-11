@@ -520,6 +520,7 @@ async fn judge(
         system: JUDGE_SYSTEM.into(),
         messages: vec![duskie_ai::Message::user(prompt)],
         image: None,
+        more_images: Vec::new(),
         think: false,
     };
     let answer = tokio::time::timeout(JUDGE_WAIT, model.complete(&req, json!({})))

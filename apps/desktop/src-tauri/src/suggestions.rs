@@ -16,6 +16,8 @@ use crate::mascot;
 use crate::state::{Active, AppState, Queued, Suggestion, executor, lock};
 
 pub const SUGGESTION_NEW: &str = "suggestion://new";
+/// The card's countdown is paused (true) or running (false) for a spoken answer.
+pub const SUGGESTION_HELD: &str = "suggestion://held";
 pub const SUGGESTION_CLEAR: &str = "suggestion://clear";
 pub const ACTION_RESULT: &str = "action://result";
 
@@ -566,6 +568,7 @@ fn expire_when_ignored(app: &AppHandle, id: String) {
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let mut idle = Duration::ZERO;
+        let mut was_held = false;
         loop {
             tokio::time::sleep(EXPIRY_TICK).await;
             let state = app.state::<AppState>();
@@ -574,7 +577,14 @@ fn expire_when_ignored(app: &AppHandle, id: String) {
                 return;
             }
             let limit = Duration::from_secs(u64::from(lock(&state.settings).collapse_after_secs));
-            idle = if state.hovered.load(Ordering::Relaxed) {
+            // Prompt still playing: pause the clock. Mic open for a spoken
+            // answer does not hold - the fill drains so the card can time out.
+            let held = crate::voice::suggestion_dismiss_held(&app);
+            if held != was_held {
+                was_held = held;
+                let _ = app.emit(SUGGESTION_HELD, held);
+            }
+            idle = if state.hovered.load(Ordering::Relaxed) || held {
                 Duration::ZERO
             } else {
                 idle + EXPIRY_TICK
@@ -625,6 +635,7 @@ pub fn choose_by_voice(app: &AppHandle, id: &str, index: usize) -> Result<(), St
 
 fn run_choice(app: &AppHandle, id: &str, index: usize, auto: bool) -> Result<(), String> {
     let active = take(app, id)?;
+    crate::voice::silence_suggestion(app, true);
     let option = active
         .proposal
         .options
@@ -1015,6 +1026,7 @@ fn log_action(
 
 pub fn dismiss(app: &AppHandle, id: &str, reason: &str) -> Result<(), String> {
     let active = take(app, id)?;
+    crate::voice::silence_suggestion(app, reason != "timeout");
     log::info!(
         "suggestion from {} dismissed: {reason}",
         active.proposal.skill_id

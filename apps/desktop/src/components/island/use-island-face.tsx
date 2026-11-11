@@ -3,7 +3,9 @@
 import { useMotionValue } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api } from "@/lib/bridge";
+import { mascotSound, usePanelSounds } from "@/lib/sound/panel-sounds";
 import { connect, useDuskie, watchWaiting } from "@/lib/store";
+import { setCreatureSound } from "../creature/creature";
 import { COMPACT } from "../island-layout";
 import { voiceShellWidth } from "../island-voice/tail";
 import type { IslandHover } from "./use-island-hover";
@@ -35,6 +37,11 @@ export function useIslandFace(c: IslandStore & IslandWork & IslandHover) {
   const contentEl = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => connect({ sounds: true }), []);
+  usePanelSounds();
+  useEffect(() => {
+    setCreatureSound(mascotSound);
+    return () => setCreatureSound(null);
+  }, []);
   // The window stays hidden until this page has drawn, so it never flashes
   // an empty black frame at startup. Two frames: the first one is painted.
   useEffect(() => {

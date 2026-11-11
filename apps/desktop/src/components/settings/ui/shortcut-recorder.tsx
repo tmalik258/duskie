@@ -50,7 +50,7 @@ export function ShortcutRecorder({
               : "border-(--border) text-(--muted)"
         }`}
       >
-        {recording ? "Press keys..." : binding || "Off"}
+        {recording ? "Press keys..." : binding.replace(/\bSuper\b/g, "Win") || "Off"}
       </button>
       {binding && !recording && (
         <Button small onClick={() => onChange(on ? `-${binding}` : binding)}>

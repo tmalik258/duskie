@@ -17,7 +17,7 @@ function groupOf(s: Session): Group {
   if (s.status === "waiting" || s.question || s.choose) return "Needs you";
   if (s.status === "working") return "Running";
   if (s.status === "failed") return "Stopped";
-  if (!s.finished && s.changes > 0) return "Ready to review";
+  if (s.changes > 0) return "Ready to review";
   return "Done";
 }
 

@@ -126,7 +126,7 @@ export const morphClose = spring({ response: 0.42, damping: 0.9 });
 /** Growing or shrinking while already open (an answer streaming in, New):
  * no bounce, so the panel never overshoots and settles back. */
 export const resize = spring(SPRINGS.settle);
-/** Ctrl+Space is a keyboard action used many times a day: Ask opens in one
+/** The Ask shortcut is a keyboard action used many times a day: Ask opens in one
  * quick, calm move, with no bounce and no blur. */
 export const askOpen = { duration: 0.2, ease: [0.23, 1, 0.32, 1] } as const;
 /** Agents is a richer surface: a short Dynamic Island spring, still snappy. */

@@ -10,6 +10,7 @@ import { Tip } from "../../tip";
 import { AgentMark } from "../marks";
 import { ContextRing, SessionMemory } from "./context-ring";
 import { NameField } from "./name-field";
+import { TrialBar } from "./trial-bar";
 
 export function SessionHeader({
   session: s,
@@ -45,10 +46,11 @@ export function SessionHeader({
           <SessionMemory id={s.id} live={active && s.status !== "ended" && s.status !== "failed" && !s.restored} />
           {s.changes > 0 && (
             <HeaderButton
-              tip="Review changes (Alt 1)"
-              label="Review changes"
+              tip="Diff (Alt 1)"
+              label="Diff"
               icon="diff"
               size={14}
+              pressed={s.view?.reviewing ?? false}
               onClick={onReview}
             />
           )}
@@ -74,6 +76,7 @@ export function SessionHeader({
           )}
         </span>
       </div>
+      <TrialBar session={s} working={working} />
       {working && s.activeMode !== s.mode && <p className="ak-note ag-sh-note">New mode applies to the next message</p>}
     </>
   );
@@ -85,6 +88,7 @@ function HeaderButton({
   icon,
   size = 13,
   danger,
+  pressed,
   onClick,
 }: {
   tip: string;
@@ -92,11 +96,18 @@ function HeaderButton({
   icon: IcName;
   size?: number;
   danger?: boolean;
+  pressed?: boolean;
   onClick: () => void;
 }) {
   return (
     <Tip label={tip}>
-      <button type="button" aria-label={label} onClick={onClick} className={`ak-ibtn chip${danger ? " danger" : ""}`}>
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={pressed}
+        onClick={onClick}
+        className={`ak-ibtn chip${danger ? " danger" : ""}`}
+      >
         <Ic name={icon} size={size} />
       </button>
     </Tip>

@@ -13,6 +13,10 @@ import { lin, THEMES } from "./fur-themes";
 
 let api = null;
 let failed = false;
+/** WebGL stayed lost long enough that we should show the still silhouette. */
+let contextGone = false;
+let lostTimer = 0;
+const lostListeners = new Set();
 // Software rendering at boot is often a GPU that is still waking up; look again a few times.
 let softTries = 0;
 const SOFT_RETRIES = 4;
@@ -42,8 +46,9 @@ function boot() {
   // Expressions follow the Mascot Lab: a mouth only on reactions, the resting moods keep a quiet face.
   const X = { ...X_A, ...X_B };
 
-  // The app plays its own sounds; the creature stays quiet.
-  const Sound = { play() {} };
+  // Mood sounds come from the app; only the island's mascot (sound: true)
+  // makes its life sounds (a yawn, dozing, tape) through Duskie's own player.
+  const Sound = { play: (name) => name && soundHook?.(name) };
   const XS = {};
 
   const all = [];
@@ -57,6 +62,8 @@ function boot() {
       this.alive = !!o.alive;
       this.follow = o.follow ?? true;
       this.interactive = !!o.interactive;
+      // Always the island-cheap path (steps / supersample / res caps).
+      this.quality = o.quality ?? "island";
       this.bust = o.bust ?? this.size < 40;
       // The canvas reaches past the box so raised arms and hops are never cut.
       this.bleed = this.bust ? 1 : (o.bleed ?? 1.3);
@@ -120,13 +127,21 @@ function boot() {
       this.aliveTick();
       all.push(this);
     }
-    /** Renders sharper when the view is zoomed. */
+    /** Renders sharper when the view is zoomed. Caps stay on the island-cheap path. */
     setScale(k) {
-      const ss = this.size <= 44 ? 3 : this.size <= 130 ? 2.4 : 1.2;
+      this.scaleK = k;
+      const ss = this.size <= 44 ? 1.5 : this.size <= 130 ? 1.35 : 1.2;
+      const cap = this.size <= 44 ? 192 : 288;
       const px = this.size * this.bleed * dpr * k;
       this.canvas.width = this.canvas.height = Math.round(px);
-      this.res = Math.min(700, Math.round(px * (k > 1 ? Math.max(1.5, (ss / k) * 1.2) : ss)));
+      this.res = Math.min(cap, Math.round(px * (k > 1 ? Math.max(1.25, (ss / k) * 1.1) : ss)));
       this.dirty = true;
+    }
+    /** Switch quality without tearing down the WebGL instance (avoids a blank remount). */
+    setQuality(q) {
+      if (this.quality === q) return;
+      this.quality = q;
+      this.setScale(this.scaleK ?? 1);
     }
     later(ms, fn) {
       const t = setTimeout(() => {
@@ -439,6 +454,7 @@ function boot() {
       }
       if (this.life === "talk") mh *= 0.45 + 0.55 * Math.abs(Math.sin(now / 140) * Math.sin(now / 310 + 1));
       const small = this.size < 60;
+      const tiny = this.size <= 44;
       return {
         uYaw: -s.gx.value * 0.34,
         uPitch: -s.gy.value * 0.14,
@@ -455,9 +471,9 @@ function boot() {
         uRimI: t.rimI * (small ? 1.35 : 1) * (this.rim ? 1.25 : 1),
         uKey: [3.8, 3.7, 3.5],
         uDim: s.dim.value,
-        uFurAmp: 0.018,
-        uDetail: 44,
-        uBump: t.bump * 0.52,
+        uFurAmp: tiny ? 0.012 : 0.018,
+        uDetail: tiny ? 28 : 40,
+        uBump: t.bump * (tiny ? 0.35 : 0.52),
         uMicro: Math.min(0.88, t.micro + 0.24),
         uTipK: 0.28,
         uEyeCore: t.core,
@@ -465,6 +481,7 @@ function boot() {
         uEmissive: t.emissive,
         uGlow: s.glow.value * (small ? 1.15 : 1),
         uGlint: t.emissive ? 0 : 1,
+        uSteps: tiny ? 40 : 56,
         uEyeL: [9, 0, 0, 0],
         uEyeR: [9, 0, 0, 0],
         uEyeLB: [LID[el] ?? 1, 0, 0, 0],
@@ -730,7 +747,8 @@ function boot() {
       )
         m.dirty = true;
       m.place(now);
-      if (m.dirty && performance.now() - t0 < 12) m.render(now);
+      // Tighter budget under load so the UI thread is not held by fur draws.
+      if (m.dirty && performance.now() - t0 < 8) m.render(now);
     }
     if (busy && !document.hidden) raf = requestAnimationFrame(frame);
   }
@@ -742,10 +760,31 @@ function boot() {
   };
   // Mark every creature dirty and run a frame (also used after WebGL restore).
   const dirt = () => {
-    for (const m of all) m.dirty = true;
+    for (const m of all) {
+      m.dirty = true;
+    }
     wake();
   };
-  R.onRestore = dirt;
+  R.onRestore = () => {
+    contextGone = false;
+    clearTimeout(lostTimer);
+    lostTimer = 0;
+    dirt();
+  };
+  R.onLost = () => {
+    // Keep each 2D canvas's last blit; if the GPU never comes back, fall
+    // through to the still silhouette so the face is never empty.
+    clearTimeout(lostTimer);
+    lostTimer = setTimeout(() => {
+      if (R.lost || R.gl.isContextLost()) {
+        contextGone = true;
+        failed = true;
+        for (const fn of lostListeners) {
+          fn();
+        }
+      }
+    }, 2500);
+  };
   // Screen lock / sleep often clears canvas pixels without a context-loss event.
   const onVisible = () => {
     if (document.hidden) return;
@@ -789,8 +828,8 @@ function boot() {
     if (i >= 0) all.splice(i, 1);
     this.el.remove();
   };
-  // Any change of mood or colour wakes the loop.
-  for (const k of ["show", "setTheme", "later"]) {
+  // Any change of mood, colour or quality wakes the loop.
+  for (const k of ["show", "setTheme", "later", "setQuality"]) {
     const f = Mascot.prototype[k];
     Mascot.prototype[k] = function (...a) {
       const r = f.apply(this, a);
@@ -803,13 +842,26 @@ function boot() {
 
 /** True while a later look might still find a GPU. */
 export function creatureMayRetry() {
-  return !api && !failed;
+  return !api && !failed && !contextGone;
 }
 
 /** True when this machine can draw the creature (WebGL 2). */
 export function creatureSupported() {
+  if (contextGone || failed) return false;
   if (!api && !failed && typeof window !== "undefined") api = boot();
   return !!api;
+}
+
+/** Subscribe to a lasting WebGL loss so React can show the still silhouette. */
+export function onCreatureLost(fn) {
+  lostListeners.add(fn);
+  return () => lostListeners.delete(fn);
+}
+
+let soundHook = null;
+/** Who plays the mascot's life sounds; null keeps it quiet. */
+export function setCreatureSound(fn) {
+  soundHook = fn;
 }
 
 export function createCreature(slot, opts) {

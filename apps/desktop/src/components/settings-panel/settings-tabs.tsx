@@ -41,11 +41,11 @@ export const GROUPS: { label: string; items: { id: SettingsTab; label: string; i
         icon: "palette",
         blurb: "The look of Duskie, the island and the wash behind it.",
       },
-      { id: "sounds", label: "Sounds", icon: "bell", blurb: "Soft cues for what happens, and how loud." },
+      { id: "sounds", label: "Sounds", icon: "speaker", blurb: "Soft cues for what happens, and how loud." },
       {
         id: "notifications",
         label: "Notifications",
-        icon: "spark",
+        icon: "bell",
         blurb: "Windows stays quiet. Only what matters comes up on the island.",
       },
     ],

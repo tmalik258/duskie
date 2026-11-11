@@ -19,6 +19,7 @@ import {
   modelsFor,
   Pop,
 } from "./controls/levels";
+import { LocalModelChip } from "./controls/local-model";
 import { NoLimits } from "./controls/no-limits";
 import { ThinkingBody } from "./controls/thinking-body";
 import { UsageBody } from "./controls/usage-body";
@@ -107,10 +108,7 @@ export function ChatControls({
         </Pop>
       )}
       {local ? (
-        <span className="ak-cchip">
-          <i className="ak-cdot" style={{ background: "#30d158" }} />
-          {localModel ?? "Local model"}
-        </span>
+        <LocalModelChip shown={model ?? localModel} onModel={onModel} />
       ) : (
         models.length > 0 && (
           <span className="ak-cmodel">
@@ -147,41 +145,38 @@ export function ChatControls({
         </Pop>
       )}
       <span className="flex-1" />
-      {!tail && (
-        <>
-          {local ? (
-            <NoLimits />
-          ) : (
-            (usageText || panel?.name === "usage") && (
-              <Pop
-                label="Usage"
-                requested={panel?.name === "usage" ? panel.at : undefined}
-                className="ak-cusage"
-                chip={
-                  <>
-                    <span className="ak-ring" aria-hidden="true">
-                      <i className="ak-cring" style={{ "--p": ringPct } as CSSProperties} />
-                    </span>
-                    {usageText || "Usage"}
-                  </>
-                }
-              >
-                {() => (
-                  <UsageBody
-                    usage={usage}
-                    ctxPct={ctxPct}
-                    plans={plans}
-                    now={now}
-                    agent={agent}
-                    onCompact={onCompact}
-                    onRefresh={onRefresh}
-                  />
-                )}
-              </Pop>
-            )
-          )}
-        </>
-      )}
+      {!tail &&
+        (local ? (
+          <NoLimits />
+        ) : (
+          (usageText || panel?.name === "usage") && (
+            <Pop
+              label="Usage"
+              requested={panel?.name === "usage" ? panel.at : undefined}
+              className="ak-cusage"
+              chip={
+                <>
+                  <span className="ak-ring" aria-hidden="true">
+                    <i className="ak-cring" style={{ "--p": ringPct } as CSSProperties} />
+                  </span>
+                  {usageText || "Usage"}
+                </>
+              }
+            >
+              {() => (
+                <UsageBody
+                  usage={usage}
+                  ctxPct={ctxPct}
+                  plans={plans}
+                  now={now}
+                  agent={agent}
+                  onCompact={onCompact}
+                  onRefresh={onRefresh}
+                />
+              )}
+            </Pop>
+          )
+        ))}
       {keys && <span className="ckeys mono">{keys}</span>}
       {tail}
     </div>

@@ -75,6 +75,12 @@ export function VoiceEnroll({
       .then((s) => {
         setState(s);
         setActive(false);
+        // Finish clears the teach lock; cancel is a no-op for a taught voice
+        // and keeps the UI and Rust flags aligned if finish is older.
+        void api
+          .voiceEnrollCancel()
+          .then(setState)
+          .catch(() => undefined);
       })
       .catch((e) => onError(`Teaching your voice: ${e}`))
       .finally(() => setBusy(null));
@@ -83,6 +89,7 @@ export function VoiceEnroll({
     setAdding(more);
     setNote(null);
     setActive(true);
+    api.voiceEnrollOpen().catch(() => undefined);
   };
   // Cancel keeps the taught voice; only the takes in progress go.
   const stop = () => {
@@ -139,7 +146,7 @@ export function VoiceEnroll({
         {state.taught && !renamed && (
           <Toggle
             label="Only answer my voice"
-            hint="Questions in other voices are dropped. Turn off if it misses you."
+            hint='Drops other people. If it ignores you, turn this off or tap "Add samples" and read the lines again at your desk mic.'
             checked={voice.onlyMe ?? false}
             onChange={(onlyMe) => set({ onlyMe })}
           />

@@ -163,6 +163,14 @@ pub async fn agent_files(id: String, query: String) -> Vec<String> {
         .unwrap_or_default()
 }
 
+/// Files in a project folder for @ in the new-session box.
+#[tauri::command]
+pub async fn project_files(path: String, query: String) -> Vec<String> {
+    tauri::async_runtime::spawn_blocking(move || crate::sessions::files_in(path.into(), &query))
+        .await
+        .unwrap_or_default()
+}
+
 /// Opens the session's project in the user's editor ("Open in Cursor").
 #[tauri::command]
 pub async fn agent_open_editor(app: AppHandle, id: String) -> CmdResult<()> {
@@ -634,10 +642,18 @@ pub async fn agent_review_decide(
     .map_err(|e| e.to_string())?
 }
 
-/// Finish a session that ran in its own worktree: merge it back.
+/// Try mode: bring the copy's changes into the project folder.
 #[tauri::command]
-pub async fn agent_finish(id: String) -> CmdResult<String> {
-    tauri::async_runtime::spawn_blocking(move || crate::sessions::finish(&id))
+pub async fn agent_keep(id: String) -> CmdResult<String> {
+    tauri::async_runtime::spawn_blocking(move || crate::sessions::keep_trial(&id))
+        .await
+        .map_err(|e| e.to_string())?
+}
+
+/// Try mode: delete the copy.
+#[tauri::command]
+pub async fn agent_discard(id: String) -> CmdResult<String> {
+    tauri::async_runtime::spawn_blocking(move || crate::sessions::discard_trial(&id))
         .await
         .map_err(|e| e.to_string())?
 }

@@ -209,6 +209,7 @@ fn decision_prompt(d: &Decision) -> ChatRequest {
             d.state, d.question
         ))],
         image: None,
+        more_images: Vec::new(),
         think: false,
     }
 }

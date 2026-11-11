@@ -17,7 +17,7 @@ impl ClipboardSensor {
     pub const EVENT_KIND: &'static str = "clipboard.changed";
 }
 
-const CHECK_EVERY: Duration = Duration::from_millis(300);
+const CHECK_EVERY: Duration = Duration::from_millis(750);
 /// Longer text is truncated in the event payload.
 const MAX_TEXT: usize = 20_000;
 

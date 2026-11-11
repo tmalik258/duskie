@@ -114,7 +114,11 @@ pub fn synthesize(tts: &OfflineTts, text: &str, sid: i32, speed: f32) -> Option<
 /// model breathes without saying "dot". Pieces stay short so the next synth
 /// finishes before the speaker queue runs dry.
 pub fn respell(text: &str) -> String {
-    tts_punctuation(text)
+    // Models often emit curly quotes; Supertonic is happier with ASCII.
+    let text = text
+        .replace(['\u{2018}', '\u{2019}', '\u{201A}', '\u{2032}'], "'")
+        .replace(['\u{201C}', '\u{201D}', '\u{201E}', '\u{2033}'], "\"");
+    tts_punctuation(&text)
 }
 
 /// `. ` / `! ` / `? ` → `, ` so Supertonic does not say "dot"; trailing
@@ -260,6 +264,7 @@ impl Speaker {
                     }
                     let text = speakable(line);
                     if !text.is_empty() {
+                        log::info!("voice: saying {text:?}");
                         speak_one(
                             &tts,
                             &out,
@@ -397,7 +402,10 @@ fn speak_one(
             let length = Duration::from_secs_f64(words as f64 / f64::from(rate));
             queued(text.to_owned(), starts_in, length);
         }
-        Some(_) => {}
+        Some(_) => {
+            // Wake or barge cleared the utterance during synth - nothing plays.
+            log::info!("voice: dropped {text:?} (stopped while synthesizing)");
+        }
         None => log::warn!("voice: no audio for {text:?}"),
     }
 }

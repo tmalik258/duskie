@@ -82,7 +82,8 @@ export const agentApi = {
     invoke<void>("agent_review_decide", { id, turn, path, hunk, accept }),
   agentTune: (id: string, model: string | null, effort: string | null) =>
     invoke<void>("agent_tune", { id, model, effort }),
-  agentFinish: (id: string) => invoke<string>("agent_finish", { id }),
+  agentKeep: (id: string) => invoke<string>("agent_keep", { id }),
+  agentDiscard: (id: string) => invoke<string>("agent_discard", { id }),
   agentStop: (id: string) => invoke<void>("agent_stop", { id }),
   agentAnswer: (question: string, answer: "allow" | "always" | "deny") =>
     invoke<void>("agent_answer", { question, answer }),
@@ -100,6 +101,10 @@ export const agentApi = {
   agentRewindPreview: (id: string, index: number) => invoke<number>("agent_rewind_preview", { id, index }),
   agentRewind: (id: string, index: number) => invoke<number>("agent_rewind", { id, index }),
   agentFiles: (id: string, query: string) => invoke<string[]>("agent_files", { id, query }),
+  projectFiles: (path: string, query: string) => invoke<string[]>("project_files", { path, query }),
+  saveAttachment: (name: string, data: number[]) => invoke<string>("save_attachment", { name, data }),
+  /** The island steps down from always-on-top while a file picker is open. */
+  islandDialog: (open: boolean) => invoke<void>("island_dialog", { open }),
   agentCommands: (id: string) => invoke<AgentCommand[]>("agent_commands", { id }),
   aiOpenLink: (target: string) => invoke<string>("ai_open_link", { target }),
   reposOverview: (fresh: boolean) => invoke<ReposOverview>("repos_overview", { fresh }),

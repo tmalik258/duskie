@@ -4,6 +4,7 @@
 //! Every external program is started with an argument list, never a shell
 //! string built from event data.
 
+pub mod app_info;
 mod capabilities;
 pub mod cleanup;
 mod convert;
@@ -18,6 +19,7 @@ pub mod office;
 pub mod pc;
 mod script;
 mod system;
+pub use system::run_shell;
 pub mod uia;
 
 use std::path::{Path, PathBuf};
@@ -191,6 +193,16 @@ impl Executor {
             "extract_archive" => {
                 let path = existing_path(args)?;
                 convert::extract(&self.caps, &path).await
+            }
+            "run_command" => {
+                let cmd = arg(args, "command")?.to_owned();
+                let out = tokio::task::spawn_blocking(move || system::run_shell(&cmd))
+                    .await
+                    .map_err(fail)?
+                    .map_err(ActionError::Failed)?;
+                Ok(Outcome::msg(
+                    out.trim().chars().take(400).collect::<String>(),
+                ))
             }
             "kill_port" => {
                 let port: u16 = arg(args, "port")?

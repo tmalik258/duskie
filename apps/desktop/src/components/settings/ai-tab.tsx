@@ -52,7 +52,7 @@ export function AiTab({ onError, part }: { onError: (e: string) => void; part?: 
         <Section
           title="Voice"
           hint="Runs on this PC. Audio is never saved or sent."
-          keywords="microphone speak talk wake word hey duskie supertonic conversation"
+          keywords="microphone speak talk wake word duskie teach train supertonic conversation"
         >
           <VoiceSection voice={voice} onError={onError} />
         </Section>

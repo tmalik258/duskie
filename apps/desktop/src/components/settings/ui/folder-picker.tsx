@@ -88,7 +88,13 @@ const RESERVED: Record<string, string> = {
   "Ctrl+Shift+Escape": "Windows",
   "Super+G": "the Xbox Game Bar",
   "Super+Alt+R": "the Xbox Game Bar",
-  "Alt+Space": "Windows (PowerToys Run)",
+  "Alt+Space": "the Google app and PowerToys Run",
+  "Ctrl+Alt+Space": "the Google app",
+  "Ctrl+Space": "VS Code suggestions",
+  "Ctrl+Shift+Space": "VS Code parameter hints",
+  "Super+Space": "Windows (keyboard language)",
+  "Ctrl+Super+Space": "Windows (keyboard language)",
+  "Shift+Super+Space": "Windows (keyboard language)",
 };
 
 /** Who else uses `keys`, or null. */

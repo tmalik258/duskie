@@ -40,6 +40,10 @@ export interface DuskieState {
   netNotice: NetNotice | null;
   /** Cursor is over the island's interactive area (reported by Rust). */
   hovered: boolean;
+  /** Spoken prompt or mic wait: countdown paused and Dismiss fill held (Rust). */
+  choiceHeld: boolean;
+  /** Hovered with jobs running, the glance was picked over the activities card. */
+  glancePicked: boolean;
   /** Shift (hovered) or Shift+Alt (suggestion), Rust polls; webview has no focus. */
   shiftHeld: boolean;
   /** Extra interactive area while a floating menu is open (unioned into the hit rect). */
@@ -82,6 +86,8 @@ export interface DuskieState {
   conversation: string;
   /** Duskie's voice is playing; the mascot talks along. */
   speaking: boolean;
+  /** A few words of what is being spoken now (karaoke caption). */
+  spokenCaption: string | null;
   /** Voice: what is being heard right now, while listening. */
   hearing: string | null;
   /** Live: the spoken answer as a caption in the compact island, and the
@@ -108,6 +114,8 @@ export const useDuskie = create<DuskieState>(() => ({
   offlineSince: null,
   netNotice: null,
   hovered: false,
+  choiceHeld: false,
+  glancePicked: false,
   shiftHeld: false,
   overlayHit: null,
   visible: true,
@@ -131,6 +139,7 @@ export const useDuskie = create<DuskieState>(() => ({
   hearing: null,
   live: null,
   speaking: false,
+  spokenCaption: null,
   voiceStatus: null,
   later: 0,
   waiting: null,

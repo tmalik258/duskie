@@ -189,3 +189,67 @@ pub fn open_system_page(page: &str) -> Result<Outcome, ActionError> {
     open::that_detached(uri).map_err(|e| ActionError::Failed(e.to_string()))?;
     Ok(Outcome::msg("Opened Settings"))
 }
+
+/// Output a command may return, at most.
+const MAX_OUT: usize = 6_000;
+const RUN_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// Unix ping runs until stopped; give it a count.
+fn bounded(cmd: &str) -> String {
+    let lower = cmd.to_lowercase();
+    if cfg!(not(windows)) && lower.starts_with("ping ") && !lower.contains(" -c") {
+        return format!("ping -c 4 {}", cmd[5..].trim());
+    }
+    cmd.to_owned()
+}
+
+/// Runs a command through the PC's shell, capped in time and length.
+pub fn run_shell(cmd: &str) -> Result<String, String> {
+    let cmd = bounded(cmd);
+    let mut c = if cfg!(windows) {
+        let mut c = std::process::Command::new("powershell");
+        c.args(["-NoProfile", "-NonInteractive", "-Command", &cmd]);
+        c
+    } else {
+        let mut c = std::process::Command::new("sh");
+        c.args(["-c", &cmd]);
+        c
+    };
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        c.creation_flags(0x0800_0000);
+    }
+    let child = c
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let _ = tx.send(child.wait_with_output());
+    });
+    let out = rx
+        .recv_timeout(RUN_TIMEOUT)
+        .map_err(|_| "it took longer than 30 seconds".to_owned())?
+        .map_err(|e| e.to_string())?;
+    let mut text = String::from_utf8_lossy(&out.stdout).into_owned();
+    let err = String::from_utf8_lossy(&out.stderr);
+    if !err.trim().is_empty() {
+        text.push('\n');
+        text.push_str(err.trim());
+    }
+    if text.len() > MAX_OUT {
+        let cut = (0..=MAX_OUT)
+            .rev()
+            .find(|i| text.is_char_boundary(*i))
+            .unwrap_or(0);
+        text.truncate(cut);
+        text.push_str("\n...cut");
+    }
+    Ok(if text.trim().is_empty() {
+        format!("Ran, no output (exit {}).", out.status.code().unwrap_or(-1))
+    } else {
+        text
+    })
+}

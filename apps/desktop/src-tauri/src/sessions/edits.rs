@@ -132,9 +132,14 @@ pub(super) fn checkpoint(id: &str, index: usize) -> Result<Baseline, String> {
 /// Files in the session's project whose path has every word of `query`,
 /// shortest paths first, for @ in the composer.
 pub fn files(id: &str, query: &str) -> Vec<String> {
-    let Some(root) = with(&SESSIONS, |s| s.get(id).map(|h| h.path.clone())) else {
-        return Vec::new();
-    };
+    match with(&SESSIONS, |s| s.get(id).map(|h| h.path.clone())) {
+        Some(root) => files_in(root, query),
+        None => Vec::new(),
+    }
+}
+
+/// Same as [`files`] for a folder, before any session exists.
+pub fn files_in(root: std::path::PathBuf, query: &str) -> Vec<String> {
     let words: Vec<String> = query
         .to_lowercase()
         .split_whitespace()
@@ -170,8 +175,20 @@ pub fn files(id: &str, query: &str) -> Vec<String> {
         })
         .collect(),
     };
+    // Folders too, so @ can point at a whole folder: "src/components/".
+    let mut folders: Vec<String> = all
+        .iter()
+        .flat_map(|p| {
+            p.match_indices('/')
+                .map(|(i, _)| p[..=i].to_string())
+                .collect::<Vec<_>>()
+        })
+        .collect();
+    folders.sort();
+    folders.dedup();
     let mut hits: Vec<String> = all
         .into_iter()
+        .chain(folders)
         .filter(|p| {
             let l = p.to_lowercase();
             words.iter().all(|w| l.contains(w.as_str()))
@@ -179,6 +196,7 @@ pub fn files(id: &str, query: &str) -> Vec<String> {
         .collect();
     // A match in the file name beats one in a folder name; then shorter paths.
     let name_hit = |p: &str| {
+        let p = p.trim_end_matches('/');
         let name = p.rsplit('/').next().unwrap_or(p).to_lowercase();
         !words.iter().all(|w| name.contains(w.as_str()))
     };

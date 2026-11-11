@@ -31,8 +31,9 @@ impl Pause {
 
 /// Shortcuts besides Ask, with their defaults.
 pub const SHORTCUTS: &[(&str, &str)] = &[
-    ("agents", "Ctrl+Shift+Space"),
-    ("talk", "Ctrl+Alt+Space"),
+    ("agents", "Ctrl+Alt+Super+Space"),
+    ("git", "Ctrl+Alt+G"),
+    ("talk", "Ctrl+Alt+T"),
     ("accept", "Ctrl+Alt+Enter"),
     ("dismiss", "Ctrl+Alt+Backspace"),
     ("screen", "Ctrl+Alt+S"),
@@ -78,6 +79,10 @@ pub struct Settings {
     /// clipboard, pause, settings). A leading `-` turns one off without
     /// clearing the combo; empty means no binding yet.
     pub shortcuts: BTreeMap<String, String>,
+    /// Which set of default shortcuts the saved ones were made from. A file
+    /// without it is from before version 1, so it reads as 0.
+    #[serde(default)]
+    pub shortcuts_version: u32,
     /// Where projects and files open: an editor id ("cursor", "pycharm"),
     /// or "auto" for the one used most this week.
     pub code_editor: String,
@@ -145,7 +150,7 @@ pub struct Settings {
     pub answer_style: String,
     /// The user works with code: technical answers and setup. None: not asked.
     pub codes: Option<bool>,
-    /// What the assistant is called and answers to ("Hey Orbi"). The app
+    /// What the assistant is called and answers to ("Orbi"). The app
     /// itself stays Duskie.
     pub assistant_name: String,
     /// Learn from choices (links, files, suggestions, routines). Off: nothing
@@ -386,19 +391,20 @@ pub struct ComposioSettings {
     pub headers: BTreeMap<String, String>,
 }
 
-/// Voice: on by default. Speech models download on launch when
-/// missing. The microphone is open only while voice is on and Duskie is not
-/// paused.
+/// Voice: wake word on by default. Speech models download on launch when
+/// missing. The microphone is always available for push-to-talk (mic button),
+/// but passive listening only when wake word is on and Duskie is not paused.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 pub struct VoiceSettings {
-    pub enabled: bool,
-    /// Listen for "Duskie" (with or without "hey"). Off leaves push to talk in Ask mode.
+    /// Listen for "Duskie" (with or without "hey"). Off means push to talk only.
     pub wake_word: bool,
     /// Read answers aloud when the question was spoken.
     pub speak_answers: bool,
     /// After a spoken answer, listen for a reply without the wake phrase.
     pub conversation: bool,
+    /// Seconds of silence after an answer before the conversation ends.
+    pub reply_wait: u32,
     /// Read suggestions aloud and take a spoken choice ("open", "not now").
     pub speak_suggestions: bool,
     /// Talking over a spoken answer stops it and listens.
@@ -416,10 +422,10 @@ pub struct VoiceSettings {
     /// previous default moves once; a voice picked on purpose is kept.
     #[serde(default = "voice_model_v1")]
     pub model: u32,
-    /// Words voice gets wrong, comma separated: "horsepot = hotspot".
+    /// Extra wake names, comma separated: "desky, desuki, deskie".
     pub fixes: String,
-    /// Live: start answering at a pause in speech and show captions in the
-    /// island. Off by default; off is the kill switch.
+    /// Old Live switch, kept so older settings files load. Live answers are
+    /// always on now.
     pub live: bool,
     /// Keep Live conversations in Ask history (text only, never audio).
     pub live_history: bool,
@@ -437,20 +443,24 @@ pub const VOICE_MODEL: u32 = 4;
 /// Default voice before [`VOICE_MODEL`] 4 (Supertonic launch default).
 const PREVIOUS_DEFAULT_VOICE: &str = "f5";
 
+/// Common ASR mishearings of "Duskie", filled into Words voice gets wrong
+/// by default. A comma list of names; rename the assistant and update it.
+pub const DEFAULT_VOICE_FIXES: &str = "desky, desuki, deskie, deski, duskee, dusuke, desuke";
+
 impl Default for VoiceSettings {
     fn default() -> Self {
         Self {
-            enabled: true,
             wake_word: true,
             speak_answers: true,
             listening_style: "compact".into(),
             conversation: true,
+            reply_wait: 8,
             speak_suggestions: true,
             interrupt: true,
             voice: "f4".into(),
             speed: 1.0,
             model: VOICE_MODEL,
-            fixes: String::new(),
+            fixes: DEFAULT_VOICE_FIXES.into(),
             live: false,
             live_history: true,
             only_me: false,
@@ -755,6 +765,7 @@ impl Default for Settings {
             skills: BTreeMap::new(),
             palette_hotkey: DEFAULT_PALETTE_HOTKEY.into(),
             shortcuts: default_shortcuts(),
+            shortcuts_version: SHORTCUTS_VERSION,
             code_editor: "auto".into(),
             code_folders: Vec::new(),
             saved_projects: Vec::new(),
@@ -794,7 +805,18 @@ impl Default for Settings {
     }
 }
 
-pub const DEFAULT_PALETTE_HOTKEY: &str = "Ctrl+Space";
+pub const DEFAULT_PALETTE_HOTKEY: &str = "Super+Alt+Space";
+
+/// Old defaults, each with the shortcuts version that replaced it, moved
+/// once when still unchanged: Ctrl+Space is VS Code's suggestions and
+/// Ctrl+Alt+Space the Google app's.
+const OLD_DEFAULT_KEYS: &[(u32, &str, &str)] = &[
+    (1, "ask", "Ctrl+Space"),
+    (1, "agents", "Ctrl+Shift+Space"),
+    (1, "talk", "Ctrl+Alt+Space"),
+    (2, "agents", "Ctrl+Alt+A"),
+];
+const SHORTCUTS_VERSION: u32 = 2;
 /// Screens in the first-run welcome (Welcome, Your AI, Connect, Tools, Extras).
 pub const WELCOME_STEP_COUNT: u32 = 5;
 
@@ -911,6 +933,24 @@ impl Settings {
         }
         // Trim; keep a leading `-` (Off) so the combo stays saved.
         self.palette_hotkey = sanitize_shortcut(&self.palette_hotkey);
+        // Old defaults nobody changed move to the new ones, once; keys you
+        // picked yourself stay.
+        if self.shortcuts_version < SHORTCUTS_VERSION {
+            let version = self.shortcuts_version;
+            for (_, action, old) in OLD_DEFAULT_KEYS.iter().filter(|(v, ..)| version < *v) {
+                if *action == "ask" {
+                    if self.palette_hotkey == *old {
+                        self.palette_hotkey = DEFAULT_PALETTE_HOTKEY.into();
+                    }
+                } else if let Some(keys) = self.shortcuts.get_mut(*action)
+                    && keys == old
+                    && let Some((_, new)) = SHORTCUTS.iter().find(|(a, _)| a == action)
+                {
+                    *keys = (*new).into();
+                }
+            }
+            self.shortcuts_version = SHORTCUTS_VERSION;
+        }
         for keys in self.shortcuts.values_mut() {
             *keys = sanitize_shortcut(keys);
         }
@@ -934,6 +974,10 @@ impl Settings {
         }
         if self.voice.voice.trim().is_empty() {
             self.voice.voice = VoiceSettings::default().voice;
+        }
+        // Empty fixes: seed the name list once. An edited list is left alone.
+        if self.voice.fixes.trim().is_empty() {
+            self.voice.fixes = DEFAULT_VOICE_FIXES.into();
         }
         if self.welcome_step >= WELCOME_STEP_COUNT {
             self.welcome_step = WELCOME_STEP_COUNT.saturating_sub(1);
@@ -1019,7 +1063,7 @@ mod tests {
         let mut s = Settings::default();
         s.ai.order = vec!["local".into(), "bogus".into(), "local".into()];
         s.ai.semif.mode = "weird".into();
-        s.palette_hotkey = " Ctrl+Space ".into();
+        s.palette_hotkey = " Ctrl+K ".into();
         let s = s.sanitized();
         assert_eq!(
             s.ai.order,
@@ -1037,7 +1081,35 @@ mod tests {
         );
         assert_eq!(s.ai.coding_agent, "auto");
         assert_eq!(s.ai.semif.mode, "direct");
-        assert_eq!(s.palette_hotkey, "Ctrl+Space");
+        assert_eq!(s.palette_hotkey, "Ctrl+K");
+    }
+
+    #[test]
+    fn old_default_keys_move_once_and_own_keys_stay() {
+        let mut s = Settings {
+            palette_hotkey: "Ctrl+Space".into(),
+            shortcuts_version: 0,
+            ..Settings::default()
+        };
+        s.shortcuts
+            .insert("agents".into(), "Ctrl+Shift+Space".into());
+        s.shortcuts.insert("talk".into(), "Ctrl+Q".into());
+        let s = s.sanitized();
+        assert_eq!(s.palette_hotkey, DEFAULT_PALETTE_HOTKEY);
+        assert_eq!(s.shortcuts["agents"], "Ctrl+Alt+Super+Space");
+        assert_eq!(s.shortcuts["talk"], "Ctrl+Q");
+        assert_eq!(s.shortcuts["git"], "Ctrl+Alt+G");
+        // Picked again after the move: stays.
+        let mut again = s.clone();
+        again.palette_hotkey = "Ctrl+Space".into();
+        assert_eq!(again.sanitized().palette_hotkey, "Ctrl+Space");
+    }
+
+    #[test]
+    fn a_file_from_before_reads_as_version_0() {
+        let s: Settings = serde_json::from_str(r#"{"paletteHotkey":"Ctrl+Space"}"#).unwrap();
+        assert_eq!(s.shortcuts_version, 0);
+        assert_eq!(s.sanitized().palette_hotkey, DEFAULT_PALETTE_HOTKEY);
     }
 
     #[test]

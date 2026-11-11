@@ -3,6 +3,14 @@
 import { call, emit } from "./handler";
 import { mockChanges, mockChat, pendingAgentAnswer } from "./mock-chat";
 
+const mockFiles = (a: Record<string, unknown>) =>
+  [
+    "apps/desktop/src-tauri/src/island.rs",
+    "apps/desktop/src-tauri/src/island_tests.rs",
+    "apps/desktop/src/components/Island.tsx",
+    "apps/desktop/src/components/island/",
+  ].filter((f) => f.toLowerCase().includes(String(a.query ?? "").toLowerCase()));
+
 export const agentCommands: Record<string, (args: Record<string, unknown>) => unknown> = {
   ai_chat: (a) => mockChat(a),
   ai_run_proposal: () => ({
@@ -70,8 +78,9 @@ export const agentCommands: Record<string, (args: Record<string, unknown>) => un
         String(a.path ?? "")
           .split(/[\\/]/)
           .pop() ?? "project",
-      branch: "main",
+      branch: a.mode === "try" ? "try/mock" : "main",
       reviewable: true,
+      trial: a.mode === "try" ? "try/mock" : null,
     };
   },
   agent_handoff: () => call("agent_start", { agent: "claude_code", path: "handoff" }),
@@ -86,6 +95,8 @@ export const agentCommands: Record<string, (args: Record<string, unknown>) => un
   agent_reviews: () => [],
   agent_review_decide: () => undefined,
   agent_stop: () => undefined,
+  agent_keep: () => "Kept. The changes are in your folder now.",
+  agent_discard: () => "Thrown away. Your code was never touched.",
   agent_close: () => undefined,
   agent_terminal: () => undefined,
   agent_resume: () => undefined,
@@ -93,12 +104,9 @@ export const agentCommands: Record<string, (args: Record<string, unknown>) => un
   agent_open_editor: () => undefined,
   agent_rewind_preview: () => 1,
   agent_rewind: () => 1,
-  agent_files: (a) =>
-    [
-      "apps/desktop/src-tauri/src/island.rs",
-      "apps/desktop/src-tauri/src/island_tests.rs",
-      "apps/desktop/src/components/Island.tsx",
-    ].filter((f) => f.toLowerCase().includes(String(a.query ?? "").toLowerCase())),
+  agent_files: (a) => mockFiles(a),
+  project_files: (a) => mockFiles(a),
+  save_attachment: (a) => `C:/Users/you/AppData/Local/Temp/duskie-attachments/01J-${String(a.name)}`,
   agent_commands: () => [
     { name: "/compact", description: "Summarize the chat to free context", group: "Session" },
     { name: "/clear", description: "Start fresh in the same project", group: "Session" },

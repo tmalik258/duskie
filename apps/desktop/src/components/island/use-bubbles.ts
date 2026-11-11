@@ -1,3 +1,5 @@
+import { useAgents } from "@/lib/agents";
+import { api } from "@/lib/bridge";
 import type { BubbleItem } from "../island-bubbles";
 import { openBoard } from "../island-voice/tail";
 import type { IslandFace } from "./use-island-face";
@@ -42,10 +44,14 @@ export function useBubbles(c: IslandStore & IslandWork & IslandHover & IslandFac
       tone: a.phase === "failed" ? "err" : undefined,
     };
   };
-  // A bubble opens its peek card; an agent's bubble opens the board instead.
+  // A bubble opens its peek card; an agent's bubble (the split ring, or its
+  // live activity "agent:<id>") opens that session, or the board when gone.
   const openBubble = (id: string) => {
-    if (id.startsWith("agent-")) return openBoard();
-    setPeekId((cur) => (cur === id ? null : id));
+    const agentId = id.startsWith("agent-") ? id.slice(6) : id.startsWith("agent:") ? id.slice(6) : null;
+    if (agentId === null) return setPeekId((cur) => (cur === id ? null : id));
+    if (!useAgents.getState().sessions.some((x) => x.id === agentId)) return openBoard();
+    useAgents.setState({ tab: "agents", current: agentId });
+    void api.askOpen();
   };
   const peekSuggestion = suggestion && peekId === suggestion.id ? suggestion : null;
   const bubbleItems = [

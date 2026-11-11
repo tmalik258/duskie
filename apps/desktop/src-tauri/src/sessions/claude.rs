@@ -146,7 +146,7 @@ pub(super) async fn run_claude(
                 Some(Cmd::Send(text)) => {
                     let mut line = json!({
                         "type": "user",
-                        "message": { "role": "user", "content": [{ "type": "text", "text": text }] },
+                        "message": { "role": "user", "content": super::images::claude_content(&text) },
                     })
                     .to_string();
                     line.push('\n');
@@ -231,6 +231,17 @@ pub fn claude_events(v: &Value, project: Option<&Path>) -> Vec<Value> {
                     continue;
                 }
                 let name = b["name"].as_str().unwrap_or_default();
+                match name {
+                    "Write" | "Edit" | "MultiEdit" | "NotebookEdit" => {
+                        let p = b["input"]["file_path"]
+                            .as_str()
+                            .or_else(|| b["input"]["notebook_path"].as_str())
+                            .unwrap_or_default();
+                        out.push(json!({ "kind": "touch", "paths": [p] }));
+                    }
+                    "Bash" => out.push(json!({ "kind": "shell" })),
+                    _ => {}
+                }
                 if name == "TodoWrite" {
                     let items: Vec<Value> = b["input"]["todos"]
                         .as_array()

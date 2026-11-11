@@ -27,6 +27,24 @@ pub fn check(id: &str) {
     }
 }
 
+/// "12.0 MB / 50.0 MB" (KB, MB, GB) in a progress line, as bytes.
+fn sizes(line: &str) -> Option<(u64, u64)> {
+    static SIZE: LazyLock<regex::Regex> = LazyLock::new(|| {
+        regex::Regex::new(r"(?i)([\d.]+)\s*([KMG])i?B\s*/\s*([\d.]+)\s*([KMG])i?B").unwrap()
+    });
+    let c = SIZE.captures(line)?;
+    let bytes = |n: &str, unit: &str| {
+        let scale = match unit.to_ascii_uppercase().as_str() {
+            "K" => 1e3,
+            "M" => 1e6,
+            _ => 1e9,
+        };
+        Some((n.parse::<f64>().ok()? * scale) as u64)
+    };
+    let total = bytes(&c[3], &c[4])?;
+    (total > 0).then_some((bytes(&c[1], &c[2])?, total))
+}
+
 #[derive(Default)]
 pub struct Layers(BTreeMap<String, (u64, u64)>);
 impl Layers {
@@ -212,14 +230,20 @@ pub fn prepare(
                     } else if lower.contains("verifying") {
                         phase = Phase::Verifying;
                     }
+                    // winget and friends print "12.0 MB / 50.0 MB".
+                    let (done, total) =
+                        sizes(&line).map_or((None, None), |(d, t)| (Some(d), Some(t)));
+                    if done.is_some() {
+                        phase = Phase::Downloading;
+                    }
                     activity::report(
                         &app,
                         &id,
                         "setup",
                         &label,
                         phase.clone(),
-                        None,
-                        None,
+                        done,
+                        total,
                         Some(line.chars().take(512).collect()),
                     );
                 }
@@ -251,6 +275,15 @@ pub fn launch_failed(script: &str, error: &str) {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn reads_sizes_from_winget_lines() {
+        assert_eq!(
+            super::sizes("  ██████   12.0 MB / 50.0 MB"),
+            Some((12_000_000, 50_000_000))
+        );
+        assert_eq!(super::sizes("Installing..."), None);
+    }
+
     use super::*;
     #[test]
     fn spinner_heartbeats_are_not_substantive_output() {

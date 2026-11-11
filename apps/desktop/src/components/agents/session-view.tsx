@@ -54,7 +54,12 @@ export function SessionView({
 
   return (
     <>
-      <SessionHeader session={s} active={active} working={working} onReview={review} />
+      <SessionHeader
+        session={s}
+        active={active}
+        working={working}
+        onReview={() => view.setReviewing(!view.reviewing)}
+      />
       {view.reviewStacked ? (
         <Review session={s} maxHeight={maxHeight} onDone={() => view.setReviewing(false)} />
       ) : (

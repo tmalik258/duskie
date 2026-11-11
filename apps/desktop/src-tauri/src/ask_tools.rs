@@ -14,17 +14,25 @@ use tauri::{AppHandle, Emitter, Manager};
 use duskie_actions::pc;
 
 use crate::state::{AppState, executor, lock};
+mod compare;
 mod defs;
+mod diagnose;
 mod open;
 mod pick;
 mod proposals;
+mod run;
 mod screen;
+mod system;
 
+pub use compare::*;
 pub use defs::*;
+pub use diagnose::*;
 pub use open::*;
 pub use pick::*;
 pub use proposals::*;
+pub use run::*;
 pub use screen::*;
+pub use system::*;
 
 const SEARCH: &str = "search";
 const TODAY: &str = "today";
@@ -53,6 +61,11 @@ const RECIPES: &str = "recipes";
 const REMEMBER: &str = "remember";
 const USE_SKILL: &str = "use_skill";
 const HELP: &str = "duskie_help";
+const SYSTEM: &str = "system";
+const RUN: &str = "run";
+const APP_INFO: &str = "app_info";
+const DIAGNOSE: &str = "diagnose";
+const COMPARE: &str = "compare";
 
 /// The Ask chat answering right now, so tools called through Duskie's
 /// MCP server (by Claude Code or Codex) put their buttons in it.
@@ -152,6 +165,8 @@ const ASK_ACTIONS: &[&str] = &[
     "clear_compat",
     "git_commit",
     "git_delete_branches",
+    "kill_port",
+    "run_command",
 ];
 
 /// An action waiting for a tap, from one chat.
@@ -301,6 +316,8 @@ async fn run_tool(app: &AppHandle, chat_id: &str, name: &str, args: &Value) -> O
         HELP => {
             let topic = args["topic"].as_str().unwrap_or_default();
             let mut out = crate::help::guide(topic);
+            out.push_str("\n\n");
+            out.push_str(&crate::commands::diag::live_state(app).await);
             if crate::help::is_problem(topic) {
                 out.push_str("\n\nHealth and recent problems:\n");
                 out.push_str(&crate::commands::diag::diagnostics(app.clone()).await);
@@ -310,6 +327,25 @@ async fn run_tool(app: &AppHandle, chat_id: &str, name: &str, args: &Value) -> O
                 );
             }
             out
+        }
+        SYSTEM => {
+            let args = args.clone();
+            blocking(move || system_tool(&args)).await
+        }
+        APP_INFO => {
+            let name = args["name"].as_str().unwrap_or_default().to_owned();
+            blocking(move || duskie_actions::app_info::app_info(&name)).await
+        }
+        DIAGNOSE => diagnose(args).await,
+        COMPARE => {
+            let args = args.clone();
+            blocking(move || Ok(compare_tool(&args))).await
+        }
+        RUN => {
+            let args = args.clone();
+            tokio::task::spawn_blocking(move || run_command(&args))
+                .await
+                .unwrap_or_else(|e| format!("Error: {e}"))
         }
         STORAGE => tokio::task::spawn_blocking(crate::disk::report)
             .await
@@ -698,6 +734,7 @@ mod tests {
         let mut expected = vec![
             SEARCH, TODAY, RECENT, OPEN, SCREEN, PROPOSE, FIND, REVEAL, PC_STATUS, STORAGE, HELP,
             DOCTOR, GIT, PC, WINDOWS, NOTIFS, DESKTOP, OFFICE, RECIPES, REMEMBER, USE_SKILL,
+            SYSTEM, RUN, APP_INFO, DIAGNOSE, COMPARE,
         ];
         let mut got: Vec<&str> = offline.iter().map(String::as_str).collect();
         expected.sort_unstable();
@@ -817,7 +854,8 @@ mod tests {
             [
                 USE_SKILL, SEARCH, FIND, REVEAL, TODAY, RECENT, SCREEN, PROPOSE, WEB_SEARCH,
                 READ_PAGE, BROWSER, APP_ACTION, DESKTOP, APPS, OFFICE, RECIPES, REMEMBER, NOTIFS,
-                PC_STATUS, STORAGE, HELP, DOCTOR, GIT, GITHUB, PC, WINDOWS, OPEN
+                PC_STATUS, STORAGE, HELP, DOCTOR, GIT, GITHUB, PC, WINDOWS, OPEN, SYSTEM, RUN,
+                APP_INFO, DIAGNOSE, COMPARE
             ]
         );
     }

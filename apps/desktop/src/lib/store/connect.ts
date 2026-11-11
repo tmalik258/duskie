@@ -5,13 +5,13 @@ import { api, EVENTS, listen } from "../bridge";
 import { watchNet } from "../net";
 import { playSound } from "../sound/play-mood";
 import { preloadSounds } from "../sound/snd-sound";
-import { onAiDelta, onAiDone, onAiProposal, onAiTool } from "./answer-events";
+import { onAiAck, onAiDelta, onAiDone, onAiProposal, onAiTool } from "./answer-events";
 import { confirmSettings, helloOncePerDay, updateLastTurn } from "./chat-turns";
 import { onActionResult, onMascotState, onSuggestionLater, onSuggestionNew } from "./core-events";
 import { setHovered, showDone } from "./done-pill";
 import { setMood, uiVolume, useDuskie } from "./duskie-state";
 import { onAskClose, onAskOpen, onBrowsersChanged, onComposioChanged } from "./panel-events";
-import { onVoiceHeard, onVoiceState } from "./voice-events";
+import { onVoiceHeard, onVoiceSaying, onVoiceState } from "./voice-events";
 
 export function connect({ sounds }: { sounds: boolean }): () => void {
   let disposed = false;
@@ -71,9 +71,10 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
       listen(EVENTS.actionResult, (p) => onActionResult(p, sounds)),
       listen(EVENTS.suggestionClear, (id) => {
         if (useDuskie.getState().suggestion?.id === id) {
-          useDuskie.setState({ suggestion: null, shiftHeld: false });
+          useDuskie.setState({ suggestion: null, shiftHeld: false, choiceHeld: false });
         }
       }),
+      listen(EVENTS.suggestionHeld, (choiceHeld) => useDuskie.setState({ choiceHeld })),
       listen(EVENTS.suggestionLater, (p) => onSuggestionLater(p, sounds)),
       listen(EVENTS.islandHover, setHovered),
       listen(EVENTS.islandShift, (shiftHeld: boolean) => useDuskie.setState({ shiftHeld })),
@@ -84,7 +85,16 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
       listen(EVENTS.askOpen, onAskOpen),
       listen(EVENTS.askClose, onAskClose),
       listen(EVENTS.voiceState, onVoiceState),
-      listen(EVENTS.voiceSpeaking, (speaking) => useDuskie.setState({ speaking })),
+      listen(EVENTS.voiceSpeaking, (speaking) => {
+        useDuskie.setState({ speaking });
+        // Keep the last words up a beat after audio ends.
+        if (!speaking) {
+          window.setTimeout(() => {
+            if (!useDuskie.getState().speaking) useDuskie.setState({ spokenCaption: null });
+          }, 600);
+        }
+      }),
+      listen(EVENTS.voiceSaying, (p) => onVoiceSaying(p)),
       listen(EVENTS.voiceHeard, onVoiceHeard),
       listen(EVENTS.aiDelta, (p) => onAiDelta(p, sounds)),
       listen(EVENTS.connectorsDuplicate, ({ app, used, unused }) =>
@@ -98,6 +108,7 @@ export function connect({ sounds }: { sounds: boolean }): () => void {
         ),
       ),
       listen(EVENTS.aiTool, onAiTool),
+      listen(EVENTS.aiAck, onAiAck),
       listen(EVENTS.aiProposal, onAiProposal),
       listen(EVENTS.islandFocus, ({ until }) => useDuskie.setState({ focusUntil: until })),
       listen(EVENTS.islandDone, ({ id, text }) => {

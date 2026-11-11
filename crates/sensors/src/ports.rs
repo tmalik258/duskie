@@ -8,8 +8,8 @@ use tokio::task::JoinHandle;
 use crate::{Sensor, SensorGate};
 
 /// Notices local TCP servers starting and stopping. Windows has
-/// no push notification for new listening sockets, so this checks once a
-/// second, which keeps its cost negligible.
+/// no push notification for new listening sockets, so this checks every
+/// few seconds, which keeps its cost negligible.
 pub struct PortsSensor;
 
 impl PortsSensor {
@@ -18,7 +18,7 @@ impl PortsSensor {
     pub const CLOSED: &'static str = "port.closed";
 }
 
-const CHECK_EVERY: Duration = Duration::from_secs(1);
+const CHECK_EVERY: Duration = Duration::from_secs(3);
 
 /// System services that listen on high ports and would only add noise.
 const IGNORED: &[&str] = &[

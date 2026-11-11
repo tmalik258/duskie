@@ -23,20 +23,18 @@ pub const SHIFT_EVENT: &str = "island://shift";
 /// can offer "Hide while fullscreen" right there.
 pub const FULLSCREEN_EVENT: &str = "island://fullscreen";
 
-/// About 40 Hz. The UI smooths it with springs, so this reads as continuous.
-const CURSOR_POLL: Duration = Duration::from_millis(24);
-/// Away from the island the pointer is checked less often: the eyes still
-/// follow (they ease towards it), and hover needs no precision out there.
-const CURSOR_POLL_FAR: Duration = Duration::from_millis(90);
+/// About 25 Hz while near. The UI smooths it with springs, so this still
+/// reads as continuous without waking the creature every frame.
+const CURSOR_POLL: Duration = Duration::from_millis(40);
+/// Away from the island the pointer is checked less often. Gaze emits are
+/// skipped out here so the fur shader stays asleep.
+const CURSOR_POLL_FAR: Duration = Duration::from_millis(250);
 /// "Near" the island, in logical pixels around its interactive area.
 const NEAR: f64 = 320.0;
 /// Movements smaller than this (logical px) are not sent.
 const CURSOR_MIN_DELTA: f64 = 1.0;
 /// Extra room around an open panel that still takes clicks (logical px).
 const ASK_MARGIN: f64 = 16.0;
-/// How often the island claims the top of the z-order again.
-const TOP_EVERY: Duration = Duration::from_secs(1);
-
 /// Shown yet: the window stays hidden until the page has drawn, so an
 /// empty webview never flashes black.
 static SHOWN: AtomicBool = AtomicBool::new(false);
@@ -50,7 +48,7 @@ pub fn setup(app: &AppHandle) -> tauri::Result<()> {
     // Size once to dock-max so Git open never calls set_size (that stalls the UI thread).
     ensure_base_width(&window)?;
     position_top_center(&window)?;
-    spawn_top_keeper(window.clone());
+    keep_on_top(&window);
     spawn_hover_tracker(app.clone(), window.clone());
     tauri::async_runtime::spawn(async move {
         tokio::time::sleep(SHOW_AT_LATEST).await;
@@ -69,6 +67,7 @@ pub fn reveal(window: &WebviewWindow) {
     if let Err(err) = window.show() {
         log::warn!("could not show the island: {err}");
     }
+    keep_on_top(window);
     let _ = window.set_ignore_cursor_events(true);
     // Brief, search, updates, … after first paint so logon feels instant.
     let app = window.app_handle().clone();
@@ -207,6 +206,7 @@ pub fn follow_active_monitor(app: &AppHandle, payload: &serde_json::Value) {
     if let Err(err) = ensure_base_width(&window) {
         log::warn!("could not size the island: {err}");
     }
+    keep_on_top(&window);
 }
 
 /// Puts the island back on top. Windows lets a window that goes
@@ -215,6 +215,9 @@ pub fn follow_active_monitor(app: &AppHandle, payload: &serde_json::Value) {
 /// keeps the island above it. Exclusive-fullscreen games still win.
 #[cfg(windows)]
 pub fn keep_on_top(window: &WebviewWindow) {
+    if DIALOG.load(Ordering::Relaxed) {
+        return;
+    }
     use windows_sys::Win32::UI::WindowsAndMessaging::{
         HWND_TOPMOST, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOOWNERZORDER, SWP_NOSIZE, SetWindowPos,
     };
@@ -237,18 +240,28 @@ pub fn keep_on_top(window: &WebviewWindow) {
 
 #[cfg(not(windows))]
 pub fn keep_on_top(window: &WebviewWindow) {
-    let _ = window.set_always_on_top(true);
+    if !DIALOG.load(Ordering::Relaxed) {
+        let _ = window.set_always_on_top(true);
+    }
 }
 
-/// Keeps the island above other windows: right away when the window in
-/// front changes, and every second in case something climbed over it.
-fn spawn_top_keeper(window: WebviewWindow) {
-    tauri::async_runtime::spawn(async move {
-        loop {
-            tokio::time::sleep(TOP_EVERY).await;
-            keep_on_top(&window);
-        }
-    });
+/// A file dialog opened from the island is up: the island steps down so
+/// the dialog is not hidden behind it.
+static DIALOG: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// The island steps down from always-on-top while a file dialog is open,
+/// and back up when it closes.
+pub fn dialog_open(app: &AppHandle, open: bool) {
+    DIALOG.store(open, Ordering::Relaxed);
+    let Some(window) = app.get_webview_window(LABEL) else {
+        return;
+    };
+    if open {
+        let _ = window.set_always_on_top(false);
+    } else {
+        let _ = window.set_always_on_top(true);
+        keep_on_top(&window);
+    }
 }
 
 static LAST_HERE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
@@ -334,8 +347,9 @@ fn spawn_hover_tracker(app: AppHandle, window: WebviewWindow) {
             // feel instant even when the cursor is nowhere near the island.
             let near = asking || suggesting || rect.contains_within(pos.x, pos.y, NEAR);
             wait = if near { CURSOR_POLL } else { CURSOR_POLL_FAR };
-            // Faded out for a fullscreen app: no eyes to move.
-            if !hidden && last.is_none_or(|l| l.moved_from(pos)) {
+            // Faded out for a fullscreen app: no eyes to move. Far from the
+            // island with nothing open: skip gaze IPC so the shader sleeps.
+            if !hidden && near && last.is_none_or(|l| l.moved_from(pos)) {
                 last = Some(pos);
                 let _ = app.emit_to(LABEL, CURSOR_EVENT, pos);
             }
@@ -367,6 +381,7 @@ fn spawn_hover_tracker(app: AppHandle, window: WebviewWindow) {
                 // The UI decides what hover shows (a waiting guide, or the
                 // parked welcome), after its hover-intent delay.
                 let _ = app.emit_to(LABEL, HOVER_EVENT, inside);
+                crate::voice::read_details(&app, inside);
             }
             // Poll modifiers here: the webview stays unfocused / click-through.
             // Hovered → Shift alone (glance Ask↔Agents, Focus↔Pause).

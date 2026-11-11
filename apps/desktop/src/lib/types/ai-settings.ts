@@ -62,6 +62,8 @@ export interface Settings {
   paletteHotkey: string;
   /** Global shortcuts by action. A leading `-` turns one off without clearing. */
   shortcuts: Record<string, string>;
+  /** Which set of default shortcuts the saved ones were made from. */
+  shortcutsVersion: number;
   codeFolders: string[];
   savedProjects: string[];
   indexFolders: string[];

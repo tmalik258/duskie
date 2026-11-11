@@ -102,7 +102,7 @@ export function McpGuide({ onDone }: { onDone: () => void }) {
 export function VoiceGuide({ onDone }: { onDone: () => void }) {
   const settings = useDuskie((s) => s.settings);
   const enable = () => {
-    void updateSettings({ voice: { ...settings.voice, enabled: true } }).then(() => {
+    void updateSettings({ voice: { ...settings.voice, wakeWord: true } }).then(() => {
       void api.voiceDownload();
       onDone();
     });
@@ -111,7 +111,7 @@ export function VoiceGuide({ onDone }: { onDone: () => void }) {
     <div className="flex flex-col gap-2 border-t border-white/10 pt-2 text-[12px] text-[rgb(235_235_245/0.65)]">
       <p>Downloads about 205 MB of speech models once. Audio stays on this PC.</p>
       <GuideButton primary onClick={enable}>
-        Turn voice on
+        Turn on wake word
       </GuideButton>
     </div>
   );

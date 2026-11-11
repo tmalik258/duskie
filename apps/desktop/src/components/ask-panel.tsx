@@ -40,7 +40,7 @@ export const ASK_PAD = { top: 8, x: 10, bottom: 5 } as const;
 export function AskPanel() {
   const m = useAskPanel();
   const { ask, s, tab, coder, hearing, streaming, keys } = m;
-  const voiceReady = useDuskie((st) => st.settings.voice.enabled && (st.voiceStatus?.listening ?? false));
+  const voiceReady = useDuskie((st) => st.voiceStatus?.listening ?? false);
   const askModel = useDuskie((st) => st.askModel);
   const speak = useDuskie((st) => st.settings.voice.speakAnswers);
   const alt = useAltHeld();

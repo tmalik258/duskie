@@ -1,0 +1,1064 @@
+[
+  {
+    "group": "ports",
+    "q": "Which port is free?",
+    "tools_must": [
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "ports",
+    "q": "Is port 3000 free?",
+    "tools_must": [
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "ports",
+    "q": "What is using port 8080?",
+    "tools_must": [
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "ports",
+    "q": "Is localhost:5000 busy?",
+    "tools_must": [
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "ports",
+    "q": "Which dev ports are free right now?",
+    "tools_must": [
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "ports",
+    "q": "What app is on port 4200?",
+    "tools_must": [
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "ports",
+    "q": "Find a free port after 3000",
+    "tools_must": [
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "ports",
+    "q": "Is my port 8000 taken?",
+    "tools_must": [
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "ports",
+    "q": "Show me all listening ports",
+    "tools_must": [
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "ports",
+    "q": "Anything running on port 5173?",
+    "tools_must": [
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "processes",
+    "q": "What is slowing my PC down?",
+    "tools_must": [
+      "system",
+      "diagnose",
+      "pc_status"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "processes",
+    "q": "Which program uses the most memory?",
+    "tools_must": [
+      "system",
+      "diagnose",
+      "pc_status"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "processes",
+    "q": "What is using all my CPU?",
+    "tools_must": [
+      "system",
+      "diagnose",
+      "pc_status"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "processes",
+    "q": "Show the top processes by CPU",
+    "tools_must": [
+      "system",
+      "diagnose",
+      "pc_status"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "processes",
+    "q": "Is Chrome using a lot of memory?",
+    "tools_must": [
+      "system",
+      "diagnose",
+      "pc_status"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "processes",
+    "q": "Why is my laptop so slow?",
+    "tools_must": [
+      "system",
+      "diagnose",
+      "pc_status"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "processes",
+    "q": "What is eating my RAM?",
+    "tools_must": [
+      "system",
+      "diagnose",
+      "pc_status"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "processes",
+    "q": "Which app is using the most CPU right now?",
+    "tools_must": [
+      "system",
+      "diagnose",
+      "pc_status"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "processes",
+    "q": "Is anything running hot?",
+    "tools_must": [
+      "system",
+      "diagnose",
+      "pc_status"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "processes",
+    "q": "How much memory is Cursor using?",
+    "tools_must": [
+      "system",
+      "diagnose",
+      "pc_status"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "extension"
+    ]
+  },
+  {
+    "group": "app broken",
+    "q": "Why is Cursor not updating?",
+    "tools_must": [
+      "diagnose",
+      "app_doctor"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "app broken",
+    "q": "Why is VS Code not updating?",
+    "tools_must": [
+      "diagnose",
+      "app_doctor"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "app broken",
+    "q": "Chrome won't update, why?",
+    "tools_must": [
+      "diagnose",
+      "app_doctor"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "app broken",
+    "q": "Discord is stuck on update, what is wrong?",
+    "tools_must": [
+      "diagnose",
+      "app_doctor"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "app broken",
+    "q": "Why is this app not working?",
+    "tools_must": [
+      "diagnose",
+      "app_doctor"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "app broken",
+    "q": "Spotify keeps crashing, why?",
+    "tools_must": [
+      "diagnose",
+      "app_doctor"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "app broken",
+    "q": "Why does Teams not open?",
+    "tools_must": [
+      "diagnose",
+      "app_doctor"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "app broken",
+    "q": "Why won't my printer app start?",
+    "tools_must": [
+      "diagnose",
+      "app_doctor"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "app broken",
+    "q": "Why is Slack not starting after the update?",
+    "tools_must": [
+      "diagnose",
+      "app_doctor"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "app broken",
+    "q": "Why is Notion not syncing?",
+    "tools_must": [
+      "diagnose",
+      "app_doctor"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "duskie",
+    "q": "How does Duskie work?",
+    "tools_must": [
+      "duskie_help"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "I don't know"
+    ]
+  },
+  {
+    "group": "duskie",
+    "q": "What can you do?",
+    "tools_must": [
+      "duskie_help"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "I don't know"
+    ]
+  },
+  {
+    "group": "duskie",
+    "q": "How do you work with voice?",
+    "tools_must": [
+      "duskie_help"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "I don't know"
+    ]
+  },
+  {
+    "group": "duskie",
+    "q": "Can you check my PC by yourself?",
+    "tools_must": [
+      "duskie_help"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "I don't know"
+    ]
+  },
+  {
+    "group": "duskie",
+    "q": "How do I turn off the wake word?",
+    "tools_must": [
+      "duskie_help"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "I don't know"
+    ]
+  },
+  {
+    "group": "duskie",
+    "q": "What is conversation mode?",
+    "tools_must": [
+      "duskie_help"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "I don't know"
+    ]
+  },
+  {
+    "group": "duskie",
+    "q": "Where do I change the shortcut?",
+    "tools_must": [
+      "duskie_help"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "I don't know"
+    ]
+  },
+  {
+    "group": "duskie",
+    "q": "Does Duskie send my files to the internet?",
+    "tools_must": [
+      "duskie_help"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "I don't know"
+    ]
+  },
+  {
+    "group": "duskie",
+    "q": "How do I add a Claude Code connection?",
+    "tools_must": [
+      "duskie_help"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "I don't know"
+    ]
+  },
+  {
+    "group": "duskie",
+    "q": "What does Try mode do?",
+    "tools_must": [
+      "duskie_help"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "I don't know"
+    ]
+  },
+  {
+    "group": "network",
+    "q": "Is my internet slow?",
+    "tools_must": [
+      "run",
+      "system",
+      "compare"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "network",
+    "q": "Is it my Wi-Fi or the site?",
+    "tools_must": [
+      "run",
+      "system",
+      "compare"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "network",
+    "q": "Why is the network down?",
+    "tools_must": [
+      "run",
+      "system",
+      "compare"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "network",
+    "q": "What is my IP address?",
+    "tools_must": [
+      "run",
+      "system",
+      "compare"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "network",
+    "q": "Can you ping google?",
+    "tools_must": [
+      "run",
+      "system",
+      "compare"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "network",
+    "q": "Is my VPN on?",
+    "tools_must": [
+      "run",
+      "system",
+      "compare"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "network",
+    "q": "What proxy am I using?",
+    "tools_must": [
+      "run",
+      "system",
+      "compare"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "network",
+    "q": "Is my connection to the internet working?",
+    "tools_must": [
+      "run",
+      "system",
+      "compare"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "network",
+    "q": "Why are sites loading slowly?",
+    "tools_must": [
+      "run",
+      "system",
+      "compare"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "network",
+    "q": "What is my DNS server?",
+    "tools_must": [
+      "run",
+      "system",
+      "compare"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension"
+    ]
+  },
+  {
+    "group": "disk",
+    "q": "How much disk space is left?",
+    "tools_must": [
+      "storage",
+      "run"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "disk",
+    "q": "Which folder takes the most space?",
+    "tools_must": [
+      "storage",
+      "run"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "disk",
+    "q": "Is my C drive almost full?",
+    "tools_must": [
+      "storage",
+      "run"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "disk",
+    "q": "What is using my storage?",
+    "tools_must": [
+      "storage",
+      "run"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "disk",
+    "q": "Free up some disk space for me",
+    "tools_must": [
+      "storage",
+      "run"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "git",
+    "q": "What branch am I on?",
+    "tools_must": [
+      "git"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "git",
+    "q": "Do I have uncommitted changes?",
+    "tools_must": [
+      "git"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "git",
+    "q": "Show my recent commits",
+    "tools_must": [
+      "git"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "git",
+    "q": "Are there merged branches I can delete?",
+    "tools_must": [
+      "git"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "git",
+    "q": "What changed in this repo today?",
+    "tools_must": [
+      "git"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "files",
+    "q": "Find my tax invoice from March",
+    "tools_must": [
+      "find_files",
+      "search",
+      "recent",
+      "show_in_folder",
+      "open"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "files",
+    "q": "Where is the budget spreadsheet?",
+    "tools_must": [
+      "find_files",
+      "search",
+      "recent",
+      "show_in_folder",
+      "open"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "files",
+    "q": "Open my Downloads folder",
+    "tools_must": [
+      "find_files",
+      "search",
+      "recent",
+      "show_in_folder",
+      "open"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "files",
+    "q": "Show me the newest file in Documents",
+    "tools_must": [
+      "find_files",
+      "search",
+      "recent",
+      "show_in_folder",
+      "open"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "files",
+    "q": "Find the PDF about onboarding",
+    "tools_must": [
+      "find_files",
+      "search",
+      "recent",
+      "show_in_folder",
+      "open"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "web",
+    "q": "What is the latest Node LTS version?",
+    "tools_must": [
+      "web_search",
+      "read_page"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "web",
+    "q": "Search the web for Tauri 2 updates",
+    "tools_must": [
+      "web_search",
+      "read_page"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "web",
+    "q": "Read this page: https://tauri.app",
+    "tools_must": [
+      "web_search",
+      "read_page"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "web",
+    "q": "What is the weather in Berlin?",
+    "tools_must": [
+      "web_search",
+      "read_page"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "web",
+    "q": "Is GitHub down right now?",
+    "tools_must": [
+      "web_search",
+      "read_page"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "chained",
+    "q": "Check my ports and tell me which app is blocking 3000, then offer to free it",
+    "tools_must": [
+      "system",
+      "diagnose",
+      "compare",
+      "notifications",
+      "search",
+      "recent"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "chained",
+    "q": "Why is my PC slow, and what is the top app?",
+    "tools_must": [
+      "system",
+      "diagnose",
+      "compare",
+      "notifications",
+      "search",
+      "recent"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "chained",
+    "q": "Find my latest invoice and open it",
+    "tools_must": [
+      "system",
+      "diagnose",
+      "compare",
+      "notifications",
+      "search",
+      "recent"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "chained",
+    "q": "What are my notifications from today and what matters?",
+    "tools_must": [
+      "system",
+      "diagnose",
+      "compare",
+      "notifications",
+      "search",
+      "recent"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "chained",
+    "q": "Check Zen against Chrome for speed",
+    "tools_must": [
+      "system",
+      "diagnose",
+      "compare",
+      "notifications",
+      "search",
+      "recent"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "browser",
+    "q": "Zen loads sites slower than Chrome, why?",
+    "tools_must": [
+      "compare",
+      "diagnose",
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension",
+      "install extension"
+    ]
+  },
+  {
+    "group": "browser",
+    "q": "Why is my browser so slow?",
+    "tools_must": [
+      "compare",
+      "diagnose",
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension",
+      "install extension"
+    ]
+  },
+  {
+    "group": "browser",
+    "q": "Firefox is laggy, what is wrong?",
+    "tools_must": [
+      "compare",
+      "diagnose",
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension",
+      "install extension"
+    ]
+  },
+  {
+    "group": "browser",
+    "q": "Edge freezes on video sites, why?",
+    "tools_must": [
+      "compare",
+      "diagnose",
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension",
+      "install extension"
+    ]
+  },
+  {
+    "group": "browser",
+    "q": "Chrome uses too much RAM, what can I do?",
+    "tools_must": [
+      "compare",
+      "diagnose",
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": [
+      "install the extension",
+      "install extension"
+    ]
+  },
+  {
+    "group": "settings",
+    "q": "Turn on the hotspot",
+    "tools_must": [
+      "pc_control",
+      "windows"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "settings",
+    "q": "Turn on night light",
+    "tools_must": [
+      "pc_control",
+      "windows"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "settings",
+    "q": "Is airplane mode on?",
+    "tools_must": [
+      "pc_control",
+      "windows"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "settings",
+    "q": "Turn bluetooth off",
+    "tools_must": [
+      "pc_control",
+      "windows"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "settings",
+    "q": "Open the Windows update settings",
+    "tools_must": [
+      "pc_control",
+      "windows"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "chat",
+    "q": "Hi",
+    "tools_must": [],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "chat",
+    "q": "Thanks, that helped",
+    "tools_must": [],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "chat",
+    "q": "What time is it?",
+    "tools_must": [],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "chat",
+    "q": "Rewrite this sentence to be friendlier: send me the file now",
+    "tools_must": [],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "chat",
+    "q": "What is 15 percent of 240?",
+    "tools_must": [],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "act",
+    "q": "Kill whatever is on port 3000",
+    "tools_must": [
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "act",
+    "q": "Stop the process using port 8080",
+    "tools_must": [
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  },
+  {
+    "group": "act",
+    "q": "Free port 5000",
+    "tools_must": [
+      "system"
+    ],
+    "answer_expect": [],
+    "answer_forbid": []
+  }
+]

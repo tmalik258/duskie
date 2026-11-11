@@ -242,12 +242,15 @@ impl OpenAiCompat {
             messages.push(json!({"role": "system", "content": system}));
         }
         messages.extend(req.messages.iter().map(|m| json!(m)));
-        if let (Some(data), Some(last)) = (req.image_base64(), messages.last_mut()) {
+        let images = req.images_base64();
+        if let (false, Some(last)) = (images.is_empty(), messages.last_mut()) {
             let text = last["content"].clone();
-            last["content"] = json!([
-                { "type": "image_url", "image_url": { "url": format!("data:image/png;base64,{data}") } },
-                { "type": "text", "text": text },
-            ]);
+            let mut parts: Vec<Value> = images
+                .into_iter()
+                .map(|data| json!({ "type": "image_url", "image_url": { "url": format!("data:image/png;base64,{data}") } }))
+                .collect();
+            parts.push(json!({ "type": "text", "text": text }));
+            last["content"] = Value::Array(parts);
         }
         json!({"model": model, "stream": stream, "messages": messages})
     }
@@ -335,7 +338,7 @@ pub async fn warm_models(base_url: &str, models: &[String]) {
                     .json(&json!({
                         "model": model,
                         "prompt": "",
-                        "keep_alive": "30m",
+                        "keep_alive": "8m",
                         "stream": false,
                     }))
                     .send()
@@ -1165,11 +1168,11 @@ mod tests {
         let body = json!({
             "model": "qwen3:4b",
             "prompt": "",
-            "keep_alive": "30m",
+            "keep_alive": "8m",
             "stream": false,
         });
         assert_eq!(body["stream"], false);
-        assert_eq!(body["keep_alive"], "30m");
+        assert_eq!(body["keep_alive"], "8m");
         assert_eq!(body["prompt"], "");
     }
 
@@ -1236,6 +1239,7 @@ mod tests {
                 system: "Be brief.".into(),
                 messages: vec![Message::user("hi")],
                 image: None,
+                more_images: Vec::new(),
                 think: false,
             },
             true,
@@ -1488,6 +1492,7 @@ mod tests {
                     system: "s".into(),
                     messages: vec![Message::user("my issues?")],
                     image: None,
+                    more_images: Vec::new(),
                     think: false,
                 },
                 &list_tool(),
@@ -1545,6 +1550,7 @@ mod tests {
                     system: String::new(),
                     messages: vec![Message::user("two at once")],
                     image: None,
+                    more_images: Vec::new(),
                     think: false,
                 },
                 &list_tool(),
@@ -1590,6 +1596,7 @@ mod tests {
                     system: String::new(),
                     messages: vec![Message::user("loop")],
                     image: None,
+                    more_images: Vec::new(),
                     think: false,
                 },
                 &list_tool(),

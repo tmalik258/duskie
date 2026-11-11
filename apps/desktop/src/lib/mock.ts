@@ -36,6 +36,18 @@ if (typeof window !== "undefined") {
 if (typeof window !== "undefined") {
   Object.assign(window, {
     __mockEmit: emit,
+    __mockReview: async (title: string) => {
+      const { openReview, useAgents } = await import("./agents");
+      const s = useAgents.getState().sessions.find((x) => x.title.includes(title));
+      if (s) openReview(s.id);
+      return s?.id ?? null;
+    },
+    __mockNewSession: async (current: string | null = null) => {
+      const { useAgents } = await import("./agents");
+      const { api } = await import("./bridge");
+      useAgents.setState({ tab: "agents", current });
+      await api.askOpen();
+    },
     __mockGo: go,
     __mockCall: (name: string, args: Record<string, unknown> = {}) => commands[name]?.(args),
     __mockAgents: async (calm = false) => {
@@ -72,7 +84,7 @@ if (typeof window !== "undefined") {
       });
       useAgents.setState({
         sessions: [
-          mk("a1", "Codex", "duskie", "Migrate tests to Vitest", "idle", "full", 22, { finished: true }),
+          mk("a1", "Codex", "duskie", "Migrate tests to Vitest", "idle", "full", 22),
           mk("a2", "Claude Code", "duskie", "Compact label wraps on narrow screens", "idle", "edit", 10, {
             changes: 3,
           }),
