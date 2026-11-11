@@ -55,6 +55,24 @@ pub fn attention_show_less(app: AppHandle, key: String) -> CmdResult<()> {
     edit(&app, |n| n.lessons.show_less(&key, now))
 }
 
+/// Undo right after Show less.
+#[tauri::command]
+pub fn attention_undo_show_less(app: AppHandle, key: String) -> CmdResult<()> {
+    let now = Utc::now().timestamp();
+    edit(&app, |n| n.lessons.undo_show_less(&key, now))
+}
+
+/// A level picked in Settings: more, usual, less or silent.
+#[tauri::command]
+pub fn attention_set_level(
+    app: AppHandle,
+    key: String,
+    level: duskie_core::attention::Lean,
+) -> CmdResult<()> {
+    let now = Utc::now().timestamp();
+    edit(&app, |n| n.lessons.set_lean(&key, level, now))
+}
+
 /// Forgets one key, a group (`group:mail:`), or everything (`all`).
 #[tauri::command]
 pub fn attention_reset(app: AppHandle, scope: String) -> CmdResult<()> {

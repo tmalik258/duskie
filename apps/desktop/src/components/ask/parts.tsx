@@ -108,7 +108,7 @@ export function Snippet({ text }: { text: string }) {
 const scrolledActive = new WeakMap<HTMLElement, true>();
 
 /** Keeps the highlighted row of a list in view as the arrows move it. */
-export function scrollIfActive(active: boolean) {
+export function scrollIfActive(active: boolean, block: ScrollLogicalPosition = "nearest") {
   return (el: HTMLElement | null) => {
     if (!el) return;
     if (!active) {
@@ -117,7 +117,7 @@ export function scrollIfActive(active: boolean) {
     }
     if (scrolledActive.has(el)) return;
     scrolledActive.set(el, true);
-    el.scrollIntoView({ block: "nearest" });
+    el.scrollIntoView({ block });
   };
 }
 

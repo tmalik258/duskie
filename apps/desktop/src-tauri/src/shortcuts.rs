@@ -55,9 +55,9 @@ pub fn register_all(app: &AppHandle) -> Vec<String> {
             if event.state == ShortcutState::Pressed {
                 let app = app.clone();
                 let action = action.clone();
-                // Ask/Agents must run in order with window focus; other actions
-                // may re-register keys and stay off the handler thread.
-                if action == "ask" || action == "agents" {
+                // Ask/Agents/Settings must run in order with window focus; other
+                // actions may re-register keys and stay off the handler thread.
+                if action == "ask" || action == "agents" || action == "settings" {
                     run(&app, &action);
                 } else {
                     tauri::async_runtime::spawn(async move { run(&app, &action) });
@@ -86,6 +86,7 @@ fn run(app: &AppHandle, action: &str) {
     match action {
         "ask" => ask::toggle(app),
         "agents" => ask::toggle_agents(app),
+        "settings" => ask::toggle_settings(app),
         "talk" => {
             if !ask::is_open(app) {
                 ask::open(app, ask::Open::default());
@@ -120,13 +121,6 @@ fn run(app: &AppHandle, action: &str) {
             app,
             ask::Open {
                 tool: Some("clipboard"),
-                ..Default::default()
-            },
-        ),
-        "settings" => ask::open(
-            app,
-            ask::Open {
-                view: Some("settings"),
                 ..Default::default()
             },
         ),

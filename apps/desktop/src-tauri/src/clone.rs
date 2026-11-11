@@ -75,12 +75,17 @@ pub fn parse(text: &str) -> Option<RepoUrl> {
 
 /// `owner/name` of a repo's origin, lowercased, on any known host.
 fn origin(repo: &Path) -> Option<(String, String)> {
-    let out = std::process::Command::new("git")
-        .arg("-C")
+    let mut cmd = std::process::Command::new("git");
+    cmd.arg("-C")
         .arg(repo)
-        .args(["remote", "get-url", "origin"])
-        .output()
-        .ok()?;
+        .args(["remote", "get-url", "origin"]);
+    // Runs for every local repo when a GitHub link is copied; no console flashes.
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    }
+    let out = cmd.output().ok()?;
     let r = parse(String::from_utf8_lossy(&out.stdout).trim())?;
     Some((r.owner.to_lowercase(), r.name.to_lowercase()))
 }

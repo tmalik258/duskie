@@ -47,8 +47,34 @@ describe("resolveIslandState", () => {
     expect(resolveIslandState({ ...base, unread: 2, bare: true })).toBe("unread");
   });
 
+  it("fresh new-message only wins when suggest-peek is off", () => {
+    // Island suppresses suggestPeek while suggestionFresh; peek is higher priority.
+    expect(
+      resolveIslandState({
+        ...base,
+        suggestPeek: true,
+        notifyFresh: true,
+        bare: false,
+      }),
+    ).toBe("suggest-peek");
+    expect(
+      resolveIslandState({
+        ...base,
+        suggestPeek: false,
+        notifyFresh: true,
+        bare: false,
+      }),
+    ).toBe("new-message");
+  });
+
   it("opens glance and quiet glance when expanded", () => {
     expect(resolveIslandState({ ...base, expanded: true, bare: false })).toBe("glance");
     expect(resolveIslandState({ ...base, expanded: true, bare: false, quietGlance: true })).toBe("quiet-glance");
+  });
+
+  it("paused pill only when the compact pause is showing", () => {
+    expect(resolveIslandState({ ...base, paused: true, bare: false })).toBe("paused");
+    // At rest the island stays idle (bare sleep mascot); pause is not latched.
+    expect(resolveIslandState({ ...base, paused: false, bare: true, mascot: "sleeping" })).toBe("idle");
   });
 });

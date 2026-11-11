@@ -16,7 +16,7 @@ export function Extras() {
     <div className="flex flex-col gap-2.5 text-[13px]">
       <WelcomeChoice
         title="Talk to me"
-        hint={`Say "Hey ${name}". Downloads about 205 MB of speech models once; all on this PC.`}
+        hint={`Say "${name}". Downloads about 205 MB of speech models once; all on this PC.`}
         on={settings.voice.enabled}
         onChange={(enabled) => {
           void updateSettings({ voice: { ...settings.voice, enabled } });
@@ -26,7 +26,7 @@ export function Extras() {
       <WelcomeChoice
         title="Keep Windows quiet"
         hint={
-          dnd.busy ? "Switching..." : "Do Not Disturb is on — I show what matters up here, not two alerts for one ping."
+          dnd.busy ? "Switching..." : "Do Not Disturb is on. I show what matters up here, not two alerts for one ping."
         }
         on={dnd.on}
         onChange={(want) => {
@@ -35,19 +35,19 @@ export function Extras() {
       />
       <WelcomeChoice
         title="Launch on login"
-        hint="On by default — so I'm here when you sit down."
+        hint="On by default, so I'm here when you sit down."
         on={settings.launchAtLogin}
         onChange={(launchAtLogin) => void updateSettings({ launchAtLogin })}
       />
       <Rename />
       <p className="px-1 pt-1 text-[12px] leading-relaxed text-[rgb(235_235_245/0.62)]">
-        Come back in Settings anytime — for these, or what's left to set up.
+        Come back in Settings anytime, for these, or what's left to set up.
       </p>
     </div>
   );
 }
 
-/** Call me something else: the name, and "Hey <name>" to talk. */
+/** Call me something else: the name, and "<name>" to talk. */
 function Rename() {
   const saved = useDuskie((s) => s.settings.assistantName);
   const [draft, setDraft] = useState(saved);

@@ -80,12 +80,14 @@ pub fn undo(app: &AppHandle, id: i64) -> Result<String, String> {
         let (repo, sha) = rest
             .split_once('\n')
             .ok_or("This action cannot be undone")?;
-        let out = std::process::Command::new("git")
-            .arg("-C")
-            .arg(repo)
-            .args(["reset", "--keep", sha])
-            .output()
-            .map_err(|e| e.to_string())?;
+        let mut cmd = std::process::Command::new("git");
+        cmd.arg("-C").arg(repo).args(["reset", "--keep", sha]);
+        #[cfg(windows)]
+        {
+            use std::os::windows::process::CommandExt;
+            cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+        }
+        let out = cmd.output().map_err(|e| e.to_string())?;
         if !out.status.success() {
             return Err(
                 "Your changes since then are in the way; undo by hand with git reset".into(),

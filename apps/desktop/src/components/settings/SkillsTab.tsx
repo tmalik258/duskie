@@ -9,6 +9,7 @@ import type { SkillInfo } from "@/lib/types";
 import { Agent } from "./Agent";
 import { MorningSetup } from "./MorningSetup";
 import { Recipes } from "./Recipes";
+import { SkillLibrary } from "./SkillLibrary";
 import { Button, Section, Segmented } from "./ui";
 
 export function SkillsTab({ onError }: { onError: (e: string) => void }) {
@@ -40,6 +41,13 @@ export function SkillsTab({ onError }: { onError: (e: string) => void }) {
         keywords="recipe routine schedule trigger every repeat saved task automation"
       >
         <Recipes onError={onError} />
+      </Section>
+      <Section
+        title="Library"
+        hint="One list for skills from Claude Code, Codex, Cursor, plugins or a link. Pick where each is written."
+        keywords="library skills claude codex cursor sync import plugin share"
+      >
+        <SkillLibrary onError={onError} />
       </Section>
       <Section
         title="Agent"

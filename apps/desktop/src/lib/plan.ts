@@ -7,7 +7,7 @@ const BARE_NUM = /^\s*\d+[.)]\s*$/;
 const INLINE_NUM = /^\s*\d+[.)]\s+(.+?)\s*$/;
 const READY = /\bplan\s+is\s+ready\b/i;
 const SECTION_STOP = /^(assumptions?|notes?|the plan is ready)\b/i;
-const TITLE = /^\s*(?:#{1,3}\s*)?(?:plan\s*[:—-]\s*)(.+?)\s*$/i;
+const TITLE = /^\s*(?:#{1,3}\s*)?(?:plan\s*[:\u2014-]\s*)(.+?)\s*$/i;
 
 /** Full document parse: title, steps with bodies, assumptions. */
 export function parsePlanDocument(text: string): PlanDoc | null {
@@ -25,8 +25,8 @@ export function parsePlanFromText(text: string): PlanItem[] {
 function toDoc(text: string, items: PlanItem[]): PlanDoc {
   const title = findTitle(text) || "Plan";
   const assumptions = findAssumptions(text);
-  const markdown = buildMarkdown(title, items, assumptions);
-  return { title, items, assumptions, markdown };
+  // Keep the agent's raw markdown as the source of truth for display.
+  return { title, items, assumptions, markdown: text.trim() };
 }
 
 function findTitle(text: string): string {
@@ -48,7 +48,7 @@ function findAssumptions(text: string): string {
   for (let i = 0; i < lines.length; i++) {
     const line = (lines[i] ?? "").trim();
     if (!/^assumptions?\b/i.test(line)) continue;
-    const rest = line.replace(/^assumptions?\s*[:.—-]?\s*/i, "").trim();
+    const rest = line.replace(/^assumptions?\s*[:.\u2014-]?\s*/i, "").trim();
     const parts: string[] = rest ? [rest] : [];
     for (let j = i + 1; j < lines.length; j++) {
       const next = (lines[j] ?? "").trim();
@@ -59,19 +59,6 @@ function findAssumptions(text: string): string {
     return parts.join(" ").replace(/\*\*/g, "").trim();
   }
   return "";
-}
-
-function buildMarkdown(title: string, items: PlanItem[], assumptions: string): string {
-  const lines = [`# ${title}`, ""];
-  items.forEach((p, i) => {
-    lines.push(`${i + 1}. **${p.text}**`);
-    if (p.detail) lines.push(`   ${p.detail}`);
-    lines.push("");
-  });
-  if (assumptions) {
-    lines.push(`**Assumptions:** ${assumptions}`, "");
-  }
-  return lines.join("\n").trim();
 }
 
 /** `1. title` on one line, or `1.` with the step on the following lines. */
@@ -141,11 +128,10 @@ function clean(raw: string): string {
 /** First sentence as the step heading. */
 function stepTitle(raw: string): string {
   const first = raw.match(/^(.+?[.!?])(?:\s|$)/);
-  const t = (first?.[1] ?? raw).trim();
-  return t.length > 120 ? `${t.slice(0, 117)}…` : t;
+  return (first?.[1] ?? raw).trim();
 }
 
-/** Remainder after the title — the full step write-up. */
+/** Remainder after the title, the full step write-up. */
 function stepDetail(raw: string, title: string): string | undefined {
   let rest = raw.trim();
   if (rest.toLowerCase().startsWith(title.toLowerCase())) {
@@ -157,7 +143,7 @@ function stepDetail(raw: string, title: string): string | undefined {
   return rest.length > 0 ? rest : undefined;
 }
 
-/** Drop clarifying questions and OPTION leftovers — those are not plan steps. */
+/** Drop clarifying questions and OPTION leftovers: those are not plan steps. */
 function isPlanStep(raw: string): boolean {
   if (raw.length < 3) return false;
   if (/^option:/i.test(raw)) return false;
@@ -166,25 +152,27 @@ function isPlanStep(raw: string): boolean {
   return true;
 }
 
-/** Prefer structured plan; otherwise the richest parse across agent text. */
+/**
+ * Fallback when no structured plan_doc exists: prefer the newest text entry
+ * that parses as a numbered plan (not the historically richest older one).
+ */
 export function planFromSession(
   plan: PlanItem[],
   entries: { kind: string; text?: string }[],
 ): { items: PlanItem[]; doc: PlanDoc | null } {
-  let best: PlanDoc | null = null;
   for (let i = entries.length - 1; i >= 0; i--) {
     const e = entries[i];
     if (e?.kind !== "text" || !e.text) continue;
     const doc = parsePlanDocument(e.text);
-    if (doc && (!best || doc.items.length > best.items.length)) best = doc;
+    if (!doc) continue;
+    const bad = looksLikeQuestionPlan(plan);
+    const proseRicher = doc.items.some((p) => !!p.detail) && !plan.some((p) => !!p.detail);
+    if (plan.length === 0 || bad || proseRicher || doc.items.length >= plan.length) {
+      return { items: doc.items, doc };
+    }
+    return { items: plan, doc };
   }
-  if (!best) return { items: plan, doc: null };
-  const bad = looksLikeQuestionPlan(plan);
-  const proseRicher = best.items.some((p) => !!p.detail) && !plan.some((p) => !!p.detail);
-  if (plan.length === 0 || bad || proseRicher || best.items.length > plan.length) {
-    return { items: best.items, doc: best };
-  }
-  return { items: plan, doc: best };
+  return { items: plan, doc: null };
 }
 
 export function claimsPlanReady(text: string): boolean {

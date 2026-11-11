@@ -38,7 +38,7 @@ static BLUR_GEN: AtomicU64 = AtomicU64::new(0);
 static KEEP_ON_BLUR: AtomicBool = AtomicBool::new(false);
 /// User hid welcome for now; hover (or Ask shortcut) brings it back.
 static WELCOME_DEFERRED: AtomicBool = AtomicBool::new(false);
-/// Last panel tab the open shortcuts asked for ("ask" / "agents").
+/// Last panel tab the open shortcuts asked for ("ask" / "agents" / "settings").
 static PANEL_TAB: Mutex<Option<&'static str>> = Mutex::new(None);
 /// Monotonic id for each open; close carries the same id so the UI can drop
 /// stale events when shortcuts fire faster than the webview applies them.
@@ -190,6 +190,11 @@ pub fn toggle_agents(app: &AppHandle) {
     toggle_tab(app, "agents");
 }
 
+/// Opens (or closes, if already on) Settings.
+pub fn toggle_settings(app: &AppHandle) {
+    toggle_tab(app, "settings");
+}
+
 fn panel_tab() -> Option<&'static str> {
     PANEL_TAB.lock().ok().and_then(|t| *t)
 }
@@ -210,13 +215,18 @@ fn toggle_tab(app: &AppHandle, tab: &'static str) {
         close_impl(app);
         return;
     }
-    open_impl(
-        app,
+    let open = if tab == "settings" {
+        Open {
+            view: Some("settings"),
+            ..Default::default()
+        }
+    } else {
         Open {
             tab: Some(tab),
             ..Default::default()
-        },
-    );
+        }
+    };
+    open_impl(app, open);
 }
 
 /// Parks welcome without finishing onboarding. Other apps stay usable until
@@ -319,7 +329,11 @@ fn open_impl(app: &AppHandle, mut open: Open) {
         open.tab = Some("agents");
     }
     if let Ok(mut t) = PANEL_TAB.lock() {
-        *t = open.tab.or(Some("ask"));
+        *t = if open.view == Some("settings") {
+            Some("settings")
+        } else {
+            open.tab.or(Some("ask"))
+        };
     }
     KEEP_ON_BLUR.store(sticky_welcome(open.view), Ordering::SeqCst);
     let state = app.state::<AppState>();

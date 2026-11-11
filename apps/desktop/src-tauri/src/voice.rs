@@ -1,4 +1,4 @@
-//! Voice in the app: "Hey Duskie" opens Ask mode and shows what you say
+//! Voice in the app: "Duskie" opens Ask mode and shows what you say
 //! as you say it; when you stop, the question goes to the AI and the answer
 //! is read aloud with Supertonic. Speech models are prefetched at build/dev into
 //! resources, copied into app data on launch, and only downloaded from GitHub
@@ -33,11 +33,11 @@ pub const WELCOME_EVENT: &str = "voice://welcome";
 /// Punctuation is the direction: the voice lifts on "!" and "?" and
 /// breathes at commas.
 pub const WELCOME_LINES: [&str; 5] = [
-    "Hey — I'm Duskie. I live up here with you on this PC. I notice things, I help when you want, and I stay put: nothing leaves this machine, and I wait for your okay.",
-    "First, how I think. If you want everything to stay on this PC, you can run a local model — only if your machine is up for it. Or use Claude Code or Codex with the plan you already have. You can use any of them, or all three, and set the order I try.",
+    "Hey, I'm Duskie. I live up here with you on this PC. I notice things, I help when you want, and I stay put: nothing leaves this machine, and I wait for your okay.",
+    "First, how I think. If you want everything to stay on this PC, you can run a local model, only if your machine is up for it. Or use Claude Code or Codex with the plan you already have. You can use any of them, or all three, and set the order I try.",
     "Now, your world. Connect your calendar, your mail and the tools you use, and I'll start noticing what matters.",
     "A few small helpers make me sharper. Install the ones you want, and I'll wait while they finish.",
-    "Welcome aboard. Say Hey Duskie whenever you need me. Do Not Disturb is on so Windows stays quiet and alerts show once up here. Launch on login is already on, so I'm here when you sit down.",
+    "Welcome aboard. Say Duskie whenever you need me. Do Not Disturb is on so Windows stays quiet and alerts show once up here. Launch on login is already on, so I'm here when you sit down.",
 ];
 
 /// When each sentence of the welcome line sounds, in Unix milliseconds, so
@@ -88,6 +88,8 @@ struct Key {
     /// The microphone opens only once onboarding is done; until then
     /// Duskie speaks the welcome but never listens.
     listen: bool,
+    /// What was learned from your voice (JSON), if you taught it.
+    profile: Option<String>,
 }
 
 struct Runtime {
@@ -279,8 +281,10 @@ pub fn refresh(app: &AppHandle) {
         interrupt: settings.interrupt,
         voice: settings.voice.clone(),
         speed: settings.speed,
-        name,
+        name: name.clone(),
         listen: onboarded && listen,
+        profile: crate::voice_enroll::profile(&v.models, &name, settings.only_me)
+            .map(|p| p.to_json()),
     };
     if lock(&v.runtime).as_ref().is_some_and(|r| r.key == key) {
         return;
@@ -296,6 +300,7 @@ pub fn refresh(app: &AppHandle) {
             && r.key.interrupt == key.interrupt
             && r.key.listen == key.listen
             && r.key.name == key.name
+            && r.key.profile == key.profile
     });
     if same_ears {
         std::thread::spawn(move || {
@@ -354,7 +359,8 @@ const ECHO_CHECK: std::time::Duration = std::time::Duration::from_millis(50);
 const ECHO_TAIL: std::time::Duration = std::time::Duration::from_millis(400);
 
 /// Keeps the microphone deaf while Duskie's own voice plays, so a line
-/// like "just say Hey Duskie" never wakes it. Runs for the whole process.
+/// like "just say Hey Duskie" never wakes it, and while you teach it your
+/// voice. Runs for the whole process.
 /// Only changes are sent (and the current state to a newly built listener):
 /// a push to talk right after speaking unmutes and must stay unmuted.
 pub fn start_echo_guard(app: &AppHandle) {
@@ -381,6 +387,9 @@ pub fn start_echo_guard(app: &AppHandle) {
                     let _ = app.emit(SPEAKING_EVENT, talking);
                 }
                 let greeting = lock(&v.greeter).as_ref().is_some_and(Speaker::busy);
+                // Teaching your voice records from the same mic: the takes
+                // say "Duskie" and must not wake it.
+                let teaching = crate::voice_enroll::busy(&app);
                 let runtime = lock(&v.runtime);
                 let Some(listener) = runtime.as_ref().and_then(|r| r.listener.as_ref()) else {
                     told = None;
@@ -391,7 +400,9 @@ pub fn start_echo_guard(app: &AppHandle) {
                         .as_ref()
                         .and_then(|r| r.speaker.as_ref())
                         .is_some_and(Speaker::busy);
-                let muted = if speaking {
+                let muted = if teaching {
+                    true
+                } else if speaking {
                     quiet_since = None;
                     true
                 } else {
@@ -694,6 +705,10 @@ fn build(app: &AppHandle, key: Key, settings: &VoiceSettings) -> Runtime {
                 models: v.models.clone(),
                 wake_word: settings.wake_word,
                 interrupt: settings.interrupt,
+                profile: key
+                    .profile
+                    .as_deref()
+                    .and_then(duskie_voice::Profile::from_json),
             },
             move |heard| on_heard(&handle, heard),
         ) {
@@ -791,7 +806,8 @@ fn on_heard(app: &AppHandle, heard: Heard) {
         // A choice ("open", "not now") is taken when it is final.
         Heard::Pause(text) if lock(&v.choosing).is_none() => {
             let text = fixed(app, strip_wake(&text));
-            if duskie_voice::text::looks_like_request(&text) {
+            let live = lock(&app.state::<AppState>().settings).voice.live;
+            if live && duskie_voice::text::looks_like_request(&text) {
                 emit_pause(app, text);
             }
         }
@@ -804,7 +820,7 @@ fn on_heard(app: &AppHandle, heard: Heard) {
                 // Clears what showed as heard; an empty answer asks nothing.
                 emit_heard(app, String::new(), true);
                 let result = match match_choice(&text, &labels) {
-                    Choice::Option(i) => crate::suggestions::choose(app, &id, i),
+                    Choice::Option(i) => crate::suggestions::choose_by_voice(app, &id, i),
                     Choice::Dismiss => crate::suggestions::dismiss(app, &id, "voice"),
                     Choice::Unclear => Ok(()),
                 };
@@ -820,7 +836,9 @@ fn on_heard(app: &AppHandle, heard: Heard) {
                 text.clear();
             }
             mascot::dispatch(app, MascotEvent::Cancelled);
-            *lock(&SPEECH_ENDED) = (!text.is_empty()).then(std::time::Instant::now);
+            let ended = (!text.is_empty()).then(std::time::Instant::now);
+            *lock(&SPEECH_ENDED) = ended;
+            *lock(&WORDS_FROM) = ended;
             emit_heard(app, text, true);
             v.opened_by_voice.store(false, Ordering::SeqCst);
         }
@@ -861,6 +879,8 @@ fn emit_heard(app: &AppHandle, text: String, done: bool) {
 
 /// When the last spoken question ended, until its answer is first heard.
 static SPEECH_ENDED: Mutex<Option<std::time::Instant>> = Mutex::new(None);
+/// The same moment, kept until the answer's first words arrive.
+static WORDS_FROM: Mutex<Option<std::time::Instant>> = Mutex::new(None);
 
 fn emit_pause(app: &AppHandle, text: String) {
     let by_voice = voice(app).opened_by_voice.load(Ordering::SeqCst);
@@ -937,6 +957,13 @@ fn with_answer(app: &AppHandle, id: &str, f: impl FnOnce(&Speaker, u64)) {
 }
 
 pub fn answer_text(app: &AppHandle, id: &str, text: &str) {
+    if !text.trim().is_empty()
+        && lock(&voice(app).asked_by_voice).as_deref() == Some(id)
+        && let Some(ended) = lock(&WORDS_FROM).take()
+    {
+        let ms = ended.elapsed().as_millis() as u64;
+        crate::timings::record(app, crate::timings::SPEECH_TO_FIRST_WORD, ms);
+    }
     with_answer(app, id, |s, u| s.push(u, text));
 }
 
@@ -1283,7 +1310,12 @@ pub fn download(app: &AppHandle) -> Result<(), String> {
         let v = voice(&app);
         let mut failure = None;
         // Greeting needs the voice; wake/ASR can follow.
-        let order = [&models::VOICE, &models::WAKE, &models::SPEECH];
+        let order = [
+            &models::VOICE,
+            &models::WAKE,
+            &models::SPEECH,
+            &models::FINAL,
+        ];
         for model in order {
             if model.installed(&v.models) {
                 continue;

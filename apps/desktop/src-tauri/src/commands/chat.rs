@@ -190,10 +190,14 @@ pub fn agent_answer(question: String, answer: crate::sessions::Answer) -> CmdRes
     crate::sessions::answer(&question, answer)
 }
 
-/// What the session changed, by file and hunk.
+/// What the session changed, by file and hunk. Emits `review://file` per file
+/// then `review://done` while building the list.
 #[tauri::command]
-pub async fn agent_changes(id: String) -> CmdResult<Vec<crate::review::FileChange>> {
-    tauri::async_runtime::spawn_blocking(move || crate::sessions::changes(&id))
+pub async fn agent_changes(
+    app: AppHandle,
+    id: String,
+) -> CmdResult<Vec<crate::review::FileChange>> {
+    tauri::async_runtime::spawn_blocking(move || crate::sessions::changes_emitting(&id, Some(&app)))
         .await
         .map_err(|e| e.to_string())?
 }
@@ -534,7 +538,7 @@ pub async fn pc_switch(name: String, on: bool) -> CmdResult<String> {
 }
 
 /// Result of opening a file from Ask. When `opened` is false, there is no
-/// default app — the UI should ask where to open it.
+/// default app, the UI should ask where to open it.
 #[derive(serde::Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FileOpenResult {

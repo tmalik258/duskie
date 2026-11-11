@@ -201,6 +201,16 @@ const DAY: i64 = 86_400;
 const HALF_LIFE: i64 = 30 * DAY;
 const MAX_ENTRIES: usize = 200;
 
+/// A level the user can pick for a sender or source in Settings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Lean {
+    More,
+    Usual,
+    Less,
+    Silent,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Lesson {
@@ -263,6 +273,26 @@ impl Lessons {
     /// The user chose Show less.
     pub fn show_less(&mut self, key: &str, now: i64) {
         self.touch(key, now, |l| l.show_less += 1.0);
+    }
+
+    /// Takes back one Show less (the Undo after it).
+    pub fn undo_show_less(&mut self, key: &str, now: i64) {
+        self.touch(key, now, |l| l.show_less = (l.show_less - 1.0).max(0.0));
+    }
+
+    /// Sets a key straight to a level chosen in Settings, replacing what
+    /// was learned for it. Later actions keep teaching from there.
+    pub fn set_lean(&mut self, key: &str, lean: Lean, now: i64) {
+        let (acted, show_less) = match lean {
+            Lean::More => (3.0, 0.0),
+            Lean::Usual => (0.0, 0.0),
+            Lean::Less => (0.0, 1.0),
+            Lean::Silent => (0.0, 4.0),
+        };
+        self.touch(key, now, |l| {
+            l.acted = acted;
+            l.show_less = show_less;
+        });
     }
 
     /// Plain Dismiss: counts for nothing.
@@ -559,6 +589,27 @@ mod tests {
         let r = score(&s, &l, NOW);
         assert!(r.score < 0);
         assert!(r.reasons.contains(&Reason::LearnedLess));
+    }
+
+    #[test]
+    fn undo_takes_back_one_show_less() {
+        let mut l = Lessons::default();
+        l.show_less("mail:a", 0);
+        l.undo_show_less("mail:a", 0);
+        assert_eq!(l.shift("mail:a", 0), 0);
+    }
+
+    #[test]
+    fn a_chosen_level_sets_the_shift() {
+        let mut l = Lessons::default();
+        l.set_lean("mail:a", Lean::More, 0);
+        assert!(l.shift("mail:a", 0) >= 6);
+        l.set_lean("mail:a", Lean::Less, 0);
+        assert!(l.shift("mail:a", 0) <= -6);
+        l.set_lean("mail:a", Lean::Silent, 0);
+        assert!(l.shift("mail:a", 0) <= -40);
+        l.set_lean("mail:a", Lean::Usual, 0);
+        assert_eq!(l.shift("mail:a", 0), 0);
     }
 
     #[test]

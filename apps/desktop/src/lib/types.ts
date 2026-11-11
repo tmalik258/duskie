@@ -68,8 +68,6 @@ export interface Settings {
   voice: VoiceSettings;
   calendar: { remindMinutes: number };
   semanticSearch: { enabled: boolean; model: string };
-  /** The new island look; off by default. */
-  redesign: { enabled: boolean };
   /** MCP servers connected directly (stdio), preferred over Composio. */
   directMcp: DirectMcp;
   onboarded: boolean;
@@ -104,7 +102,14 @@ export interface Settings {
 }
 
 export interface CalendarToday {
-  meetings: { title: string; start: string; end: string; joinUrl: string | null }[];
+  meetings: {
+    title: string;
+    start: string;
+    end: string;
+    joinUrl: string | null;
+    /** The page or file used last time for this meeting, from history. */
+    notes?: { title: string; source: string; reference: string } | null;
+  }[];
   error: string | null;
   /** Calendars read through Composio, e.g. "Google Calendar". */
   sources: string[];
@@ -128,6 +133,29 @@ export interface VoiceSettings {
   fixes?: string;
   /** Which voice model the voice was picked for (3 = Supertonic 3). */
   model?: number;
+  /** Start answering at a pause in speech. Off by default. */
+  live?: boolean;
+  /** Keep Live conversations in Ask history, as text. */
+  liveHistory?: boolean;
+  /** Only the voice you taught Duskie wakes it. */
+  onlyMe?: boolean;
+}
+
+/** Teaching Duskie your voice: takes so far, kept in memory only. */
+export interface EnrollState {
+  taught: boolean;
+  /** The name it was taught with; differs after a rename. */
+  taughtFor?: string | null;
+  nameTakes: number;
+  sentenceTakes: number;
+  namesNeeded: number;
+  sentences: string[];
+  /** Lines for the current "Add samples" round. */
+  moreSentences: string[];
+  /** Voiceprints kept for the taught voice. */
+  samples: number;
+  /** Sentences recorded so far in an "Add samples" round. */
+  moreTakes: number;
 }
 
 export interface VoiceStatus {
@@ -171,10 +199,20 @@ export interface VoiceDownload {
   error: string | null;
 }
 
-export const AI_PROVIDERS = ["local", "gemini", "groq", "claude_code", "codex", "anthropic", "openrouter"] as const;
+export const AI_PROVIDERS = [
+  "local",
+  "gemini",
+  "groq",
+  "claude_code",
+  "codex",
+  "anthropic",
+  "openrouter",
+  "openai",
+  "xai",
+] as const;
 /** Cloud models reached with an API key kept in Credential Manager. */
-export type CloudId = "gemini" | "groq" | "openrouter";
-export const CLOUD_IDS: CloudId[] = ["gemini", "groq", "openrouter"];
+export type CloudId = "gemini" | "groq" | "openrouter" | "openai" | "xai";
+export const CLOUD_IDS: CloudId[] = ["gemini", "groq", "openrouter", "openai", "xai"];
 export type AiProviderId = (typeof AI_PROVIDERS)[number];
 
 export interface AiSettings {
@@ -188,6 +226,8 @@ export interface AiSettings {
   gemini: { enabled: boolean; model: string };
   groq: { enabled: boolean; model: string };
   openrouter: { enabled: boolean; model: string };
+  openai: { enabled: boolean; model: string };
+  xai: { enabled: boolean; model: string };
   semif: {
     enabled: boolean;
     command: string[];
@@ -210,6 +250,8 @@ export const PROVIDER_LABELS: Record<string, string> = {
   gemini: "Gemini",
   groq: "Groq",
   openrouter: "OpenRouter",
+  openai: "OpenAI",
+  xai: "xAI Grok",
   semif: "SemIf",
 };
 
@@ -219,7 +261,7 @@ export interface ProviderStatus {
   id: string;
   available: boolean;
   local: boolean;
-  /** Installed / keyed / model chosen — even if not running right now. */
+  /** Installed / keyed / model chosen, even if not running right now. */
   configured: boolean;
 }
 
@@ -231,6 +273,8 @@ export interface ChatMessage {
 /** One turn of an Ask conversation, as the island shows it. */
 export interface Turn extends ChatMessage {
   provider?: string | null;
+  /** Where app tools answered from ("direct connection", "Composio"). */
+  sources?: string[];
   error?: string | null;
   streaming?: boolean;
   /** A screenshot went with this question. */
@@ -247,6 +291,8 @@ export interface Turn extends ChatMessage {
   proposals?: Proposal[];
   /** What the answer cost in US dollars (Anthropic API only). */
   cost?: number;
+  /** Answered Live: spoken as it was heard, so Live history can filter it. */
+  live?: boolean;
   /** When the question was sent (ms since 1970), and how long the answer took. */
   startedAt?: number;
   tookMs?: number;
@@ -307,7 +353,7 @@ export interface AskOpen {
 
 /** One measured moment, for the timings overlay. */
 export interface Timing {
-  name: "open_to_ready" | "enter_to_first_word" | "speech_to_first_sound";
+  name: "open_to_ready" | "enter_to_first_word" | "speech_to_first_word" | "speech_to_first_sound";
   ms: number;
 }
 
@@ -367,6 +413,14 @@ export interface Suggestion {
   always?: boolean[];
   /** Why this showed, from how often you took this kind before. */
   why?: string;
+  /** A small pill that opens into the card on hover or while Alt is held. */
+  compact?: boolean;
+  /** Shows without a sound. */
+  silent?: boolean;
+  /** Where it came from, for "From Calendar, 2 min ago". */
+  source?: string;
+  /** When it was first raised (Unix ms). */
+  at?: number;
 }
 
 /** A newer Duskie release than the one running. */
@@ -374,6 +428,8 @@ export interface UpdateInfo {
   version: string;
   current: string;
   url: string;
+  /** First line of the release notes, plain text; may be empty. */
+  summary: string;
 }
 
 export interface UpdateProgress {
@@ -436,7 +492,7 @@ export const DEFAULT_SETTINGS: Settings = {
   endOfDayHour: 18,
   cloneRules: {},
   ai: {
-    order: ["local", "gemini", "groq", "claude_code", "codex", "anthropic", "openrouter"],
+    order: ["local", "gemini", "groq", "claude_code", "codex", "anthropic", "openrouter", "openai", "xai"],
     claudeCode: { enabled: true, path: "", model: FAST_CLAUDE_MODEL },
     codex: { enabled: true, path: "", model: FAST_CODEX_MODEL },
     codingAgent: "auto",
@@ -445,6 +501,8 @@ export const DEFAULT_SETTINGS: Settings = {
     gemini: { enabled: false, model: "" },
     groq: { enabled: false, model: "" },
     openrouter: { enabled: false, model: "" },
+    openai: { enabled: false, model: "" },
+    xai: { enabled: false, model: "" },
     semif: {
       enabled: true,
       command: ["semif-score"],
@@ -459,7 +517,6 @@ export const DEFAULT_SETTINGS: Settings = {
   },
   calendar: { remindMinutes: 5 },
   semanticSearch: { enabled: true, model: "nomic-embed-text" },
-  redesign: { enabled: false },
   directMcp: { servers: [] },
   onboarded: false,
   welcomeStep: 0,
@@ -500,6 +557,9 @@ export const DEFAULT_SETTINGS: Settings = {
     conversation: true,
     speakSuggestions: true,
     interrupt: true,
+    live: false,
+    liveHistory: true,
+    onlyMe: false,
     voice: "f4",
     speed: 1,
   },
@@ -565,6 +625,75 @@ export interface SkillInfo {
   autoByDefault: boolean;
   /** Quiet after Not now three times, until this time. */
   mutedUntil: string | null;
+}
+
+export type SkillOrigin = "claude" | "claude_plugin" | "codex" | "cursor" | "duskie" | "url";
+export type SkillTarget = "claude" | "codex" | "cursor" | "local";
+
+/** A skill found on this PC that is not in the library yet. */
+export interface FoundSkill {
+  name: string;
+  description: string;
+  origin: SkillOrigin;
+  dir: string;
+  hash: string;
+  files: string[];
+  hasScripts: boolean;
+}
+
+/** A skill in the library and where it is written. */
+export interface LibrarySkill {
+  name: string;
+  description: string;
+  origin: SkillOrigin;
+  hash: string;
+  hasScripts: boolean;
+  targets: Partial<Record<SkillTarget, boolean>>;
+  synced: Partial<Record<SkillTarget, string>>;
+  url: string | null;
+  commit: string | null;
+}
+
+/** One skill behind a link, compared with the library. */
+export interface LinkSkill {
+  name: string;
+  description: string;
+  files: number;
+  bytes: number;
+  hasScripts: boolean;
+  status: "new" | "changed" | "same";
+  /** Files added, changed or removed against the library copy. */
+  diff: string[];
+}
+
+export interface LinkPreview {
+  url: string;
+  commit: string;
+  skills: LinkSkill[];
+}
+
+export interface SyncReport {
+  written: string[];
+  conflicts: string[];
+  backups: string[];
+}
+
+/** One file or folder in the editor's project tree. */
+export interface TreeEntry {
+  path: string;
+  dir: boolean;
+}
+
+export interface OpenFile {
+  text: string;
+  /** What was on disk when opened; a save sends it back. */
+  stamp: string;
+}
+
+export interface EditorHit {
+  path: string;
+  line: number;
+  text: string;
 }
 
 export interface CapabilityInfo {
@@ -715,6 +844,8 @@ export interface ChatSummary {
   id: string;
   title: string;
   updated: string;
+  /** At least one answer was a Live answer. */
+  live?: boolean;
 }
 
 /** Shortcut actions besides Ask, in the order Settings shows them. */
@@ -743,7 +874,7 @@ export interface RoutineItem {
 
 /** Coding agents on this PC, and which one gets handoffs. */
 /** How much an agent may do without asking. */
-export type AgentMode = "plan" | "ask" | "edit" | "full";
+export type AgentMode = "plan" | "ask" | "edit" | "debug" | "full";
 
 export interface AgentStarted {
   id: string;
@@ -868,6 +999,21 @@ export interface DirectServer {
   writesAllowed: string[];
 }
 
+/** A provider or connector paused after repeated errors. */
+export interface LimitState {
+  name: string;
+  /** Seconds until it is tried again. */
+  pausedSecs: number;
+}
+
+/** A tool a direct server offers. Writes stay off until allowed. */
+export interface ServerTool {
+  name: string;
+  description: string;
+  writes: boolean;
+  allowed: boolean;
+}
+
 /** Where the Gmail connection stands. Never holds message content. */
 export type MailState = "disconnected" | "connected" | "offline" | "auth_expired";
 
@@ -879,7 +1025,7 @@ export interface MailStatus {
   lastOk: number | null;
   error: string | null;
   /** Which account is connected. */
-  provider: "gmail" | "imap" | null;
+  provider: "gmail" | "imap" | "composio" | null;
 }
 
 /** One changed file in the Git dock. */
@@ -891,6 +1037,33 @@ export interface GitFile {
   unstaged: boolean;
 }
 
+/** One local branch in the Git dock's Branches tab. */
+export interface GitBranch {
+  name: string;
+  current: boolean;
+  ahead: number;
+  behind: number;
+  /** Tracks a remote branch; without one, Push publishes it. */
+  upstream: boolean;
+}
+
+/** One commit in the Git dock's History tab. */
+export interface CommitRow {
+  hash: string;
+  subject: string;
+  author: string;
+  /** Relative time, as git words it. */
+  when: string;
+}
+
+/** One stash in the Git dock's Stashes tab. */
+export interface StashRow {
+  /** stash@{0} and so on. */
+  name: string;
+  message: string;
+  when: string;
+}
+
 /** The capped diff a model reads to write a commit message. */
 export interface MessageDiff {
   text: string;
@@ -900,6 +1073,9 @@ export interface MessageDiff {
 }
 
 /** One learned sender or source, as Settings lists it. */
+/** A level picked for a sender or source in Settings (attention::Lean). */
+export type LearnedLevel = "more" | "usual" | "less" | "silent";
+
 export interface LessonRow {
   key: string;
   /** Points added to or taken from the score; negative means less. */

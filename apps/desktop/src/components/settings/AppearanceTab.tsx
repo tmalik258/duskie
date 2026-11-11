@@ -122,13 +122,7 @@ export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
           ))}
         </div>
       </Section>
-      <Section title="Behaviour" keywords="fullscreen hide alive idle collapse close suggestions redesign atelier">
-        <Toggle
-          label="New island look"
-          hint="Prototype shell: Take A mascot, grain wash, Atelier chrome. Off keeps the current island."
-          checked={settings.redesign.enabled}
-          onChange={(enabled) => save({ redesign: { enabled } })}
-        />
+      <Section title="Behaviour" keywords="fullscreen hide alive idle collapse close suggestions atelier">
         <Field label="Close suggestions after">
           <Select
             label="Close suggestions after"
@@ -162,7 +156,8 @@ export function AppearanceTab({ onError }: { onError: (e: string) => void }) {
 
 /** What saying the name does, and a warning for names that wake by mistake. */
 function nameHint(name: string): string {
-  const said = `Say "Hey ${name || "Duskie"}" to talk. "Hey Duskie" keeps working too.`;
+  const said =
+    name && name !== "Duskie" ? `Say "${name}" to talk. "Duskie" keeps working too.` : `Say "Duskie" to talk.`;
   const vowels = (name.toLowerCase().match(/[aeiouy]+/g) ?? []).length;
   return name.length < 4 || vowels < 2
     ? `${said} Short names wake by mistake more often; two syllables or more work best.`

@@ -35,6 +35,14 @@ const MODELS = [
     files: ["encoder.onnx", "decoder.onnx", "joiner.onnx", "tokens.txt"],
   },
   {
+    id: "final",
+    label: "Final transcript",
+    url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8.tar.bz2",
+    sha256: "157c157bc51155e03e37d2466522a3a737dd9c72bb25f36eb18912964161e1ad",
+    dir: "sherpa-onnx-nemo-parakeet-tdt-0.6b-v2-int8",
+    files: ["encoder.int8.onnx", "decoder.int8.onnx", "joiner.int8.onnx", "tokens.txt"],
+  },
+  {
     id: "voice",
     label: "Supertonic voice",
     url: "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/sherpa-onnx-supertonic-3-tts-int8-2026-05-11.tar.bz2",

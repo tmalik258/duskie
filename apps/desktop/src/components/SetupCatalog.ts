@@ -126,7 +126,7 @@ export const SETUP_CATALOG: Array<{
     id: "voice",
     group: "connect",
     title: "Voice",
-    why: 'Say "Hey Duskie" and hear answers. About 205 MB, all on this PC.',
+    why: 'Say "Duskie" and hear answers. About 205 MB, all on this PC.',
     recommended: false,
   },
   {
