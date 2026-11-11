@@ -12,8 +12,11 @@ export class FurRenderer {
     const gl = this.canvas.getContext("webgl2", {
       premultipliedAlpha: true,
       alpha: true,
-      preserveDrawingBuffer: true,
+      // Last blit lives on each creature's 2D canvas; keeping the GL buffer
+      // around costs VRAM for no gain on the island.
+      preserveDrawingBuffer: false,
       antialias: false,
+      powerPreference: "low-power",
     });
     if (!gl) throw new Error("WebGL2 unavailable");
     this.gl = gl;
@@ -23,6 +26,7 @@ export class FurRenderer {
     this.canvas.addEventListener("webglcontextlost", (e) => {
       e.preventDefault();
       this.lost = true;
+      this.onLost?.();
       // The browser does not always give the context back after a GPU reset; ask for it.
       setTimeout(() => {
         if (this.lost) loser?.restoreContext();

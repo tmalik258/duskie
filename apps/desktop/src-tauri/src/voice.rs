@@ -265,11 +265,11 @@ pub fn refresh(app: &AppHandle) {
     duskie_voice::text::set_name(&name);
     duskie_voice::text::set_name_aliases(&name_aliases_from_fixes(&settings.fixes));
     let v = voice(app);
-    // The speaker also runs for typed answers when "Speak answers" is on.
-    // Voice runtime always runs for push-to-talk, even with wake word off.
+    // Warm runtime when voice models are in (push-to-talk). Speak-answers
+    // alone without those models uses the short-lived greeter in `say`.
     let listen = models::all_installed(&v.models);
     let speak = settings.speak_answers && models::VOICE.installed(&v.models);
-    let wanted = !paused && (listen || speak);
+    let wanted = !paused && listen;
     if !wanted {
         // Taken out first: dropping it joins the listener thread, which may
         // be waiting for this lock.
@@ -277,6 +277,11 @@ pub fn refresh(app: &AppHandle) {
         if old.is_some() {
             drop(old);
             log::info!("voice off");
+        }
+        if !speak {
+            if let Some(greeter) = lock(&v.greeter).take() {
+                drop(greeter);
+            }
         }
         emit_state(app);
         return;

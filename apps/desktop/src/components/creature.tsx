@@ -7,7 +7,7 @@ import { useReducedMotion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { subscribeCursor } from "@/lib/cursor";
 import type { MascotState, Theme } from "@/lib/types";
-import { createCreature, creatureMayRetry, creatureSupported } from "./creature/creature";
+import { createCreature, creatureMayRetry, creatureSupported, onCreatureLost } from "./creature/creature";
 import { type Expression, FOR_STATE } from "./creature/expressions";
 
 interface Live {
@@ -34,7 +34,7 @@ export function Creature(props: {
   magnetic?: boolean;
   /** Idle on its own: glances, blinks, the odd smile. */
   alive?: boolean;
-  /** Battery saver: no motion beyond what a state needs. */
+  /** Battery saver / reduced motion: no blinks, magnetic pull, or idle antics. */
   simple?: boolean;
   /** Makes its life sounds (yawn, doze, tape). The island's mascot only. */
   sound?: boolean;
@@ -62,6 +62,7 @@ export function Creature(props: {
   // render match; null means not decided yet.
   const [supported, setSupported] = useState<boolean | null>(null);
   useEffect(() => setSupported(creatureSupported()), []);
+  useEffect(() => onCreatureLost(() => setSupported(false)), []);
   // A GPU still waking up reads as software rendering; try again before settling on the still.
   const [look, setLook] = useState(0);
   // biome-ignore lint/correctness/useExhaustiveDependencies: look schedules the next try.
@@ -80,6 +81,9 @@ export function Creature(props: {
   const latest = useRef({ expression, theme, alive, active });
   latest.current = { expression, theme, alive, active };
 
+  // Remount only when size/bust/sound change. Shader quality is always the
+  // island-cheap path; simple only gates motion (blinks / magnetic / alive).
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reduced/blink is read once at create
   useEffect(() => {
     if (supported !== true || !root.current) return;
     const now = latest.current;
@@ -89,6 +93,7 @@ export function Creature(props: {
       theme: now.theme,
       alive: now.alive,
       active: now.active,
+      quality: "island",
       blink: !reduced,
       sound,
       ...(bust !== undefined ? { bust } : {}),
@@ -98,7 +103,7 @@ export function Creature(props: {
       c?.destroy();
       live.current = null;
     };
-  }, [supported, size, reduced, bust, sound]);
+  }, [supported, size, bust, sound]);
 
   useEffect(() => {
     const c = live.current;
@@ -121,7 +126,7 @@ export function Creature(props: {
     const unsubscribe = subscribeCursor((x, y) => {
       const el = root.current;
       const c = live.current;
-      if (!el || !c) return;
+      if (!el || !c || !latest.current.active) return;
       const r = el.getBoundingClientRect();
       const dx = x - (r.left + r.width / 2);
       const dy = y - (r.top + r.height * 0.42);

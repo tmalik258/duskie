@@ -29,6 +29,7 @@ uniform float uZoom, uCamY;
 uniform float uWig;
 uniform vec3 uWigCol;
 uniform float uGlint;
+uniform float uSteps; // march budget; lower on tiny faces
 
 // ---- noise (Ashima / Gustavson simplex, MIT) ----
 vec3 mod289(vec3 x){return x-floor(x*(1.0/289.0))*289.0;}

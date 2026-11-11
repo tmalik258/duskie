@@ -338,7 +338,7 @@ pub async fn warm_models(base_url: &str, models: &[String]) {
                     .json(&json!({
                         "model": model,
                         "prompt": "",
-                        "keep_alive": "30m",
+                        "keep_alive": "8m",
                         "stream": false,
                     }))
                     .send()
@@ -1168,11 +1168,11 @@ mod tests {
         let body = json!({
             "model": "qwen3:4b",
             "prompt": "",
-            "keep_alive": "30m",
+            "keep_alive": "8m",
             "stream": false,
         });
         assert_eq!(body["stream"], false);
-        assert_eq!(body["keep_alive"], "30m");
+        assert_eq!(body["keep_alive"], "8m");
         assert_eq!(body["prompt"], "");
     }
 

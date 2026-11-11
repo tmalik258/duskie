@@ -84,7 +84,8 @@ void main(){
     float t=max(-bb-sqrt(disc),0.0), tEnd=-bb+sqrt(disc);
     bool hit=false; vec3 p;
     float minD=1e3; vec3 pc=o;
-    for(int i=0;i<110;i++){
+    for(int i=0;i<64;i++){
+      if(float(i)>=uSteps) break;
       p=o+dir*t;
       float d=body(p);
       if(d<0.08) d=map(p);
